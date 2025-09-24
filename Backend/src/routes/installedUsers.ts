@@ -505,10 +505,7 @@ router.post('/activity', [
         action,
         resourceType,
         resourceId,
-        metadata: metadata || {},
-        timestamp: new Date(),
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent')
+        metadata: metadata ? JSON.stringify(metadata) : null
       }
     });
 
@@ -517,10 +514,12 @@ router.post('/activity', [
       message: 'Activity recorded successfully',
       activity: {
         id: activity.id,
+        deviceId: activity.deviceId,
         action: activity.action,
         resourceType: activity.resourceType,
         resourceId: activity.resourceId,
-        timestamp: activity.timestamp
+        metadata: activity.metadata,
+        createdAt: activity.createdAt
       }
     });
 

@@ -107,14 +107,14 @@ router.post('/images', upload.single('image'), [
         title,
         description: description || '',
         category,
-        tags: tags ? JSON.parse(tags) : [],
-        filename: req.file.filename,
-        originalName: req.file.originalname,
-        mimeType: req.file.mimetype,
-        size: req.file.size,
-        path: req.file.path,
-        uploadedBy: req.user!.id,
-        status: 'PENDING'
+        tags: tags ? JSON.stringify(JSON.parse(tags)) : JSON.stringify([]),
+        url: req.file.path,
+        thumbnailUrl: req.file.path, // Using same path for thumbnail
+        fileSize: req.file.size,
+        format: req.file.mimetype,
+        adminUploaderId: req.user!.id,
+        uploaderType: 'ADMIN',
+        approvalStatus: 'PENDING'
       }
     });
 
@@ -125,10 +125,13 @@ router.post('/images', upload.single('image'), [
         id: image.id,
         title: image.title,
         description: image.description,
+        url: image.url,
+        thumbnailUrl: image.thumbnailUrl,
         category: image.category,
         tags: image.tags,
-        filename: image.filename,
-        status: image.status,
+        fileSize: image.fileSize,
+        format: image.format,
+        approvalStatus: image.approvalStatus,
         createdAt: image.createdAt
       }
     });
@@ -394,14 +397,14 @@ router.post('/videos', upload.single('video'), [
         title,
         description: description || '',
         category,
-        tags: tags ? JSON.parse(tags) : [],
-        filename: req.file.filename,
-        originalName: req.file.originalname,
-        mimeType: req.file.mimetype,
-        size: req.file.size,
-        path: req.file.path,
-        uploadedBy: req.user!.id,
-        status: 'PENDING'
+        tags: tags ? JSON.stringify(JSON.parse(tags)) : JSON.stringify([]),
+        url: req.file.path,
+        thumbnailUrl: req.file.path, // Using same path for thumbnail
+        fileSize: req.file.size,
+        format: req.file.mimetype,
+        adminUploaderId: req.user!.id,
+        uploaderType: 'ADMIN',
+        approvalStatus: 'PENDING'
       }
     });
 
@@ -412,10 +415,13 @@ router.post('/videos', upload.single('video'), [
         id: video.id,
         title: video.title,
         description: video.description,
+        url: video.url,
+        thumbnailUrl: video.thumbnailUrl,
         category: video.category,
         tags: video.tags,
-        filename: video.filename,
-        status: video.status,
+        fileSize: video.fileSize,
+        format: video.format,
+        approvalStatus: video.approvalStatus,
         createdAt: video.createdAt
       }
     });

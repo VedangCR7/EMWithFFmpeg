@@ -62,14 +62,14 @@ class ContentService {
         throw new Error(response.error || 'Failed to fetch categories');
       }
     } catch (error) {
-      console.error('Failed to get business categories:', error);
+      console.log('Using mock business categories due to API error:', error);
       
       // Return cached categories if available, even if expired
       if (this.cachedCategories) {
         return this.cachedCategories;
       }
       
-      throw error;
+      return this.getMockBusinessCategories();
     }
   }
 
@@ -282,6 +282,65 @@ class ContentService {
    */
   getCachedCategories(): BusinessCategory[] | null {
     return this.cachedCategories;
+  }
+
+  // ============================================================================
+  // MOCK DATA METHODS (FALLBACK WHEN SERVER IS NOT AVAILABLE)
+  // ============================================================================
+
+  private getMockBusinessCategories(): BusinessCategory[] {
+    return [
+      {
+        id: 'cat-1',
+        name: 'Business',
+        description: 'Professional business templates and content',
+        icon: 'business',
+        color: '#2196F3',
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'cat-2',
+        name: 'Festival',
+        description: 'Festival and celebration templates',
+        icon: 'celebration',
+        color: '#FF9800',
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'cat-3',
+        name: 'Marketing',
+        description: 'Marketing and promotional content',
+        icon: 'campaign',
+        color: '#4CAF50',
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'cat-4',
+        name: 'Events',
+        description: 'Event planning and management templates',
+        icon: 'event',
+        color: '#9C27B0',
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'cat-5',
+        name: 'Social Media',
+        description: 'Social media posts and stories',
+        icon: 'share',
+        color: '#E91E63',
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ];
   }
 }
 

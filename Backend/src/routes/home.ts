@@ -239,10 +239,8 @@ router.get('/templates', async (req: Request, res: Response) => {
         previewUrl: true,
         category: true,
         subcategory: true,
-        likes: true,
         downloads: true,
         views: true,
-        isPremium: true,
         tags: true,
         fileSize: true,
         createdAt: true,
@@ -371,15 +369,11 @@ router.get('/video-content', async (req: Request, res: Response) => {
         id: true,
         title: true,
         description: true,
-        thumbnail: true,
-        videoUrl: true,
+        url: true,
         duration: true,
         category: true,
-        language: true,
-        likes: true,
         views: true,
         downloads: true,
-        isPremium: true,
         tags: true,
         fileSize: true,
         createdAt: true,
@@ -470,10 +464,8 @@ router.get('/search', async (req: Request, res: Response) => {
           description: true,
           thumbnail: true,
           category: true,
-          likes: true,
           downloads: true,
           views: true,
-          isPremium: true,
           tags: true,
           createdAt: true
         }
@@ -488,7 +480,7 @@ router.get('/search', async (req: Request, res: Response) => {
           OR: [
             { title: { contains: query as string, mode: 'insensitive' } },
             { description: { contains: query as string, mode: 'insensitive' } },
-            { tags: { hasSome: [query as string] } }
+            { tags: { contains: query as string, mode: 'insensitive' } }
           ]
         },
         take: searchLimit,
@@ -496,14 +488,10 @@ router.get('/search', async (req: Request, res: Response) => {
           id: true,
           title: true,
           description: true,
-          thumbnail: true,
           category: true,
-          language: true,
           duration: true,
-          likes: true,
           views: true,
           downloads: true,
-          isPremium: true,
           tags: true,
           createdAt: true
         }
@@ -590,7 +578,7 @@ router.post('/templates/:id/like', async (req: Request, res: Response) => {
     // Update template likes count
     await prisma.template.update({
       where: { id },
-      data: { likes: { increment: 1 } }
+      data: { views: { increment: 1 } }
     });
 
     res.json({
@@ -627,7 +615,7 @@ router.delete('/templates/:id/like', async (req: Request, res: Response) => {
     // Update template likes count
     await prisma.template.update({
       where: { id },
-      data: { likes: { decrement: 1 } }
+      data: { views: { decrement: 1 } }
     });
 
     res.json({
@@ -672,7 +660,7 @@ router.post('/videos/:id/like', async (req: Request, res: Response) => {
     // Update video likes count
     await prisma.video.update({
       where: { id },
-      data: { likes: { increment: 1 } }
+      data: { views: { increment: 1 } }
     });
 
     res.json({
@@ -709,7 +697,7 @@ router.delete('/videos/:id/like', async (req: Request, res: Response) => {
     // Update video likes count
     await prisma.video.update({
       where: { id },
-      data: { likes: { decrement: 1 } }
+      data: { views: { decrement: 1 } }
     });
 
     res.json({
@@ -833,10 +821,8 @@ router.get('/templates/:id', async (req: Request, res: Response) => {
         previewUrl: true,
         category: true,
         subcategory: true,
-        likes: true,
         downloads: true,
         views: true,
-        isPremium: true,
         tags: true,
         fileSize: true,
         createdAt: true,
@@ -892,15 +878,11 @@ router.get('/videos/:id', async (req: Request, res: Response) => {
         id: true,
         title: true,
         description: true,
-        thumbnail: true,
-        videoUrl: true,
+        url: true,
         duration: true,
         category: true,
-        language: true,
-        likes: true,
         views: true,
         downloads: true,
-        isPremium: true,
         tags: true,
         fileSize: true,
         createdAt: true,

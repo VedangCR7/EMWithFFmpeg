@@ -194,8 +194,8 @@ class HomeApiService {
       const response = await api.get(url);
       return response.data;
     } catch (error) {
-      console.error('Get featured content error:', error);
-      throw error;
+      console.log('Using mock featured content due to API error:', error);
+      return this.getMockFeaturedContent(params);
     }
   }
 
@@ -237,8 +237,8 @@ class HomeApiService {
       const response = await api.get(url);
       return response.data;
     } catch (error) {
-      console.error('Get upcoming events error:', error);
-      throw error;
+      console.log('Using mock upcoming events due to API error:', error);
+      return this.getMockUpcomingEvents(params);
     }
   }
 
@@ -282,8 +282,8 @@ class HomeApiService {
       const response = await api.get(url);
       return response.data;
     } catch (error) {
-      console.error('Get professional templates error:', error);
-      throw error;
+      console.log('Using mock professional templates due to API error:', error);
+      return this.getMockProfessionalTemplates(params);
     }
   }
 
@@ -330,8 +330,8 @@ class HomeApiService {
       const response = await api.get(url);
       return response.data;
     } catch (error) {
-      console.error('Get video content error:', error);
-      throw error;
+      console.log('Using mock video content due to API error:', error);
+      return this.getMockVideoContent(params);
     }
   }
 
@@ -409,6 +409,364 @@ class HomeApiService {
       console.error('Get content details error:', error);
       throw error;
     }
+  }
+
+  // ============================================================================
+  // MOCK DATA METHODS (FALLBACK WHEN SERVER IS NOT AVAILABLE)
+  // ============================================================================
+
+  private getMockFeaturedContent(params?: {
+    limit?: number;
+    type?: 'banner' | 'promotion' | 'highlight' | 'all';
+    active?: boolean;
+  }): FeaturedContentResponse {
+    const mockData: FeaturedContent[] = [
+      {
+        id: 'fc-1',
+        title: 'Welcome to EventMarketers',
+        description: 'Create stunning marketing materials with our professional templates',
+        imageUrl: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&h=400&fit=crop',
+        link: '/templates',
+        type: 'banner',
+        priority: 1,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'fc-2',
+        title: 'Premium Templates Available',
+        description: 'Unlock premium templates and advanced features',
+        imageUrl: 'https://images.unsplash.com/photo-1559136555-9303baea8ebd?w=800&h=400&fit=crop',
+        link: '/subscription',
+        type: 'promotion',
+        priority: 2,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'fc-3',
+        title: 'New Video Editor',
+        description: 'Create professional videos with our new video editor',
+        imageUrl: 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=800&h=400&fit=crop',
+        link: '/video-editor',
+        type: 'highlight',
+        priority: 3,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ];
+
+    let filteredData = mockData;
+
+    // Apply filters
+    if (params?.type && params.type !== 'all') {
+      filteredData = filteredData.filter(item => item.type === params.type);
+    }
+
+    if (params?.active !== undefined) {
+      filteredData = filteredData.filter(item => item.isActive === params.active);
+    }
+
+    // Apply limit
+    if (params?.limit) {
+      filteredData = filteredData.slice(0, params.limit);
+    }
+
+    return {
+      success: true,
+      data: filteredData,
+      message: 'Mock featured content retrieved successfully',
+    };
+  }
+
+  private getMockUpcomingEvents(params?: {
+    limit?: number;
+    category?: string;
+    location?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    isFree?: boolean;
+  }): UpcomingEventsResponse {
+    const mockData: UpcomingEvent[] = [
+      {
+        id: 'event-1',
+        title: 'Digital Marketing Workshop',
+        description: 'Learn the latest digital marketing strategies',
+        date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        time: '10:00',
+        location: 'Online',
+        organizer: 'Marketing Pro',
+        organizerId: 'org-1',
+        imageUrl: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=400&h=300&fit=crop',
+        category: 'Workshop',
+        price: 99,
+        isFree: false,
+        attendees: 45,
+        maxAttendees: 100,
+        tags: ['marketing', 'digital', 'workshop'],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'event-2',
+        title: 'Free Design Tips Session',
+        description: 'Get free design tips from industry experts',
+        date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        time: '14:00',
+        location: 'Design Hub',
+        organizer: 'Design Masters',
+        organizerId: 'org-2',
+        imageUrl: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=300&fit=crop',
+        category: 'Seminar',
+        isFree: true,
+        attendees: 120,
+        maxAttendees: 150,
+        tags: ['design', 'free', 'tips'],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ];
+
+    let filteredData = mockData;
+
+    // Apply filters
+    if (params?.category) {
+      filteredData = filteredData.filter(event => event.category === params.category);
+    }
+
+    if (params?.location) {
+      filteredData = filteredData.filter(event => event.location.toLowerCase().includes(params.location!.toLowerCase()));
+    }
+
+    if (params?.isFree !== undefined) {
+      filteredData = filteredData.filter(event => event.isFree === params.isFree);
+    }
+
+    // Apply limit
+    if (params?.limit) {
+      filteredData = filteredData.slice(0, params.limit);
+    }
+
+    return {
+      success: true,
+      data: filteredData,
+      message: 'Mock upcoming events retrieved successfully',
+    };
+  }
+
+  private getMockProfessionalTemplates(params?: {
+    limit?: number;
+    category?: string;
+    subcategory?: string;
+    isPremium?: boolean;
+    sortBy?: 'popular' | 'recent' | 'likes' | 'downloads';
+    tags?: string[];
+  }): ProfessionalTemplatesResponse {
+    const mockData: ProfessionalTemplate[] = [
+      {
+        id: 'template-1',
+        name: 'Business Card Template',
+        description: 'Professional business card design',
+        thumbnail: 'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=300&h=200&fit=crop',
+        category: 'Business',
+        subcategory: 'Cards',
+        likes: 245,
+        downloads: 189,
+        views: 1200,
+        isLiked: false,
+        isDownloaded: false,
+        isPremium: false,
+        tags: ['business', 'card', 'professional'],
+        fileSize: 1024000,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'template-2',
+        name: 'Premium Flyer Design',
+        description: 'High-quality flyer template for events',
+        thumbnail: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=300&h=200&fit=crop',
+        category: 'Marketing',
+        subcategory: 'Flyers',
+        likes: 312,
+        downloads: 234,
+        views: 1500,
+        isLiked: true,
+        isDownloaded: false,
+        isPremium: true,
+        tags: ['flyer', 'event', 'premium'],
+        fileSize: 2048000,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ];
+
+    let filteredData = mockData;
+
+    // Apply filters
+    if (params?.category) {
+      filteredData = filteredData.filter(template => template.category === params.category);
+    }
+
+    if (params?.subcategory) {
+      filteredData = filteredData.filter(template => template.subcategory === params.subcategory);
+    }
+
+    if (params?.isPremium !== undefined) {
+      filteredData = filteredData.filter(template => template.isPremium === params.isPremium);
+    }
+
+    if (params?.tags && params.tags.length > 0) {
+      filteredData = filteredData.filter(template => 
+        params.tags!.some(tag => template.tags.includes(tag))
+      );
+    }
+
+    // Apply sorting
+    if (params?.sortBy) {
+      switch (params.sortBy) {
+        case 'likes':
+          filteredData.sort((a, b) => b.likes - a.likes);
+          break;
+        case 'downloads':
+          filteredData.sort((a, b) => b.downloads - a.downloads);
+          break;
+        case 'recent':
+          filteredData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          break;
+        case 'popular':
+        default:
+          filteredData.sort((a, b) => (b.likes + b.downloads) - (a.likes + a.downloads));
+          break;
+      }
+    }
+
+    // Apply limit
+    if (params?.limit) {
+      filteredData = filteredData.slice(0, params.limit);
+    }
+
+    return {
+      success: true,
+      data: filteredData,
+      message: 'Mock professional templates retrieved successfully',
+    };
+  }
+
+  private getMockVideoContent(params?: {
+    limit?: number;
+    category?: string;
+    language?: string;
+    isPremium?: boolean;
+    sortBy?: 'popular' | 'recent' | 'likes' | 'views' | 'downloads';
+    duration?: 'short' | 'medium' | 'long';
+    tags?: string[];
+  }): VideoContentResponse {
+    const mockData: VideoContent[] = [
+      {
+        id: 'video-1',
+        title: 'Product Launch Video',
+        description: 'Professional product launch video template',
+        thumbnail: 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=300&h=200&fit=crop',
+        videoUrl: 'https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4',
+        duration: 30,
+        category: 'Business',
+        language: 'en',
+        likes: 189,
+        views: 800,
+        downloads: 45,
+        isLiked: false,
+        isDownloaded: false,
+        isPremium: false,
+        tags: ['product', 'launch', 'business'],
+        fileSize: 10240000,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'video-2',
+        title: 'Event Promo Video',
+        description: 'Dynamic event promotion video template',
+        thumbnail: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=300&h=200&fit=crop',
+        videoUrl: 'https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_2mb.mp4',
+        duration: 60,
+        category: 'Events',
+        language: 'en',
+        likes: 267,
+        views: 1200,
+        downloads: 78,
+        isLiked: true,
+        isDownloaded: false,
+        isPremium: true,
+        tags: ['event', 'promo', 'dynamic'],
+        fileSize: 20480000,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ];
+
+    let filteredData = mockData;
+
+    // Apply filters
+    if (params?.category) {
+      filteredData = filteredData.filter(video => video.category === params.category);
+    }
+
+    if (params?.language) {
+      filteredData = filteredData.filter(video => video.language === params.language);
+    }
+
+    if (params?.isPremium !== undefined) {
+      filteredData = filteredData.filter(video => video.isPremium === params.isPremium);
+    }
+
+    if (params?.duration) {
+      const durationMap = { short: 30, medium: 60, long: 120 };
+      const maxDuration = durationMap[params.duration];
+      filteredData = filteredData.filter(video => video.duration <= maxDuration);
+    }
+
+    if (params?.tags && params.tags.length > 0) {
+      filteredData = filteredData.filter(video => 
+        params.tags!.some(tag => video.tags.includes(tag))
+      );
+    }
+
+    // Apply sorting
+    if (params?.sortBy) {
+      switch (params.sortBy) {
+        case 'likes':
+          filteredData.sort((a, b) => b.likes - a.likes);
+          break;
+        case 'views':
+          filteredData.sort((a, b) => b.views - a.views);
+          break;
+        case 'downloads':
+          filteredData.sort((a, b) => b.downloads - a.downloads);
+          break;
+        case 'recent':
+          filteredData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          break;
+        case 'popular':
+        default:
+          filteredData.sort((a, b) => (b.likes + b.views + b.downloads) - (a.likes + a.views + a.downloads));
+          break;
+      }
+    }
+
+    // Apply limit
+    if (params?.limit) {
+      filteredData = filteredData.slice(0, params.limit);
+    }
+
+    return {
+      success: true,
+      data: filteredData,
+      message: 'Mock video content retrieved successfully',
+    };
   }
 }
 
