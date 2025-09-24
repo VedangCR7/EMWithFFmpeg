@@ -1,0 +1,12 @@
+prefix="/home/mayur/Android/Sdk/ndk/23.2.8568313/toolchains/llvm/prebuilt/linux-x86_64/sysroot"/usr
+exec_prefix=${prefix}
+libdir=/home/mayur/Android/Sdk/ndk/23.2.8568313/platforms/android-16/arch-x86/usr/lib
+includedir=${prefix}/include
+
+Name: zlib
+Description: zlib compression library
+Version: 1.2.11
+
+Requires:
+Libs: -L${libdir} -lz
+Cflags: -I${includedir}

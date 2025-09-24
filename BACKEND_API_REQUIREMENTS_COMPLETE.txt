@@ -1,0 +1,1147 @@
+EVENTMARKETERS - COMPLETE BACKEND API REQUIREMENTS
+==================================================
+
+PROJECT OVERVIEW
+---------------
+EventMarketers is a comprehensive event marketing platform that includes:
+- User authentication and profile management
+- Business profile creation and management
+- Template gallery and management
+- Poster creation and editing
+- Video processing and editing
+- Subscription and payment processing
+- Event management
+- Analytics and reporting
+- Push notifications
+- File upload and management
+
+BASE CONFIGURATION
+------------------
+Base URL: https://your-api-domain.com/api/v1
+Authentication: JWT Bearer Token
+Content-Type: application/json
+File Upload: multipart/form-data
+Timeout: 30 seconds for file uploads, 10 seconds for regular requests
+
+================================================================================
+
+1. AUTHENTICATION APIs
+======================
+
+1.1 User Registration
+---------------------
+POST /auth/register
+Request Body:
+{
+  "companyName": "string (required)",
+  "email": "string (required, unique)",
+  "phone": "string (required)",
+  "password": "string (required, min 8 chars)",
+  "confirmPassword": "string (required)"
+}
+
+Response:
+{
+  "success": true,
+  "message": "Registration successful",
+  "data": {
+    "user": {
+      "id": "string",
+      "companyName": "string",
+      "email": "string",
+      "phone": "string",
+      "isVerified": false,
+      "createdAt": "ISO date"
+    },
+    "token": "JWT token",
+    "refreshToken": "JWT refresh token"
+  }
+}
+
+1.2 User Login
+--------------
+POST /auth/login
+Request Body:
+{
+  "email": "string (required)",
+  "password": "string (required)"
+}
+
+Response:
+{
+  "success": true,
+  "message": "Login successful",
+  "data": {
+    "user": {
+      "id": "string",
+      "companyName": "string",
+      "email": "string",
+      "phone": "string",
+      "isVerified": boolean,
+      "subscription": {
+        "plan": "free|monthly|yearly",
+        "status": "active|expired|cancelled",
+        "expiresAt": "ISO date"
+      }
+    },
+    "token": "JWT token",
+    "refreshToken": "JWT refresh token"
+  }
+}
+
+1.3 Google Sign-In
+------------------
+POST /auth/google
+Request Body:
+{
+  "idToken": "string (required)",
+  "accessToken": "string (required)"
+}
+
+Response: Same as login response
+
+1.4 Phone OTP Verification
+--------------------------
+POST /auth/send-otp
+Request Body:
+{
+  "phone": "string (required)"
+}
+
+POST /auth/verify-otp
+Request Body:
+{
+  "phone": "string (required)",
+  "otp": "string (required)"
+}
+
+1.5 Refresh Token
+-----------------
+POST /auth/refresh
+Request Body:
+{
+  "refreshToken": "string (required)"
+}
+
+1.6 Logout
+----------
+POST /auth/logout
+Headers: Authorization: Bearer {token}
+
+================================================================================
+
+2. USER PROFILE MANAGEMENT APIs
+===============================
+
+2.1 Get User Profile
+--------------------
+GET /user/profile
+Headers: Authorization: Bearer {token}
+
+Response:
+{
+  "success": true,
+  "data": {
+    "id": "string",
+    "companyName": "string",
+    "email": "string",
+    "phone": "string",
+    "profileImage": "string (URL)",
+    "isVerified": boolean,
+    "subscription": {
+      "plan": "free|monthly|yearly",
+      "status": "active|expired|cancelled",
+      "expiresAt": "ISO date"
+    },
+    "createdAt": "ISO date",
+    "updatedAt": "ISO date"
+  }
+}
+
+2.2 Update User Profile
+-----------------------
+PUT /user/profile
+Headers: Authorization: Bearer {token}
+Request Body:
+{
+  "companyName": "string",
+  "phone": "string",
+  "email": "string",
+  "profileImage": "file (optional)"
+}
+
+2.3 Change Password
+-------------------
+PUT /user/change-password
+Headers: Authorization: Bearer {token}
+Request Body:
+{
+  "currentPassword": "string (required)",
+  "newPassword": "string (required, min 8 chars)",
+  "confirmPassword": "string (required)"
+}
+
+2.4 Delete Account
+------------------
+DELETE /user/account
+Headers: Authorization: Bearer {token}
+
+================================================================================
+
+3. BUSINESS PROFILE APIs
+========================
+
+3.1 Create Business Profile
+---------------------------
+POST /business/profile
+Headers: Authorization: Bearer {token}
+Request Body:
+{
+  "name": "string (required)",
+  "description": "string (required)",
+  "category": "Event Planners|Decorators|Sound Suppliers|Light Suppliers|Technology|Design|Restaurant",
+  "address": "string (required)",
+  "phone": "string (required)",
+  "alternatePhone": "string (optional)",
+  "email": "string (required)",
+  "website": "string (optional)",
+  "companyLogo": "file (optional)",
+  "services": ["string"] (required),
+  "workingHours": {
+    "monday": {"open": "09:00", "close": "18:00", "isOpen": true},
+    "tuesday": {"open": "09:00", "close": "18:00", "isOpen": true},
+    "wednesday": {"open": "09:00", "close": "18:00", "isOpen": true},
+    "thursday": {"open": "09:00", "close": "18:00", "isOpen": true},
+    "friday": {"open": "09:00", "close": "18:00", "isOpen": true},
+    "saturday": {"open": "10:00", "close": "16:00", "isOpen": true},
+    "sunday": {"open": "00:00", "close": "00:00", "isOpen": false}
+  },
+  "socialMedia": {
+    "facebook": "string (optional)",
+    "instagram": "string (optional)",
+    "twitter": "string (optional)",
+    "linkedin": "string (optional)"
+  }
+}
+
+3.2 Get Business Profile
+------------------------
+GET /business/profile/{id}
+Headers: Authorization: Bearer {token}
+
+3.3 Update Business Profile
+---------------------------
+PUT /business/profile/{id}
+Headers: Authorization: Bearer {token}
+Request Body: Same as create
+
+3.4 Get All Business Profiles
+-----------------------------
+GET /business/profiles
+Headers: Authorization: Bearer {token}
+Query Parameters:
+- category: Filter by category
+- search: Search by name/description
+- page: Page number (default: 1)
+- limit: Items per page (default: 20)
+
+3.5 Delete Business Profile
+---------------------------
+DELETE /business/profile/{id}
+Headers: Authorization: Bearer {token}
+
+3.6 Search Business Profiles
+----------------------------
+GET /business/search
+Headers: Authorization: Bearer {token}
+Query Parameters:
+- q: Search query (required)
+- category: Filter by category
+- location: Filter by location
+- page: Page number
+- limit: Items per page
+
+3.7 Get Business Profiles by Category
+-------------------------------------
+GET /business/category/{category}
+Headers: Authorization: Bearer {token}
+Query Parameters:
+- page: Page number
+- limit: Items per page
+
+3.8 Verify Business Profile
+---------------------------
+POST /business/profile/{id}/verify
+Headers: Authorization: Bearer {token}
+
+================================================================================
+
+4. TEMPLATE MANAGEMENT APIs
+===========================
+
+4.1 Get Templates
+-----------------
+GET /templates
+Query Parameters:
+- category: free|premium|all
+- language: english|hindi|marathi|spanish|french|german|italian
+- search: Search term
+- page: Page number (default: 1)
+- limit: Items per page (default: 20)
+- tab: trending|popular|recent
+
+Response:
+{
+  "success": true,
+  "data": {
+    "templates": [
+      {
+        "id": "string",
+        "title": "string",
+        "description": "string",
+        "imageUrl": "string",
+        "thumbnail": "string",
+        "category": "free|premium",
+        "language": "string",
+        "tags": ["string"],
+        "downloads": number,
+        "likes": number,
+        "isLiked": boolean,
+        "isDownloaded": boolean,
+        "createdAt": "ISO date",
+        "updatedAt": "ISO date"
+      }
+    ],
+    "pagination": {
+      "page": number,
+      "limit": number,
+      "total": number,
+      "pages": number
+    }
+  }
+}
+
+4.2 Get Template Details
+------------------------
+GET /templates/{id}
+Headers: Authorization: Bearer {token}
+
+4.3 Like/Unlike Template
+------------------------
+POST /templates/{id}/like
+Headers: Authorization: Bearer {token}
+
+4.4 Download Template
+---------------------
+POST /templates/{id}/download
+Headers: Authorization: Bearer {token}
+
+4.5 Get Available Languages
+---------------------------
+GET /templates/languages
+
+Response:
+{
+  "success": true,
+  "data": ["English", "Spanish", "French", "German", "Italian", "Hindi", "Marathi"]
+}
+
+4.6 Search Templates
+--------------------
+GET /templates/search
+Query Parameters:
+- q: Search query (required)
+- category: free|premium
+- language: string
+- page: Page number
+- limit: Items per page
+
+4.7 Get Templates by Category
+-----------------------------
+GET /templates/category/{category}
+Query Parameters:
+- page: Page number
+- limit: Items per page
+
+================================================================================
+
+5. POSTER MANAGEMENT APIs
+=========================
+
+5.1 Create Poster
+-----------------
+POST /posters
+Headers: Authorization: Bearer {token}
+Request Body:
+{
+  "templateId": "string (required)",
+  "title": "string (required)",
+  "description": "string (optional)",
+  "imageData": "base64 string (required)",
+  "settings": {
+    "font": "string",
+    "colors": ["string"],
+    "layout": "string",
+    "texts": [
+      {
+        "id": "string",
+        "content": "string",
+        "position": {"x": number, "y": number},
+        "fontSize": number,
+        "fontFamily": "string",
+        "color": "string"
+      }
+    ],
+    "images": [
+      {
+        "id": "string",
+        "url": "string",
+        "position": {"x": number, "y": number},
+        "size": {"width": number, "height": number}
+      }
+    ]
+  }
+}
+
+5.2 Get User Posters
+--------------------
+GET /posters
+Headers: Authorization: Bearer {token}
+Query Parameters:
+- page: Page number (default: 1)
+- limit: Items per page (default: 20)
+
+5.3 Get Poster Details
+----------------------
+GET /posters/{id}
+Headers: Authorization: Bearer {token}
+
+5.4 Update Poster
+-----------------
+PUT /posters/{id}
+Headers: Authorization: Bearer {token}
+Request Body: Same as create
+
+5.5 Delete Poster
+-----------------
+DELETE /posters/{id}
+Headers: Authorization: Bearer {token}
+
+5.6 Share Poster
+----------------
+POST /posters/{id}/share
+Headers: Authorization: Bearer {token}
+Request Body:
+{
+  "platform": "whatsapp|facebook|instagram|twitter|email"
+}
+
+5.7 Download Poster
+-------------------
+GET /posters/{id}/download
+Headers: Authorization: Bearer {token}
+
+================================================================================
+
+6. VIDEO PROCESSING APIs
+========================
+
+6.1 Process Video with Overlays
+-------------------------------
+POST /videos/process
+Headers: Authorization: Bearer {token}
+Request Body:
+{
+  "videoUri": "string (required)",
+  "layers": [
+    {
+      "id": "string",
+      "type": "text|image|logo",
+      "content": "string",
+      "position": {"x": number, "y": number},
+      "size": {"width": number, "height": number},
+      "style": {}
+    }
+  ],
+  "options": {
+    "addWatermark": boolean,
+    "compress": boolean,
+    "trim": {"start": number, "end": number},
+    "addAudio": "string"
+  }
+}
+
+6.2 Get Video Info
+------------------
+GET /videos/{id}/info
+Headers: Authorization: Bearer {token}
+
+6.3 Compress Video
+------------------
+POST /videos/compress
+Headers: Authorization: Bearer {token}
+Request Body:
+{
+  "videoUri": "string (required)",
+  "quality": "low|medium|high"
+}
+
+6.4 Trim Video
+--------------
+POST /videos/trim
+Headers: Authorization: Bearer {token}
+Request Body:
+{
+  "videoUri": "string (required)",
+  "start": number (seconds),
+  "end": number (seconds)
+}
+
+6.5 Add Audio to Video
+----------------------
+POST /videos/add-audio
+Headers: Authorization: Bearer {token}
+Request Body:
+{
+  "videoUri": "string (required)",
+  "audioUri": "string (required)"
+}
+
+6.6 Get User Videos
+-------------------
+GET /videos
+Headers: Authorization: Bearer {token}
+Query Parameters:
+- page: Page number
+- limit: Items per page
+
+6.7 Delete Video
+----------------
+DELETE /videos/{id}
+Headers: Authorization: Bearer {token}
+
+================================================================================
+
+7. SUBSCRIPTION & PAYMENT APIs
+==============================
+
+7.1 Get Subscription Plans
+--------------------------
+GET /subscription/plans
+
+Response:
+{
+  "success": true,
+  "data": {
+    "plans": [
+      {
+        "id": "string",
+        "name": "Monthly Pro",
+        "price": 299,
+        "originalPrice": 499,
+        "savings": "40% OFF",
+        "period": "month",
+        "features": [
+          "Unlimited templates",
+          "Premium fonts",
+          "No watermarks",
+          "Priority support"
+        ]
+      },
+      {
+        "id": "string",
+        "name": "Yearly Pro",
+        "price": 1999,
+        "originalPrice": 5988,
+        "savings": "67% OFF",
+        "period": "year",
+        "features": [
+          "All Monthly Pro features",
+          "Early access to new features",
+          "Exclusive templates"
+        ]
+      }
+    ]
+  }
+}
+
+7.2 Create Payment Order
+------------------------
+POST /subscription/create-order
+Headers: Authorization: Bearer {token}
+Request Body:
+{
+  "planId": "string (required)",
+  "amount": number (required)
+}
+
+Response:
+{
+  "success": true,
+  "data": {
+    "orderId": "string",
+    "amount": number,
+    "currency": "INR",
+    "razorpayOrderId": "string"
+  }
+}
+
+7.3 Verify Payment
+------------------
+POST /subscription/verify-payment
+Headers: Authorization: Bearer {token}
+Request Body:
+{
+  "orderId": "string (required)",
+  "paymentId": "string (required)",
+  "signature": "string (required)"
+}
+
+7.4 Get Subscription Status
+---------------------------
+GET /subscription/status
+Headers: Authorization: Bearer {token}
+
+7.5 Cancel Subscription
+-----------------------
+POST /subscription/cancel
+Headers: Authorization: Bearer {token}
+
+7.6 Get Payment History
+-----------------------
+GET /subscription/payments
+Headers: Authorization: Bearer {token}
+Query Parameters:
+- page: Page number
+- limit: Items per page
+
+================================================================================
+
+8. FONT MANAGEMENT APIs
+========================
+
+8.1 Get Google Fonts
+--------------------
+GET /fonts
+Query Parameters:
+- search: Search term
+- category: serif|sans-serif|display|handwriting|monospace
+- page: Page number
+- limit: Items per page
+
+Response:
+{
+  "success": true,
+  "data": {
+    "fonts": [
+      {
+        "name": "string",
+        "displayName": "string",
+        "webFont": "string",
+        "category": "serif|sans-serif|display|handwriting|monospace"
+      }
+    ],
+    "pagination": {
+      "page": number,
+      "limit": number,
+      "total": number,
+      "pages": number
+    }
+  }
+}
+
+8.2 Get Font Details
+--------------------
+GET /fonts/{family}
+
+8.3 Download Font
+-----------------
+GET /fonts/{family}/download
+
+8.4 Get Fonts by Category
+-------------------------
+GET /fonts/category/{category}
+Query Parameters:
+- page: Page number
+- limit: Items per page
+
+================================================================================
+
+9. EVENT MANAGEMENT APIs
+=========================
+
+9.1 Create Event
+----------------
+POST /events
+Headers: Authorization: Bearer {token}
+Request Body:
+{
+  "title": "string (required)",
+  "description": "string (required)",
+  "date": "ISO date (required)",
+  "time": "string (required)",
+  "location": "string (required)",
+  "category": "string (required)",
+  "maxAttendees": number (optional),
+  "imageUrl": "string (optional)",
+  "status": "active|upcoming|planning|completed"
+}
+
+9.2 Get User Events
+-------------------
+GET /events
+Headers: Authorization: Bearer {token}
+Query Parameters:
+- status: active|upcoming|planning|completed|all
+- page: Page number
+- limit: Items per page
+
+9.3 Get Event Details
+---------------------
+GET /events/{id}
+Headers: Authorization: Bearer {token}
+
+9.4 Update Event
+----------------
+PUT /events/{id}
+Headers: Authorization: Bearer {token}
+Request Body: Same as create
+
+9.5 Delete Event
+----------------
+DELETE /events/{id}
+Headers: Authorization: Bearer {token}
+
+9.6 Get Events by Status
+------------------------
+GET /events/status/{status}
+Headers: Authorization: Bearer {token}
+Query Parameters:
+- page: Page number
+- limit: Items per page
+
+================================================================================
+
+10. ANALYTICS & USAGE APIs
+===========================
+
+10.1 Get User Analytics
+-----------------------
+GET /analytics/user
+Headers: Authorization: Bearer {token}
+Query Parameters:
+- period: daily|weekly|monthly|yearly
+- startDate: ISO date
+- endDate: ISO date
+
+Response:
+{
+  "success": true,
+  "data": {
+    "postersCreated": number,
+    "videosProcessed": number,
+    "templatesUsed": number,
+    "downloads": number,
+    "shares": number,
+    "subscriptionUsage": {
+      "plan": "string",
+      "usage": number,
+      "limit": number
+    }
+  }
+}
+
+10.2 Get Poster Analytics
+-------------------------
+GET /analytics/posters
+Headers: Authorization: Bearer {token}
+Query Parameters:
+- period: daily|weekly|monthly|yearly
+- startDate: ISO date
+- endDate: ISO date
+
+10.3 Get Template Usage
+-----------------------
+GET /analytics/templates
+Headers: Authorization: Bearer {token}
+Query Parameters:
+- period: daily|weekly|monthly|yearly
+- startDate: ISO date
+- endDate: ISO date
+
+10.4 Get Dashboard Stats
+------------------------
+GET /analytics/dashboard
+Headers: Authorization: Bearer {token}
+
+================================================================================
+
+11. NOTIFICATION APIs
+======================
+
+11.1 Register FCM Token
+-----------------------
+POST /notifications/register-token
+Headers: Authorization: Bearer {token}
+Request Body:
+{
+  "fcmToken": "string (required)",
+  "deviceType": "android|ios (required)"
+}
+
+11.2 Get Notifications
+----------------------
+GET /notifications
+Headers: Authorization: Bearer {token}
+Query Parameters:
+- page: Page number (default: 1)
+- limit: Items per page (default: 20)
+
+Response:
+{
+  "success": true,
+  "data": {
+    "notifications": [
+      {
+        "id": "string",
+        "title": "string",
+        "message": "string",
+        "type": "info|success|warning|error",
+        "isRead": boolean,
+        "createdAt": "ISO date"
+      }
+    ],
+    "pagination": {
+      "page": number,
+      "limit": number,
+      "total": number,
+      "pages": number
+    }
+  }
+}
+
+11.3 Mark Notification as Read
+------------------------------
+PUT /notifications/{id}/read
+Headers: Authorization: Bearer {token}
+
+11.4 Mark All Notifications as Read
+-----------------------------------
+PUT /notifications/read-all
+Headers: Authorization: Bearer {token}
+
+11.5 Delete Notification
+------------------------
+DELETE /notifications/{id}
+Headers: Authorization: Bearer {token}
+
+11.6 Get Unread Count
+---------------------
+GET /notifications/unread-count
+Headers: Authorization: Bearer {token}
+
+================================================================================
+
+12. FILE UPLOAD APIs
+=====================
+
+12.1 Upload Image
+-----------------
+POST /upload/image
+Headers: Authorization: Bearer {token}
+Request Body: multipart/form-data
+- file: image file (required)
+- type: logo|poster|template|profile (required)
+- folder: string (optional)
+
+Response:
+{
+  "success": true,
+  "data": {
+    "url": "string",
+    "filename": "string",
+    "size": number,
+    "mimeType": "string"
+  }
+}
+
+12.2 Upload Video
+-----------------
+POST /upload/video
+Headers: Authorization: Bearer {token}
+Request Body: multipart/form-data
+- file: video file (required)
+- type: video|processed (required)
+
+12.3 Delete File
+----------------
+DELETE /upload/{fileId}
+Headers: Authorization: Bearer {token}
+
+12.4 Get Uploaded Files
+-----------------------
+GET /upload/files
+Headers: Authorization: Bearer {token}
+Query Parameters:
+- type: image|video
+- page: Page number
+- limit: Items per page
+
+================================================================================
+
+13. SEARCH & DISCOVERY APIs
+============================
+
+13.1 Search Templates
+---------------------
+GET /search/templates
+Query Parameters:
+- q: Search query (required)
+- category: free|premium
+- language: string
+- page: Page number
+- limit: Items per page
+
+13.2 Search Business Profiles
+-----------------------------
+GET /search/business
+Query Parameters:
+- q: Search query (required)
+- category: string
+- location: string
+- page: Page number
+- limit: Items per page
+
+13.3 Search Events
+------------------
+GET /search/events
+Headers: Authorization: Bearer {token}
+Query Parameters:
+- q: Search query (required)
+- category: string
+- date: ISO date
+- page: Page number
+- limit: Items per page
+
+13.4 Global Search
+------------------
+GET /search/global
+Query Parameters:
+- q: Search query (required)
+- type: templates|business|events|all
+- page: Page number
+- limit: Items per page
+
+================================================================================
+
+14. DASHBOARD & BANNER APIs
+============================
+
+14.1 Get Dashboard Data
+-----------------------
+GET /dashboard
+Headers: Authorization: Bearer {token}
+Query Parameters:
+- tab: trending|popular|recent
+
+Response:
+{
+  "success": true,
+  "data": {
+    "banners": [
+      {
+        "id": "string",
+        "title": "string",
+        "imageUrl": "string",
+        "link": "string"
+      }
+    ],
+    "templates": [
+      {
+        "id": "string",
+        "name": "string",
+        "thumbnail": "string",
+        "category": "string",
+        "likes": number,
+        "downloads": number,
+        "isLiked": boolean,
+        "isDownloaded": boolean
+      }
+    ],
+    "categories": [
+      {
+        "id": "string",
+        "name": "string"
+      }
+    ]
+  }
+}
+
+14.2 Get Banners
+----------------
+GET /banners
+Query Parameters:
+- active: boolean
+
+14.3 Get Categories
+-------------------
+GET /categories
+
+================================================================================
+
+15. ADMIN APIs (Optional)
+==========================
+
+15.1 Get System Statistics
+--------------------------
+GET /admin/stats
+Headers: Authorization: Bearer {admin_token}
+
+15.2 Manage Templates
+---------------------
+POST /admin/templates
+PUT /admin/templates/{id}
+DELETE /admin/templates/{id}
+Headers: Authorization: Bearer {admin_token}
+
+15.3 Manage Users
+-----------------
+GET /admin/users
+PUT /admin/users/{id}
+DELETE /admin/users/{id}
+Headers: Authorization: Bearer {admin_token}
+
+15.4 Manage Business Profiles
+-----------------------------
+GET /admin/business-profiles
+PUT /admin/business-profiles/{id}
+DELETE /admin/business-profiles/{id}
+Headers: Authorization: Bearer {admin_token}
+
+================================================================================
+
+ERROR RESPONSE FORMAT
+=====================
+
+All APIs should return errors in this format:
+{
+  "success": false,
+  "error": {
+    "code": "ERROR_CODE",
+    "message": "Human readable error message",
+    "details": {}
+  }
+}
+
+COMMON ERROR CODES
+==================
+- AUTH_REQUIRED: Authentication required
+- INVALID_TOKEN: Invalid or expired token
+- PERMISSION_DENIED: User doesn't have permission
+- RESOURCE_NOT_FOUND: Resource not found
+- VALIDATION_ERROR: Input validation failed
+- SUBSCRIPTION_REQUIRED: Premium subscription required
+- RATE_LIMIT_EXCEEDED: Too many requests
+- SERVER_ERROR: Internal server error
+- FILE_TOO_LARGE: File size exceeds limit
+- INVALID_FILE_TYPE: File type not supported
+- PAYMENT_FAILED: Payment processing failed
+- INSUFFICIENT_CREDITS: User doesn't have enough credits
+
+RATE LIMITING
+=============
+- Public APIs: 100 requests per minute
+- Authenticated APIs: 1000 requests per minute
+- File Upload: 10 requests per minute
+- Payment APIs: 5 requests per minute
+
+SECURITY REQUIREMENTS
+=====================
+1. JWT Token Expiration: 24 hours for access token, 7 days for refresh token
+2. Password Requirements: Minimum 8 characters, must include uppercase, lowercase, number, and special character
+3. File Upload: Maximum 10MB for images, 100MB for videos
+4. CORS: Configured for mobile app domains
+5. Rate Limiting: Implemented for all endpoints
+6. Input Validation: All inputs validated and sanitized
+7. SQL Injection Protection: Use parameterized queries
+8. XSS Protection: Sanitize all user inputs
+9. HTTPS: All endpoints must use HTTPS
+10. API Key Protection: Secure API keys and secrets
+
+DATABASE SCHEMA REQUIREMENTS
+============================
+
+Core Tables:
+- users: User accounts and authentication
+- business_profiles: Business profile information
+- templates: Poster templates
+- posters: User created posters
+- videos: User created videos
+- events: User events
+- subscriptions: User subscription data
+- payments: Payment transactions
+- notifications: Push notifications
+- analytics: Usage analytics
+- file_uploads: File storage metadata
+
+Supporting Tables:
+- fonts: Google Fonts data
+- categories: Business and template categories
+- languages: Supported languages
+- banners: Dashboard banners
+- fcm_tokens: FCM token storage
+
+DEPLOYMENT REQUIREMENTS
+=======================
+1. HTTPS: All endpoints must use HTTPS
+2. CDN: For static assets (images, fonts, templates)
+3. Database: PostgreSQL or MySQL with proper indexing
+4. Caching: Redis for session management and caching
+5. File Storage: AWS S3 or similar for file uploads
+6. Monitoring: Application performance monitoring
+7. Backup: Automated database backups
+8. SSL Certificate: Valid SSL certificate for domain
+9. Load Balancer: For high availability
+10. Auto-scaling: Based on traffic patterns
+
+THIRD-PARTY INTEGRATIONS
+========================
+1. Razorpay: Payment processing
+2. Firebase: Push notifications (FCM)
+3. Google Fonts API: Font management
+4. Google Sign-In: OAuth authentication
+5. AWS S3: File storage
+6. CloudFront: CDN for static assets
+7. SendGrid/Mailgun: Email notifications
+8. Twilio: SMS notifications
+
+API VERSIONING
+==============
+- Current Version: v1
+- Version in URL: /api/v1/
+- Backward Compatibility: Maintained for at least 6 months
+- Deprecation Notice: 3 months advance notice
+
+MONITORING & LOGGING
+====================
+1. Request/Response logging
+2. Error tracking and alerting
+3. Performance monitoring
+4. User activity tracking
+5. API usage analytics
+6. Database query monitoring
+7. File upload/download tracking
+8. Payment transaction logging
+
+TESTING REQUIREMENTS
+====================
+1. Unit tests for all API endpoints
+2. Integration tests for payment flows
+3. Load testing for file uploads
+4. Security testing for authentication
+5. API documentation testing
+6. Mobile app integration testing
+7. Error handling testing
+8. Rate limiting testing
+
+This comprehensive API structure will support all the features currently implemented in the EventMarketers mobile app and provide a solid foundation for future enhancements.

@@ -1,0 +1,14 @@
+prefix=/home/mayur/ffmpeg-kit/prebuilt/android-arm-lts/freetype
+exec_prefix=/home/mayur/ffmpeg-kit/prebuilt/android-arm-lts/freetype
+libdir=/home/mayur/ffmpeg-kit/prebuilt/android-arm-lts/freetype/lib
+includedir=/home/mayur/ffmpeg-kit/prebuilt/android-arm-lts/freetype/include
+
+Name: FreeType 2
+URL: https://freetype.org
+Description: A free, high-quality, and portable font engine.
+Version: 25.0.19
+Requires: zlib
+Requires.private: 
+Libs: -L/home/mayur/ffmpeg-kit/prebuilt/android-arm-lts/freetype/lib -lfreetype -L/home/mayur/ffmpeg-kit/prebuilt/android-arm-lts/libpng/lib
+Libs.private: 
+Cflags: -I${includedir}/freetype2

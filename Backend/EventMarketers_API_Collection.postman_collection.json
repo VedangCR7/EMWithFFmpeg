@@ -1,0 +1,552 @@
+{
+  "info": {
+    "name": "EventMarketers Backend API",
+    "description": "Complete API collection for EventMarketers mobile app integration",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://eventmarketersbackend.onrender.com",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "deviceId",
+      "value": "test-device-123",
+      "type": "string"
+    },
+    {
+      "key": "customerId",
+      "value": "test-customer-123",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["health"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Mobile App APIs",
+      "item": [
+        {
+          "name": "Get Business Categories",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/mobile/business-categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "mobile", "business-categories"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"deviceId\": \"{{deviceId}}\",\n  \"name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"phone\": \"+1234567890\",\n  \"appVersion\": \"1.0.0\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/installed-users/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "installed-users", "register"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get User Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/installed-users/profile/{{deviceId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "installed-users", "profile", "{{deviceId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update User Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Smith\",\n  \"email\": \"johnsmith@example.com\",\n  \"phone\": \"+1234567890\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/installed-users/profile/{{deviceId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "installed-users", "profile", "{{deviceId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Record User Activity",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"deviceId\": \"{{deviceId}}\",\n  \"action\": \"view\",\n  \"resourceType\": \"image\",\n  \"resourceId\": \"content-id\",\n  \"metadata\": {\n    \"category\": \"Restaurant\",\n    \"duration\": 30\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/installed-users/activity",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "installed-users", "activity"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Customer Content",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/mobile/content/{{customerId}}?category=Restaurant&page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "mobile", "content", "{{customerId}}"],
+              "query": [
+                {
+                  "key": "category",
+                  "value": "Restaurant"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Customer Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/mobile/profile/{{customerId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "mobile", "profile", "{{customerId}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Business Profile APIs",
+      "item": [
+        {
+          "name": "Create Business Profile",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"businessName\": \"John's Restaurant\",\n  \"businessEmail\": \"info@johnsrestaurant.com\",\n  \"businessPhone\": \"+1234567890\",\n  \"businessWebsite\": \"https://johnsrestaurant.com\",\n  \"businessAddress\": \"123 Main St, City, State\",\n  \"businessDescription\": \"Fine dining restaurant\",\n  \"businessCategory\": \"Restaurant\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/business-profile/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "business-profile", "profile"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Business Logo",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "logo",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/business-profile/upload-logo",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "business-profile", "upload-logo"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Authentication APIs",
+      "item": [
+        {
+          "name": "Admin Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"adminpassword\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/admin/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "admin", "login"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Subadmin Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"subadmin@example.com\",\n  \"password\": \"subadminpassword\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/subadmin/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "subadmin", "login"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin Management APIs",
+      "item": [
+        {
+          "name": "Get Subadmins",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/subadmins",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "subadmins"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Subadmin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"New Subadmin\",\n  \"email\": \"newsubadmin@example.com\",\n  \"password\": \"password123\",\n  \"role\": \"Content Manager\",\n  \"permissions\": [\"Images\", \"Videos\"],\n  \"assignedCategories\": [\"Restaurant\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/subadmins",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "subadmins"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Content Management APIs",
+      "item": [
+        {
+          "name": "Get Pending Approvals",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/content/pending-approvals",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "content", "pending-approvals"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Image",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "title",
+                  "value": "New Restaurant Image",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Image description",
+                  "type": "text"
+                },
+                {
+                  "key": "category",
+                  "value": "BUSINESS",
+                  "type": "text"
+                },
+                {
+                  "key": "businessCategoryId",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "tags",
+                  "value": "restaurant,interior,design",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/content/images",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "content", "images"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Video",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "video",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "title",
+                  "value": "New Restaurant Video",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Video description",
+                  "type": "text"
+                },
+                {
+                  "key": "category",
+                  "value": "BUSINESS",
+                  "type": "text"
+                },
+                {
+                  "key": "businessCategoryId",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "tags",
+                  "value": "restaurant,promo,video",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/content/videos",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "content", "videos"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Mobile API Aliases",
+      "item": [
+        {
+          "name": "Get Categories (Alias)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "categories"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Content (Alias)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/content/{{customerId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "content", "{{customerId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Profile (Alias)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/profile/{{customerId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "profile", "{{customerId}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Auto-generate unique device ID if not set",
+          "if (!pm.collectionVariables.get('deviceId') || pm.collectionVariables.get('deviceId') === 'test-device-123') {",
+          "    pm.collectionVariables.set('deviceId', 'device-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9));",
+          "}"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Auto-save auth token from login responses",
+          "if (pm.response.json() && pm.response.json().token) {",
+          "    pm.collectionVariables.set('authToken', pm.response.json().token);",
+          "    console.log('Auth token saved to collection variable');",
+          "}",
+          "",
+          "// Log response for debugging",
+          "console.log('Response Status:', pm.response.status);",
+          "console.log('Response Body:', pm.response.json());"
+        ]
+      }
+    }
+  ]
+}

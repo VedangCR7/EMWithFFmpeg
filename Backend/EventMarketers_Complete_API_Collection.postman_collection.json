@@ -1,0 +1,1157 @@
+{
+  "info": {
+    "name": "EventMarketers Complete API Collection",
+    "description": "Comprehensive API collection for EventMarketers backend with all implemented endpoints",
+    "version": "2.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{auth_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://eventmarketersbackend.onrender.com",
+      "type": "string"
+    },
+    {
+      "key": "auth_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "admin_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "subadmin_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "customer_token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Admin Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@eventmarketers.com\",\n  \"password\": \"admin123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/admin/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "admin", "login"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.success && response.token) {",
+                  "        pm.collectionVariables.set('admin_token', response.token);",
+                  "        pm.collectionVariables.set('auth_token', response.token);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Subadmin Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"subadmin@eventmarketers.com\",\n  \"password\": \"subadmin123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/subadmin/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "subadmin", "login"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.success && response.token) {",
+                  "        pm.collectionVariables.set('subadmin_token', response.token);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Customer Registration",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Customer\",\n  \"email\": \"customer@example.com\",\n  \"password\": \"password123\",\n  \"phone\": \"+1234567890\",\n  \"businessName\": \"Test Business\",\n  \"businessType\": \"Restaurant\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/mobile/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "mobile", "auth", "register"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.success && response.token) {",
+                  "        pm.collectionVariables.set('customer_token', response.token);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Customer Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"customer@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/mobile/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "mobile", "auth", "login"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.success && response.token) {",
+                  "        pm.collectionVariables.set('customer_token', response.token);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Analytics",
+      "item": [
+        {
+          "name": "User Analytics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/analytics/users",
+              "host": ["{{base_url}}"],
+              "path": ["api", "analytics", "users"]
+            }
+          }
+        },
+        {
+          "name": "Content Analytics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/analytics/content",
+              "host": ["{{base_url}}"],
+              "path": ["api", "analytics", "content"]
+            }
+          }
+        },
+        {
+          "name": "Download Analytics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/analytics/downloads",
+              "host": ["{{base_url}}"],
+              "path": ["api", "analytics", "downloads"]
+            }
+          }
+        },
+        {
+          "name": "Dashboard Analytics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/analytics/dashboard",
+              "host": ["{{base_url}}"],
+              "path": ["api", "analytics", "dashboard"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "File Management",
+      "item": [
+        {
+          "name": "Upload Directory Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/file-management/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "file-management", "status"]
+            }
+          }
+        },
+        {
+          "name": "Supported File Types",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/file-management/types",
+              "host": ["{{base_url}}"],
+              "path": ["api", "file-management", "types"]
+            }
+          }
+        },
+        {
+          "name": "File Statistics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/file-management/stats",
+              "host": ["{{base_url}}"],
+              "path": ["api", "file-management", "stats"]
+            }
+          }
+        },
+        {
+          "name": "Setup Upload Directories",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/file-management/setup",
+              "host": ["{{base_url}}"],
+              "path": ["api", "file-management", "setup"]
+            }
+          }
+        },
+        {
+          "name": "Cleanup Orphaned Files",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/file-management/cleanup",
+              "host": ["{{base_url}}"],
+              "path": ["api", "file-management", "cleanup"]
+            }
+          }
+        },
+        {
+          "name": "Get File Information",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/file-management/info/test-file.jpg",
+              "host": ["{{base_url}}"],
+              "path": ["api", "file-management", "info", "test-file.jpg"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "File Uploads",
+      "item": [
+        {
+          "name": "Upload Image (Original)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "title",
+                  "value": "Test Image",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Test image upload",
+                  "type": "text"
+                },
+                {
+                  "key": "category",
+                  "value": "GENERAL",
+                  "type": "text"
+                },
+                {
+                  "key": "tags",
+                  "value": "test,image,upload",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/content/images/upload",
+              "host": ["{{base_url}}"],
+              "path": ["api", "content", "images", "upload"]
+            }
+          }
+        },
+        {
+          "name": "Upload Image (Simple)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "title",
+                  "value": "Test Image Simple",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Test simple image upload",
+                  "type": "text"
+                },
+                {
+                  "key": "category",
+                  "value": "GENERAL",
+                  "type": "text"
+                },
+                {
+                  "key": "tags",
+                  "value": "test,simple,upload",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/content/images/upload-simple",
+              "host": ["{{base_url}}"],
+              "path": ["api", "content", "images", "upload-simple"]
+            }
+          }
+        },
+        {
+          "name": "Upload Video (Original)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "video",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "title",
+                  "value": "Test Video",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Test video upload",
+                  "type": "text"
+                },
+                {
+                  "key": "category",
+                  "value": "GENERAL",
+                  "type": "text"
+                },
+                {
+                  "key": "tags",
+                  "value": "test,video,upload",
+                  "type": "text"
+                },
+                {
+                  "key": "duration",
+                  "value": "30",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/content/videos/upload",
+              "host": ["{{base_url}}"],
+              "path": ["api", "content", "videos", "upload"]
+            }
+          }
+        },
+        {
+          "name": "Upload Video (Simple)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "video",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "title",
+                  "value": "Test Video Simple",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Test simple video upload",
+                  "type": "text"
+                },
+                {
+                  "key": "category",
+                  "value": "GENERAL",
+                  "type": "text"
+                },
+                {
+                  "key": "tags",
+                  "value": "test,simple,video",
+                  "type": "text"
+                },
+                {
+                  "key": "duration",
+                  "value": "30",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/content/videos/upload-simple",
+              "host": ["{{base_url}}"],
+              "path": ["api", "content", "videos", "upload-simple"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Search",
+      "item": [
+        {
+          "name": "Search Images",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/search/images?q=test&category=GENERAL&page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "search", "images"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "test"
+                },
+                {
+                  "key": "category",
+                  "value": "GENERAL"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search Videos",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/search/videos?q=test&category=GENERAL&page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "search", "videos"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "test"
+                },
+                {
+                  "key": "category",
+                  "value": "GENERAL"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search All Content",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/search/content?q=test&page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "search", "content"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "test"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search Suggestions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/search/suggestions?query=bus",
+              "host": ["{{base_url}}"],
+              "path": ["api", "search", "suggestions"],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "bus"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search Statistics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/search/stats",
+              "host": ["{{base_url}}"],
+              "path": ["api", "search", "stats"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin Management",
+      "item": [
+        {
+          "name": "Get Subadmins",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/subadmins",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "subadmins"]
+            }
+          }
+        },
+        {
+          "name": "Create Subadmin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Subadmin\",\n  \"email\": \"test.subadmin@example.com\",\n  \"password\": \"password123\",\n  \"permissions\": [\"manage_content\", \"view_analytics\"],\n  \"assignedBusinessCategories\": [\"cmfw47iiy00045yh2pq3lqyu7\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/subadmins",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "subadmins"]
+            }
+          }
+        },
+        {
+          "name": "Get Pending Approvals",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/content/pending-approvals",
+              "host": ["{{base_url}}"],
+              "path": ["api", "content", "pending-approvals"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Subscription Management",
+      "item": [
+        {
+          "name": "Activate Customer Subscription",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plan\": \"MONTHLY\",\n  \"amount\": 29.99,\n  \"currency\": \"USD\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/customers/:customerId/activate-subscription",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "customers", ":customerId", "activate-subscription"]
+            }
+          }
+        },
+        {
+          "name": "Deactivate Customer Subscription",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/customers/:customerId/deactivate-subscription",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "customers", ":customerId", "deactivate-subscription"]
+            }
+          }
+        },
+        {
+          "name": "Get Customer Subscription",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/customers/:customerId/subscription",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "customers", ":customerId", "subscription"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Business Profile",
+      "item": [
+        {
+          "name": "Get Business Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/business-profile/profile",
+              "host": ["{{base_url}}"],
+              "path": ["api", "business-profile", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Update Business Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "businessName",
+                  "value": "Updated Business Name",
+                  "type": "text"
+                },
+                {
+                  "key": "businessType",
+                  "value": "Restaurant",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Updated business description",
+                  "type": "text"
+                },
+                {
+                  "key": "address",
+                  "value": "123 Updated Street",
+                  "type": "text"
+                },
+                {
+                  "key": "city",
+                  "value": "Updated City",
+                  "type": "text"
+                },
+                {
+                  "key": "state",
+                  "value": "Updated State",
+                  "type": "text"
+                },
+                {
+                  "key": "zipCode",
+                  "value": "12345",
+                  "type": "text"
+                },
+                {
+                  "key": "country",
+                  "value": "Updated Country",
+                  "type": "text"
+                },
+                {
+                  "key": "website",
+                  "value": "https://updated-website.com",
+                  "type": "text"
+                },
+                {
+                  "key": "businessLogo",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/business-profile/profile",
+              "host": ["{{base_url}}"],
+              "path": ["api", "business-profile", "profile"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Mobile Customer",
+      "item": [
+        {
+          "name": "Get Customer Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/mobile/auth/profile",
+              "host": ["{{base_url}}"],
+              "path": ["api", "mobile", "auth", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Update Customer Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Customer Name\",\n  \"phone\": \"+1234567890\",\n  \"businessName\": \"Updated Business\",\n  \"businessType\": \"Restaurant\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/mobile/auth/profile",
+              "host": ["{{base_url}}"],
+              "path": ["api", "mobile", "auth", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Get Customer Content",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/mobile/content/:customerId",
+              "host": ["{{base_url}}"],
+              "path": ["api", "mobile", "content", ":customerId"]
+            }
+          }
+        },
+        {
+          "name": "Get Customer Profile by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/mobile/profile/:customerId",
+              "host": ["{{base_url}}"],
+              "path": ["api", "mobile", "profile", ":customerId"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Content Management",
+      "item": [
+        {
+          "name": "Get All Images",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/content/images",
+              "host": ["{{base_url}}"],
+              "path": ["api", "content", "images"]
+            }
+          }
+        },
+        {
+          "name": "Get All Videos",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/content/videos",
+              "host": ["{{base_url}}"],
+              "path": ["api", "content", "videos"]
+            }
+          }
+        },
+        {
+          "name": "Approve Content",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"APPROVED\",\n  \"reason\": \"Content meets quality standards\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/content/images/:id/approval",
+              "host": ["{{base_url}}"],
+              "path": ["api", "content", "images", ":id", "approval"]
+            }
+          }
+        },
+        {
+          "name": "Reject Content",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"REJECTED\",\n  \"reason\": \"Content does not meet quality standards\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/content/images/:id/approval",
+              "host": ["{{base_url}}"],
+              "path": ["api", "content", "images", ":id", "approval"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Business Categories",
+      "item": [
+        {
+          "name": "Get Business Categories",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/mobile/business-categories",
+              "host": ["{{base_url}}"],
+              "path": ["api", "mobile", "business-categories"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health Check",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+prefix=/home/mayur/ffmpeg-kit/prebuilt/android-arm-neon-lts/ffmpeg
+exec_prefix=${prefix}
+libdir=/home/mayur/ffmpeg-kit/prebuilt/android-arm-neon-lts/ffmpeg/lib
+includedir=/home/mayur/ffmpeg-kit/prebuilt/android-arm-neon-lts/ffmpeg/include
+
+Name: libavformat_neon
+Description: FFmpeg container format library
+Version: 60.3.100
+Requires: 
+Requires.private: libavcodec_neon >= 60.3.100, libswresample_neon >= 4.10.100, libavutil_neon >= 58.2.100
+Conflicts:
+Libs: -L${libdir}  -lavformat_neon 
+Libs.private: -lm -latomic
+Cflags: -I${includedir}

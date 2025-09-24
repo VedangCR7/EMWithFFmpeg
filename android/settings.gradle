@@ -1,0 +1,14 @@
+pluginManagement { includeBuild("../node_modules/@react-native/gradle-plugin") }
+plugins { id("com.facebook.react.settings") }
+extensions.configure(com.facebook.react.ReactSettingsExtension) { ex -> ex.autolinkLibrariesFromCommand() }
+rootProject.name = 'MarketBrand'
+include ':app'
+includeBuild('../node_modules/@react-native/gradle-plugin')
+
+// Include local FFmpeg Kit Android library
+include ':ffmpeg-kit-android-lib'
+project(':ffmpeg-kit-android-lib').projectDir = new File(rootProject.projectDir, '../ffmpeg-kit-main/android/ffmpeg-kit-android-lib')
+
+// Include local FFmpeg Kit React Native module
+include ':ffmpeg-kit-react-native'
+project(':ffmpeg-kit-react-native').projectDir = new File(rootProject.projectDir, '../ffmpeg-kit-main/react-native/android')

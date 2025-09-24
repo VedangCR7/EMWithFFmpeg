@@ -1,0 +1,291 @@
+import { 
+  getBusinessCategories, 
+  getCustomerContent, 
+  getCustomerProfile,
+  checkAPIHealth 
+} from './eventMarketersApi';
+import { 
+  BusinessCategory, 
+  CustomerContent, 
+  Pagination,
+  buildQueryString 
+} from '../constants/api';
+import userService from './userService';
+
+class ContentService {
+  private static instance: ContentService;
+  private cachedCategories: BusinessCategory[] | null = null;
+  private lastCategoriesFetch: number = 0;
+  private categoriesCacheTimeout: number = 5 * 60 * 1000; // 5 minutes
+
+  public static getInstance(): ContentService {
+    if (!ContentService.instance) {
+      ContentService.instance = new ContentService();
+    }
+    return ContentService.instance;
+  }
+
+  /**
+   * Check API health
+   */
+  async checkHealth(): Promise<boolean> {
+    try {
+      const response = await checkAPIHealth();
+      return response.status === 'healthy';
+    } catch (error) {
+      console.error('API health check failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get business categories with caching
+   */
+  async getBusinessCategories(forceRefresh: boolean = false): Promise<BusinessCategory[]> {
+    try {
+      const now = Date.now();
+      
+      // Return cached categories if not expired and not forcing refresh
+      if (!forceRefresh && 
+          this.cachedCategories && 
+          (now - this.lastCategoriesFetch) < this.categoriesCacheTimeout) {
+        return this.cachedCategories;
+      }
+
+      const response = await getBusinessCategories();
+      
+      if (response.success && response.categories) {
+        this.cachedCategories = response.categories;
+        this.lastCategoriesFetch = now;
+        return response.categories;
+      } else {
+        throw new Error(response.error || 'Failed to fetch categories');
+      }
+    } catch (error) {
+      console.error('Failed to get business categories:', error);
+      
+      // Return cached categories if available, even if expired
+      if (this.cachedCategories) {
+        return this.cachedCategories;
+      }
+      
+      throw error;
+    }
+  }
+
+  /**
+   * Get content for a specific customer
+   */
+  async getCustomerContent(customerId: string, options?: {
+    category?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{
+    content: CustomerContent;
+    pagination: Pagination;
+  }> {
+    try {
+      const response = await getCustomerContent(customerId, options);
+      
+      if (response.success && response.content) {
+        return {
+          content: response.content,
+          pagination: response.pagination || {
+            page: 1,
+            limit: 20,
+            total: 0,
+            totalPages: 0,
+          },
+        };
+      } else {
+        throw new Error(response.error || 'Failed to fetch content');
+      }
+    } catch (error) {
+      console.error('Failed to get customer content:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get customer profile
+   */
+  async getCustomerProfile(customerId: string) {
+    try {
+      const response = await getCustomerProfile(customerId);
+      
+      if (response.success && response.customer) {
+        return response.customer;
+      } else {
+        throw new Error(response.error || 'Failed to fetch customer profile');
+      }
+    } catch (error) {
+      console.error('Failed to get customer profile:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get content by category
+   */
+  async getContentByCategory(customerId: string, category: string, page: number = 1, limit: number = 20) {
+    return this.getCustomerContent(customerId, {
+      category,
+      page,
+      limit,
+    });
+  }
+
+  /**
+   * Search content
+   */
+  async searchContent(customerId: string, query: string, page: number = 1, limit: number = 20) {
+    // Note: This would need to be implemented in the backend
+    // For now, we'll get all content and filter client-side
+    try {
+      const response = await this.getCustomerContent(customerId, { page, limit });
+      
+      // Client-side filtering (not ideal, but works for now)
+      const filteredContent = {
+        images: response.content.images.filter(item => 
+          item.title.toLowerCase().includes(query.toLowerCase()) ||
+          item.description.toLowerCase().includes(query.toLowerCase()) ||
+          item.tags.some(tag => tag.toLowerCase().includes(query.toLowerCase()))
+        ),
+        videos: response.content.videos.filter(item => 
+          item.title.toLowerCase().includes(query.toLowerCase()) ||
+          item.description.toLowerCase().includes(query.toLowerCase()) ||
+          item.tags.some(tag => tag.toLowerCase().includes(query.toLowerCase()))
+        ),
+      };
+
+      return {
+        content: filteredContent,
+        pagination: response.pagination,
+      };
+    } catch (error) {
+      console.error('Failed to search content:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get featured content (most viewed/downloaded)
+   */
+  async getFeaturedContent(customerId: string, limit: number = 10) {
+    try {
+      const response = await this.getCustomerContent(customerId, { limit });
+      
+      // Sort by views and downloads
+      const featuredContent = {
+        images: response.content.images
+          .sort((a, b) => (b.views || 0) - (a.views || 0))
+          .slice(0, limit),
+        videos: response.content.videos
+          .sort((a, b) => (b.views || 0) - (a.views || 0))
+          .slice(0, limit),
+      };
+
+      return featuredContent;
+    } catch (error) {
+      console.error('Failed to get featured content:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get recent content
+   */
+  async getRecentContent(customerId: string, limit: number = 10) {
+    try {
+      const response = await this.getCustomerContent(customerId, { limit });
+      
+      // Sort by creation date (assuming newer content comes first)
+      const recentContent = {
+        images: response.content.images.slice(0, limit),
+        videos: response.content.videos.slice(0, limit),
+      };
+
+      return recentContent;
+    } catch (error) {
+      console.error('Failed to get recent content:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Track content view
+   */
+  async trackContentView(contentId: string, contentType: 'image' | 'video', category?: string) {
+    try {
+      await userService.trackContentView(contentId, contentType, {
+        category,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error('Failed to track content view:', error);
+    }
+  }
+
+  /**
+   * Track content download
+   */
+  async trackContentDownload(contentId: string, contentType: 'image' | 'video', category?: string) {
+    try {
+      await userService.trackContentDownload(contentId, contentType, {
+        category,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error('Failed to track content download:', error);
+    }
+  }
+
+  /**
+   * Get content statistics
+   */
+  async getContentStats(customerId: string) {
+    try {
+      const response = await this.getCustomerContent(customerId, { limit: 1000 }); // Get all content
+      
+      const stats = {
+        totalImages: response.content.images.length,
+        totalVideos: response.content.videos.length,
+        totalViews: response.content.images.reduce((sum, item) => sum + (item.views || 0), 0) +
+                   response.content.videos.reduce((sum, item) => sum + (item.views || 0), 0),
+        totalDownloads: response.content.images.reduce((sum, item) => sum + (item.downloads || 0), 0) +
+                       response.content.videos.reduce((sum, item) => sum + (item.downloads || 0), 0),
+        categories: {} as Record<string, number>,
+      };
+
+      // Count content by category
+      [...response.content.images, ...response.content.videos].forEach(item => {
+        stats.categories[item.category] = (stats.categories[item.category] || 0) + 1;
+      });
+
+      return stats;
+    } catch (error) {
+      console.error('Failed to get content stats:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Clear cache
+   */
+  clearCache(): void {
+    this.cachedCategories = null;
+    this.lastCategoriesFetch = 0;
+  }
+
+  /**
+   * Get cached categories
+   */
+  getCachedCategories(): BusinessCategory[] | null {
+    return this.cachedCategories;
+  }
+}
+
+// Export singleton instance
+const contentService = ContentService.getInstance();
+export default contentService;
+

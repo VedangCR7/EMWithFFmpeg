@@ -1,0 +1,10 @@
+prefix=/home/mayur/ffmpeg-kit/prebuilt/android-arm-lts/jpeg
+exec_prefix=/home/mayur/ffmpeg-kit/prebuilt/android-arm-lts/jpeg
+libdir=/home/mayur/ffmpeg-kit/prebuilt/android-arm-lts/jpeg/lib
+includedir=/home/mayur/ffmpeg-kit/prebuilt/android-arm-lts/jpeg/include
+
+Name: libjpeg
+Description: A SIMD-accelerated JPEG codec that provides the libjpeg API
+Version: 3.0.0
+Libs: -L${libdir} -ljpeg
+Cflags: -I${includedir}

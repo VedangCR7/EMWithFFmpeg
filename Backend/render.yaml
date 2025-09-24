@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: eventmarketers-backend
+    env: node
+    plan: free
+    buildCommand: npm install --include=dev && npm run build && npx prisma generate && npx prisma db push
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: eventmarketers-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: CORS_ORIGIN
+        value: https://your-frontend-domain.com
+      - key: BCRYPT_ROUNDS
+        value: 12
+      - key: RATE_LIMIT_WINDOW_MS
+        value: 900000
+      - key: RATE_LIMIT_MAX_REQUESTS
+        value: 100
+
+databases:
+  - name: eventmarketers_db
+    plan: free
+    databaseName: eventmarketers_db
+    user: eventmarketers_user

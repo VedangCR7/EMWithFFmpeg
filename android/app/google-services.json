@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "1037985236626",
+    "project_id": "eventmarketers",
+    "storage_bucket": "eventmarketers.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1037985236626:android:e1cda3477365eaec28884b",
+        "android_client_info": {
+          "package_name": "com.eventmarketers"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1037985236626-im6lbdis9q5g1bptng6g22ods7mf4bjh.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBh6CHiC4RtoJDKXkWPGPVAkgkhepdONPA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1037985236626-im6lbdis9q5g1bptng6g22ods7mf4bjh.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
