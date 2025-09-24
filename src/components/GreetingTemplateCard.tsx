@@ -18,9 +18,25 @@ const { width: screenWidth } = Dimensions.get('window');
 // Responsive design helpers
 const isSmallScreen = screenWidth < 375;
 const isMediumScreen = screenWidth >= 375 && screenWidth < 414;
+const isTablet = screenWidth >= 768;
 
-const cardWidth = isSmallScreen ? screenWidth * 0.29 : isMediumScreen ? screenWidth * 0.28 : screenWidth * 0.27;
-const cardHeight = cardWidth * 1.3;
+// Calculate proper card width with even spacing
+export const getCardDimensions = () => {
+  const padding = 16; // Total horizontal padding for FlatList
+  const gap = 8; // Gap between cards
+  
+  // Always use 3 columns for consistent layout
+  const columns = 3;
+  
+  const totalGap = (columns - 1) * gap;
+  const availableWidth = screenWidth - (padding * 2) - totalGap;
+  const cardWidth = Math.floor(availableWidth / columns);
+  const cardHeight = cardWidth * 1.3;
+  
+  return { cardWidth, cardHeight, columns };
+};
+
+const { cardWidth, cardHeight } = getCardDimensions();
 
 interface GreetingTemplateCardProps {
   template: GreetingTemplate;

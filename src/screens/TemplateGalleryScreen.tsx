@@ -33,6 +33,7 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
 const isMediumScreen = screenWidth >= 375 && screenWidth < 414;
 const isLargeScreen = screenWidth >= 414;
+const isTablet = screenWidth >= 768;
 
 // Responsive spacing and sizing
 const responsiveSpacing = {
@@ -217,7 +218,7 @@ const TemplateGalleryScreen: React.FC = () => {
           <View style={[styles.upgradeModalContent, { backgroundColor: '#ffffff' }]}>
             {/* Premium Badge */}
             <View style={styles.premiumBadge}>
-              <Icon name="star" size={isSmallScreen ? 20 : 24} color="#DAA520" />
+              <Icon name="star" size={isSmallScreen ? 20 : isTablet ? 28 : 24} color="#DAA520" />
               <Text style={[styles.premiumBadgeText, { color: '#B8860B' }]}>PREMIUM</Text>
             </View>
 
@@ -249,25 +250,25 @@ const TemplateGalleryScreen: React.FC = () => {
             {/* Features List */}
             <View style={styles.featuresList}>
               <View style={styles.featureItem}>
-                <Icon name="check-circle" size={isSmallScreen ? 18 : 20} color="#4CAF50" />
+                <Icon name="check-circle" size={isSmallScreen ? 18 : isTablet ? 24 : 20} color="#4CAF50" />
                 <Text style={[styles.featureText, { color: '#1a1a1a' }]}>
                   Access to all premium templates
                 </Text>
               </View>
               <View style={styles.featureItem}>
-                <Icon name="check-circle" size={isSmallScreen ? 18 : 20} color="#4CAF50" />
+                <Icon name="check-circle" size={isSmallScreen ? 18 : isTablet ? 24 : 20} color="#4CAF50" />
                 <Text style={[styles.featureText, { color: '#1a1a1a' }]}>
                   No watermarks on final designs
                 </Text>
               </View>
               <View style={styles.featureItem}>
-                <Icon name="check-circle" size={isSmallScreen ? 18 : 20} color="#4CAF50" />
+                <Icon name="check-circle" size={isSmallScreen ? 18 : isTablet ? 24 : 20} color="#4CAF50" />
                 <Text style={[styles.featureText, { color: '#1a1a1a' }]}>
                   Priority customer support
                 </Text>
               </View>
               <View style={styles.featureItem}>
-                <Icon name="check-circle" size={isSmallScreen ? 18 : 20} color="#4CAF50" />
+                <Icon name="check-circle" size={isSmallScreen ? 18 : isTablet ? 24 : 20} color="#4CAF50" />
                 <Text style={[styles.featureText, { color: '#1a1a1a' }]}>
                   Advanced editing features
                 </Text>
@@ -297,7 +298,7 @@ const TemplateGalleryScreen: React.FC = () => {
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                 >
-                  <Icon name="star" size={isSmallScreen ? 14 : 16} color="#ffffff" style={styles.upgradeButtonIcon} />
+                  <Icon name="star" size={isSmallScreen ? 14 : isTablet ? 20 : 16} color="#ffffff" style={styles.upgradeButtonIcon} />
                   <Text style={styles.upgradeButtonText}>Upgrade to Premium</Text>
                 </LinearGradient>
               </TouchableOpacity>
@@ -714,14 +715,19 @@ const styles = StyleSheet.create({
   // Modal Styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: isSmallScreen ? 16 : isTablet ? 32 : 20,
   },
   modalScrollView: {
-    flex: 1,
+    maxHeight: screenHeight * 0.9,
+    width: '100%',
+    maxWidth: isTablet ? 500 : screenWidth - 32,
   },
   modalScrollContent: {
     flexGrow: 1,
+    justifyContent: 'center',
   },
   modalContent: {
     borderTopLeftRadius: 24,
@@ -820,60 +826,65 @@ const styles = StyleSheet.create({
    },
    // Upgrade Modal Styles
    upgradeModalContent: {
-     margin: isSmallScreen ? 12 : 20,
-     borderRadius: 24,
-     padding: isSmallScreen ? 16 : 24,
+     borderRadius: isTablet ? 32 : isSmallScreen ? 20 : 24,
+     padding: isSmallScreen ? 20 : isTablet ? 32 : 24,
      shadowColor: '#000',
      shadowOffset: {
        width: 0,
-       height: 8,
+       height: isTablet ? 12 : 8,
      },
-     shadowOpacity: 0.25,
-     shadowRadius: 16,
-     elevation: 20,
-     maxHeight: screenHeight * 0.85,
-     minHeight: screenHeight * 0.4,
+     shadowOpacity: isTablet ? 0.3 : 0.25,
+     shadowRadius: isTablet ? 20 : 16,
+     elevation: isTablet ? 25 : 20,
      width: '100%',
-     maxWidth: screenWidth - (isSmallScreen ? 24 : 40),
+     minHeight: isSmallScreen ? screenHeight * 0.35 : screenHeight * 0.4,
+     maxHeight: screenHeight * 0.85,
    },
    premiumBadge: {
      flexDirection: 'row',
      alignItems: 'center',
      justifyContent: 'center',
      backgroundColor: 'rgba(255, 215, 0, 0.1)',
-     paddingHorizontal: 16,
-     paddingVertical: 8,
-     borderRadius: 20,
+     paddingHorizontal: isSmallScreen ? 12 : isTablet ? 20 : 16,
+     paddingVertical: isSmallScreen ? 6 : isTablet ? 10 : 8,
+     borderRadius: isTablet ? 24 : 20,
      alignSelf: 'center',
-     marginBottom: 20,
+     marginBottom: isSmallScreen ? 16 : isTablet ? 24 : 20,
+     borderWidth: 1,
+     borderColor: 'rgba(255, 215, 0, 0.3)',
    },
    premiumBadgeText: {
-     fontSize: 12,
+     fontSize: isSmallScreen ? 10 : isTablet ? 14 : 12,
      fontWeight: '700',
-     color: '#FFD700',
-     marginLeft: 6,
+     color: '#B8860B',
+     marginLeft: isTablet ? 8 : 6,
      letterSpacing: 1,
    },
    upgradeModalHeader: {
      alignItems: 'center',
-     marginBottom: 24,
+     marginBottom: isSmallScreen ? 20 : isTablet ? 32 : 24,
    },
    upgradeModalTitle: {
-     fontSize: 24,
+     fontSize: isSmallScreen ? 20 : isTablet ? 28 : 24,
      fontWeight: '700',
      textAlign: 'center',
-     marginBottom: 8,
+     marginBottom: isSmallScreen ? 6 : isTablet ? 12 : 8,
+     paddingHorizontal: isSmallScreen ? 8 : 0,
+     color: '#1a1a1a',
+     lineHeight: isSmallScreen ? 24 : isTablet ? 36 : 30,
    },
    upgradeModalSubtitle: {
-     fontSize: 16,
+     fontSize: isSmallScreen ? 14 : isTablet ? 18 : 16,
      textAlign: 'center',
-     lineHeight: 22,
+     lineHeight: isSmallScreen ? 20 : isTablet ? 26 : 22,
+     paddingHorizontal: isSmallScreen ? 8 : isTablet ? 16 : 0,
+     color: '#666666',
    },
    templatePreview: {
-     height: 120,
-     borderRadius: 16,
+     height: isSmallScreen ? 100 : isTablet ? 140 : 120,
+     borderRadius: isTablet ? 20 : 16,
      overflow: 'hidden',
-     marginBottom: 24,
+     marginBottom: isSmallScreen ? 20 : isTablet ? 28 : 24,
      position: 'relative',
    },
    templatePreviewImage: {
@@ -886,73 +897,87 @@ const styles = StyleSheet.create({
      left: 0,
      right: 0,
      backgroundColor: 'rgba(0, 0, 0, 0.7)',
-     padding: 16,
+     padding: isSmallScreen ? 12 : isTablet ? 20 : 16,
    },
    templatePreviewTitle: {
-     fontSize: 16,
+     fontSize: isSmallScreen ? 14 : isTablet ? 18 : 16,
      fontWeight: '600',
      color: '#ffffff',
-     marginBottom: 4,
+     marginBottom: isTablet ? 6 : 4,
    },
    templatePreviewDescription: {
-     fontSize: 14,
+     fontSize: isSmallScreen ? 12 : isTablet ? 16 : 14,
      color: 'rgba(255, 255, 255, 0.8)',
    },
    featuresList: {
-     marginBottom: 24,
+     marginBottom: isSmallScreen ? 20 : isTablet ? 28 : 24,
    },
    featureItem: {
      flexDirection: 'row',
      alignItems: 'center',
-     marginBottom: 12,
+     marginBottom: isSmallScreen ? 10 : isTablet ? 16 : 12,
    },
    featureText: {
-     fontSize: 16,
-     marginLeft: 12,
+     fontSize: isSmallScreen ? 14 : isTablet ? 18 : 16,
+     marginLeft: isSmallScreen ? 10 : isTablet ? 16 : 12,
      flex: 1,
+     lineHeight: isSmallScreen ? 20 : isTablet ? 26 : 22,
+     color: '#1a1a1a',
    },
    upgradeModalFooter: {
      flexDirection: isSmallScreen ? 'column' : 'row',
-     gap: isSmallScreen ? 12 : 16,
+     gap: isSmallScreen ? 12 : isTablet ? 20 : 16,
      alignItems: 'stretch',
      width: '100%',
+     marginTop: isTablet ? 8 : 0,
+     justifyContent: 'center',
    },
    cancelButton: {
-     flex: isSmallScreen ? undefined : 1,
-     paddingVertical: isSmallScreen ? 14 : 16,
-     paddingHorizontal: 16,
-     borderRadius: 12,
+     flex: 1,
+     paddingVertical: isSmallScreen ? 14 : isTablet ? 18 : 16,
+     paddingHorizontal: isSmallScreen ? 16 : isTablet ? 24 : 20,
+     borderRadius: isTablet ? 16 : 12,
      borderWidth: 1,
      alignItems: 'center',
      justifyContent: 'center',
-     minHeight: 48,
+     minHeight: isSmallScreen ? 48 : isTablet ? 56 : 48,
      maxWidth: '100%',
+     minWidth: isSmallScreen ? 140 : isTablet ? 180 : 160,
+     borderColor: '#cccccc',
    },
    cancelButtonText: {
-     fontSize: isSmallScreen ? 14 : 16,
+     fontSize: isSmallScreen ? 14 : isTablet ? 17 : 16,
      fontWeight: '600',
+     color: '#666666',
+     textAlign: 'center',
+     flexShrink: 0,
    },
    upgradeButton: {
-     flex: isSmallScreen ? undefined : 1,
-     borderRadius: 12,
+     flex: 1,
+     borderRadius: isTablet ? 16 : 12,
      overflow: 'hidden',
-     minHeight: 48,
+     minHeight: isSmallScreen ? 48 : isTablet ? 56 : 48,
      maxWidth: '100%',
+     minWidth: isSmallScreen ? 140 : isTablet ? 180 : 160,
    },
    upgradeButtonGradient: {
      flexDirection: 'row',
      alignItems: 'center',
      justifyContent: 'center',
-     paddingVertical: isSmallScreen ? 14 : 16,
-     minHeight: 48,
+     paddingVertical: isSmallScreen ? 14 : isTablet ? 18 : 16,
+     paddingHorizontal: isSmallScreen ? 12 : isTablet ? 20 : 16,
+     minHeight: isSmallScreen ? 48 : isTablet ? 56 : 48,
    },
    upgradeButtonIcon: {
-     marginRight: 8,
+     marginRight: isSmallScreen ? 4 : isTablet ? 8 : 6,
    },
    upgradeButtonText: {
-     fontSize: 16,
+     fontSize: isSmallScreen ? 12 : isTablet ? 16 : 14,
      fontWeight: '700',
      color: '#ffffff',
+     textAlign: 'center',
+     flexShrink: 0,
+     numberOfLines: 1,
    },
  });
 
