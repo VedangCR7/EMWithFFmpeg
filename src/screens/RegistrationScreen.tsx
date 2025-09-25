@@ -149,6 +149,22 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
   }, []);
 
   const handleInputChange = (field: string, value: string) => {
+    // Phone number validation and length restriction
+    if (field === 'phone' || field === 'alternatePhone') {
+      // Remove any non-numeric characters
+      const numericValue = value.replace(/[^0-9]/g, '');
+      
+      // Limit to 10 digits
+      if (numericValue.length <= 10) {
+        setFormData(prev => ({
+          ...prev,
+          [field]: numericValue,
+        }));
+      }
+      // If user tries to enter more than 10 digits, ignore the input
+      return;
+    }
+
     setFormData(prev => ({
       ...prev,
       [field]: value,
@@ -176,6 +192,11 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
     }
     if (!formData.phone.trim()) {
       errors.phone = 'Phone number is required';
+    } else if (formData.phone.length !== 10) {
+      errors.phone = 'Enter phone number';
+    }
+    if (formData.alternatePhone && formData.alternatePhone.length !== 10) {
+      errors.alternatePhone = 'Enter alternate phone number ';
     }
     if (!formData.password.trim()) {
       errors.password = 'Password is required';
@@ -220,6 +241,13 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
     }
     if (!formData.phone.trim()) {
       basicValidationErrors.phone = 'Phone number is required';
+      hasBasicErrors = true;
+    } else if (formData.phone.length !== 10) {
+      basicValidationErrors.phone = 'Phone number must be exactly 10 digits';
+      hasBasicErrors = true;
+    }
+    if (formData.alternatePhone && formData.alternatePhone.length !== 10) {
+      basicValidationErrors.alternatePhone = 'Alternate phone number must be exactly 10 digits';
       hasBasicErrors = true;
     }
     if (!formData.password.trim()) {
@@ -473,7 +501,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                 value={formData.phone}
                 onChangeText={(value) => handleInputChange('phone', value)}
                 field="phone"
-                placeholder="Enter phone number"
+                placeholder="Enter 10-digit phone number"
                 keyboardType="phone-pad"
                 focusedField={focusedField}
                 setFocusedField={setFocusedField}
@@ -484,7 +512,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                 value={formData.alternatePhone || ''}
                 onChangeText={(value) => handleInputChange('alternatePhone', value)}
                 field="alternatePhone"
-                placeholder="Enter alternate phone number"
+                placeholder="Enter 10-digit alternate phone number"
                 keyboardType="phone-pad"
                   focusedField={focusedField}
                   setFocusedField={setFocusedField}
