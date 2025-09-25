@@ -1,5 +1,5 @@
 import api from './api';
-import authService from './authService';
+import authService from './auth';
 
 // Types for subscription
 export interface SubscriptionPlan {

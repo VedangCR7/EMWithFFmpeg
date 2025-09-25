@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from './api';
-import authService from './authService';
+import authService from './auth';
 
 export interface Transaction {
   id: string;
