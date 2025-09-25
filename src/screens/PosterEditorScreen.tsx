@@ -31,6 +31,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { PanGestureHandler, State, PinchGestureHandler } from 'react-native-gesture-handler';
 import businessProfileService, { BusinessProfile } from '../services/businessProfile';
+import authService from '../services/auth';
 import { frames, Frame, getFramesByCategory } from '../data/frames';
 import { mapBusinessProfileToFrameContent, generateLayersFromFrame, getFrameBackgroundSource } from '../utils/frameUtils';
 import FrameSelector from '../components/FrameSelector';
@@ -771,23 +772,108 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     ]).start();
   }, []);
 
-  // Fetch business profiles
+  // Fetch business profiles - now user-specific
   const fetchBusinessProfiles = async () => {
     try {
       setLoadingProfiles(true);
-      const profiles = await businessProfileService.getBusinessProfiles();
-      setBusinessProfiles(profiles);
       
-      if (profiles.length === 1) {
-        // If only one profile, auto-select it
-        setSelectedBusinessProfile(profiles[0]);
-        applyBusinessProfileToPoster(profiles[0]);
-      } else if (profiles.length > 1) {
-        // If multiple profiles, show selection modal
-        setShowProfileSelectionModal(true);
+      // Get current user ID
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id;
+      
+      if (!userId) {
+        console.log('⚠️ No user ID available, using fallback business profiles');
+        // Use mock data if no user ID
+        const mockProfiles = [
+          {
+            id: '1',
+            name: 'Tech Solutions Inc.',
+            description: 'Leading technology solutions provider',
+            category: 'Technology',
+            address: '123 Innovation Drive, Tech City',
+            phone: '+1 (555) 123-4567',
+            email: 'contact@techsolutions.com',
+            services: ['Custom Software Development', 'Web Development'],
+            workingHours: {},
+            rating: 4.8,
+            reviewCount: 156,
+            isVerified: true,
+            createdAt: '2024-01-15T10:00:00Z',
+            updatedAt: '2024-01-20T14:30:00Z',
+          }
+        ];
+        setBusinessProfiles(mockProfiles);
+        setSelectedBusinessProfile(mockProfiles[0]);
+        applyBusinessProfileToPoster(mockProfiles[0]);
+        return;
+      }
+      
+      console.log('🔍 Fetching user-specific business profiles for user:', userId);
+      
+      // Fetch user-specific business profiles
+      const profiles = await businessProfileService.getUserBusinessProfiles(userId);
+      
+      if (profiles.length > 0) {
+        setBusinessProfiles(profiles);
+        console.log('✅ Loaded user-specific business profiles:', profiles.length);
+        
+        if (profiles.length === 1) {
+          // If only one profile, auto-select it
+          setSelectedBusinessProfile(profiles[0]);
+          applyBusinessProfileToPoster(profiles[0]);
+        } else if (profiles.length > 1) {
+          // If multiple profiles, show selection modal
+          setShowProfileSelectionModal(true);
+        }
+      } else {
+        console.log('⚠️ No user-specific business profiles found, using fallback');
+        // Use mock data if no user profiles found
+        const mockProfiles = [
+          {
+            id: '1',
+            name: 'Tech Solutions Inc.',
+            description: 'Leading technology solutions provider',
+            category: 'Technology',
+            address: '123 Innovation Drive, Tech City',
+            phone: '+1 (555) 123-4567',
+            email: 'contact@techsolutions.com',
+            services: ['Custom Software Development', 'Web Development'],
+            workingHours: {},
+            rating: 4.8,
+            reviewCount: 156,
+            isVerified: true,
+            createdAt: '2024-01-15T10:00:00Z',
+            updatedAt: '2024-01-20T14:30:00Z',
+          }
+        ];
+        setBusinessProfiles(mockProfiles);
+        setSelectedBusinessProfile(mockProfiles[0]);
+        applyBusinessProfileToPoster(mockProfiles[0]);
       }
     } catch (error) {
-      console.error('Error fetching business profiles:', error);
+      console.error('Error fetching user-specific business profiles:', error);
+      // Use mock data immediately on error
+      const mockProfiles = [
+        {
+          id: '1',
+          name: 'Tech Solutions Inc.',
+          description: 'Leading technology solutions provider',
+          category: 'Technology',
+          address: '123 Innovation Drive, Tech City',
+          phone: '+1 (555) 123-4567',
+          email: 'contact@techsolutions.com',
+          services: ['Custom Software Development', 'Web Development'],
+          workingHours: {},
+          rating: 4.8,
+          reviewCount: 156,
+          isVerified: true,
+          createdAt: '2024-01-15T10:00:00Z',
+          updatedAt: '2024-01-20T14:30:00Z',
+        }
+      ];
+      setBusinessProfiles(mockProfiles);
+      setSelectedBusinessProfile(mockProfiles[0]);
+      applyBusinessProfileToPoster(mockProfiles[0]);
       Alert.alert('Error', 'Failed to load business profiles');
     } finally {
       setLoadingProfiles(false);

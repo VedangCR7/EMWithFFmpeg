@@ -52,6 +52,64 @@ class BusinessProfileService {
   private cacheTimestamp: number = 0;
   private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
 
+  // Get user-specific business profiles
+  async getUserBusinessProfiles(userId: string): Promise<BusinessProfile[]> {
+    try {
+      console.log('Fetching user-specific business profiles for user:', userId);
+      const response = await api.get(`/api/mobile/business-profile/${userId}`);
+      
+      if (response.data.success) {
+        const profile = response.data.data;
+        if (profile) {
+          // Convert single profile to array format
+          const businessProfile: BusinessProfile = {
+            id: profile.id,
+            name: profile.businessName,
+            description: profile.description || '',
+            category: profile.category,
+            address: profile.address || '',
+            phone: profile.phone || '',
+            alternatePhone: '',
+            email: profile.email || '',
+            website: profile.website || '',
+            logo: profile.logo || '',
+            companyLogo: profile.logo || '',
+            banner: '',
+            socialMedia: profile.socialMedia || {
+              facebook: '',
+              instagram: '',
+              twitter: '',
+              linkedin: '',
+            },
+            services: [],
+            workingHours: {
+              monday: { open: '09:00', close: '18:00', isOpen: true },
+              tuesday: { open: '09:00', close: '18:00', isOpen: true },
+              wednesday: { open: '09:00', close: '18:00', isOpen: true },
+              thursday: { open: '09:00', close: '18:00', isOpen: true },
+              friday: { open: '09:00', close: '18:00', isOpen: true },
+              saturday: { open: '10:00', close: '16:00', isOpen: true },
+              sunday: { open: '00:00', close: '00:00', isOpen: false },
+            },
+            rating: 0,
+            reviewCount: 0,
+            isVerified: false,
+            createdAt: profile.createdAt,
+            updatedAt: profile.updatedAt,
+          };
+          return [businessProfile];
+        }
+        return [];
+      } else {
+        console.log('No user-specific business profile found');
+        return [];
+      }
+    } catch (error) {
+      console.error('Error fetching user-specific business profiles:', error);
+      return [];
+    }
+  }
+
   // Get all business profiles with caching
   async getBusinessProfiles(): Promise<BusinessProfile[]> {
     // Check if cache is valid
