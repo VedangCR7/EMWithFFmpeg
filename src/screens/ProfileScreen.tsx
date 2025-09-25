@@ -24,6 +24,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import userBusinessProfilesService from '../services/userBusinessProfiles';
 import userLikesService from '../services/userLikes';
 import userPreferencesService from '../services/userPreferences';
+import userProfileService from '../services/userProfile';
 import { useTheme } from '../context/ThemeContext';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import downloadedPostersService from '../services/downloadedPosters';
@@ -78,7 +79,9 @@ const ProfileScreen: React.FC = () => {
   const [businessProfileStats, setBusinessProfileStats] = useState({ total: 0, recentCount: 0 });
   const [likeStats, setLikeStats] = useState({ total: 0, recentCount: 0, byType: { template: 0, video: 0, poster: 0, businessProfile: 0 } });
   const [showImagePickerModal, setShowImagePickerModal] = useState(false);
-  const [profileImageUri, setProfileImageUri] = useState<string | null>(null);
+  const [profileImageUri, setProfileImageUri] = useState<string | null>(
+    currentUser?.companyLogo || currentUser?.businessLogo || currentUser?.logo || null
+  );
   const [userPreferences, setUserPreferences] = useState<any>(null);
   const { isDarkMode, toggleDarkMode, theme } = useTheme();
   const { isSubscribed, transactionStats } = useSubscription();
@@ -107,14 +110,48 @@ const ProfileScreen: React.FC = () => {
     darkModeAnimation.setValue(isDarkMode ? 1 : 0);
   }, [isDarkMode]);
 
-  // Load poster stats when screen is focused
+  // Load user profile data and stats when screen is focused
   useFocusEffect(
     React.useCallback(() => {
-      const loadPosterStats = async () => {
+      const loadUserProfileData = async () => {
         try {
-          // Get current user ID for user-specific downloads
+          // Get current user ID for user-specific data
           const currentUser = authService.getCurrentUser();
           const userId = currentUser?.id;
+          
+          if (!userId) {
+            console.log('⚠️ No user ID available for loading profile data');
+            return;
+          }
+
+          console.log('🔍 Loading complete user profile data for user:', userId);
+
+          // Load complete user profile from backend
+          try {
+            const profileResponse = await authApi.getProfile(currentUser?.deviceId, userId);
+            const completeUserData = profileResponse.data;
+            
+            console.log('🔍 Complete Profile Data from API:', JSON.stringify(completeUserData, null, 2));
+            
+            // Update current user with complete profile data
+            const updatedUserData = {
+              ...currentUser,
+              ...completeUserData,
+            };
+            
+            // Update auth service with complete data
+            authService.setCurrentUser(updatedUserData);
+            
+            // Update profile image from companyLogo
+            if (completeUserData?.companyLogo || completeUserData?.logo) {
+              setProfileImageUri(completeUserData?.companyLogo || completeUserData?.logo);
+            }
+            
+            console.log('✅ User profile data loaded and updated');
+          } catch (error) {
+            console.log('⚠️ Failed to load profile data from API:', error);
+            // Continue with existing user data
+          }
           
           // Load poster stats
           const posterStats = await downloadedPostersService.getPosterStats(userId);
@@ -123,23 +160,23 @@ const ProfileScreen: React.FC = () => {
             recentCount: posterStats.recentCount,
           });
           
-          // Load business profile stats
-          const businessStats = await userBusinessProfilesService.getBusinessProfileStats(userId);
+          // Load business profile stats from backend
+          const businessStats = await userProfileService.getBusinessProfileStats(userId);
           setBusinessProfileStats({
             total: businessStats.total,
             recentCount: businessStats.recentCount,
           });
           
-          // Load like stats
-          const likeStats = await userLikesService.getLikeStats(userId);
+          // Load like stats from backend
+          const likeStats = await userProfileService.getLikeStats(userId);
           setLikeStats({
             total: likeStats.total,
             recentCount: likeStats.recentCount,
             byType: likeStats.byType,
           });
           
-          // Load user preferences
-          const preferences = await userPreferencesService.getUserPreferences(userId);
+          // Load user preferences from backend
+          const preferences = await userProfileService.getUserPreferences(userId);
           setUserPreferences(preferences);
           
           // Set preferences state
@@ -149,11 +186,11 @@ const ProfileScreen: React.FC = () => {
           
           console.log('📊 Loaded stats for user:', userId, 'Posters:', posterStats.total, 'Business Profiles:', businessStats.total, 'Likes:', likeStats.total, 'Preferences:', preferences?.notificationsEnabled);
         } catch (error) {
-          console.error('Error loading stats:', error);
+          console.error('Error loading user profile data:', error);
         }
       };
 
-      loadPosterStats();
+      loadUserProfileData();
     }, [])
   );
 
@@ -199,8 +236,8 @@ const ProfileScreen: React.FC = () => {
       const newValue = !notificationsEnabled;
       setNotificationsEnabled(newValue);
       
-      // Save to user preferences
-      await userPreferencesService.updatePreference(userId, 'notificationsEnabled', newValue);
+      // Save to user preferences via backend
+      await userProfileService.updatePreference(userId, 'notificationsEnabled', newValue);
       
       // Animate the toggle
       Animated.timing(notificationsAnimation, {
@@ -228,9 +265,9 @@ const ProfileScreen: React.FC = () => {
       const newValue = !isDarkMode;
       toggleDarkMode();
       
-      // Save to user preferences
+      // Save to user preferences via backend
       if (userId) {
-        await userPreferencesService.updatePreference(userId, 'darkModeEnabled', newValue);
+        await userProfileService.updatePreference(userId, 'darkModeEnabled', newValue);
         console.log('✅ Dark mode preference updated for user:', userId, 'Value:', newValue);
       }
       
@@ -280,12 +317,38 @@ const ProfileScreen: React.FC = () => {
 
   const handleEditProfile = async () => {
     try {
-      // Try to fetch complete profile data from API
+      // Always fetch complete profile data from API
       console.log('🔍 Fetching complete profile data from API...');
-      const profileResponse = await authApi.getProfile();
+      
+      const currentUser = authService.getCurrentUser();
+      
+      if (!currentUser) {
+        console.log('⚠️ No current user available');
+        throw new Error('No user data available');
+      }
+      
+      const deviceId = currentUser?.deviceId;
+      const userId = currentUser?.id;
+      
+      if (!deviceId && !userId) {
+        throw new Error('No user identifiers available');
+      }
+      
+      console.log('🔍 Fetching profile using deviceId:', deviceId, 'userId:', userId);
+      
+      const profileResponse = await authApi.getProfile(deviceId, userId);
       const completeUserData = profileResponse.data;
       
       console.log('🔍 Complete Profile Data from API:', JSON.stringify(completeUserData, null, 2));
+      
+      // Update current user with complete profile data
+      const updatedUserData = {
+        ...currentUser,
+        ...completeUserData,
+      };
+      
+      // Update auth service with complete data
+      authService.setCurrentUser(updatedUserData);
       
       setEditFormData({
         name: completeUserData?.displayName || completeUserData?.companyName || completeUserData?.name || completeUserData?.businessName || '',
@@ -302,53 +365,24 @@ const ProfileScreen: React.FC = () => {
       setShowEditProfileModal(true);
       
     } catch (error) {
-      console.log('⚠️ Failed to fetch complete profile data, checking local storage:', error);
+      console.log('⚠️ Failed to fetch complete profile data from API:', error);
       
-      try {
-        // Try to get complete profile data from local storage
-        const storedCompleteData = await AsyncStorage.getItem('completeProfileData');
-        
-        if (storedCompleteData) {
-          const completeUserData = JSON.parse(storedCompleteData);
-          console.log('🔍 Edit Profile - Complete Data from Storage:', JSON.stringify(completeUserData, null, 2));
-          
-          setEditFormData({
-            name: completeUserData?.displayName || completeUserData?.companyName || completeUserData?.name || completeUserData?.businessName || '',
-            description: completeUserData?.description || completeUserData?.bio || completeUserData?.businessDescription || '',
-            category: completeUserData?.category || completeUserData?.businessCategory || '',
-            address: completeUserData?.address || completeUserData?.businessAddress || '',
-            phone: completeUserData?.phoneNumber || completeUserData?.phone || completeUserData?.businessPhone || '',
-            alternatePhone: completeUserData?.alternatePhone || completeUserData?.alternateBusinessPhone || '',
-            email: completeUserData?.email || completeUserData?.businessEmail || '',
-            website: completeUserData?.website || completeUserData?.businessWebsite || '',
-            companyLogo: completeUserData?.companyLogo || completeUserData?.businessLogo || completeUserData?.logo || '',
-          });
-          
-          setShowEditProfileModal(true);
-          return;
-        }
-      } catch (storageError) {
-        console.log('⚠️ Failed to get complete profile data from storage:', storageError);
-      }
+      // No local storage fallback - API only
+      console.log('❌ All profile API endpoints failed, showing error to user');
       
-      // Final fallback to local user data
-    const user = authService.getCurrentUser();
-      
-      console.log('🔍 Edit Profile - Local User Data (Fallback):', JSON.stringify(user, null, 2));
-      
-    setEditFormData({
-        name: user?.displayName || user?.companyName || user?.name || user?.businessName || '',
-        description: user?.description || user?.bio || user?.businessDescription || '',
-        category: user?.category || user?.businessCategory || '',
-        address: user?.address || user?.businessAddress || '',
-        phone: user?.phoneNumber || user?.phone || user?.businessPhone || '',
-        alternatePhone: user?.alternatePhone || user?.alternateBusinessPhone || '',
-        email: user?.email || user?.businessEmail || '',
-        website: user?.website || user?.businessWebsite || '',
-        companyLogo: user?.companyLogo || user?.businessLogo || user?.logo || '',
-      });
-      
-    setShowEditProfileModal(true);
+      // Show error to user instead of using local data
+      Alert.alert(
+        'Error', 
+        'Failed to load profile data from server. Please check your internet connection and try again.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              console.log('Edit profile cancelled due to API error');
+            }
+          }
+        ]
+      );
     }
   };
 
@@ -380,28 +414,58 @@ const ProfileScreen: React.FC = () => {
 
     setIsUpdating(true);
     try {
-      // Here you would typically call your auth service to update the profile
-      // For now, we'll simulate the update
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id;
       
-      // Update the current user object (in a real app, this would come from the service)
-      if (currentUser) {
-        currentUser.displayName = editFormData.name.trim();
-        currentUser.companyName = editFormData.name.trim();
-        currentUser.email = editFormData.email.trim();
-        currentUser.phoneNumber = editFormData.phone.trim();
-        currentUser.description = editFormData.description.trim();
-        currentUser.bio = editFormData.description.trim(); // For backward compatibility
-        currentUser.category = editFormData.category.trim();
-        currentUser.address = editFormData.address.trim();
-        currentUser.alternatePhone = editFormData.alternatePhone.trim();
-        currentUser.website = editFormData.website.trim();
-        currentUser.companyLogo = editFormData.companyLogo.trim();
+      if (!userId) {
+        Alert.alert('Error', 'User not found. Please log in again.');
+        return;
       }
+
+      // Update profile via backend API
+      const updateData = {
+        name: editFormData.name.trim(),
+        email: editFormData.email.trim(),
+        phone: editFormData.phone.trim(),
+        description: editFormData.description.trim(),
+        category: editFormData.category.trim(),
+        address: editFormData.address.trim(),
+        alternatePhone: editFormData.alternatePhone.trim(),
+        website: editFormData.website.trim(),
+        companyLogo: editFormData.companyLogo.trim()
+      };
+
+      const response = await authApi.updateProfile(updateData, userId);
       
-      setShowEditProfileModal(false);
-      Alert.alert('Success', 'Profile updated successfully!');
+      if (response.success) {
+        // Update the current user object with the response
+        const updatedUser = {
+          ...currentUser,
+          ...response.data,
+          displayName: response.data.name,
+          companyName: response.data.name,
+          phoneNumber: response.data.phone,
+          bio: response.data.description,
+          businessName: response.data.name,
+          businessEmail: response.data.email,
+          businessPhone: response.data.phone,
+          businessDescription: response.data.description,
+          businessCategory: response.data.category,
+          businessAddress: response.data.address,
+          alternateBusinessPhone: response.data.alternatePhone,
+          businessWebsite: response.data.website,
+          businessLogo: response.data.companyLogo,
+        };
+        
+        authService.setCurrentUser(updatedUser);
+        
+        setShowEditProfileModal(false);
+        Alert.alert('Success', 'Profile updated successfully!');
+      } else {
+        throw new Error('API returned unsuccessful response');
+      }
     } catch (error) {
+      console.error('Profile update error:', error);
       Alert.alert('Error', 'Failed to update profile. Please try again.');
     } finally {
       setIsUpdating(false);
@@ -430,10 +494,11 @@ const ProfileScreen: React.FC = () => {
 
   const handleImageSelected = (imageUri: string) => {
     setProfileImageUri(imageUri);
-    // Update the current user's profile picture
+    // Update the current user's profile picture and company logo
     if (currentUser) {
       currentUser.photoURL = imageUri;
       currentUser.profileImage = imageUri;
+      currentUser.companyLogo = imageUri; // Also update companyLogo field
     }
     Alert.alert('Success', 'Profile picture updated successfully!');
   };
@@ -529,10 +594,10 @@ const ProfileScreen: React.FC = () => {
           <View style={[styles.profileCard, { backgroundColor: theme.colors.cardBackground }]}>
             <View style={styles.profileHeader}>
               <View style={styles.avatarContainer}>
-                {profileImageUri || currentUser?.photoURL || currentUser?.profileImage ? (
+                {profileImageUri || currentUser?.companyLogo || currentUser?.businessLogo || currentUser?.logo || currentUser?.photoURL || currentUser?.profileImage ? (
                   <View style={styles.avatarImageContainer}>
                     <Image
-                      source={{ uri: profileImageUri || currentUser?.photoURL || currentUser?.profileImage }}
+                      source={{ uri: profileImageUri || currentUser?.companyLogo || currentUser?.businessLogo || currentUser?.logo || currentUser?.photoURL || currentUser?.profileImage }}
                       style={styles.avatarImage}
                       resizeMode="cover"
                     />

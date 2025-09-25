@@ -1,4 +1,4 @@
-import eventMarketersApi from './eventMarketersApi';
+import api from './api';
 
 export interface SubadminUser {
   id: string;
@@ -50,7 +50,7 @@ class AdminManagementService {
         };
       }
 
-      const response = await eventMarketersApi.get('/api/admin/subadmins');
+      const response = await api.get('/api/admin/subadmins');
       
       if (response.data.success) {
         this.subadminsCache = response.data.subadmins;
@@ -82,7 +82,7 @@ class AdminManagementService {
   async createSubadmin(subadminData: SubadminRequest): Promise<SubadminResponse> {
     try {
       console.log('Creating subadmin:', subadminData.email);
-      const response = await eventMarketersApi.post('/api/admin/subadmins', subadminData);
+      const response = await api.post('/api/admin/subadmins', subadminData);
       
       if (response.data.success) {
         console.log('✅ Subadmin created:', response.data.subadmin.id);

@@ -178,10 +178,32 @@ const TemplateGalleryScreen: React.FC = () => {
     applyFilters();
   }, [applyFilters]);
 
+  // Handle like change
+  const handleLikeChange = useCallback((templateId: string, isLiked: boolean) => {
+    setTemplates(prevTemplates => 
+      prevTemplates.map(template => 
+        template.id === templateId 
+          ? { ...template, isLiked, likes: isLiked ? template.likes + 1 : Math.max(0, template.likes - 1) }
+          : template
+      )
+    );
+    setFilteredTemplates(prevFiltered => 
+      prevFiltered.map(template => 
+        template.id === templateId 
+          ? { ...template, isLiked, likes: isLiked ? template.likes + 1 : Math.max(0, template.likes - 1) }
+          : template
+      )
+    );
+  }, []);
+
   // Render template item
   const renderTemplateItem = useCallback(({ item }: { item: Template }) => (
-    <TemplateCard template={item} onPress={handleTemplatePress} />
-  ), [handleTemplatePress]);
+    <TemplateCard 
+      template={item} 
+      onPress={handleTemplatePress} 
+      onLikeChange={handleLikeChange}
+    />
+  ), [handleTemplatePress, handleLikeChange]);
 
   // Key extractor for FlatList
   const keyExtractor = useCallback((item: Template) => item.id, []);

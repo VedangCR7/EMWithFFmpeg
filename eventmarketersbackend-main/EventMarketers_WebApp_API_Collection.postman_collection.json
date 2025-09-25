@@ -1,0 +1,1058 @@
+{
+  "info": {
+    "name": "EventMarketers Web App API Collection",
+    "description": "Complete API collection for EventMarketers Web Application (Admin/Subadmin Dashboard)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://eventmarketersbackend.onrender.com",
+      "type": "string"
+    },
+    {
+      "key": "adminToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "subadminToken",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{adminToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Admin Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@eventmarketers.com\",\n  \"password\": \"admin123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/admin/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "admin", "login"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.success && response.token) {",
+                  "        pm.collectionVariables.set('adminToken', response.token);",
+                  "        console.log('Admin token saved:', response.token);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Subadmin Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"subadmin@eventmarketers.com\",\n  \"password\": \"subadmin123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/subadmin/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "subadmin", "login"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.success && response.token) {",
+                  "        pm.collectionVariables.set('subadminToken', response.token);",
+                  "        console.log('Subadmin token saved:', response.token);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Admin Management",
+      "item": [
+        {
+          "name": "Get All Subadmins",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/subadmins",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "subadmins"]
+            }
+          }
+        },
+        {
+          "name": "Create Subadmin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"New Subadmin\",\n  \"email\": \"new.subadmin@example.com\",\n  \"password\": \"SecurePassword123\",\n  \"mobileNumber\": \"+1234567890\",\n  \"role\": \"Content Manager\",\n  \"permissions\": [\"Images\", \"Videos\", \"Categories\"],\n  \"assignedCategories\": [\"Restaurant\", \"Wedding Planning\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/subadmins",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "subadmins"]
+            }
+          }
+        },
+        {
+          "name": "Update Subadmin",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Subadmin\",\n  \"email\": \"updated@example.com\",\n  \"role\": \"Content Manager\",\n  \"permissions\": [\"Images\", \"Videos\"],\n  \"assignedCategories\": [\"Restaurant\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/subadmins/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "subadmins", ":id"]
+            }
+          }
+        },
+        {
+          "name": "Delete Subadmin",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/subadmins/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "subadmins", ":id"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Business Categories",
+      "item": [
+        {
+          "name": "Get All Business Categories",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/business-categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "business-categories"]
+            }
+          }
+        },
+        {
+          "name": "Create Business Category",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"New Category\",\n  \"description\": \"Category description\",\n  \"icon\": \"🏢\",\n  \"sortOrder\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/business-categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "business-categories"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Content Management",
+      "item": [
+        {
+          "name": "Get All Images",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/content/images?category=BUSINESS&status=APPROVED&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "content", "images"],
+              "query": [
+                {
+                  "key": "category",
+                  "value": "BUSINESS"
+                },
+                {
+                  "key": "status",
+                  "value": "APPROVED"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Upload Image",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "title",
+                  "value": "My Business Image",
+                  "type": "text"
+                },
+                {
+                  "key": "category",
+                  "value": "BUSINESS",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Business image description",
+                  "type": "text"
+                },
+                {
+                  "key": "businessCategoryId",
+                  "value": "",
+                  "type": "text"
+                },
+                {
+                  "key": "tags",
+                  "value": "business,marketing,professional",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/content/images/upload",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "content", "images", "upload"]
+            }
+          }
+        },
+        {
+          "name": "Approve Image",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"APPROVED\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/content/images/:id/approval",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "content", "images", ":id", "approval"]
+            }
+          }
+        },
+        {
+          "name": "Reject Image",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"REJECTED\",\n  \"reason\": \"Image quality is poor\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/content/images/:id/approval",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "content", "images", ":id", "approval"]
+            }
+          }
+        },
+        {
+          "name": "Get All Videos",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/content/videos?category=BUSINESS&status=APPROVED&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "content", "videos"],
+              "query": [
+                {
+                  "key": "category",
+                  "value": "BUSINESS"
+                },
+                {
+                  "key": "status",
+                  "value": "APPROVED"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Upload Video",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "video",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "title",
+                  "value": "My Business Video",
+                  "type": "text"
+                },
+                {
+                  "key": "category",
+                  "value": "BUSINESS",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Business video description",
+                  "type": "text"
+                },
+                {
+                  "key": "businessCategoryId",
+                  "value": "",
+                  "type": "text"
+                },
+                {
+                  "key": "tags",
+                  "value": "business,video,marketing",
+                  "type": "text"
+                },
+                {
+                  "key": "duration",
+                  "value": "120",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/content/videos/upload",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "content", "videos", "upload"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Analytics",
+      "item": [
+        {
+          "name": "User Analytics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/analytics/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "analytics", "users"]
+            }
+          }
+        },
+        {
+          "name": "Content Analytics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/analytics/content",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "analytics", "content"]
+            }
+          }
+        },
+        {
+          "name": "Download Analytics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/analytics/downloads",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "analytics", "downloads"]
+            }
+          }
+        },
+        {
+          "name": "Dashboard Analytics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/analytics/dashboard",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "analytics", "dashboard"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Search",
+      "item": [
+        {
+          "name": "Search Images",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/search/images?q=business&category=BUSINESS&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "search", "images"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "business"
+                },
+                {
+                  "key": "category",
+                  "value": "BUSINESS"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search Videos",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/search/videos?q=marketing&category=BUSINESS&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "search", "videos"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "marketing"
+                },
+                {
+                  "key": "category",
+                  "value": "BUSINESS"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search All Content",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/search/content?q=event&category=BUSINESS&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "search", "content"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "event"
+                },
+                {
+                  "key": "category",
+                  "value": "BUSINESS"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search Suggestions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/search/suggestions?query=business&type=all",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "search", "suggestions"],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "business"
+                },
+                {
+                  "key": "type",
+                  "value": "all"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "File Management",
+      "item": [
+        {
+          "name": "Upload Directory Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/file-management/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "file-management", "status"]
+            }
+          }
+        },
+        {
+          "name": "Supported File Types",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/file-management/file-types",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "file-management", "file-types"]
+            }
+          }
+        },
+        {
+          "name": "File Statistics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/file-management/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "file-management", "stats"]
+            }
+          }
+        },
+        {
+          "name": "Directory Setup",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/file-management/setup",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "file-management", "setup"]
+            }
+          }
+        },
+        {
+          "name": "Cleanup Orphaned Files",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/file-management/cleanup",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "file-management", "cleanup"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Content Sync",
+      "item": [
+        {
+          "name": "Sync Images to Mobile",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"imageIds\": [\"image_id_1\", \"image_id_2\"],\n  \"force\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/content-sync/images",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "content-sync", "images"]
+            }
+          }
+        },
+        {
+          "name": "Sync Videos to Mobile",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"videoIds\": [\"video_id_1\", \"video_id_2\"],\n  \"force\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/content-sync/videos",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "content-sync", "videos"]
+            }
+          }
+        },
+        {
+          "name": "Get Sync Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/content-sync/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "content-sync", "status"]
+            }
+          }
+        },
+        {
+          "name": "Bulk Sync All Content",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contentType\": \"all\",\n  \"force\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/content-sync/bulk",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "content-sync", "bulk"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "User Management",
+      "item": [
+        {
+          "name": "Get Installed Users",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/installed-users?page=1&limit=10&isConverted=false",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "installed-users"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "isConverted",
+                  "value": "false"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Customers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/installed-users/customers?page=1&limit=10&status=ACTIVE",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "installed-users", "customers"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "status",
+                  "value": "ACTIVE"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get User Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/installed-users/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "installed-users", ":id"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Business Profiles",
+      "item": [
+        {
+          "name": "Get Business Profiles",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/business-profile?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "business-profile"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Business Profile Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/business-profile/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "business-profile", ":id"]
+            }
+          }
+        },
+        {
+          "name": "Update Business Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"businessName\": \"Updated Business Name\",\n  \"ownerName\": \"Updated Owner\",\n  \"email\": \"updated@business.com\",\n  \"phone\": \"+1234567890\",\n  \"address\": \"Updated Address\",\n  \"category\": \"Restaurant\",\n  \"description\": \"Updated description\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/business-profile/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "business-profile", ":id"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health Check",
+      "item": [
+        {
+          "name": "System Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

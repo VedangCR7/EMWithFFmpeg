@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useTheme } from '../context/ThemeContext';
 import { loginAPIs } from '../services';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import responsiveUtils, { 
   responsiveSpacing, 
   responsiveFontSize, 
@@ -96,6 +97,7 @@ const LoginScreen: React.FC = ({ navigation }: any) => {
       return;
     }
 
+    console.log('🔐 Attempting login with:', { email: email.trim(), passwordLength: password.length });
     setIsLoading(true);
     try {
       const result = await loginAPIs.loginUser({
@@ -103,10 +105,13 @@ const LoginScreen: React.FC = ({ navigation }: any) => {
         password: password.trim(),
       });
       
+      console.log('✅ Login successful:', result);
       // Navigation will be handled automatically by auth state change
       // No need to show success alert as user will be redirected
     } catch (error: any) {
-      console.error('Sign in error:', error);
+      console.error('❌ Sign in error:', error);
+      console.error('❌ Error response:', error.response?.data);
+      console.error('❌ Error status:', error.response?.status);
       const errorMessage = error.response?.data?.message || error.message || 'Sign in failed. Please try again.';
       Alert.alert('Error', errorMessage);
     } finally {
@@ -117,14 +122,33 @@ const LoginScreen: React.FC = ({ navigation }: any) => {
 
 
   const handleDevelopmentSignIn = useCallback(async () => {
-    console.log('Development sign in clicked');
+    console.log('Demo access clicked');
     setIsLoading(true);
     try {
-      // Anonymous sign-in is disabled in API-only mode
-      Alert.alert('Info', 'Anonymous sign-in is not supported. Please use email/password or Google sign-in.');
+      // Create demo user session
+      const demoUser = {
+        id: 'demo-user-' + Date.now(),
+        email: 'demo@eventmarketers.com',
+        name: 'Demo User',
+        companyName: 'Demo Company',
+        phoneNumber: '+1234567890',
+        isDemo: true,
+        createdAt: new Date().toISOString(),
+      };
+
+      // Store demo user in AsyncStorage
+      await AsyncStorage.setItem('user', JSON.stringify(demoUser));
+      await AsyncStorage.setItem('authToken', 'demo-token-' + Date.now());
+      await AsyncStorage.setItem('isDemoUser', 'true');
+
+      console.log('Demo user created:', demoUser);
+      
+      // Navigate directly to main app without alert
+      console.log('Demo access successful, navigating to main app');
+      
     } catch (error) {
-      console.error('Development sign in error:', error);
-      Alert.alert('Error', 'Development sign in failed. Please try again.');
+      console.error('Demo access error:', error);
+      Alert.alert('Error', 'Demo access failed. Please try again.');
     } finally {
       setIsLoading(false);
     }

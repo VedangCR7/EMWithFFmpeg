@@ -20,6 +20,20 @@ class AuthService {
   // Load stored user from AsyncStorage
   private async loadStoredUser() {
     try {
+      // Check for demo user first
+      const isDemoUser = await AsyncStorage.getItem('isDemoUser');
+      if (isDemoUser === 'true') {
+        const storedUser = await AsyncStorage.getItem('user');
+        const authToken = await AsyncStorage.getItem('authToken');
+        if (storedUser && authToken) {
+          this.currentUser = JSON.parse(storedUser);
+          this.notifyAuthStateListeners(this.currentUser);
+          console.log('Loaded demo user:', this.currentUser.id);
+          return;
+        }
+      }
+
+      // Check for regular user
       const storedUser = await AsyncStorage.getItem('currentUser');
       const authToken = await AsyncStorage.getItem('authToken');
       if (storedUser && authToken) {
@@ -167,13 +181,20 @@ class AuthService {
     try {
       console.log('Signing out user...');
       
-      // Try API logout
-      try {
-        await authApi.logout();
-        console.log('API logout successful');
-      } catch (apiError) {
-        console.error('API logout failed:', apiError);
-        // Continue with local cleanup even if API logout fails
+      // Check if this is a demo user
+      const isDemoUser = await AsyncStorage.getItem('isDemoUser');
+      
+      // Only try API logout for real users, not demo users
+      if (isDemoUser !== 'true') {
+        try {
+          await authApi.logout();
+          console.log('API logout successful');
+        } catch (apiError) {
+          console.error('API logout failed:', apiError);
+          // Continue with local cleanup even if API logout fails
+        }
+      } else {
+        console.log('Demo user logout - skipping API call');
       }
       
       // Sign out from Google if user was signed in with Google
@@ -190,6 +211,8 @@ class AuthService {
       this.currentUser = null;
       await AsyncStorage.removeItem('currentUser');
       await AsyncStorage.removeItem('authToken');
+      await AsyncStorage.removeItem('user'); // Clear demo user data
+      await AsyncStorage.removeItem('isDemoUser'); // Clear demo flag
       this.notifyAuthStateListeners(null);
       console.log('Sign out successful');
     } catch (error) {

@@ -1,4 +1,4 @@
-import eventMarketersApi from './eventMarketersApi';
+import api from './api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface InstalledUser {
@@ -45,7 +45,7 @@ class InstalledUsersService {
   async registerUser(userData: RegisterUserRequest): Promise<RegisterUserResponse> {
     try {
       console.log('Registering installed user:', userData.email);
-      const response = await eventMarketersApi.post('/api/installed-users/register', userData);
+      const response = await api.post('/api/installed-users/register', userData);
       
       if (response.data.success) {
         this.currentUser = response.data.user;
@@ -64,7 +64,7 @@ class InstalledUsersService {
   async getUserProfile(deviceId: string): Promise<UserProfileResponse> {
     try {
       console.log('Fetching user profile for device:', deviceId);
-      const response = await eventMarketersApi.get(`/api/installed-users/profile/${deviceId}`);
+      const response = await api.get(`/api/installed-users/profile/${deviceId}`);
       
       if (response.data.success) {
         this.currentUser = response.data.user;
@@ -83,7 +83,7 @@ class InstalledUsersService {
   async updateUserProfile(deviceId: string, userData: UpdateUserRequest): Promise<UserProfileResponse> {
     try {
       console.log('Updating user profile for device:', deviceId);
-      const response = await eventMarketersApi.put(`/api/installed-users/profile/${deviceId}`, userData);
+      const response = await api.put(`/api/installed-users/profile/${deviceId}`, userData);
       
       if (response.data.success) {
         this.currentUser = response.data.user;

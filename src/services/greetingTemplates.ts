@@ -37,8 +37,20 @@ class GreetingTemplatesService {
   // Get all greeting categories
   async getCategories(): Promise<GreetingCategory[]> {
     try {
-      const response = await api.get('/api/mobile/greeting-categories');
-      return response.data;
+      const response = await api.get('/api/mobile/greetings/categories');
+      
+      if (response.data.success) {
+        // Map backend response to frontend format
+        const mappedCategories = response.data.data.map((backendCategory: any) => ({
+          id: backendCategory.id,
+          name: backendCategory.name,
+          icon: backendCategory.icon || 'apps',
+          color: backendCategory.color || '#4A90E2'
+        }));
+        return mappedCategories;
+      } else {
+        throw new Error('API returned unsuccessful response');
+      }
     } catch (error) {
       console.log('Using mock greeting categories due to API error:', error);
       return this.getMockCategories();
@@ -48,8 +60,30 @@ class GreetingTemplatesService {
   // Get greeting templates by category
   async getTemplatesByCategory(category: string): Promise<GreetingTemplate[]> {
     try {
-      const response = await api.get(`/api/mobile/greeting-templates?category=${category}`);
-      return response.data;
+      const response = await api.get(`/api/mobile/greetings/templates?category=${category}`);
+      
+      if (response.data.success) {
+        // Map backend response to frontend format
+        const mappedTemplates = response.data.data.templates.map((backendTemplate: any) => ({
+          id: backendTemplate.id,
+          name: backendTemplate.title, // Backend uses 'title', frontend expects 'name'
+          thumbnail: backendTemplate.imageUrl,
+          category: backendTemplate.category,
+          content: {
+            text: backendTemplate.description,
+            background: backendTemplate.imageUrl,
+            layout: 'vertical' as const
+          },
+          likes: backendTemplate.likes || 0,
+          downloads: backendTemplate.downloads || 0,
+          isLiked: false, // This would need to be determined by checking user likes
+          isDownloaded: false, // This would need to be determined by checking user downloads
+          isPremium: backendTemplate.isPremium || false
+        }));
+        return mappedTemplates;
+      } else {
+        throw new Error('API returned unsuccessful response');
+      }
     } catch (error) {
       console.log('Using mock greeting templates due to API error:', error);
       return this.getMockTemplatesByCategory(category);
@@ -65,8 +99,30 @@ class GreetingTemplatesService {
       if (filters?.isPremium !== undefined) params.append('isPremium', filters.isPremium.toString());
       if (filters?.search) params.append('search', filters.search);
 
-      const response = await api.get(`/api/mobile/greeting-templates?${params.toString()}`);
-      return response.data;
+      const response = await api.get(`/api/mobile/greetings/templates?${params.toString()}`);
+      
+      if (response.data.success) {
+        // Map backend response to frontend format
+        const mappedTemplates = response.data.data.templates.map((backendTemplate: any) => ({
+          id: backendTemplate.id,
+          name: backendTemplate.title, // Backend uses 'title', frontend expects 'name'
+          thumbnail: backendTemplate.imageUrl,
+          category: backendTemplate.category,
+          content: {
+            text: backendTemplate.description,
+            background: backendTemplate.imageUrl,
+            layout: 'vertical' as const
+          },
+          likes: backendTemplate.likes || 0,
+          downloads: backendTemplate.downloads || 0,
+          isLiked: false, // This would need to be determined by checking user likes
+          isDownloaded: false, // This would need to be determined by checking user downloads
+          isPremium: backendTemplate.isPremium || false
+        }));
+        return mappedTemplates;
+      } else {
+        throw new Error('API returned unsuccessful response');
+      }
     } catch (error) {
       console.log('Using mock greeting templates due to API error:', error);
       return this.getMockTemplates(filters);
@@ -76,8 +132,30 @@ class GreetingTemplatesService {
   // Search greeting templates
   async searchTemplates(query: string): Promise<GreetingTemplate[]> {
     try {
-      const response = await api.get(`/api/mobile/greeting-templates/search?q=${query}`);
-      return response.data;
+      const response = await api.get(`/api/mobile/greetings/templates/search?q=${query}`);
+      
+      if (response.data.success) {
+        // Map backend response to frontend format
+        const mappedTemplates = response.data.data.templates.map((backendTemplate: any) => ({
+          id: backendTemplate.id,
+          name: backendTemplate.title, // Backend uses 'title', frontend expects 'name'
+          thumbnail: backendTemplate.imageUrl,
+          category: backendTemplate.category,
+          content: {
+            text: backendTemplate.description,
+            background: backendTemplate.imageUrl,
+            layout: 'vertical' as const
+          },
+          likes: backendTemplate.likes || 0,
+          downloads: backendTemplate.downloads || 0,
+          isLiked: false, // This would need to be determined by checking user likes
+          isDownloaded: false, // This would need to be determined by checking user downloads
+          isPremium: backendTemplate.isPremium || false
+        }));
+        return mappedTemplates;
+      } else {
+        throw new Error('API returned unsuccessful response');
+      }
     } catch (error) {
       console.log('Using mock search results due to API error:', error);
       return this.getMockSearchResults(query);
@@ -87,10 +165,26 @@ class GreetingTemplatesService {
   // Like/unlike a template
   async toggleLike(templateId: string): Promise<boolean> {
     try {
-      const response = await api.post(`/api/mobile/greeting-templates/${templateId}/like`);
-      return response.data.isLiked;
+      // First check if already liked (this would need to be implemented)
+      // For now, we'll assume it's not liked and try to like it
+      const response = await api.post(`/api/mobile/greetings/templates/${templateId}/like`);
+      
+      if (response.data.success) {
+        return response.data.isLiked;
+      } else {
+        throw new Error('API returned unsuccessful response');
+      }
     } catch (error) {
       console.error('Error toggling like:', error);
+      // If like failed, try to unlike
+      try {
+        const unlikeResponse = await api.delete(`/api/mobile/greetings/templates/${templateId}/like`);
+        if (unlikeResponse.data.success) {
+          return unlikeResponse.data.isLiked;
+        }
+      } catch (unlikeError) {
+        console.error('Error unliking template:', unlikeError);
+      }
       return false;
     }
   }
@@ -98,8 +192,13 @@ class GreetingTemplatesService {
   // Download a template
   async downloadTemplate(templateId: string): Promise<boolean> {
     try {
-      const response = await api.post(`/api/mobile/greeting-templates/${templateId}/download`);
-      return response.data.success;
+      const response = await api.post(`/api/mobile/greetings/templates/${templateId}/download`);
+      
+      if (response.data.success) {
+        return true;
+      } else {
+        throw new Error('API returned unsuccessful response');
+      }
     } catch (error) {
       console.error('Error downloading template:', error);
       return false;
@@ -109,8 +208,14 @@ class GreetingTemplatesService {
   // Get available stickers
   async getStickers(): Promise<string[]> {
     try {
-      const response = await api.get('/api/mobile/stickers');
-      return response.data;
+      const response = await api.get('/api/mobile/greetings/stickers');
+      
+      if (response.data.success) {
+        // Map backend response to frontend format
+        return response.data.data.stickers.map((sticker: any) => sticker.emoji || sticker.name);
+      } else {
+        throw new Error('API returned unsuccessful response');
+      }
     } catch (error) {
       console.log('Using mock stickers due to API error:', error);
       return this.getMockStickers();
@@ -120,8 +225,14 @@ class GreetingTemplatesService {
   // Get available emojis
   async getEmojis(): Promise<string[]> {
     try {
-      const response = await api.get('/api/mobile/emojis');
-      return response.data;
+      const response = await api.get('/api/mobile/greetings/emojis');
+      
+      if (response.data.success) {
+        // Map backend response to frontend format
+        return response.data.data.emojis.map((emoji: any) => emoji.emoji || emoji.name);
+      } else {
+        throw new Error('API returned unsuccessful response');
+      }
     } catch (error) {
       console.log('Using mock emojis due to API error:', error);
       return this.getMockEmojis();

@@ -829,6 +829,7 @@ const HomeScreen: React.FC = React.memo(() => {
 
 
 
+
   // Memoized render functions to prevent unnecessary re-renders
   const renderBanner = useCallback(({ item }: { item: Banner }) => {
     return (

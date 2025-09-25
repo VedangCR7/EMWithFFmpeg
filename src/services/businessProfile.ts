@@ -62,10 +62,44 @@ class BusinessProfileService {
 
     try {
       console.log('Fetching business profiles from API...');
-      const response = await api.get('/api/mobile/business-profiles');
+      const response = await api.get('/api/mobile/business-profile');
       
       if (response.data.success) {
-        const profiles = response.data.data.profiles;
+        const profiles = response.data.data.profiles.map((profile: any) => ({
+          id: profile.id,
+          name: profile.businessName,
+          description: profile.description || '',
+          category: profile.category,
+          address: profile.address || '',
+          phone: profile.phone || '',
+          alternatePhone: '',
+          email: profile.email || '',
+          website: profile.website || '',
+          logo: profile.logo || '',
+          companyLogo: profile.logo || '',
+          banner: '',
+          socialMedia: profile.socialMedia || {
+            facebook: '',
+            instagram: '',
+            twitter: '',
+            linkedin: '',
+          },
+          services: [],
+          workingHours: {
+            monday: { open: '09:00', close: '18:00', isOpen: true },
+            tuesday: { open: '09:00', close: '18:00', isOpen: true },
+            wednesday: { open: '09:00', close: '18:00', isOpen: true },
+            thursday: { open: '09:00', close: '18:00', isOpen: true },
+            friday: { open: '09:00', close: '18:00', isOpen: true },
+            saturday: { open: '10:00', close: '16:00', isOpen: true },
+            sunday: { open: '00:00', close: '00:00', isOpen: false },
+          },
+          rating: 0,
+          reviewCount: 0,
+          isVerified: false,
+          createdAt: profile.createdAt,
+          updatedAt: profile.updatedAt,
+        }));
         this.profilesCache = profiles;
         this.cacheTimestamp = Date.now();
         console.log('✅ Business profiles loaded from API:', profiles.length, 'profiles');
@@ -89,11 +123,47 @@ class BusinessProfileService {
   async getBusinessProfile(id: string): Promise<BusinessProfile> {
     try {
       console.log('Fetching business profile by ID:', id);
-      const response = await api.get(`/api/mobile/business-profiles/${id}`);
+      const response = await api.get(`/api/mobile/business-profile/${id}`);
       
       if (response.data.success) {
-        console.log('✅ Business profile loaded from API:', response.data.data.name);
-        return response.data.data;
+        const profile = response.data.data;
+        const mappedProfile = {
+          id: profile.id,
+          name: profile.businessName,
+          description: profile.description || '',
+          category: profile.category,
+          address: profile.address || '',
+          phone: profile.phone || '',
+          alternatePhone: '',
+          email: profile.email || '',
+          website: profile.website || '',
+          logo: profile.logo || '',
+          companyLogo: profile.logo || '',
+          banner: '',
+          socialMedia: profile.socialMedia || {
+            facebook: '',
+            instagram: '',
+            twitter: '',
+            linkedin: '',
+          },
+          services: [],
+          workingHours: {
+            monday: { open: '09:00', close: '18:00', isOpen: true },
+            tuesday: { open: '09:00', close: '18:00', isOpen: true },
+            wednesday: { open: '09:00', close: '18:00', isOpen: true },
+            thursday: { open: '09:00', close: '18:00', isOpen: true },
+            friday: { open: '09:00', close: '18:00', isOpen: true },
+            saturday: { open: '10:00', close: '16:00', isOpen: true },
+            sunday: { open: '00:00', close: '00:00', isOpen: false },
+          },
+          rating: 0,
+          reviewCount: 0,
+          isVerified: false,
+          createdAt: profile.createdAt,
+          updatedAt: profile.updatedAt,
+        };
+        console.log('✅ Business profile loaded from API:', mappedProfile.name);
+        return mappedProfile;
       } else {
         throw new Error('API returned unsuccessful response');
       }
@@ -109,41 +179,45 @@ class BusinessProfileService {
   // Create new business profile
   async createBusinessProfile(data: CreateBusinessProfileData): Promise<BusinessProfile> {
     try {
-      console.log('Creating business profile via EventMarketers API:', data.name);
+      console.log('Creating business profile via API:', data.name);
       
-      // Try EventMarketers API first
-      const eventMarketersData = {
+      // Map frontend data to backend format
+      const backendData = {
         businessName: data.name,
-        businessEmail: data.email,
-        businessPhone: data.phone,
-        businessWebsite: data.website,
-        businessAddress: data.address,
-        businessDescription: data.description || '',
-        businessCategory: data.category
+        ownerName: data.name, // Use business name as owner name for now
+        email: data.email,
+        phone: data.phone,
+        address: data.address,
+        category: data.category,
+        logo: data.companyLogo || '',
+        description: data.description || '',
+        website: data.website || '',
+        socialMedia: data.socialMedia || null
       };
       
-      const response = await eventMarketersBusinessProfileService.createBusinessProfile(eventMarketersData);
+      const response = await api.post('/api/mobile/business-profile', backendData);
       
-      if (response.success) {
-        console.log('✅ Business profile created via EventMarketers API:', response.profile.id);
+      if (response.data.success) {
+        console.log('✅ Business profile created via API:', response.data.data.id);
         // Clear cache to force refresh
         this.clearCache();
         
-        // Convert EventMarketers response to our format
+        // Map backend response to frontend format
+        const backendProfile = response.data.data;
         const newProfile: BusinessProfile = {
-          id: response.profile.id,
-          name: response.profile.businessName,
-          description: response.profile.businessDescription,
-          category: response.profile.businessCategory,
-          address: response.profile.businessAddress,
-          phone: response.profile.businessPhone,
+          id: backendProfile.id,
+          name: backendProfile.businessName,
+          description: backendProfile.description || '',
+          category: backendProfile.category,
+          address: backendProfile.address || '',
+          phone: backendProfile.phone || '',
           alternatePhone: '',
-          email: response.profile.businessEmail,
-          website: response.profile.businessWebsite || '',
-          companyLogo: '',
-          logo: '',
+          email: backendProfile.email || '',
+          website: backendProfile.website || '',
+          companyLogo: backendProfile.logo || '',
+          logo: backendProfile.logo || '',
           banner: '',
-          socialMedia: {
+          socialMedia: backendProfile.socialMedia || {
             facebook: '',
             instagram: '',
             twitter: '',
@@ -162,70 +236,54 @@ class BusinessProfileService {
           rating: 0,
           reviewCount: 0,
           isVerified: false,
-          createdAt: response.profile.createdAt,
-          updatedAt: response.profile.createdAt,
+          createdAt: backendProfile.createdAt,
+          updatedAt: backendProfile.updatedAt,
         };
         return newProfile;
       } else {
-        throw new Error('EventMarketers API returned unsuccessful response');
+        throw new Error('API returned unsuccessful response');
       }
     } catch (error) {
-      console.error('❌ Error creating business profile via EventMarketers API:', error);
-      console.log('⚠️ Falling back to original API');
+      console.error('❌ Error creating business profile via API:', error);
+      console.log('⚠️ Creating mock business profile due to API error');
       
-      // Fallback to original API
-      try {
-        const response = await api.post('/api/mobile/business-profiles', data);
-        
-        if (response.data.success) {
-          console.log('✅ Business profile created via original API:', response.data.data.name);
-          this.clearCache();
-          return response.data.data;
-        } else {
-          throw new Error('Original API returned unsuccessful response');
-        }
-      } catch (fallbackError) {
-        console.error('❌ Error creating business profile via original API:', fallbackError);
-        console.log('⚠️ Creating mock business profile due to API error');
-        
-        // Fallback to mock creation
-        const newProfile: BusinessProfile = {
-          id: Date.now().toString(),
-          name: data.name,
-          description: data.description || '',
-          category: data.category,
-          address: data.address,
-          phone: data.phone,
-          alternatePhone: data.alternatePhone || '',
-          email: data.email,
-          website: data.website || '',
-          companyLogo: data.companyLogo || '',
-          logo: data.companyLogo || '',
-          banner: '',
-          socialMedia: {
-            facebook: '',
-            instagram: '',
-            twitter: '',
-            linkedin: '',
-          },
-          services: [],
-          workingHours: {
-            monday: { open: '09:00', close: '18:00', isOpen: true },
-            tuesday: { open: '09:00', close: '18:00', isOpen: true },
-            wednesday: { open: '09:00', close: '18:00', isOpen: true },
-            thursday: { open: '09:00', close: '18:00', isOpen: true },
-            friday: { open: '09:00', close: '18:00', isOpen: true },
-            saturday: { open: '10:00', close: '16:00', isOpen: true },
-            sunday: { open: '00:00', close: '00:00', isOpen: false },
-          },
-          rating: 0,
-          reviewCount: 0,
-          isVerified: false,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        return newProfile;
-      }
+      // Fallback to mock creation
+      const newProfile: BusinessProfile = {
+        id: Date.now().toString(),
+        name: data.name,
+        description: data.description || '',
+        category: data.category,
+        address: data.address,
+        phone: data.phone,
+        alternatePhone: data.alternatePhone || '',
+        email: data.email,
+        website: data.website || '',
+        companyLogo: data.companyLogo || '',
+        logo: data.companyLogo || '',
+        banner: '',
+        socialMedia: {
+          facebook: '',
+          instagram: '',
+          twitter: '',
+          linkedin: '',
+        },
+        services: [],
+        workingHours: {
+          monday: { open: '09:00', close: '18:00', isOpen: true },
+          tuesday: { open: '09:00', close: '18:00', isOpen: true },
+          wednesday: { open: '09:00', close: '18:00', isOpen: true },
+          thursday: { open: '09:00', close: '18:00', isOpen: true },
+          friday: { open: '09:00', close: '18:00', isOpen: true },
+          saturday: { open: '10:00', close: '16:00', isOpen: true },
+          sunday: { open: '00:00', close: '00:00', isOpen: false },
+        },
+        rating: 0,
+        reviewCount: 0,
+        isVerified: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      return newProfile;
     }
   }
 
@@ -233,13 +291,66 @@ class BusinessProfileService {
   async updateBusinessProfile(id: string, data: Partial<CreateBusinessProfileData>): Promise<BusinessProfile> {
     try {
       console.log('Updating business profile via API:', id);
-      const response = await api.put(`/api/mobile/business-profiles/${id}`, data);
+      
+      // Map frontend data to backend format
+      const backendData = {
+        businessName: data.name,
+        ownerName: data.name, // Use business name as owner name for now
+        email: data.email,
+        phone: data.phone,
+        address: data.address,
+        category: data.category,
+        logo: data.companyLogo || '',
+        description: data.description || '',
+        website: data.website || '',
+        socialMedia: data.socialMedia || null
+      };
+      
+      const response = await api.put(`/api/mobile/business-profile/${id}`, backendData);
       
       if (response.data.success) {
-        console.log('✅ Business profile updated via API:', response.data.data.name);
+        console.log('✅ Business profile updated via API:', response.data.data.businessName);
         // Clear cache to force refresh
         this.clearCache();
-        return response.data.data;
+        
+        // Map backend response to frontend format
+        const backendProfile = response.data.data;
+        const updatedProfile: BusinessProfile = {
+          id: backendProfile.id,
+          name: backendProfile.businessName,
+          description: backendProfile.description || '',
+          category: backendProfile.category,
+          address: backendProfile.address || '',
+          phone: backendProfile.phone || '',
+          alternatePhone: '',
+          email: backendProfile.email || '',
+          website: backendProfile.website || '',
+          companyLogo: backendProfile.logo || '',
+          logo: backendProfile.logo || '',
+          banner: '',
+          socialMedia: backendProfile.socialMedia || {
+            facebook: '',
+            instagram: '',
+            twitter: '',
+            linkedin: '',
+          },
+          services: [],
+          workingHours: {
+            monday: { open: '09:00', close: '18:00', isOpen: true },
+            tuesday: { open: '09:00', close: '18:00', isOpen: true },
+            wednesday: { open: '09:00', close: '18:00', isOpen: true },
+            thursday: { open: '09:00', close: '18:00', isOpen: true },
+            friday: { open: '09:00', close: '18:00', isOpen: true },
+            saturday: { open: '10:00', close: '16:00', isOpen: true },
+            sunday: { open: '00:00', close: '00:00', isOpen: false },
+          },
+          rating: 0,
+          reviewCount: 0,
+          isVerified: false,
+          createdAt: backendProfile.createdAt,
+          updatedAt: backendProfile.updatedAt,
+        };
+        return updatedProfile;
       } else {
         throw new Error('API returned unsuccessful response');
       }
@@ -290,7 +401,7 @@ class BusinessProfileService {
   async deleteBusinessProfile(id: string): Promise<void> {
     try {
       console.log('Deleting business profile via API:', id);
-      const response = await api.delete(`/api/mobile/business-profiles/${id}`);
+      const response = await api.delete(`/api/mobile/business-profile/${id}`);
       
       if (response.data.success) {
         console.log('✅ Business profile deleted via API:', id);
@@ -317,9 +428,8 @@ class BusinessProfileService {
         type: 'image/jpeg',
         name: `${imageType}_${Date.now()}.jpg`,
       } as any);
-      formData.append('type', imageType);
 
-      const response = await api.post(`/api/mobile/business-profiles/${profileId}/upload`, formData, {
+      const response = await api.post(`/api/mobile/business-profile/${profileId}/upload`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -345,10 +455,48 @@ class BusinessProfileService {
   async searchBusinessProfiles(query: string): Promise<BusinessProfile[]> {
     try {
       console.log('Searching business profiles via API:', query);
-      const response = await api.get(`/api/mobile/business-profiles?search=${encodeURIComponent(query)}`);
+      const response = await api.get(`/api/mobile/business-profile?search=${encodeURIComponent(query)}`);
       
       if (response.data.success) {
-        const profiles = response.data.data.profiles;
+        const backendProfiles = response.data.data.profiles;
+        
+        // Map backend profiles to frontend format
+        const profiles = backendProfiles.map((profile: any) => ({
+          id: profile.id,
+          name: profile.businessName,
+          description: profile.description || '',
+          category: profile.category,
+          address: profile.address || '',
+          phone: profile.phone || '',
+          alternatePhone: '',
+          email: profile.email || '',
+          website: profile.website || '',
+          logo: profile.logo || '',
+          companyLogo: profile.logo || '',
+          banner: '',
+          socialMedia: profile.socialMedia || {
+            facebook: '',
+            instagram: '',
+            twitter: '',
+            linkedin: '',
+          },
+          services: [],
+          workingHours: {
+            monday: { open: '09:00', close: '18:00', isOpen: true },
+            tuesday: { open: '09:00', close: '18:00', isOpen: true },
+            wednesday: { open: '09:00', close: '18:00', isOpen: true },
+            thursday: { open: '09:00', close: '18:00', isOpen: true },
+            friday: { open: '09:00', close: '18:00', isOpen: true },
+            saturday: { open: '10:00', close: '16:00', isOpen: true },
+            sunday: { open: '00:00', close: '00:00', isOpen: false },
+          },
+          rating: 0,
+          reviewCount: 0,
+          isVerified: false,
+          createdAt: profile.createdAt,
+          updatedAt: profile.updatedAt,
+        }));
+        
         console.log('✅ Business profiles search completed via API:', profiles.length, 'results');
         return profiles;
       } else {
@@ -371,10 +519,48 @@ class BusinessProfileService {
   async getBusinessProfilesByCategory(category: string): Promise<BusinessProfile[]> {
     try {
       console.log('Fetching business profiles by category via API:', category);
-      const response = await api.get(`/api/mobile/business-profiles?category=${encodeURIComponent(category)}`);
+      const response = await api.get(`/api/mobile/business-profile?category=${encodeURIComponent(category)}`);
       
       if (response.data.success) {
-        const profiles = response.data.data.profiles;
+        const backendProfiles = response.data.data.profiles;
+        
+        // Map backend profiles to frontend format
+        const profiles = backendProfiles.map((profile: any) => ({
+          id: profile.id,
+          name: profile.businessName,
+          description: profile.description || '',
+          category: profile.category,
+          address: profile.address || '',
+          phone: profile.phone || '',
+          alternatePhone: '',
+          email: profile.email || '',
+          website: profile.website || '',
+          logo: profile.logo || '',
+          companyLogo: profile.logo || '',
+          banner: '',
+          socialMedia: profile.socialMedia || {
+            facebook: '',
+            instagram: '',
+            twitter: '',
+            linkedin: '',
+          },
+          services: [],
+          workingHours: {
+            monday: { open: '09:00', close: '18:00', isOpen: true },
+            tuesday: { open: '09:00', close: '18:00', isOpen: true },
+            wednesday: { open: '09:00', close: '18:00', isOpen: true },
+            thursday: { open: '09:00', close: '18:00', isOpen: true },
+            friday: { open: '09:00', close: '18:00', isOpen: true },
+            saturday: { open: '10:00', close: '16:00', isOpen: true },
+            sunday: { open: '00:00', close: '00:00', isOpen: false },
+          },
+          rating: 0,
+          reviewCount: 0,
+          isVerified: false,
+          createdAt: profile.createdAt,
+          updatedAt: profile.updatedAt,
+        }));
+        
         console.log('✅ Business profiles by category loaded via API:', profiles.length, 'profiles');
         return profiles;
       } else {

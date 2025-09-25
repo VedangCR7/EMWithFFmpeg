@@ -1,4 +1,4 @@
-import eventMarketersApi from './eventMarketersApi';
+import api from './api';
 
 // Types for API responses
 export interface HealthCheckResponse {
@@ -226,7 +226,7 @@ class EventMarketersService {
   // 1. Health Check
   async getHealthCheck(): Promise<HealthCheckResponse> {
     try {
-      const response = await eventMarketersApi.get('/health');
+      const response = await api.get('/health');
       return response.data;
     } catch (error) {
       console.error('Health check failed:', error);
@@ -237,7 +237,7 @@ class EventMarketersService {
   // 2. Business Categories
   async getBusinessCategories(): Promise<BusinessCategoriesResponse> {
     try {
-      const response = await eventMarketersApi.get('/api/mobile/business-categories');
+      const response = await api.get('/api/mobile/business-categories');
       return response.data;
     } catch (error) {
       console.error('Failed to fetch business categories:', error);
@@ -248,7 +248,7 @@ class EventMarketersService {
   // 3. User Registration (Installed Users)
   async registerInstalledUser(userData: RegisterUserRequest): Promise<RegisterUserResponse> {
     try {
-      const response = await eventMarketersApi.post('/api/installed-users/register', userData);
+      const response = await api.post('/api/installed-users/register', userData);
       return response.data;
     } catch (error) {
       console.error('Failed to register installed user:', error);
@@ -259,7 +259,7 @@ class EventMarketersService {
   // 4. Get User Profile
   async getUserProfile(deviceId: string): Promise<{ success: boolean; user: InstalledUser }> {
     try {
-      const response = await eventMarketersApi.get(`/api/installed-users/profile/${deviceId}`);
+      const response = await api.get(`/api/installed-users/profile/${deviceId}`);
       return response.data;
     } catch (error) {
       console.error('Failed to get user profile:', error);
@@ -270,7 +270,7 @@ class EventMarketersService {
   // 5. Update User Profile
   async updateUserProfile(deviceId: string, userData: UpdateUserRequest): Promise<{ success: boolean; user: InstalledUser }> {
     try {
-      const response = await eventMarketersApi.put(`/api/installed-users/profile/${deviceId}`, userData);
+      const response = await api.put(`/api/installed-users/profile/${deviceId}`, userData);
       return response.data;
     } catch (error) {
       console.error('Failed to update user profile:', error);
@@ -281,7 +281,7 @@ class EventMarketersService {
   // 6. Record User Activity
   async recordUserActivity(activityData: UserActivityRequest): Promise<UserActivityResponse> {
     try {
-      const response = await eventMarketersApi.post('/api/installed-users/activity', activityData);
+      const response = await api.post('/api/installed-users/activity', activityData);
       return response.data;
     } catch (error) {
       console.error('Failed to record user activity:', error);
@@ -303,7 +303,7 @@ class EventMarketersService {
       const queryString = params.toString();
       const url = `/api/mobile/content/${customerId}${queryString ? `?${queryString}` : ''}`;
       
-      const response = await eventMarketersApi.get(url);
+      const response = await api.get(url);
       return response.data;
     } catch (error) {
       console.error('Failed to get customer content:', error);
@@ -314,7 +314,7 @@ class EventMarketersService {
   // 8. Get Customer Profile
   async getCustomerProfile(customerId: string): Promise<CustomerProfileResponse> {
     try {
-      const response = await eventMarketersApi.get(`/api/mobile/profile/${customerId}`);
+      const response = await api.get(`/api/mobile/profile/${customerId}`);
       return response.data;
     } catch (error) {
       console.error('Failed to get customer profile:', error);
@@ -325,7 +325,7 @@ class EventMarketersService {
   // 9. Business Profile Creation
   async createBusinessProfile(profileData: BusinessProfileRequest): Promise<BusinessProfileResponse> {
     try {
-      const response = await eventMarketersApi.post('/api/business-profile/profile', profileData);
+      const response = await api.post('/api/business-profile/profile', profileData);
       return response.data;
     } catch (error) {
       console.error('Failed to create business profile:', error);
@@ -339,7 +339,7 @@ class EventMarketersService {
       const formData = new FormData();
       formData.append('logo', logoFile);
 
-      const response = await eventMarketersApi.post('/api/business-profile/upload-logo', formData, {
+      const response = await api.post('/api/business-profile/upload-logo', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -354,7 +354,7 @@ class EventMarketersService {
   // 11. Admin Login
   async adminLogin(loginData: LoginRequest): Promise<AuthResponse> {
     try {
-      const response = await eventMarketersApi.post('/api/auth/admin/login', loginData);
+      const response = await api.post('/api/auth/admin/login', loginData);
       return response.data;
     } catch (error) {
       console.error('Admin login failed:', error);
@@ -365,7 +365,7 @@ class EventMarketersService {
   // 12. Subadmin Login
   async subadminLogin(loginData: LoginRequest): Promise<AuthResponse> {
     try {
-      const response = await eventMarketersApi.post('/api/auth/subadmin/login', loginData);
+      const response = await api.post('/api/auth/subadmin/login', loginData);
       return response.data;
     } catch (error) {
       console.error('Subadmin login failed:', error);
@@ -376,7 +376,7 @@ class EventMarketersService {
   // 13. Get Current User
   async getCurrentUser(): Promise<{ success: boolean; user: AuthUser }> {
     try {
-      const response = await eventMarketersApi.get('/api/auth/me');
+      const response = await api.get('/api/auth/me');
       return response.data;
     } catch (error) {
       console.error('Failed to get current user:', error);
@@ -387,7 +387,7 @@ class EventMarketersService {
   // 14. Get Subadmins
   async getSubadmins(): Promise<{ success: boolean; subadmins: SubadminResponse['subadmin'][] }> {
     try {
-      const response = await eventMarketersApi.get('/api/admin/subadmins');
+      const response = await api.get('/api/admin/subadmins');
       return response.data;
     } catch (error) {
       console.error('Failed to get subadmins:', error);
@@ -398,7 +398,7 @@ class EventMarketersService {
   // 15. Create Subadmin
   async createSubadmin(subadminData: SubadminRequest): Promise<SubadminResponse> {
     try {
-      const response = await eventMarketersApi.post('/api/admin/subadmins', subadminData);
+      const response = await api.post('/api/admin/subadmins', subadminData);
       return response.data;
     } catch (error) {
       console.error('Failed to create subadmin:', error);
@@ -409,7 +409,7 @@ class EventMarketersService {
   // 16. Get Pending Approvals
   async getPendingApprovals(): Promise<PendingApprovalsResponse> {
     try {
-      const response = await eventMarketersApi.get('/api/content/pending-approvals');
+      const response = await api.get('/api/content/pending-approvals');
       return response.data;
     } catch (error) {
       console.error('Failed to get pending approvals:', error);
@@ -435,7 +435,7 @@ class EventMarketersService {
       formData.append('businessCategoryId', imageData.businessCategoryId);
       formData.append('tags', imageData.tags);
 
-      const response = await eventMarketersApi.post('/api/content/images', formData, {
+      const response = await api.post('/api/content/images', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -465,7 +465,7 @@ class EventMarketersService {
       formData.append('businessCategoryId', videoData.businessCategoryId);
       formData.append('tags', videoData.tags);
 
-      const response = await eventMarketersApi.post('/api/content/videos', formData, {
+      const response = await api.post('/api/content/videos', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -480,7 +480,7 @@ class EventMarketersService {
   // 19. Get Categories (Alias)
   async getCategories(): Promise<BusinessCategoriesResponse> {
     try {
-      const response = await eventMarketersApi.get('/api/v1/categories');
+      const response = await api.get('/api/v1/categories');
       return response.data;
     } catch (error) {
       console.error('Failed to fetch categories:', error);
@@ -502,7 +502,7 @@ class EventMarketersService {
       const queryString = params.toString();
       const url = `/api/v1/content/${customerId}${queryString ? `?${queryString}` : ''}`;
       
-      const response = await eventMarketersApi.get(url);
+      const response = await api.get(url);
       return response.data;
     } catch (error) {
       console.error('Failed to get content:', error);
@@ -513,7 +513,7 @@ class EventMarketersService {
   // 21. Get Profile (Alias)
   async getProfile(customerId: string): Promise<CustomerProfileResponse> {
     try {
-      const response = await eventMarketersApi.get(`/api/v1/profile/${customerId}`);
+      const response = await api.get(`/api/v1/profile/${customerId}`);
       return response.data;
     } catch (error) {
       console.error('Failed to get profile:', error);

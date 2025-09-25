@@ -1,4 +1,4 @@
-import eventMarketersApi from './eventMarketersApi';
+import api from './api';
 
 export interface PendingApproval {
   id: string;
@@ -71,7 +71,7 @@ class ContentManagementService {
         };
       }
 
-      const response = await eventMarketersApi.get('/api/content/pending-approvals');
+      const response = await api.get('/api/content/pending-approvals');
       
       if (response.data.success) {
         this.pendingApprovalsCache = response.data.pendingApprovals;
@@ -112,7 +112,7 @@ class ContentManagementService {
       formData.append('businessCategoryId', imageData.businessCategoryId);
       formData.append('tags', imageData.tags);
 
-      const response = await eventMarketersApi.post('/api/content/images', formData, {
+      const response = await api.post('/api/content/images', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -147,7 +147,7 @@ class ContentManagementService {
       formData.append('businessCategoryId', videoData.businessCategoryId);
       formData.append('tags', videoData.tags);
 
-      const response = await eventMarketersApi.post('/api/content/videos', formData, {
+      const response = await api.post('/api/content/videos', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },

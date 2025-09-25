@@ -1,4 +1,4 @@
-import eventMarketersApi from './eventMarketersApi';
+import api from './api';
 
 export interface ContentItem {
   id: string;
@@ -87,7 +87,7 @@ class CustomerContentService {
       const queryString = params.toString();
       const url = `/api/mobile/content/${customerId}${queryString ? `?${queryString}` : ''}`;
       
-      const response = await eventMarketersApi.get(url);
+      const response = await api.get(url);
       
       if (response.data.success) {
         console.log('✅ Customer content loaded:', 
@@ -135,7 +135,7 @@ class CustomerContentService {
         };
       }
 
-      const response = await eventMarketersApi.get(`/api/mobile/profile/${customerId}`);
+      const response = await api.get(`/api/mobile/profile/${customerId}`);
       
       if (response.data.success) {
         console.log('✅ Customer profile loaded:', response.data.customer.name);
@@ -185,7 +185,7 @@ class CustomerContentService {
       const queryString = params.toString();
       const url = `/api/v1/content/${customerId}${queryString ? `?${queryString}` : ''}`;
       
-      const response = await eventMarketersApi.get(url);
+      const response = await api.get(url);
       
       if (response.data.success) {
         console.log('✅ Content loaded from alias endpoint');
@@ -205,7 +205,7 @@ class CustomerContentService {
   async getProfile(customerId: string): Promise<CustomerProfileResponse> {
     try {
       console.log('Fetching profile from alias endpoint for:', customerId);
-      const response = await eventMarketersApi.get(`/api/v1/profile/${customerId}`);
+      const response = await api.get(`/api/v1/profile/${customerId}`);
       
       if (response.data.success) {
         console.log('✅ Profile loaded from alias endpoint');

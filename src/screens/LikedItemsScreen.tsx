@@ -21,63 +21,46 @@ import authService from '../services/auth';
 import userLikesService from '../services/userLikes';
 import Video from 'react-native-video';
 
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+
 // Enhanced responsive design helpers
-const getResponsiveValues = () => {
-  const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
-  
-  // Determine screen size category
-  const isSmallScreen = screenWidth < 375;
-  const isMediumScreen = screenWidth >= 375 && screenWidth < 414;
-  const isLargeScreen = screenWidth >= 414 && screenWidth < 768;
-  const isTablet = screenWidth >= 768;
-  
-  // Determine orientation
-  const isLandscape = screenWidth > screenHeight;
-  
-  // Responsive spacing
-  const responsiveSpacing = {
-    xs: isSmallScreen ? 6 : isMediumScreen ? 8 : isLargeScreen ? 10 : isTablet ? 12 : 16,
-    sm: isSmallScreen ? 8 : isMediumScreen ? 12 : isLargeScreen ? 14 : isTablet ? 16 : 20,
-    md: isSmallScreen ? 12 : isMediumScreen ? 16 : isLargeScreen ? 18 : isTablet ? 20 : 24,
-    lg: isSmallScreen ? 16 : isMediumScreen ? 20 : isLargeScreen ? 22 : isTablet ? 24 : 32,
-    xl: isSmallScreen ? 20 : isMediumScreen ? 24 : isLargeScreen ? 26 : isTablet ? 28 : 40,
-  };
-  
-  // Responsive font sizes
-  const responsiveFontSize = {
-    xs: isSmallScreen ? 9 : isMediumScreen ? 10 : isLargeScreen ? 11 : isTablet ? 12 : 14,
-    sm: isSmallScreen ? 11 : isMediumScreen ? 12 : isLargeScreen ? 13 : isTablet ? 14 : 16,
-    md: isSmallScreen ? 13 : isMediumScreen ? 14 : isLargeScreen ? 15 : isTablet ? 16 : 18,
-    lg: isSmallScreen ? 15 : isMediumScreen ? 16 : isLargeScreen ? 17 : isTablet ? 18 : 20,
-    xl: isSmallScreen ? 17 : isMediumScreen ? 18 : isLargeScreen ? 19 : isTablet ? 20 : 22,
-    xxl: isSmallScreen ? 19 : isMediumScreen ? 20 : isLargeScreen ? 21 : isTablet ? 22 : 24,
-    xxxl: isSmallScreen ? 22 : isMediumScreen ? 24 : isLargeScreen ? 26 : isTablet ? 28 : 32,
-  };
-  
-  // Responsive card dimensions
-  const cardHeight = isSmallScreen ? screenHeight * 0.12 : 
-                    isMediumScreen ? screenHeight * 0.13 : 
-                    isLargeScreen ? screenHeight * 0.14 : 
-                    isTablet ? screenHeight * 0.16 : screenHeight * 0.15;
-  
-  // Grid columns based on screen size
-  const gridColumns = isTablet ? (isLandscape ? 4 : 3) : 2;
-  
-  // Card width calculation
-  const cardWidth = (screenWidth - (responsiveSpacing.md * 2) - (responsiveSpacing.sm * (gridColumns - 1))) / gridColumns;
-  
-  return {
-    responsiveSpacing,
-    responsiveFontSize,
-    cardHeight,
-    cardWidth,
-    gridColumns,
-    isTablet,
-    isLandscape,
-    screenWidth,
-    screenHeight,
-  };
+const isSmallScreen = screenWidth < 375;
+const isMediumScreen = screenWidth >= 375 && screenWidth < 414;
+const isLargeScreen = screenWidth >= 414 && screenWidth < 768;
+const isTablet = screenWidth >= 768;
+const isLandscape = screenWidth > screenHeight;
+
+// Responsive spacing
+const responsiveSpacing = {
+  xs: isSmallScreen ? 6 : isMediumScreen ? 8 : isLargeScreen ? 10 : isTablet ? 12 : 16,
+  sm: isSmallScreen ? 8 : isMediumScreen ? 12 : isLargeScreen ? 14 : isTablet ? 16 : 20,
+  md: isSmallScreen ? 12 : isMediumScreen ? 16 : isLargeScreen ? 18 : isTablet ? 20 : 24,
+  lg: isSmallScreen ? 16 : isMediumScreen ? 20 : isLargeScreen ? 22 : isTablet ? 24 : 32,
+  xl: isSmallScreen ? 20 : isMediumScreen ? 24 : isLargeScreen ? 26 : isTablet ? 28 : 40,
 };
+
+// Responsive font sizes
+const responsiveFontSize = {
+  xs: isSmallScreen ? 9 : isMediumScreen ? 10 : isLargeScreen ? 11 : isTablet ? 12 : 14,
+  sm: isSmallScreen ? 11 : isMediumScreen ? 12 : isLargeScreen ? 13 : isTablet ? 14 : 16,
+  md: isSmallScreen ? 13 : isMediumScreen ? 14 : isLargeScreen ? 15 : isTablet ? 16 : 18,
+  lg: isSmallScreen ? 15 : isMediumScreen ? 16 : isLargeScreen ? 17 : isTablet ? 18 : 20,
+  xl: isSmallScreen ? 17 : isMediumScreen ? 18 : isLargeScreen ? 19 : isTablet ? 20 : 22,
+  xxl: isSmallScreen ? 19 : isMediumScreen ? 20 : isLargeScreen ? 21 : isTablet ? 22 : 24,
+  xxxl: isSmallScreen ? 22 : isMediumScreen ? 24 : isLargeScreen ? 26 : isTablet ? 28 : 32,
+};
+
+// Responsive card dimensions
+const cardHeight = isSmallScreen ? screenHeight * 0.12 : 
+                  isMediumScreen ? screenHeight * 0.13 : 
+                  isLargeScreen ? screenHeight * 0.14 : 
+                  isTablet ? screenHeight * 0.16 : screenHeight * 0.15;
+
+// Grid columns based on screen size
+const gridColumns = isTablet ? (isLandscape ? 4 : 3) : 2;
+
+// Card width calculation
+const cardWidth = (screenWidth - (responsiveSpacing.md * 2) - (responsiveSpacing.sm * (gridColumns - 1))) / gridColumns;
 
 interface LikedItem {
   id: string;

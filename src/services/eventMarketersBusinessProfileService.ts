@@ -1,4 +1,4 @@
-import eventMarketersApi from './eventMarketersApi';
+import api from './api';
 
 export interface BusinessProfileRequest {
   businessName: string;
@@ -38,7 +38,7 @@ class BusinessProfileService {
   async createBusinessProfile(profileData: BusinessProfileRequest): Promise<BusinessProfileResponse> {
     try {
       console.log('Creating business profile:', profileData.businessName);
-      const response = await eventMarketersApi.post('/api/business-profile/profile', profileData);
+      const response = await api.post('/api/business-profile/profile', profileData);
       
       if (response.data.success) {
         console.log('✅ Business profile created:', response.data.profile.id);
@@ -64,7 +64,7 @@ class BusinessProfileService {
       const formData = new FormData();
       formData.append('logo', logoFile);
 
-      const response = await eventMarketersApi.post('/api/business-profile/upload-logo', formData, {
+      const response = await api.post('/api/business-profile/upload-logo', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },

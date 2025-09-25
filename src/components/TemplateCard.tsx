@@ -10,28 +10,33 @@ import {
   ActivityIndicator,
   Modal,
   ScrollView,
+  Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import { Template } from '../services/templates';
 import { useTheme } from '../context/ThemeContext';
+import templatesBannersApi from '../services/templatesBannersApi';
 
 interface TemplateCardProps {
   template: Template;
   onPress: (template: Template) => void;
+  onLikeChange?: (templateId: string, isLiked: boolean) => void;
   width?: number;
 }
 
 const { width, height } = Dimensions.get('window');
 const cardWidth = (width - 60) / 2; // Default for 2 columns, can be overridden
 
-const TemplateCard: React.FC<TemplateCardProps> = React.memo(({ template, onPress, width: customWidth }) => {
+const TemplateCard: React.FC<TemplateCardProps> = React.memo(({ template, onPress, onLikeChange, width: customWidth }) => {
   const { theme, isDarkMode } = useTheme();
   const [scaleValue] = useState(() => new Animated.Value(1));
   const [imageLoaded, setImageLoaded] = useState(false);
   const [previewModalVisible, setPreviewModalVisible] = useState(false);
   const [previewImageLoaded, setPreviewImageLoaded] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [isLiked, setIsLiked] = useState(template.isLiked || false);
+  const [isLiking, setIsLiking] = useState(false);
   const gradientBorderOpacity = useRef(new Animated.Value(0)).current;
 
   const handlePressIn = () => {
@@ -81,6 +86,37 @@ const TemplateCard: React.FC<TemplateCardProps> = React.memo(({ template, onPres
 
   const getCategoryIcon = () => {
     return template.category === 'premium' ? 'star' : 'favorite';
+  };
+
+  const handleLikePress = async (e: any) => {
+    e.stopPropagation();
+    
+    if (isLiking) return; // Prevent multiple rapid clicks
+    
+    try {
+      setIsLiking(true);
+      
+      if (isLiked) {
+        // Unlike the template
+        await templatesBannersApi.unlikeTemplate(template.id);
+        setIsLiked(false);
+        onLikeChange?.(template.id, false);
+      } else {
+        // Like the template
+        await templatesBannersApi.likeTemplate(template.id);
+        setIsLiked(true);
+        onLikeChange?.(template.id, true);
+      }
+    } catch (error) {
+      console.error('Error toggling like:', error);
+      Alert.alert(
+        'Error',
+        'Failed to update like status. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsLiking(false);
+    }
   };
 
   const renderPreviewModal = () => (
@@ -290,6 +326,24 @@ const TemplateCard: React.FC<TemplateCardProps> = React.memo(({ template, onPres
               <Text style={styles.languageText}>{template.language}</Text>
             </View>
 
+            {/* Like Button */}
+            <TouchableOpacity
+              style={styles.likeButton}
+              onPress={handleLikePress}
+              disabled={isLiking}
+              activeOpacity={0.7}
+            >
+              {isLiking ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <Icon 
+                  name={isLiked ? "favorite" : "favorite-border"} 
+                  size={16} 
+                  color={isLiked ? "#ff4757" : "#ffffff"} 
+                />
+              )}
+            </TouchableOpacity>
+
             {/* Overlay Gradient */}
             <LinearGradient
               colors={['transparent', 'rgba(0,0,0,0.4)']}
@@ -460,6 +514,25 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 10,
     fontWeight: '600',
+  },
+  likeButton: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 20,
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   content: {
     padding: 14,

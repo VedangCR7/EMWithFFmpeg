@@ -214,13 +214,10 @@ class LoginAPIsService {
         authService.setCurrentUser(completeUserData);
         await authService.saveUserToStorage(completeUserData, accessToken);
         
-        // Store complete profile data separately for edit profile access
-        await AsyncStorage.setItem('completeProfileData', JSON.stringify(completeUserData));
-        
         // Notify auth state listeners (this will trigger navigation)
         authService.notifyAuthStateListeners(completeUserData);
         
-        console.log('✅ User registration successful and complete data stored locally');
+        console.log('✅ User registration successful and complete data stored');
       }
       
       return response.data;
@@ -247,6 +244,9 @@ class LoginAPIsService {
       // Get or generate device ID if not provided
       const deviceId = data.deviceId || await this.getDeviceId();
       
+      console.log('📡 Making API call to:', '/api/mobile/auth/login');
+      console.log('📡 Request data:', { email: data.email, deviceId, rememberMe: data.rememberMe || false });
+      
       const response = await api.post('/api/mobile/auth/login', {
         email: data.email,
         password: data.password,
@@ -254,18 +254,46 @@ class LoginAPIsService {
         rememberMe: data.rememberMe || false,
       });
       
+      console.log('📡 API Response status:', response.status);
+      console.log('📡 API Response data:', response.data);
+      
       if (response.data.success) {
         // Store user data and token in auth service
         const { user, accessToken } = response.data.data;
         
-        // Update auth service with user data
-        authService.setCurrentUser(user);
-        await authService.saveUserToStorage(user, accessToken);
+        // Fetch complete profile data from API after login
+        let completeUserData = user;
+        try {
+          console.log('🔍 Fetching complete profile data from API after login...');
+          
+          // Try to get complete profile using user ID and deviceId
+          const profileResponse = await authApi.getProfile(user.deviceId, user.id);
+          if (profileResponse.success && profileResponse.data) {
+            completeUserData = {
+              ...user,
+              ...profileResponse.data, // Merge complete profile data from API
+            };
+            console.log('✅ Complete profile data fetched from API and merged');
+            console.log('🔍 Complete profile data:', JSON.stringify(completeUserData, null, 2));
+          } else {
+            console.log('⚠️ Profile API returned no data, using basic user data');
+          }
+        } catch (profileError) {
+          console.log('⚠️ Failed to fetch complete profile from API, using basic user data:', profileError.message);
+          // Continue with basic user data - the profile will be fetched later when needed
+        }
+        
+        // Update auth service with complete user data
+        authService.setCurrentUser(completeUserData);
+        await authService.saveUserToStorage(completeUserData, accessToken);
         
         // Notify auth state listeners (this will trigger navigation)
-        authService.notifyAuthStateListeners(user);
+        authService.notifyAuthStateListeners(completeUserData);
         
-        console.log('✅ User login successful and auth state updated');
+        console.log('✅ User login successful and complete data stored');
+      } else {
+        console.log('❌ Login failed - success=false:', response.data);
+        throw new Error(response.data.message || 'Login failed');
       }
       
       return response.data;

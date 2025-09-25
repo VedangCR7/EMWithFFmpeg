@@ -140,7 +140,38 @@ class TemplatesBannersApiService {
       if (filters?.limit) params.append('limit', filters.limit.toString());
 
       const response = await api.get(`/api/mobile/templates?${params.toString()}`);
-      return response.data;
+      
+      if (response.data.success) {
+        // Map backend response to frontend format
+        const mappedTemplates = response.data.data.templates.map((backendTemplate: any) => ({
+          id: backendTemplate.id,
+          name: backendTemplate.title, // Backend uses 'title', frontend expects 'name'
+          description: backendTemplate.description || '',
+          thumbnail: backendTemplate.imageUrl,
+          imageUrl: backendTemplate.imageUrl,
+          category: backendTemplate.isPremium ? 'premium' : 'free', // Map isPremium to category
+          type: backendTemplate.type,
+          language: backendTemplate.language,
+          tags: backendTemplate.tags ? JSON.parse(backendTemplate.tags) : [],
+          likes: backendTemplate.likes || 0,
+          downloads: backendTemplate.downloads || 0,
+          isLiked: false, // This would need to be determined by checking user likes
+          createdAt: backendTemplate.createdAt,
+        }));
+
+        return {
+          success: true,
+          data: {
+            templates: mappedTemplates,
+            total: response.data.data.pagination.total,
+            page: response.data.data.pagination.page,
+            limit: response.data.data.pagination.limit,
+          },
+          message: response.data.message,
+        };
+      } else {
+        throw new Error('API returned unsuccessful response');
+      }
     } catch (error) {
       console.log('Using mock templates due to API error:', error);
       return this.getMockTemplates(filters);
@@ -151,7 +182,33 @@ class TemplatesBannersApiService {
   async getTemplateById(id: string): Promise<TemplateResponse> {
     try {
       const response = await api.get(`/api/mobile/templates/${id}`);
-      return response.data;
+      
+      if (response.data.success) {
+        const backendTemplate = response.data.data;
+        const mappedTemplate = {
+          id: backendTemplate.id,
+          name: backendTemplate.title, // Backend uses 'title', frontend expects 'name'
+          description: backendTemplate.description || '',
+          thumbnail: backendTemplate.imageUrl,
+          imageUrl: backendTemplate.imageUrl,
+          category: backendTemplate.isPremium ? 'premium' : 'free', // Map isPremium to category
+          type: backendTemplate.type,
+          language: backendTemplate.language,
+          tags: backendTemplate.tags ? JSON.parse(backendTemplate.tags) : [],
+          likes: backendTemplate.likes || 0,
+          downloads: backendTemplate.downloads || 0,
+          isLiked: false, // This would need to be determined by checking user likes
+          createdAt: backendTemplate.createdAt,
+        };
+
+        return {
+          success: true,
+          data: mappedTemplate,
+          message: response.data.message,
+        };
+      } else {
+        throw new Error('API returned unsuccessful response');
+      }
     } catch (error) {
       console.log('Using mock template details due to API error:', error);
       return this.getMockTemplateById(id);
@@ -162,7 +219,23 @@ class TemplatesBannersApiService {
   async getLanguages(): Promise<LanguagesResponse> {
     try {
       const response = await api.get('/api/mobile/templates/languages');
-      return response.data;
+      
+      if (response.data.success) {
+        // Map backend language format to frontend format
+        const mappedLanguages = response.data.data.map((backendLang: any) => ({
+          code: backendLang.code || backendLang.name?.toLowerCase() || 'en',
+          name: backendLang.name || backendLang.code || 'English',
+          nativeName: backendLang.nativeName || backendLang.name || 'English',
+        }));
+
+        return {
+          success: true,
+          data: mappedLanguages,
+          message: response.data.message,
+        };
+      } else {
+        throw new Error('API returned unsuccessful response');
+      }
     } catch (error) {
       console.log('Using mock languages due to API error:', error);
       return this.getMockLanguages();
@@ -287,6 +360,17 @@ class TemplatesBannersApiService {
     }
   }
 
+  // Unlike template
+  async unlikeTemplate(id: string): Promise<{ success: boolean; message: string; isLiked: boolean }> {
+    try {
+      const response = await api.delete(`/api/mobile/templates/${id}/like`);
+      return response.data;
+    } catch (error) {
+      console.error('Unlike template error:', error);
+      throw error;
+    }
+  }
+
   // Download template
   async downloadTemplate(id: string): Promise<{ success: boolean; message: string }> {
     try {
@@ -302,7 +386,21 @@ class TemplatesBannersApiService {
   async getTemplateCategories(): Promise<{ success: boolean; data: string[]; message: string }> {
     try {
       const response = await api.get('/api/mobile/templates/categories');
-      return response.data;
+      
+      if (response.data.success) {
+        // Map backend category format to frontend format (array of category names)
+        const mappedCategories = response.data.data.map((backendCategory: any) => 
+          backendCategory.name || backendCategory.slug || 'Unknown'
+        );
+
+        return {
+          success: true,
+          data: mappedCategories,
+          message: response.data.message,
+        };
+      } else {
+        throw new Error('API returned unsuccessful response');
+      }
     } catch (error) {
       console.log('Using mock template categories due to API error:', error);
       return this.getMockTemplateCategories();

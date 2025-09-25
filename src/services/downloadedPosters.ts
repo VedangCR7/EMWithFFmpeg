@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraRoll } from '@react-native-camera-roll/camera-roll';
+import downloadTrackingService from './downloadTracking';
 
 export interface DownloadedPoster {
   id: string;
@@ -24,6 +25,22 @@ class DownloadedPostersService {
   // Save poster information to local storage with user ID
   async savePosterInfo(poster: Omit<DownloadedPoster, 'id' | 'downloadDate' | 'userId'>, userId?: string): Promise<DownloadedPoster> {
     try {
+      // First, try to save to backend via download tracking service
+      if (userId && poster.templateId) {
+        try {
+          await downloadTrackingService.trackDownload(
+            userId, 
+            'TEMPLATE', 
+            poster.templateId, 
+            poster.imageUri
+          );
+          console.log('✅ Download tracked in backend for user:', userId);
+        } catch (error) {
+          console.log('⚠️ Failed to track download in backend, using local storage:', error);
+        }
+      }
+
+      // Also save to local storage for offline access
       const existingPosters = await this.getAllDownloadedPosters();
       
       const newPoster: DownloadedPoster = {
@@ -58,9 +75,38 @@ class DownloadedPostersService {
     }
   }
 
-  // Get downloaded posters for specific user
+  // Get downloaded posters for specific user (now uses backend API)
   async getDownloadedPosters(userId?: string): Promise<DownloadedPoster[]> {
     try {
+      // If user ID is provided, try to get from backend first
+      if (userId) {
+        try {
+          const backendDownloads = await downloadTrackingService.getUserDownloads(userId);
+          const templateDownloads = backendDownloads.downloads.filter(d => d.resourceType === 'TEMPLATE');
+          
+          // Map backend downloads to DownloadedPoster format
+          const mappedPosters = templateDownloads.map(download => ({
+            id: download.id,
+            title: download.title || `Template ${download.resourceId}`,
+            description: '',
+            imageUri: download.fileUrl,
+            thumbnailUri: download.thumbnail,
+            downloadDate: download.createdAt,
+            templateId: download.resourceId,
+            category: download.category || 'Templates',
+            tags: [],
+            userId: userId,
+            size: { width: 300, height: 400 }
+          }));
+
+          console.log('✅ Retrieved downloads from backend for user:', userId, 'Count:', mappedPosters.length);
+          return mappedPosters;
+        } catch (error) {
+          console.log('⚠️ Failed to get downloads from backend, falling back to local storage:', error);
+        }
+      }
+
+      // Fallback to local storage
       const allPosters = await this.getAllDownloadedPosters();
       
       // Filter by user ID if provided
@@ -147,13 +193,34 @@ class DownloadedPostersService {
     }
   }
 
-  // Get poster statistics for specific user
+  // Get poster statistics for specific user (now uses backend API)
   async getPosterStats(userId?: string): Promise<{
     total: number;
     byCategory: Record<string, number>;
     recentCount: number;
   }> {
     try {
+      // If user ID is provided, try to get from backend first
+      if (userId) {
+        try {
+          const backendStats = await downloadTrackingService.getDownloadStats(userId);
+          
+          return {
+            total: backendStats.byType.templates,
+            byCategory: {
+              'Templates': backendStats.byType.templates,
+              'Videos': backendStats.byType.videos,
+              'Greetings': backendStats.byType.greetings,
+              'Content': backendStats.byType.content
+            },
+            recentCount: backendStats.recent
+          };
+        } catch (error) {
+          console.log('⚠️ Failed to get stats from backend, falling back to local storage:', error);
+        }
+      }
+
+      // Fallback to local storage calculation
       const posters = await this.getDownloadedPosters(userId);
       const byCategory: Record<string, number> = {};
       

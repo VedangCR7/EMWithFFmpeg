@@ -1,4 +1,4 @@
-import eventMarketersApi from './eventMarketersApi';
+import api from './api';
 
 export interface HealthCheckResponse {
   status: string;
@@ -12,7 +12,7 @@ class HealthService {
   async getHealthCheck(): Promise<HealthCheckResponse> {
     try {
       console.log('Checking EventMarketers backend health...');
-      const response = await eventMarketersApi.get('/health');
+      const response = await api.get('/health');
       console.log('✅ Health check successful:', response.data);
       return response.data;
     } catch (error) {

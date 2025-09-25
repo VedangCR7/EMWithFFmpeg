@@ -1,4 +1,4 @@
-import eventMarketersApi from './eventMarketersApi';
+import api from './api';
 
 export interface UserActivityRequest {
   deviceId: string;
@@ -44,7 +44,7 @@ class UserActivityService {
   async recordActivity(activityData: UserActivityRequest): Promise<UserActivityResponse> {
     try {
       console.log('Recording user activity:', activityData.action, 'on', activityData.resourceType);
-      const response = await eventMarketersApi.post('/api/installed-users/activity', activityData);
+      const response = await api.post('/api/installed-users/activity', activityData);
       
       if (response.data.success) {
         console.log('✅ Activity recorded successfully:', response.data.activity.id);

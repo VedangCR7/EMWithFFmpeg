@@ -1,4 +1,4 @@
-import eventMarketersApi from './eventMarketersApi';
+import api from './api';
 
 export interface BusinessCategory {
   id: string;
@@ -21,7 +21,7 @@ class BusinessCategoriesService {
   async getBusinessCategories(): Promise<BusinessCategoriesResponse> {
     try {
       console.log('Fetching business categories from EventMarketers API...');
-      const response = await eventMarketersApi.get('/api/mobile/business-categories');
+      const response = await api.get('/api/mobile/business-categories');
       console.log('✅ Business categories loaded:', response.data.categories?.length || 0, 'categories');
       
       // Cache the categories
@@ -53,7 +53,7 @@ class BusinessCategoriesService {
   async getCategories(): Promise<BusinessCategoriesResponse> {
     try {
       console.log('Fetching categories from alias endpoint...');
-      const response = await eventMarketersApi.get('/api/v1/categories');
+      const response = await api.get('/api/v1/categories');
       console.log('✅ Categories loaded from alias endpoint:', response.data.categories?.length || 0, 'categories');
       
       // Cache the categories

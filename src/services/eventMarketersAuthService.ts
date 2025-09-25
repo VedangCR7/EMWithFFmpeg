@@ -1,4 +1,4 @@
-import eventMarketersApi from './eventMarketersApi';
+import api from './api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface AuthUser {
@@ -34,7 +34,7 @@ class EventMarketersAuthService {
   async adminLogin(loginData: LoginRequest): Promise<AuthResponse> {
     try {
       console.log('Admin login attempt for:', loginData.email);
-      const response = await eventMarketersApi.post('/api/auth/admin/login', loginData);
+      const response = await api.post('/api/auth/admin/login', loginData);
       
       if (response.data.success) {
         this.currentUser = response.data.user;
@@ -58,7 +58,7 @@ class EventMarketersAuthService {
   async subadminLogin(loginData: LoginRequest): Promise<AuthResponse> {
     try {
       console.log('Subadmin login attempt for:', loginData.email);
-      const response = await eventMarketersApi.post('/api/auth/subadmin/login', loginData);
+      const response = await api.post('/api/auth/subadmin/login', loginData);
       
       if (response.data.success) {
         this.currentUser = response.data.user;
@@ -82,7 +82,7 @@ class EventMarketersAuthService {
   async getCurrentUser(): Promise<CurrentUserResponse> {
     try {
       console.log('Fetching current user...');
-      const response = await eventMarketersApi.get('/api/auth/me');
+      const response = await api.get('/api/auth/me');
       
       if (response.data.success) {
         this.currentUser = response.data.user;

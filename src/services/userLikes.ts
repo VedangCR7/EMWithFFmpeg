@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import userLikesBackendService from './userLikesBackend';
 
 export interface UserLike {
   id: string;
@@ -124,9 +125,21 @@ class UserLikesService {
     }
   }
 
-  // Get likes for specific user
+  // Get likes for specific user (now uses backend API)
   async getUserLikes(userId?: string): Promise<UserLike[]> {
     try {
+      // If user ID is provided, try to get from backend first
+      if (userId) {
+        try {
+          const backendLikes = await userLikesBackendService.getUserLikes(userId);
+          console.log('✅ Retrieved likes from backend for user:', userId, 'Count:', backendLikes.length);
+          return backendLikes;
+        } catch (error) {
+          console.log('⚠️ Failed to get likes from backend, falling back to local storage:', error);
+        }
+      }
+
+      // Fallback to local storage
       const allLikes = await this.getAllLikes();
       
       // Filter by user ID if provided
@@ -164,9 +177,21 @@ class UserLikesService {
     }
   }
 
-  // Get like statistics for specific user
+  // Get like statistics for specific user (now uses backend API)
   async getLikeStats(userId?: string): Promise<LikeStats> {
     try {
+      // If user ID is provided, try to get from backend first
+      if (userId) {
+        try {
+          const backendStats = await userLikesBackendService.getLikeStats(userId);
+          console.log('✅ Retrieved like stats from backend for user:', userId);
+          return backendStats;
+        } catch (error) {
+          console.log('⚠️ Failed to get like stats from backend, falling back to local storage:', error);
+        }
+      }
+
+      // Fallback to local storage calculation
       const userLikes = await this.getUserLikes(userId);
       
       const byType = {
@@ -248,13 +273,25 @@ class UserLikesService {
     }
   }
 
-  // Apply like status to content array
+  // Apply like status to content array (now uses backend API)
   async applyLikeStatusToContent<T extends { id: string }>(
     content: T[], 
     contentType: 'template' | 'video' | 'poster' | 'business-profile', 
     userId?: string
   ): Promise<(T & { isLiked: boolean })[]> {
     try {
+      // If user ID is provided, try to get from backend first
+      if (userId) {
+        try {
+          const backendResult = await userLikesBackendService.applyLikeStatusToContent(content, contentType, userId);
+          console.log('✅ Applied like status from backend for user:', userId);
+          return backendResult;
+        } catch (error) {
+          console.log('⚠️ Failed to apply like status from backend, falling back to local storage:', error);
+        }
+      }
+
+      // Fallback to local storage
       const likedContentIds = await this.getLikedContentIds(contentType, userId);
       
       return content.map(item => ({

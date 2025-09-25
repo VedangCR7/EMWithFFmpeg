@@ -97,10 +97,38 @@ class AuthApiService {
   }
 
   // Get user profile
-  async getProfile(): Promise<ProfileResponse> {
+  async getProfile(deviceId?: string, userId?: string): Promise<ProfileResponse> {
     try {
-      const response = await api.get('/api/mobile/auth/profile');
-      return response.data;
+      // Try multiple profile endpoints in order of preference
+      const endpoints = [];
+      
+      if (userId) {
+        endpoints.push(`/api/mobile/profile/${userId}`);
+        endpoints.push(`/api/v1/profile/${userId}`);
+      }
+      
+      if (deviceId) {
+        endpoints.push(`/api/installed-users/profile/${deviceId}`);
+      }
+      
+      // Add fallback endpoints
+      endpoints.push('/api/mobile/auth/profile');
+      
+      console.log('🔍 Trying profile endpoints:', endpoints);
+      
+      for (const endpoint of endpoints) {
+        try {
+          console.log(`📡 Attempting profile endpoint: ${endpoint}`);
+          const response = await api.get(endpoint);
+          console.log(`✅ Profile endpoint ${endpoint} succeeded`);
+          return response.data;
+        } catch (error: any) {
+          console.log(`❌ Profile endpoint ${endpoint} failed:`, error.response?.status || error.message);
+          // Continue to next endpoint
+        }
+      }
+      
+      throw new Error('All profile endpoints failed');
     } catch (error) {
       console.error('Get profile error:', error);
       throw error;
@@ -108,10 +136,33 @@ class AuthApiService {
   }
 
   // Update user profile
-  async updateProfile(data: UpdateProfileRequest): Promise<ProfileResponse> {
+  async updateProfile(data: UpdateProfileRequest, userId?: string): Promise<ProfileResponse> {
     try {
-      const response = await api.put('/api/mobile/auth/profile', data);
-      return response.data;
+      // Try multiple update endpoints
+      const endpoints = [];
+      
+      if (userId) {
+        endpoints.push(`/api/mobile/users/${userId}`);
+      }
+      
+      // Add fallback endpoint
+      endpoints.push('/api/mobile/auth/profile');
+      
+      console.log('🔍 Trying profile update endpoints:', endpoints);
+      
+      for (const endpoint of endpoints) {
+        try {
+          console.log(`📡 Attempting profile update endpoint: ${endpoint}`);
+          const response = await api.put(endpoint, data);
+          console.log(`✅ Profile update endpoint ${endpoint} succeeded`);
+          return response.data;
+        } catch (error: any) {
+          console.log(`❌ Profile update endpoint ${endpoint} failed:`, error.response?.status || error.message);
+          // Continue to next endpoint
+        }
+      }
+      
+      throw new Error('All profile update endpoints failed');
     } catch (error) {
       console.error('Update profile error:', error);
       throw error;
