@@ -57,8 +57,6 @@ const BusinessProfilesScreen: React.FC = () => {
       id: '1',
       name: 'Creative Events Studio',
       category: 'Event Planning',
-      rating: 4.8,
-      reviewCount: 156,
       description: 'Professional event planning and management services for all occasions.',
       phone: '+1 (555) 123-4567',
       email: 'info@creativeevents.com',
@@ -70,8 +68,6 @@ const BusinessProfilesScreen: React.FC = () => {
       id: '2',
       name: 'Elite Marketing Solutions',
       category: 'Marketing',
-      rating: 4.9,
-      reviewCount: 234,
       description: 'Comprehensive marketing solutions for businesses of all sizes.',
       phone: '+1 (555) 987-6543',
       email: 'contact@elitemarketing.com',
@@ -83,8 +79,6 @@ const BusinessProfilesScreen: React.FC = () => {
       id: '3',
       name: 'Premier Catering Services',
       category: 'Catering',
-      rating: 4.7,
-      reviewCount: 89,
       description: 'Exquisite catering services for weddings, corporate events, and special occasions.',
       phone: '+1 (555) 456-7890',
       email: 'info@premiercatering.com',
@@ -233,17 +227,11 @@ const BusinessProfilesScreen: React.FC = () => {
           <Text style={[styles.businessName, { color: theme.colors.text }]}>
             {item.name || 'Business Name'}
           </Text>
-          <Text style={[styles.businessCategory, { color: theme.colors.primary }]}>
-            {item.category || 'Category'}
-          </Text>
-          <View style={styles.ratingContainer}>
-            <Text style={[styles.rating, { color: theme.colors.text }]}>
-              {item.rating || 0} ★
+          {item.category && (
+            <Text style={[styles.businessCategory, { color: theme.colors.primary }]}>
+              {item.category}
             </Text>
-            <Text style={[styles.reviewCount, { color: theme.colors.textSecondary }]}>
-              ({item.reviewCount || 0} reviews)
-            </Text>
-          </View>
+          )}
         </View>
         <View style={styles.cardActions}>
           <TouchableOpacity
@@ -261,42 +249,66 @@ const BusinessProfilesScreen: React.FC = () => {
         </View>
       </View>
 
-      <Text style={[styles.description, { color: theme.colors.textSecondary }]}>
-        {item.description || 'No description available'}
-      </Text>
+      {item.description && (
+        <Text style={[styles.description, { color: theme.colors.textSecondary }]}>
+          {item.description}
+        </Text>
+      )}
 
       <View style={styles.contactInfo}>
-        <View style={styles.contactItem}>
-          <Icon name="phone" size={14} color={theme.colors.textSecondary} />
-          <Text style={[styles.contactText, { color: theme.colors.textSecondary }]}>
-            {item.phone || 'No phone'}
-          </Text>
-        </View>
-        <View style={styles.contactItem}>
-          <Icon name="email" size={14} color={theme.colors.textSecondary} />
-          <Text style={[styles.contactText, { color: theme.colors.textSecondary }]}>
-            {item.email || 'No email'}
-          </Text>
-        </View>
+        {item.phone && (
+          <View style={styles.contactItem}>
+            <Icon name="phone" size={14} color={theme.colors.textSecondary} />
+            <Text style={[styles.contactText, { color: theme.colors.textSecondary }]}>
+              {item.phone}
+            </Text>
+          </View>
+        )}
+        {item.email && (
+          <View style={styles.contactItem}>
+            <Icon name="email" size={14} color={theme.colors.textSecondary} />
+            <Text style={[styles.contactText, { color: theme.colors.textSecondary }]}>
+              {item.email}
+            </Text>
+          </View>
+        )}
+        {item.address && (
+          <View style={styles.contactItem}>
+            <Icon name="location-on" size={14} color={theme.colors.textSecondary} />
+            <Text style={[styles.contactText, { color: theme.colors.textSecondary }]}>
+              {item.address}
+            </Text>
+          </View>
+        )}
+        {item.website && (
+          <View style={styles.contactItem}>
+            <Icon name="language" size={14} color={theme.colors.textSecondary} />
+            <Text style={[styles.contactText, { color: theme.colors.textSecondary }]}>
+              {item.website}
+            </Text>
+          </View>
+        )}
       </View>
 
-      <View style={styles.servicesContainer}>
-        <Text style={[styles.servicesTitle, { color: theme.colors.text }]}>Services:</Text>
-        <View style={styles.servicesList}>
-          {(item.services || []).slice(0, 3).map((service: string, index: number) => (
-            <View key={`${item.id}-service-${index}-${service}`} style={[styles.serviceTag, { backgroundColor: `${theme.colors.primary}20` }]}>
-              <Text style={[styles.serviceText, { color: theme.colors.primary }]}>{service}</Text>
-            </View>
-          ))}
-          {(item.services || []).length > 3 && (
-            <View key={`${item.id}-more-services`} style={[styles.serviceTag, { backgroundColor: `${theme.colors.textSecondary}20` }]}>
-              <Text style={[styles.serviceText, { color: theme.colors.textSecondary }]}>
-                +{(item.services || []).length - 3} more
-              </Text>
-            </View>
-          )}
+      {item.services && item.services.length > 0 && (
+        <View style={styles.servicesContainer}>
+          <Text style={[styles.servicesTitle, { color: theme.colors.text }]}>Services:</Text>
+          <View style={styles.servicesList}>
+            {item.services.slice(0, 3).map((service: string, index: number) => (
+              <View key={`${item.id}-service-${index}-${service}`} style={[styles.serviceTag, { backgroundColor: `${theme.colors.primary}20` }]}>
+                <Text style={[styles.serviceText, { color: theme.colors.primary }]}>{service}</Text>
+              </View>
+            ))}
+            {item.services.length > 3 && (
+              <View key={`${item.id}-more-services`} style={[styles.serviceTag, { backgroundColor: `${theme.colors.textSecondary}20` }]}>
+                <Text style={[styles.serviceText, { color: theme.colors.textSecondary }]}>
+                  +{item.services.length - 3} more
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
-      </View>
+      )}
     </View>
   ), [theme, handleEditProfile, handleDeleteProfile]);
 
@@ -466,18 +478,6 @@ const styles = StyleSheet.create({
     fontSize: Math.min(screenWidth * 0.035, 14),
     fontWeight: '600',
     marginBottom: screenHeight * 0.005,
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  rating: {
-    fontSize: Math.min(screenWidth * 0.035, 14),
-    fontWeight: '600',
-    marginRight: screenWidth * 0.01,
-  },
-  reviewCount: {
-    fontSize: Math.min(screenWidth * 0.03, 12),
   },
   cardActions: {
     flexDirection: 'row',
