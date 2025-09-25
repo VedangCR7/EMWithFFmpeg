@@ -426,6 +426,7 @@ const ProfileScreen: React.FC = () => {
   };
 
   const handleSaveProfile = async () => {
+    // Only validate the essential fields
     if (!editFormData.name.trim()) {
       Alert.alert('Error', 'Company name is required');
       return;
@@ -443,11 +444,6 @@ const ProfileScreen: React.FC = () => {
 
     if (!editFormData.category.trim()) {
       Alert.alert('Error', 'Business category is required');
-      return;
-    }
-
-    if (!editFormData.address.trim()) {
-      Alert.alert('Error', 'Address is required');
       return;
     }
 
@@ -947,40 +943,66 @@ const ProfileScreen: React.FC = () => {
               {/* Business Category */}
               <View style={styles.inputGroup}>
                 <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Business Category *</Text>
-                <View style={[styles.categoryPicker, { 
-                  backgroundColor: theme.colors.surface,
-                  borderColor: theme.colors.border
-                }]}>
-                  <Text style={[styles.categoryPickerText, { 
-                    color: editFormData.category ? theme.colors.text : theme.colors.textSecondary 
-                  }]}>
-                    {editFormData.category || 'Select business category'}
-                  </Text>
-                  <Icon name="keyboard-arrow-down" size={24} color={theme.colors.textSecondary} />
+                
+                {/* Selected Category Display */}
+                <View style={styles.selectedCategoryContainer}>
+                  <TextInput
+                    style={[
+                      styles.selectedCategoryInput,
+                      { 
+                        color: theme.colors.text,
+                        borderColor: editFormData.category ? theme.colors.primary : theme.colors.border,
+                        backgroundColor: theme.colors.surface,
+                      }
+                    ]}
+                    value={editFormData.category}
+                    placeholder="Select your business category"
+                    placeholderTextColor={theme.colors.textSecondary}
+                    editable={false}
+                    pointerEvents="none"
+                  />
                 </View>
-                {editFormData.category && (
-                  <View style={styles.categoryOptions}>
-                    {categories.map((category) => (
-                      <TouchableOpacity
-                        key={category}
-                        style={[
-                          styles.categoryOption,
-                          { backgroundColor: theme.colors.surface },
-                          editFormData.category === category && [styles.categoryOptionSelected, { backgroundColor: theme.colors.primary }]
-                        ]}
-                        onPress={() => setEditFormData({...editFormData, category})}
-                      >
-                        <Text style={[
-                          styles.categoryOptionText,
-                          { color: theme.colors.text },
-                          editFormData.category === category && [styles.categoryOptionTextSelected, { color: '#ffffff' }]
-                        ]}>
-                          {category}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
+                
+                {/* Category Options */}
+                <ScrollView 
+                  horizontal 
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.categoryScrollContent}
+                >
+                {categories.map((category) => (
+                  <TouchableOpacity
+                    key={category}
+                    style={[
+                      styles.categoryOption,
+                      { borderColor: theme.colors.border },
+                      editFormData.category === category && [
+                        styles.categoryOptionSelected, 
+                        { 
+                          backgroundColor: theme.colors.primary,
+                          borderColor: theme.colors.primary,
+                          shadowColor: theme.colors.primary,
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.3,
+                          shadowRadius: 4,
+                          elevation: 5,
+                        }
+                      ]
+                    ]}
+                    onPress={() => setEditFormData({...editFormData, category})}
+                  >
+                    <Text style={[
+                      styles.categoryOptionText,
+                      { color: theme.colors.text },
+                      editFormData.category === category && [
+                        styles.categoryOptionTextSelected, 
+                        { color: '#ffffff' }
+                      ]
+                    ]}>
+                      {category}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                </ScrollView>
               </View>
 
               {/* Phone Number */}
@@ -1055,7 +1077,7 @@ const ProfileScreen: React.FC = () => {
 
               {/* Address */}
               <View style={styles.inputGroup}>
-                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Address *</Text>
+                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Address</Text>
                 <TextInput
                   style={[styles.textArea, { 
                     backgroundColor: theme.colors.surface,
@@ -1730,17 +1752,34 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  // Horizontal category selection styles
+  selectedCategoryContainer: {
+    marginBottom: screenHeight * 0.015,
+  },
+  selectedCategoryInput: {
+    borderWidth: 1,
+    borderRadius: screenWidth * 0.03,
+    paddingHorizontal: screenWidth * 0.04,
+    paddingVertical: screenHeight * 0.015,
+    fontSize: Math.min(screenWidth * 0.04, 16),
+  },
+  categoryScrollContent: {
+    paddingVertical: screenHeight * 0.01,
+    gap: screenWidth * 0.03,
+  },
   categoryOption: {
     paddingVertical: screenHeight * 0.012,
     paddingHorizontal: screenWidth * 0.04,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.1)',
+    borderRadius: screenWidth * 0.02,
+    borderWidth: 1,
+    marginRight: screenWidth * 0.02,
   },
   categoryOptionSelected: {
     // Selected state styling handled inline
   },
   categoryOptionText: {
-    fontSize: Math.min(screenWidth * 0.04, 16),
+    fontSize: Math.min(screenWidth * 0.035, 14),
+    fontWeight: '500',
   },
   categoryOptionTextSelected: {
     fontWeight: '600',
