@@ -330,15 +330,41 @@ const ProfileScreen: React.FC = () => {
 
   const handleEditProfile = async () => {
     try {
-      // Always fetch complete profile data from API
-      console.log('🔍 Fetching complete profile data from API...');
-      
       const currentUser = authService.getCurrentUser();
       
       if (!currentUser) {
         console.log('⚠️ No current user available');
         throw new Error('No user data available');
       }
+      
+      // Check if we already have complete user data from registration
+      if (currentUser && currentUser.email && currentUser.phone && currentUser.name) {
+        console.log('✅ User data already complete from registration, skipping API call');
+        
+        // Update edit form with existing data
+        setEditFormData({
+          name: currentUser?.displayName || currentUser?.companyName || currentUser?.name || currentUser?.businessName || '',
+          description: currentUser?.description || currentUser?.bio || currentUser?.businessDescription || '',
+          category: currentUser?.category || currentUser?.businessCategory || '',
+          address: currentUser?.address || currentUser?.businessAddress || '',
+          phone: currentUser?.phoneNumber || currentUser?.businessPhone || currentUser?.phone || '',
+          alternatePhone: currentUser?.alternateBusinessPhone || currentUser?.alternatePhone || '',
+          email: currentUser?.email || currentUser?.businessEmail || '',
+          website: currentUser?.website || currentUser?.businessWebsite || '',
+          companyLogo: currentUser?.companyLogo || currentUser?.businessLogo || currentUser?.logo || '',
+        });
+        
+        // Update profile image if available
+        if (currentUser?.companyLogo || currentUser?.businessLogo || currentUser?.logo) {
+          setProfileImageUri(currentUser?.companyLogo || currentUser?.businessLogo || currentUser?.logo);
+        }
+        
+        setShowEditProfileModal(true);
+        return;
+      }
+      
+      // Only fetch from API if we don't have complete data
+      console.log('🔍 Fetching complete profile data from API...');
       
       const deviceId = currentUser?.deviceId;
       const userId = currentUser?.id;

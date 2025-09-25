@@ -99,20 +99,8 @@ class AuthApiService {
   // Get user profile
   async getProfile(deviceId?: string, userId?: string): Promise<ProfileResponse> {
     try {
-      // Try multiple profile endpoints in order of preference
-      const endpoints = [];
-      
-      if (userId) {
-        endpoints.push(`/api/mobile/profile/${userId}`);
-        endpoints.push(`/api/v1/profile/${userId}`);
-      }
-      
-      if (deviceId) {
-        endpoints.push(`/api/installed-users/profile/${deviceId}`);
-      }
-      
-      // Add fallback endpoints
-      endpoints.push('/api/mobile/auth/profile');
+      // Use the correct endpoint that we know works
+      const endpoints = ['/api/mobile/auth/me'];
       
       console.log('🔍 Trying profile endpoints:', endpoints);
       
