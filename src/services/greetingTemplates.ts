@@ -37,7 +37,7 @@ class GreetingTemplatesService {
   // Get all greeting categories
   async getCategories(): Promise<GreetingCategory[]> {
     try {
-      const response = await api.get('/greeting-categories');
+      const response = await api.get('/api/mobile/greeting-categories');
       return response.data;
     } catch (error) {
       console.log('Using mock greeting categories due to API error:', error);
@@ -48,7 +48,7 @@ class GreetingTemplatesService {
   // Get greeting templates by category
   async getTemplatesByCategory(category: string): Promise<GreetingTemplate[]> {
     try {
-      const response = await api.get(`/greeting-templates?category=${category}`);
+      const response = await api.get(`/api/mobile/greeting-templates?category=${category}`);
       return response.data;
     } catch (error) {
       console.log('Using mock greeting templates due to API error:', error);
@@ -65,7 +65,7 @@ class GreetingTemplatesService {
       if (filters?.isPremium !== undefined) params.append('isPremium', filters.isPremium.toString());
       if (filters?.search) params.append('search', filters.search);
 
-      const response = await api.get(`/greeting-templates?${params.toString()}`);
+      const response = await api.get(`/api/mobile/greeting-templates?${params.toString()}`);
       return response.data;
     } catch (error) {
       console.log('Using mock greeting templates due to API error:', error);
@@ -76,7 +76,7 @@ class GreetingTemplatesService {
   // Search greeting templates
   async searchTemplates(query: string): Promise<GreetingTemplate[]> {
     try {
-      const response = await api.get(`/greeting-templates/search?q=${query}`);
+      const response = await api.get(`/api/mobile/greeting-templates/search?q=${query}`);
       return response.data;
     } catch (error) {
       console.log('Using mock search results due to API error:', error);
@@ -87,7 +87,7 @@ class GreetingTemplatesService {
   // Like/unlike a template
   async toggleLike(templateId: string): Promise<boolean> {
     try {
-      const response = await api.post(`/greeting-templates/${templateId}/like`);
+      const response = await api.post(`/api/mobile/greeting-templates/${templateId}/like`);
       return response.data.isLiked;
     } catch (error) {
       console.error('Error toggling like:', error);
@@ -98,7 +98,7 @@ class GreetingTemplatesService {
   // Download a template
   async downloadTemplate(templateId: string): Promise<boolean> {
     try {
-      const response = await api.post(`/greeting-templates/${templateId}/download`);
+      const response = await api.post(`/api/mobile/greeting-templates/${templateId}/download`);
       return response.data.success;
     } catch (error) {
       console.error('Error downloading template:', error);
@@ -109,7 +109,7 @@ class GreetingTemplatesService {
   // Get available stickers
   async getStickers(): Promise<string[]> {
     try {
-      const response = await api.get('/stickers');
+      const response = await api.get('/api/mobile/stickers');
       return response.data;
     } catch (error) {
       console.log('Using mock stickers due to API error:', error);
@@ -120,7 +120,7 @@ class GreetingTemplatesService {
   // Get available emojis
   async getEmojis(): Promise<string[]> {
     try {
-      const response = await api.get('/emojis');
+      const response = await api.get('/api/mobile/emojis');
       return response.data;
     } catch (error) {
       console.log('Using mock emojis due to API error:', error);

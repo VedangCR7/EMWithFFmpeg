@@ -17,6 +17,8 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
+import authService from '../services/auth';
+import userLikesService from '../services/userLikes';
 import Video from 'react-native-video';
 
 // Enhanced responsive design helpers
@@ -93,6 +95,8 @@ const LikedItemsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const [activeTab, setActiveTab] = useState('all');
+  const [likedItems, setLikedItems] = useState<LikedItem[]>([]);
+  const [loading, setLoading] = useState(true);
   
   // Get responsive values - memoized to prevent unnecessary re-renders
   const responsiveValues = useMemo(() => getResponsiveValues(), []);
@@ -186,16 +190,102 @@ const LikedItemsScreen: React.FC = () => {
     { id: 'greeting', label: 'Greetings', icon: 'celebration' },
   ], []);
 
+  // Load user-specific liked items
+  const loadUserLikedItems = useCallback(async () => {
+    try {
+      setLoading(true);
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id;
+      
+      console.log('🔍 Loading liked items for user:', userId);
+      
+      // Get user's liked items from all content types
+      const [templateLikes, videoLikes, posterLikes, greetingLikes] = await Promise.all([
+        userLikesService.getLikesByType('template', userId),
+        userLikesService.getLikesByType('video', userId),
+        userLikesService.getLikesByType('poster', userId),
+        userLikesService.getLikesByType('business-profile', userId), // Using business-profile for greetings
+      ]);
+      
+      // Convert user likes to LikedItem format
+      const userLikedItems: LikedItem[] = [];
+      
+      // Add template likes
+      templateLikes.forEach(like => {
+        userLikedItems.push({
+          id: like.contentId,
+          name: `Template ${like.contentId}`,
+          thumbnail: 'https://images.unsplash.com/photo-1511578314322-379afb476865?w=300&h=200&fit=crop',
+          type: 'template',
+          category: 'Templates',
+          likes: Math.floor(Math.random() * 200) + 50, // Mock likes count
+        });
+      });
+      
+      // Add video likes
+      videoLikes.forEach(like => {
+        userLikedItems.push({
+          id: like.contentId,
+          name: `Video ${like.contentId}`,
+          thumbnail: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=300&h=200&fit=crop',
+          type: 'video',
+          category: 'Videos',
+          likes: Math.floor(Math.random() * 300) + 100,
+          videoUrl: 'https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4',
+        });
+      });
+      
+      // Add poster likes
+      posterLikes.forEach(like => {
+        userLikedItems.push({
+          id: like.contentId,
+          name: `Poster ${like.contentId}`,
+          thumbnail: 'https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=300&h=200&fit=crop',
+          type: 'poster',
+          category: 'Posters',
+          likes: Math.floor(Math.random() * 150) + 30,
+          downloads: Math.floor(Math.random() * 100) + 20,
+        });
+      });
+      
+      // Add greeting likes (using business-profile type)
+      greetingLikes.forEach(like => {
+        userLikedItems.push({
+          id: like.contentId,
+          name: `Greeting ${like.contentId}`,
+          thumbnail: 'https://images.unsplash.com/photo-1511578314322-379afb476865?w=300&h=200&fit=crop',
+          type: 'greeting',
+          category: 'Greetings',
+          likes: Math.floor(Math.random() * 80) + 20,
+        });
+      });
+      
+      setLikedItems(userLikedItems);
+      console.log('✅ Loaded user-specific liked items:', userLikedItems.length);
+    } catch (error) {
+      console.error('❌ Error loading user liked items:', error);
+      // Fallback to mock data if there's an error
+      setLikedItems(mockLikedItems);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const filteredItems = useMemo(() => {
     if (activeTab === 'all') {
-      return mockLikedItems;
+      return likedItems;
     }
-    return mockLikedItems.filter(item => item.type === activeTab);
-  }, [mockLikedItems, activeTab]);
+    return likedItems.filter(item => item.type === activeTab);
+  }, [likedItems, activeTab]);
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
   };
+
+  // Load user-specific liked items on component mount
+  useEffect(() => {
+    loadUserLikedItems();
+  }, [loadUserLikedItems]);
 
   const handleItemPress = (item: LikedItem) => {
     // Navigate based on item type
@@ -228,6 +318,44 @@ const LikedItemsScreen: React.FC = () => {
         break;
     }
   };
+
+  const handleUnlikeItem = useCallback(async (item: LikedItem) => {
+    try {
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id;
+      
+      // Map LikedItem type to userLikesService content type
+      let contentType: 'template' | 'video' | 'poster' | 'business-profile';
+      switch (item.type) {
+        case 'template':
+          contentType = 'template';
+          break;
+        case 'video':
+          contentType = 'video';
+          break;
+        case 'poster':
+          contentType = 'poster';
+          break;
+        case 'greeting':
+          contentType = 'business-profile';
+          break;
+        default:
+          console.error('Unknown item type for unlike:', item.type);
+          return;
+      }
+      
+      // Unlike the item
+      const success = await userLikesService.unlikeContent(item.id, contentType, userId);
+      
+      if (success) {
+        // Remove from local state
+        setLikedItems(prev => prev.filter(likedItem => likedItem.id !== item.id));
+        console.log('✅ Item unliked successfully:', item.id);
+      }
+    } catch (error) {
+      console.error('❌ Error unliking item:', error);
+    }
+  }, []);
 
   const renderTab = useCallback(({ item }: { item: { id: string; label: string; icon: string } }) => (
     <TouchableOpacity
@@ -356,11 +484,38 @@ const LikedItemsScreen: React.FC = () => {
                 {item.category}
               </Text>
             )}
+            
+            {/* Unlike Button */}
+            <TouchableOpacity
+              style={[
+                styles.unlikeButton,
+                { 
+                  backgroundColor: '#E74C3C20',
+                  paddingHorizontal: isTablet ? 8 : 6,
+                  paddingVertical: isTablet ? 4 : 2,
+                  borderRadius: isTablet ? 8 : 6,
+                  marginTop: responsiveSpacing.xs,
+                }
+              ]}
+              onPress={() => handleUnlikeItem(item)}
+            >
+              <Icon name="favorite" size={isTablet ? 14 : 12} color="#E74C3C" />
+              <Text style={[
+                styles.unlikeButtonText,
+                { 
+                  color: '#E74C3C',
+                  fontSize: responsiveFontSize.xs,
+                  marginLeft: 4,
+                }
+              ]}>
+                Unlike
+              </Text>
+            </TouchableOpacity>
           </View>
         </Animated.View>
       </TouchableOpacity>
     );
-  }, [cardWidth, theme.colors.cardBackground, isTablet, cardHeight, responsiveSpacing, responsiveFontSize, handleItemPress]);
+  }, [cardWidth, theme.colors.cardBackground, isTablet, cardHeight, responsiveSpacing, responsiveFontSize, handleItemPress, handleUnlikeItem]);
 
   const getTypeColor = useCallback((type: string) => {
     switch (type) {
@@ -438,7 +593,22 @@ const LikedItemsScreen: React.FC = () => {
 
         {/* Content */}
         <View style={styles.content}>
-          {filteredItems.length > 0 ? (
+          {loading ? (
+            <View style={[styles.loadingState, { paddingHorizontal: responsiveSpacing.xl }]}>
+              <Icon name="favorite" size={isTablet ? 80 : 64} color="rgba(255,255,255,0.5)" />
+              <Text style={[
+                styles.loadingStateTitle,
+                { 
+                  color: 'rgba(255,255,255,0.8)',
+                  fontSize: responsiveFontSize.lg,
+                  marginTop: responsiveSpacing.md,
+                  textAlign: 'center',
+                }
+              ]}>
+                Loading your liked items...
+              </Text>
+            </View>
+          ) : filteredItems.length > 0 ? (
             <FlatList
               data={filteredItems}
               renderItem={renderItem}
@@ -471,7 +641,7 @@ const LikedItemsScreen: React.FC = () => {
                   marginTop: responsiveSpacing.md,
                   marginBottom: responsiveSpacing.sm,
                 }
-              ]}>No Liked Items</Text>
+              ]}>No Liked Items Yet</Text>
               <Text style={[
                 styles.emptyStateSubtitle,
                 { 
@@ -506,6 +676,25 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 8,
+  },
+  unlikeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'flex-start',
+  },
+  unlikeButtonText: {
+    fontWeight: '600',
+  },
+  loadingState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: responsiveSpacing.xl * 2,
+  },
+  loadingStateTitle: {
+    fontWeight: '600',
+    textAlign: 'center',
   },
   headerTitle: {
     fontWeight: 'bold',

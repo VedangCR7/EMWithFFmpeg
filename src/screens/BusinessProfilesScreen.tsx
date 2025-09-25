@@ -16,6 +16,8 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import businessProfileService from '../services/businessProfile';
+import userBusinessProfilesService from '../services/userBusinessProfiles';
+import authService from '../services/auth';
 import BusinessProfileForm from '../components/BusinessProfileForm';
 import BottomSheet from '../components/BottomSheet';
 import responsiveUtils, { 
@@ -95,25 +97,46 @@ const BusinessProfilesScreen: React.FC = () => {
   const loadBusinessProfiles = useCallback(async () => {
     setLoading(true);
     try {
-      // Use mock data immediately for better performance
-      setProfiles(mockProfiles);
+      // Get current user ID for user-specific business profiles
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id;
       
-      // Try API call in background
+      console.log('🔍 Loading business profiles for user:', userId);
+      
+      // Try to get user-specific profiles from local storage first
+      const localProfiles = await userBusinessProfilesService.getBusinessProfiles(userId);
+      
+      if (localProfiles.length > 0) {
+        setProfiles(localProfiles);
+        console.log('✅ Loaded user-specific business profiles:', localProfiles.length);
+      } else {
+        // Use mock data for demo purposes
+        const mockUserProfiles = userBusinessProfilesService.getMockBusinessProfiles(userId);
+        setProfiles(mockUserProfiles);
+        console.log('📋 Using mock business profiles for user:', userId);
+      }
+      
+      // Try API call in background for additional profiles
       setTimeout(async () => {
         try {
           const data = await businessProfileService.getBusinessProfiles();
-          setProfiles(data);
+          console.log('📡 API returned business profiles:', data.length);
+          // Note: API profiles are not user-specific yet, so we keep using local profiles
         } catch (error) {
-          console.log('Using mock data due to API error:', error);
+          console.log('⚠️ API call failed, using local profiles:', error);
         }
       }, 100);
     } catch (error) {
-      console.error('Error loading profiles:', error);
-      setProfiles(mockProfiles);
+      console.error('Error loading business profiles:', error);
+      // Fallback to mock data
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id;
+      const mockUserProfiles = userBusinessProfilesService.getMockBusinessProfiles(userId);
+      setProfiles(mockUserProfiles);
     } finally {
       setLoading(false);
     }
-  }, [mockProfiles]);
+  }, []);
 
   useEffect(() => {
     loadBusinessProfiles();
@@ -131,23 +154,29 @@ const BusinessProfilesScreen: React.FC = () => {
       return;
     }
 
-    // Use local search immediately for better performance
-    const filtered = mockProfiles.filter(profile =>
-      profile.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      profile.category.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-    setProfiles(filtered);
-
-    // Try API search in background
-    setTimeout(async () => {
-      try {
-        const results = await businessProfileService.searchBusinessProfiles(searchQuery);
-        setProfiles(results);
-      } catch (error) {
-        console.error('Search error:', error);
-      }
-    }, 100);
-  }, [searchQuery, loadBusinessProfiles, mockProfiles]);
+    try {
+      // Get current user ID for user-specific search
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id;
+      
+      // Search in user-specific profiles
+      const results = await userBusinessProfilesService.searchBusinessProfiles(searchQuery, userId);
+      setProfiles(results);
+      console.log('🔍 Search results for user:', userId, 'Query:', searchQuery, 'Results:', results.length);
+    } catch (error) {
+      console.error('Error searching profiles:', error);
+      // Fallback to mock data search
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id;
+      const mockUserProfiles = userBusinessProfilesService.getMockBusinessProfiles(userId);
+      const filtered = mockUserProfiles.filter(profile => 
+        profile.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        profile.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        profile.category.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setProfiles(filtered);
+    }
+  }, [searchQuery, loadBusinessProfiles]);
 
   const handleDeleteProfile = useCallback(async (profileId: string) => {
     Alert.alert(
@@ -160,8 +189,18 @@ const BusinessProfilesScreen: React.FC = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await businessProfileService.deleteBusinessProfile(profileId);
-              setProfiles(prev => prev.filter(p => p.id !== profileId));
+              // Get current user ID for user-specific deletion
+              const currentUser = authService.getCurrentUser();
+              const userId = currentUser?.id;
+              
+              const success = await userBusinessProfilesService.deleteBusinessProfile(profileId, userId);
+              if (success) {
+                setProfiles(prev => prev.filter(p => p.id !== profileId));
+                Alert.alert('Success', 'Business profile deleted successfully');
+                console.log('✅ Business profile deleted for user:', userId);
+              } else {
+                Alert.alert('Error', 'Failed to delete business profile');
+              }
             } catch (error) {
               console.error('Error deleting profile:', error);
               Alert.alert('Error', 'Failed to delete profile');
@@ -185,13 +224,28 @@ const BusinessProfilesScreen: React.FC = () => {
   const handleFormSubmit = useCallback(async (formData: any) => {
     setFormLoading(true);
     try {
+      // Get current user ID for user-specific business profiles
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id;
+      
       if (editingProfile) {
-        await businessProfileService.updateBusinessProfile(editingProfile.id, formData);
-        setProfiles(prev => prev.map(p => p.id === editingProfile.id ? { ...p, ...formData } : p));
+        // Update existing profile
+        const updatedProfile = await userBusinessProfilesService.updateBusinessProfile(editingProfile.id, formData, userId);
+        if (updatedProfile) {
+          setProfiles(prev => prev.map(p => p.id === editingProfile.id ? updatedProfile : p));
+          Alert.alert('Success', 'Business profile updated successfully');
+          console.log('✅ Business profile updated for user:', userId);
+        } else {
+          Alert.alert('Error', 'Failed to update business profile');
+        }
       } else {
-        const newProfile = await businessProfileService.createBusinessProfile(formData);
+        // Create new profile
+        const newProfile = await userBusinessProfilesService.saveBusinessProfile(formData, userId);
         setProfiles(prev => [...prev, newProfile]);
+        Alert.alert('Success', 'Business profile created successfully');
+        console.log('✅ Business profile created for user:', userId);
       }
+      
       setShowForm(false);
       setShowBottomSheet(false);
       setEditingProfile(null);

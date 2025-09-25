@@ -16,7 +16,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useTheme } from '../context/ThemeContext';
-import authService from '../services/auth';
+import { loginAPIs } from '../services';
 import responsiveUtils, { 
   responsiveSpacing, 
   responsiveFontSize, 
@@ -98,10 +98,17 @@ const LoginScreen: React.FC = ({ navigation }: any) => {
 
     setIsLoading(true);
     try {
-      await authService.signInWithEmail(email, password);
-    } catch (error) {
+      const result = await loginAPIs.loginUser({
+        email: email.trim(),
+        password: password.trim(),
+      });
+      
+      // Navigation will be handled automatically by auth state change
+      // No need to show success alert as user will be redirected
+    } catch (error: any) {
       console.error('Sign in error:', error);
-      Alert.alert('Error', 'Sign in failed. Please try again.');
+      const errorMessage = error.response?.data?.message || error.message || 'Sign in failed. Please try again.';
+      Alert.alert('Error', errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -113,8 +120,8 @@ const LoginScreen: React.FC = ({ navigation }: any) => {
     console.log('Development sign in clicked');
     setIsLoading(true);
     try {
-      await authService.signInAnonymously();
-      console.log('Development sign in successful');
+      // Anonymous sign-in is disabled in API-only mode
+      Alert.alert('Info', 'Anonymous sign-in is not supported. Please use email/password or Google sign-in.');
     } catch (error) {
       console.error('Development sign in error:', error);
       Alert.alert('Error', 'Development sign in failed. Please try again.');

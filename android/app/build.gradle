@@ -123,18 +123,49 @@ android {
         }
     }
     
-    // Packaging options to avoid duplicate native libs while allowing FFmpeg's C++ runtime
+    // Packaging options to force use of custom FFmpeg 6.1.1 libraries
     packagingOptions {
-        pickFirst '**/*.so'
+        // Force pickFirst for all .so files to prioritize custom jniLibs
+        jniLibs {
+            pickFirsts += ['**/*.so']
+        }
+        
+        // Exclude ALL prebuilt FFmpeg libraries from any source
+        exclude '**/libavcodec.so'
+        exclude '**/libavfilter.so'
+        exclude '**/libavformat.so'
+        exclude '**/libavutil.so'
+        exclude '**/libpostproc.so'
+        exclude '**/libswresample.so'
+        exclude '**/libswscale.so'
+        exclude '**/libavdevice.so'
+        
+        // Exclude from specific problematic paths
+        exclude '**/ffmpeg-kit*/**/*.so'
+        exclude '**/node_modules/**/*.so'
+        exclude '**/prebuilt/**/*.so'
+        exclude '**/android-arm*/**/*.so'
+        exclude '**/android-x86*/**/*.so'
+        
+        // Keep only essential non-FFmpeg libraries
         pickFirst '**/libc++_shared.so'
         pickFirst '**/libjsc.so'
-        // Do not exclude libc++_shared.so, required by ffmpeg-kit-react-native
-        // exclude '**/libc++_shared.so'
-        // Keep jsc excluded if using Hermes, but it's already pickFirst'ed to avoid conflicts
-        // exclude '**/libjsc.so'
+        pickFirst '**/libffmpegkit.so'
+        pickFirst '**/libffmpegkit_abidetect.so'
+        
+        // Exclude problematic libraries
         exclude '**/libreactnativejni.so'
         exclude '**/libhermes.so'
     }
+}
+
+// Exclude ffmpeg-kit prebuilt libraries globally
+configurations.all {
+    exclude group: 'com.arthenica', module: 'ffmpeg-kit-full'
+    exclude group: 'com.arthenica', module: 'ffmpeg-kit-min'
+    exclude group: 'com.arthenica', module: 'ffmpeg-kit-min-gpl'
+    exclude group: 'com.arthenica', module: 'ffmpeg-kit-min-lts'
+    exclude group: 'com.arthenica', module: 'ffmpeg-kit-min-lts-gpl'
 }
 
 dependencies {

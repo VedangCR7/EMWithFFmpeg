@@ -20,12 +20,14 @@ export interface SubscribeRequest {
 
 export interface SubscriptionStatus {
   isActive: boolean;
-  planId: string;
-  planName: string;
-  startDate: string;
-  endDate: string;
+  plan?: SubscriptionPlan | null;
+  planId?: string;
+  planName?: string;
+  startDate?: string;
+  endDate?: string;
+  expiryDate?: string | null;
   autoRenew: boolean;
-  status: 'active' | 'expired' | 'cancelled' | 'pending';
+  status: 'active' | 'expired' | 'cancelled' | 'pending' | 'inactive';
 }
 
 export interface SubscriptionHistory {
@@ -62,7 +64,7 @@ class SubscriptionApiService {
   // Get subscription plans
   async getPlans(): Promise<PlansResponse> {
     try {
-      const response = await api.get('/subscription/plans');
+      const response = await api.get('/api/mobile/subscription/plans');
       return response.data;
     } catch (error) {
       console.error('Get plans error:', error);
@@ -73,7 +75,7 @@ class SubscriptionApiService {
   // Subscribe to plan
   async subscribe(data: SubscribeRequest): Promise<SubscriptionResponse> {
     try {
-      const response = await api.post('/subscription/subscribe', data);
+      const response = await api.post('/api/mobile/subscription/subscribe', data);
       return response.data;
     } catch (error) {
       console.error('Subscribe error:', error);
@@ -84,10 +86,27 @@ class SubscriptionApiService {
   // Get subscription status
   async getStatus(): Promise<SubscriptionResponse> {
     try {
-      const response = await api.get('/subscription/status');
+      const response = await api.get('/api/mobile/subscription/status');
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Get subscription status error:', error);
+      
+      // If it's a 401 error, return a default status instead of throwing
+      if (error.response?.status === 401) {
+        console.log('⚠️ Subscription status requires authentication, returning default status');
+        return {
+          success: true,
+          data: {
+            isActive: false,
+            plan: null,
+            expiryDate: null,
+            autoRenew: false,
+            status: 'inactive'
+          },
+          message: 'No active subscription'
+        };
+      }
+      
       throw error;
     }
   }
@@ -95,7 +114,7 @@ class SubscriptionApiService {
   // Renew subscription
   async renew(): Promise<SubscriptionResponse> {
     try {
-      const response = await api.post('/subscription/renew');
+      const response = await api.post('/api/mobile/subscription/renew');
       return response.data;
     } catch (error) {
       console.error('Renew subscription error:', error);
@@ -106,7 +125,7 @@ class SubscriptionApiService {
   // Get subscription history
   async getHistory(): Promise<HistoryResponse> {
     try {
-      const response = await api.get('/subscription/history');
+      const response = await api.get('/api/mobile/subscription/history');
       return response.data;
     } catch (error) {
       console.error('Get subscription history error:', error);
@@ -117,7 +136,7 @@ class SubscriptionApiService {
   // Cancel subscription
   async cancel(): Promise<{ success: boolean; message: string }> {
     try {
-      const response = await api.post('/subscription/cancel');
+      const response = await api.post('/api/mobile/subscription/cancel');
       return response.data;
     } catch (error) {
       console.error('Cancel subscription error:', error);

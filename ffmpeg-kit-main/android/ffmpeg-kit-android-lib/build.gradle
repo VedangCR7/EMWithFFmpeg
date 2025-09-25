@@ -30,9 +30,23 @@ android {
 
     sourceSets {
         main {
-            // Enable native libraries for FFmpeg
-            jniLibs.srcDirs = ["../libs"]
+            // Point to your custom FFmpeg 6.1.1 libraries
+            jniLibs.srcDirs = ["../../android/app/src/main/jniLibs"]
         }
+    }
+
+    // Packaging options to prevent ffmpeg-kit from packaging its own .so files
+    packagingOptions {
+        exclude '**/*.so'
+        // Allow only your custom libraries
+        pickFirst '**/libavcodec.so'
+        pickFirst '**/libavfilter.so'
+        pickFirst '**/libavformat.so'
+        pickFirst '**/libavutil.so'
+        pickFirst '**/libpostproc.so'
+        pickFirst '**/libswresample.so'
+        pickFirst '**/libswscale.so'
+        pickFirst '**/libavdevice.so'
     }
 
     testOptions {

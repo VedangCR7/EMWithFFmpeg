@@ -20,7 +20,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { launchImageLibrary, launchCamera, ImagePickerResponse, MediaType } from 'react-native-image-picker';
 import { useTheme } from '../context/ThemeContext';
-import authService from '../services/auth';
+import { loginAPIs } from '../services';
 import ImagePickerModal from '../components/ImagePickerModal';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -250,38 +250,22 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
 
       console.log('Registering user with data:', registrationData);
       
-      const result = await authService.registerUser({
+      const result = await loginAPIs.registerUser({
         email: formData.email.trim(),
         password: formData.password.trim(),
+        companyName: formData.name.trim(),
+        phoneNumber: formData.phone.trim(),
+        description: formData.description.trim(),
+        category: formData.category.trim(),
+        address: formData.address.trim(),
+        alternatePhone: formData.alternatePhone.trim(),
+        website: formData.website.trim(),
+        companyLogo: logoImage || formData.companyLogo,
         displayName: formData.name.trim(),
-            companyName: formData.name.trim(),
-        photoURL: logoImage || formData.companyLogo,
-            logo: logoImage || formData.companyLogo,
-            // Additional profile fields
-            description: formData.description.trim(),
-            category: formData.category.trim(),
-            address: formData.address.trim(),
-            alternatePhone: formData.alternatePhone.trim(),
-            website: formData.website.trim(),
-        phone: formData.phone.trim(),
-        bio: formData.description.trim(),
-          });
+      });
 
-      if (result.success) {
-        Alert.alert(
-          'Registration Successful',
-          'Your account has been created successfully!',
-          [
-            {
-              text: 'OK',
-              onPress: () => navigation.navigate('Login'),
-            },
-          ]
-        );
-      } else {
-        setErrorMessage(result.error || 'Registration failed. Please try again.');
-        setShowErrorModal(true);
-      }
+      // Navigation will be handled automatically by auth state change
+      // No need to show success alert as user will be redirected to home
     } catch (error) {
       console.error('Registration error:', error);
       setErrorMessage('Registration failed. Please try again.');
@@ -431,7 +415,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                         styles.selectedCategoryInput,
                         { 
                           color: theme.theme.colors.text,
-                          borderColor: theme.theme.colors.border,
+                          borderColor: formData.category ? theme.theme.colors.primary : theme.theme.colors.border,
                           backgroundColor: theme.theme.colors.inputBackground,
                         }
                       ]}
@@ -441,13 +425,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                       editable={false}
                       pointerEvents="none"
                     />
-                    <Icon 
-                      name="keyboard-arrow-down" 
-                      size={24} 
-                      color={theme.theme.colors.textSecondary}
-                      style={styles.dropdownIcon}
-                    />
-                </View>
+                  </View>
                   
                   {/* Category Options */}
                   <ScrollView 
@@ -460,15 +438,29 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                       key={category}
                       style={[
                         styles.categoryOption,
-                          { borderColor: theme.theme.colors.border },
-                          formData.category === category && [styles.categoryOptionSelected, { backgroundColor: theme.theme.colors.primary }]
+                        { borderColor: theme.theme.colors.border },
+                        formData.category === category && [
+                          styles.categoryOptionSelected, 
+                          { 
+                            backgroundColor: theme.theme.colors.primary,
+                            borderColor: theme.theme.colors.primary,
+                            shadowColor: theme.theme.colors.primary,
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: 0.3,
+                            shadowRadius: 4,
+                            elevation: 5,
+                          }
+                        ]
                       ]}
                       onPress={() => handleInputChange('category', category)}
                     >
                       <Text style={[
                         styles.categoryOptionText,
-                          { color: formData.category === category ? '#ffffff' : theme.theme.colors.text },
-                        formData.category === category && [styles.categoryOptionTextSelected, { color: '#ffffff' }]
+                        { color: theme.theme.colors.text },
+                        formData.category === category && [
+                          styles.categoryOptionTextSelected, 
+                          { color: '#ffffff' }
+                        ]
                       ]}>
                         {category}
                       </Text>
@@ -835,14 +827,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: screenWidth * 0.04,
     paddingVertical: screenHeight * 0.015,
-    paddingRight: screenWidth * 0.12,
     fontSize: isSmallScreen ? 14 : 16,
     minHeight: isSmallScreen ? 48 : 52,
-  },
-  dropdownIcon: {
-    position: 'absolute',
-    right: screenWidth * 0.04,
-    top: screenHeight * 0.015,
   },
   categoryScrollContent: {
     paddingRight: screenWidth * 0.05,
@@ -853,14 +839,19 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     marginRight: screenWidth * 0.02,
-    backgroundColor: '#667eea',
+    backgroundColor: 'transparent',
   },
   categoryOptionSelected: {
     backgroundColor: '#667eea',
+    shadowColor: '#667eea',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
   },
   categoryOptionText: {
     fontSize: isSmallScreen ? 12 : 14,
-    color: '#ffffff',
+    color: '#667eea',
     fontWeight: '500',
   },
   categoryOptionTextSelected: {

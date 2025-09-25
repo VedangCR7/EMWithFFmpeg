@@ -82,7 +82,7 @@ class DashboardApiService {
   // Get dashboard data
   async getDashboardData(): Promise<DashboardResponse> {
     try {
-      const response = await api.get('/dashboard');
+      const response = await api.get('/api/mobile/dashboard');
       return response.data;
     } catch (error) {
       console.error('Get dashboard data error:', error);
@@ -93,7 +93,7 @@ class DashboardApiService {
   // Get banner statistics
   async getBannerStats(): Promise<BannerStatsResponse> {
     try {
-      const response = await api.get('/dashboard/banners/stats');
+      const response = await api.get('/api/mobile/dashboard/banners/stats');
       return response.data;
     } catch (error) {
       console.error('Get banner stats error:', error);
@@ -104,7 +104,7 @@ class DashboardApiService {
   // Get template usage statistics
   async getTemplateUsage(): Promise<TemplateUsageResponse> {
     try {
-      const response = await api.get('/dashboard/templates/usage');
+      const response = await api.get('/api/mobile/dashboard/templates/usage');
       return response.data;
     } catch (error) {
       console.error('Get template usage error:', error);
@@ -120,7 +120,7 @@ class DashboardApiService {
         params.append('limit', limit.toString());
       }
 
-      const response = await api.get(`/dashboard/activity?${params.toString()}`);
+      const response = await api.get(`/api/mobile/dashboard/activity?${params.toString()}`);
       return response.data;
     } catch (error) {
       console.error('Get recent activity error:', error);

@@ -19,6 +19,11 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import authService from '../services/auth';
+import authApi from '../services/authApi';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import userBusinessProfilesService from '../services/userBusinessProfiles';
+import userLikesService from '../services/userLikes';
+import userPreferencesService from '../services/userPreferences';
 import { useTheme } from '../context/ThemeContext';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import downloadedPostersService from '../services/downloadedPosters';
@@ -52,23 +57,29 @@ const responsiveFontSize = {
 
 const ProfileScreen: React.FC = () => {
   const currentUser = authService.getCurrentUser();
+  
+  // Debug: Log current user data to see what fields are available
+  console.log('🔍 ProfileScreen - Current User Data:', JSON.stringify(currentUser, null, 2));
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [editFormData, setEditFormData] = useState({
-    name: currentUser?.displayName || currentUser?.companyName || '',
-    description: currentUser?.description || currentUser?.bio || '',
-    category: currentUser?.category || '',
-    address: currentUser?.address || '',
-    phone: currentUser?.phoneNumber || '',
-    alternatePhone: currentUser?.alternatePhone || '',
-    email: currentUser?.email || '',
-    website: currentUser?.website || '',
-    companyLogo: currentUser?.companyLogo || '',
+    name: currentUser?.displayName || currentUser?.companyName || currentUser?.name || currentUser?.businessName || '',
+    description: currentUser?.description || currentUser?.bio || currentUser?.businessDescription || '',
+    category: currentUser?.category || currentUser?.businessCategory || '',
+    address: currentUser?.address || currentUser?.businessAddress || '',
+    phone: currentUser?.phoneNumber || currentUser?.phone || currentUser?.businessPhone || '',
+    alternatePhone: currentUser?.alternatePhone || currentUser?.alternateBusinessPhone || '',
+    email: currentUser?.email || currentUser?.businessEmail || '',
+    website: currentUser?.website || currentUser?.businessWebsite || '',
+    companyLogo: currentUser?.companyLogo || currentUser?.businessLogo || currentUser?.logo || '',
   });
   const [isUpdating, setIsUpdating] = useState(false);
   const [posterStats, setPosterStats] = useState({ total: 0, recentCount: 0 });
+  const [businessProfileStats, setBusinessProfileStats] = useState({ total: 0, recentCount: 0 });
+  const [likeStats, setLikeStats] = useState({ total: 0, recentCount: 0, byType: { template: 0, video: 0, poster: 0, businessProfile: 0 } });
   const [showImagePickerModal, setShowImagePickerModal] = useState(false);
   const [profileImageUri, setProfileImageUri] = useState<string | null>(null);
+  const [userPreferences, setUserPreferences] = useState<any>(null);
   const { isDarkMode, toggleDarkMode, theme } = useTheme();
   const { isSubscribed, transactionStats } = useSubscription();
   const insets = useSafeAreaInsets();
@@ -101,13 +112,44 @@ const ProfileScreen: React.FC = () => {
     React.useCallback(() => {
       const loadPosterStats = async () => {
         try {
-          const stats = await downloadedPostersService.getPosterStats();
+          // Get current user ID for user-specific downloads
+          const currentUser = authService.getCurrentUser();
+          const userId = currentUser?.id;
+          
+          // Load poster stats
+          const posterStats = await downloadedPostersService.getPosterStats(userId);
           setPosterStats({
-            total: stats.total,
-            recentCount: stats.recentCount,
+            total: posterStats.total,
+            recentCount: posterStats.recentCount,
           });
+          
+          // Load business profile stats
+          const businessStats = await userBusinessProfilesService.getBusinessProfileStats(userId);
+          setBusinessProfileStats({
+            total: businessStats.total,
+            recentCount: businessStats.recentCount,
+          });
+          
+          // Load like stats
+          const likeStats = await userLikesService.getLikeStats(userId);
+          setLikeStats({
+            total: likeStats.total,
+            recentCount: likeStats.recentCount,
+            byType: likeStats.byType,
+          });
+          
+          // Load user preferences
+          const preferences = await userPreferencesService.getUserPreferences(userId);
+          setUserPreferences(preferences);
+          
+          // Set preferences state
+          if (preferences) {
+            setNotificationsEnabled(preferences.notificationsEnabled);
+          }
+          
+          console.log('📊 Loaded stats for user:', userId, 'Posters:', posterStats.total, 'Business Profiles:', businessStats.total, 'Likes:', likeStats.total, 'Preferences:', preferences?.notificationsEnabled);
         } catch (error) {
-          console.error('Error loading poster stats:', error);
+          console.error('Error loading stats:', error);
         }
       };
 
@@ -144,32 +186,63 @@ const ProfileScreen: React.FC = () => {
 
 
 
-  const handleNotificationToggle = () => {
-    const newValue = !notificationsEnabled;
-    setNotificationsEnabled(newValue);
-    
-    // Animate the toggle
-    Animated.timing(notificationsAnimation, {
-      toValue: newValue ? 1 : 0,
-      duration: 200,
-      useNativeDriver: false,
-    }).start();
+  const handleNotificationToggle = async () => {
+    try {
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id;
+      
+      if (!userId) {
+        console.warn('No user ID available for notification toggle');
+        return;
+      }
+      
+      const newValue = !notificationsEnabled;
+      setNotificationsEnabled(newValue);
+      
+      // Save to user preferences
+      await userPreferencesService.updatePreference(userId, 'notificationsEnabled', newValue);
+      
+      // Animate the toggle
+      Animated.timing(notificationsAnimation, {
+        toValue: newValue ? 1 : 0,
+        duration: 200,
+        useNativeDriver: false,
+      }).start();
+      
+      console.log('✅ Notification preference updated for user:', userId, 'Value:', newValue);
+    } catch (error) {
+      console.error('❌ Error updating notification preference:', error);
+    }
   };
+
 
   const handleBusinessProfiles = () => {
     navigation.navigate('BusinessProfiles' as never);
   };
 
-  const handleDarkModeToggle = () => {
-    const newValue = !isDarkMode;
-    toggleDarkMode();
-    
-    // Animate the toggle
-    Animated.timing(darkModeAnimation, {
-      toValue: newValue ? 1 : 0,
-      duration: 200,
-      useNativeDriver: false,
-    }).start();
+  const handleDarkModeToggle = async () => {
+    try {
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id;
+      
+      const newValue = !isDarkMode;
+      toggleDarkMode();
+      
+      // Save to user preferences
+      if (userId) {
+        await userPreferencesService.updatePreference(userId, 'darkModeEnabled', newValue);
+        console.log('✅ Dark mode preference updated for user:', userId, 'Value:', newValue);
+      }
+      
+      // Animate the toggle
+      Animated.timing(darkModeAnimation, {
+        toValue: newValue ? 1 : 0,
+        duration: 200,
+        useNativeDriver: false,
+      }).start();
+    } catch (error) {
+      console.error('❌ Error updating dark mode preference:', error);
+    }
   };
 
   const handleSubscription = () => {
@@ -205,20 +278,78 @@ const ProfileScreen: React.FC = () => {
     }
   };
 
-  const handleEditProfile = () => {
+  const handleEditProfile = async () => {
+    try {
+      // Try to fetch complete profile data from API
+      console.log('🔍 Fetching complete profile data from API...');
+      const profileResponse = await authApi.getProfile();
+      const completeUserData = profileResponse.data;
+      
+      console.log('🔍 Complete Profile Data from API:', JSON.stringify(completeUserData, null, 2));
+      
+      setEditFormData({
+        name: completeUserData?.displayName || completeUserData?.companyName || completeUserData?.name || completeUserData?.businessName || '',
+        description: completeUserData?.description || completeUserData?.bio || completeUserData?.businessDescription || '',
+        category: completeUserData?.category || completeUserData?.businessCategory || '',
+        address: completeUserData?.address || completeUserData?.businessAddress || '',
+        phone: completeUserData?.phoneNumber || completeUserData?.phone || completeUserData?.businessPhone || '',
+        alternatePhone: completeUserData?.alternatePhone || completeUserData?.alternateBusinessPhone || '',
+        email: completeUserData?.email || completeUserData?.businessEmail || '',
+        website: completeUserData?.website || completeUserData?.businessWebsite || '',
+        companyLogo: completeUserData?.companyLogo || completeUserData?.businessLogo || completeUserData?.logo || '',
+      });
+      
+      setShowEditProfileModal(true);
+      
+    } catch (error) {
+      console.log('⚠️ Failed to fetch complete profile data, checking local storage:', error);
+      
+      try {
+        // Try to get complete profile data from local storage
+        const storedCompleteData = await AsyncStorage.getItem('completeProfileData');
+        
+        if (storedCompleteData) {
+          const completeUserData = JSON.parse(storedCompleteData);
+          console.log('🔍 Edit Profile - Complete Data from Storage:', JSON.stringify(completeUserData, null, 2));
+          
+          setEditFormData({
+            name: completeUserData?.displayName || completeUserData?.companyName || completeUserData?.name || completeUserData?.businessName || '',
+            description: completeUserData?.description || completeUserData?.bio || completeUserData?.businessDescription || '',
+            category: completeUserData?.category || completeUserData?.businessCategory || '',
+            address: completeUserData?.address || completeUserData?.businessAddress || '',
+            phone: completeUserData?.phoneNumber || completeUserData?.phone || completeUserData?.businessPhone || '',
+            alternatePhone: completeUserData?.alternatePhone || completeUserData?.alternateBusinessPhone || '',
+            email: completeUserData?.email || completeUserData?.businessEmail || '',
+            website: completeUserData?.website || completeUserData?.businessWebsite || '',
+            companyLogo: completeUserData?.companyLogo || completeUserData?.businessLogo || completeUserData?.logo || '',
+          });
+          
+          setShowEditProfileModal(true);
+          return;
+        }
+      } catch (storageError) {
+        console.log('⚠️ Failed to get complete profile data from storage:', storageError);
+      }
+      
+      // Final fallback to local user data
     const user = authService.getCurrentUser();
+      
+      console.log('🔍 Edit Profile - Local User Data (Fallback):', JSON.stringify(user, null, 2));
+      
     setEditFormData({
-      name: user?.displayName || user?.companyName || '',
-      description: user?.description || user?.bio || '',
-      category: user?.category || '',
-      address: user?.address || '',
-      phone: user?.phoneNumber || '',
-      alternatePhone: user?.alternatePhone || '',
-      email: user?.email || '',
-      website: user?.website || '',
-      companyLogo: user?.companyLogo || '',
-    });
+        name: user?.displayName || user?.companyName || user?.name || user?.businessName || '',
+        description: user?.description || user?.bio || user?.businessDescription || '',
+        category: user?.category || user?.businessCategory || '',
+        address: user?.address || user?.businessAddress || '',
+        phone: user?.phoneNumber || user?.phone || user?.businessPhone || '',
+        alternatePhone: user?.alternatePhone || user?.alternateBusinessPhone || '',
+        email: user?.email || user?.businessEmail || '',
+        website: user?.website || user?.businessWebsite || '',
+        companyLogo: user?.companyLogo || user?.businessLogo || user?.logo || '',
+      });
+      
     setShowEditProfileModal(true);
+    }
   };
 
   const handleSaveProfile = async () => {
@@ -281,15 +412,15 @@ const ProfileScreen: React.FC = () => {
     const user = authService.getCurrentUser();
     setShowEditProfileModal(false);
     setEditFormData({
-      name: user?.displayName || user?.companyName || '',
-      description: user?.description || user?.bio || '',
-      category: user?.category || '',
-      address: user?.address || '',
-      phone: user?.phoneNumber || '',
-      alternatePhone: user?.alternatePhone || '',
-      email: user?.email || '',
-      website: user?.website || '',
-      companyLogo: user?.companyLogo || '',
+      name: user?.displayName || user?.companyName || user?.name || user?.businessName || '',
+      description: user?.description || user?.bio || user?.businessDescription || '',
+      category: user?.category || user?.businessCategory || '',
+      address: user?.address || user?.businessAddress || '',
+      phone: user?.phoneNumber || user?.phone || user?.businessPhone || '',
+      alternatePhone: user?.alternatePhone || user?.alternateBusinessPhone || '',
+      email: user?.email || user?.businessEmail || '',
+      website: user?.website || user?.businessWebsite || '',
+      companyLogo: user?.companyLogo || user?.businessLogo || user?.logo || '',
     });
   };
 
@@ -425,7 +556,7 @@ const ProfileScreen: React.FC = () => {
               </View>
               <View style={styles.profileInfo}>
                 <Text style={[styles.userName, { color: theme.colors.text }]}>
-                  {currentUser?.displayName || 'Event Marketer'}
+                  {currentUser?.displayName || currentUser?.companyName || currentUser?.name || 'MarketBrand'}
                 </Text>
                 <Text style={[styles.userEmail, { color: theme.colors.textSecondary }]}>
                   {currentUser?.email || 'eventmarketer@example.com'}
@@ -447,8 +578,8 @@ const ProfileScreen: React.FC = () => {
                   </View>
                   <View style={[styles.statDivider, { backgroundColor: theme.colors.border }]} />
                   <View style={styles.statItem}>
-                    <Text style={[styles.statNumber, { color: theme.colors.primary }]}>{posterStats.recentCount}</Text>
-                    <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Recent</Text>
+                    <Text style={[styles.statNumber, { color: theme.colors.primary }]}>{businessProfileStats.total}</Text>
+                    <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Business</Text>
                   </View>
                 </View>
               </View>
@@ -465,7 +596,7 @@ const ProfileScreen: React.FC = () => {
           {/* Account Settings */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Account Settings</Text>
-            {renderMenuItem('business', 'Business Profiles', 'Manage your business profiles', handleBusinessProfiles)}
+            {renderMenuItem('business', 'Business Profiles', `${businessProfileStats.total} profiles • ${businessProfileStats.recentCount} recent`, handleBusinessProfiles)}
             {renderMenuItem('notifications', 'Notifications', 'Manage notification preferences', undefined, true, notificationsEnabled, handleNotificationToggle, notificationsAnimation)}
           </View>
 
@@ -512,7 +643,7 @@ const ProfileScreen: React.FC = () => {
                       Liked Content
                     </Text>
                     <Text style={[styles.likedItemsSubtitle, { color: theme.colors.textSecondary }]}>
-                      Posters • Videos • Templates • Greetings
+                      {likeStats.total} liked items • {likeStats.recentCount} recent
                     </Text>
                   </View>
                 </View>

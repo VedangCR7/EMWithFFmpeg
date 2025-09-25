@@ -168,7 +168,7 @@ class HomeApiService {
   // ============================================================================
   // API 1: FEATURED CONTENT
   // ============================================================================
-  // Endpoint: GET /api/home/featured
+  // Endpoint: GET /api/mobile/home/featured
   // Purpose: Get featured banners, promotions, and highlights for home screen
   // Query Parameters:
   //   - limit: number (optional, default: 10)
@@ -189,7 +189,7 @@ class HomeApiService {
       if (params?.active !== undefined) queryParams.append('active', params.active.toString());
       
       const queryString = queryParams.toString();
-      const url = `/home/featured${queryString ? `?${queryString}` : ''}`;
+      const url = `/api/mobile/home/featured${queryString ? `?${queryString}` : ''}`;
       
       const response = await api.get(url);
       return response.data;
@@ -202,7 +202,7 @@ class HomeApiService {
   // ============================================================================
   // API 2: UPCOMING EVENTS
   // ============================================================================
-  // Endpoint: GET /api/home/upcoming-events
+  // Endpoint: GET /api/mobile/home/upcoming-events
   // Purpose: Get upcoming events for home screen
   // Query Parameters:
   //   - limit: number (optional, default: 20)
@@ -232,7 +232,7 @@ class HomeApiService {
       if (params?.isFree !== undefined) queryParams.append('isFree', params.isFree.toString());
       
       const queryString = queryParams.toString();
-      const url = `/home/upcoming-events${queryString ? `?${queryString}` : ''}`;
+      const url = `/api/mobile/home/upcoming-events${queryString ? `?${queryString}` : ''}`;
       
       const response = await api.get(url);
       return response.data;
@@ -245,7 +245,7 @@ class HomeApiService {
   // ============================================================================
   // API 3: PROFESSIONAL TEMPLATES
   // ============================================================================
-  // Endpoint: GET /api/home/templates
+  // Endpoint: GET /api/mobile/home/templates
   // Purpose: Get professional templates for home screen
   // Query Parameters:
   //   - limit: number (optional, default: 20)
@@ -277,7 +277,7 @@ class HomeApiService {
       }
       
       const queryString = queryParams.toString();
-      const url = `/home/templates${queryString ? `?${queryString}` : ''}`;
+      const url = `/api/mobile/home/templates${queryString ? `?${queryString}` : ''}`;
       
       const response = await api.get(url);
       return response.data;
@@ -290,7 +290,7 @@ class HomeApiService {
   // ============================================================================
   // API 4: VIDEO CONTENT
   // ============================================================================
-  // Endpoint: GET /api/home/video-content
+  // Endpoint: GET /api/mobile/home/video-content
   // Purpose: Get video templates and content for home screen
   // Query Parameters:
   //   - limit: number (optional, default: 20)
@@ -325,7 +325,7 @@ class HomeApiService {
       }
       
       const queryString = queryParams.toString();
-      const url = `/home/video-content${queryString ? `?${queryString}` : ''}`;
+      const url = `/api/mobile/home/video-content${queryString ? `?${queryString}` : ''}`;
       
       const response = await api.get(url);
       return response.data;
@@ -353,7 +353,7 @@ class HomeApiService {
       if (params.limit) queryParams.append('limit', params.limit.toString());
       
       const queryString = queryParams.toString();
-      const url = `/home/search?${queryString}`;
+      const url = `/api/mobile/home/search?${queryString}`;
       
       const response = await api.get(url);
       return response.data;
@@ -366,7 +366,7 @@ class HomeApiService {
   // Like content (templates or videos)
   async likeContent(contentId: string, contentType: 'template' | 'video'): Promise<ActionResponse> {
     try {
-      const response = await api.post(`/home/${contentType}s/${contentId}/like`);
+      const response = await api.post(`/api/mobile/home/${contentType}s/${contentId}/like`);
       return response.data;
     } catch (error) {
       console.error('Like content error:', error);
@@ -377,7 +377,7 @@ class HomeApiService {
   // Unlike content (templates or videos)
   async unlikeContent(contentId: string, contentType: 'template' | 'video'): Promise<ActionResponse> {
     try {
-      const response = await api.delete(`/home/${contentType}s/${contentId}/like`);
+      const response = await api.delete(`/api/mobile/home/${contentType}s/${contentId}/like`);
       return response.data;
     } catch (error) {
       console.error('Unlike content error:', error);
@@ -388,7 +388,7 @@ class HomeApiService {
   // Download content (templates or videos)
   async downloadContent(contentId: string, contentType: 'template' | 'video'): Promise<ActionResponse> {
     try {
-      const response = await api.post(`/home/${contentType}s/${contentId}/download`);
+      const response = await api.post(`/api/mobile/home/${contentType}s/${contentId}/download`);
       return response.data;
     } catch (error) {
       console.error('Download content error:', error);
@@ -403,7 +403,7 @@ class HomeApiService {
     message: string;
   }> {
     try {
-      const response = await api.get(`/home/${contentType}s/${contentId}`);
+      const response = await api.get(`/api/mobile/home/${contentType}s/${contentId}`);
       return response.data;
     } catch (error) {
       console.error('Get content details error:', error);

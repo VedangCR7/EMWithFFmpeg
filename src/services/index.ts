@@ -70,5 +70,16 @@ export type {
   ActivityResponse,
 } from './dashboardApi';
 
+// Login APIs - Comprehensive Authentication Service
+export { default as loginAPIs } from './loginAPIs';
+export type {
+  UserRegistrationRequest,
+  UserLoginRequest,
+  PasswordResetRequest,
+  PasswordResetConfirmRequest,
+  ChangePasswordRequest,
+  EmailVerificationRequest,
+} from './loginAPIs';
+
 // Base API instance
 export { default as api } from './api';

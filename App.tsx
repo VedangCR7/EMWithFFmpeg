@@ -5,12 +5,14 @@
  * @format
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { LogBox, Text, View, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AppNavigator from './src/navigation/AppNavigator';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { SubscriptionProvider } from './src/contexts/SubscriptionContext';
+import FFmpegRuntimeDebugger from './src/services/FFmpegRuntimeDebugger';
+import FFmpegVerificationService from './src/services/FFmpegVerificationService';
 
 // Enable detailed logging for debugging
 LogBox.ignoreAllLogs(false);
@@ -58,6 +60,40 @@ class ErrorBoundary extends React.Component<
 }
 
 const App: React.FC = () => {
+  // Run FFmpeg verification on app startup
+  useEffect(() => {
+    const runFFmpegVerification = async () => {
+      try {
+        console.log("🚀 App started - Running FFmpeg 6.1.1 verification...");
+        
+        // First run the runtime debugger
+        const debugResult = await FFmpegRuntimeDebugger.debugFFmpegRuntime();
+        console.log("🎯 FFmpeg Runtime Debug Result:", debugResult);
+        
+        // Then run the verification service
+        const verificationResult = await FFmpegVerificationService.verifyCustomFFmpeg();
+        console.log("🎯 FFmpeg Verification Result:", verificationResult);
+        
+        // Log final status
+        if (verificationResult.version.includes('6.1.1') && verificationResult.hasDrawtext) {
+          console.log("🎉 SUCCESS: Custom FFmpeg 6.1.1 with drawtext is working!");
+        } else {
+          console.log("❌ FAILURE: Custom FFmpeg 6.1.1 is NOT working properly");
+          console.log("❌ Current version:", verificationResult.version);
+          console.log("❌ Drawtext available:", verificationResult.hasDrawtext);
+        }
+        
+      } catch (error) {
+        console.error("❌ FFmpeg verification failed on startup:", error);
+      }
+    };
+
+    // Run verification after a short delay to ensure app is fully loaded
+    const timer = setTimeout(runFFmpegVerification, 3000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <ErrorBoundary>
       <SafeAreaProvider>

@@ -1,6 +1,6 @@
 
 
-import { templatesBannersApi, type Template as ApiTemplate, type TemplateFilters as ApiTemplateFilters } from './templatesBannersApi';
+import templatesBannersApi, { type Template as ApiTemplate, type TemplateFilters as ApiTemplateFilters } from './templatesBannersApi';
 
 
 export interface Template {

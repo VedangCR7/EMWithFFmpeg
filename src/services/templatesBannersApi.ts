@@ -139,7 +139,7 @@ class TemplatesBannersApiService {
       if (filters?.page) params.append('page', filters.page.toString());
       if (filters?.limit) params.append('limit', filters.limit.toString());
 
-      const response = await api.get(`/templates?${params.toString()}`);
+      const response = await api.get(`/api/mobile/templates?${params.toString()}`);
       return response.data;
     } catch (error) {
       console.log('Using mock templates due to API error:', error);
@@ -150,7 +150,7 @@ class TemplatesBannersApiService {
   // Get template by ID
   async getTemplateById(id: string): Promise<TemplateResponse> {
     try {
-      const response = await api.get(`/templates/${id}`);
+      const response = await api.get(`/api/mobile/templates/${id}`);
       return response.data;
     } catch (error) {
       console.log('Using mock template details due to API error:', error);
@@ -161,7 +161,7 @@ class TemplatesBannersApiService {
   // Get available languages
   async getLanguages(): Promise<LanguagesResponse> {
     try {
-      const response = await api.get('/templates/languages');
+      const response = await api.get('/api/mobile/templates/languages');
       return response.data;
     } catch (error) {
       console.log('Using mock languages due to API error:', error);
@@ -172,7 +172,7 @@ class TemplatesBannersApiService {
   // Create banner
   async createBanner(data: CreateBannerRequest): Promise<BannerResponse> {
     try {
-      const response = await api.post('/banners', data);
+      const response = await api.post('/api/mobile/banners', data);
       return response.data;
     } catch (error) {
       console.error('Create banner error:', error);
@@ -183,7 +183,7 @@ class TemplatesBannersApiService {
   // Update banner
   async updateBanner(id: string, data: UpdateBannerRequest): Promise<BannerResponse> {
     try {
-      const response = await api.put(`/banners/${id}`, data);
+      const response = await api.put(`/api/mobile/banners/${id}`, data);
       return response.data;
     } catch (error) {
       console.error('Update banner error:', error);
@@ -199,7 +199,7 @@ class TemplatesBannersApiService {
       if (filters?.page) params.append('page', filters.page.toString());
       if (filters?.limit) params.append('limit', filters.limit.toString());
 
-      const response = await api.get(`/banners/my?${params.toString()}`);
+      const response = await api.get(`/api/mobile/banners/my?${params.toString()}`);
       return response.data;
     } catch (error) {
       console.error('Get user banners error:', error);
@@ -210,7 +210,7 @@ class TemplatesBannersApiService {
   // Get banner by ID
   async getBannerById(id: string): Promise<BannerResponse> {
     try {
-      const response = await api.get(`/banners/${id}`);
+      const response = await api.get(`/api/mobile/banners/${id}`);
       return response.data;
     } catch (error) {
       console.error('Get banner by ID error:', error);
@@ -221,7 +221,7 @@ class TemplatesBannersApiService {
   // Delete banner
   async deleteBanner(id: string): Promise<{ success: boolean; message: string }> {
     try {
-      const response = await api.delete(`/banners/${id}`);
+      const response = await api.delete(`/api/mobile/banners/${id}`);
       return response.data;
     } catch (error) {
       console.error('Delete banner error:', error);
@@ -232,7 +232,7 @@ class TemplatesBannersApiService {
   // Publish banner
   async publishBanner(id: string): Promise<BannerResponse> {
     try {
-      const response = await api.post(`/banners/${id}/publish`);
+      const response = await api.post(`/api/mobile/banners/${id}/publish`);
       return response.data;
     } catch (error) {
       console.error('Publish banner error:', error);
@@ -243,7 +243,7 @@ class TemplatesBannersApiService {
   // Archive banner
   async archiveBanner(id: string): Promise<BannerResponse> {
     try {
-      const response = await api.post(`/banners/${id}/archive`);
+      const response = await api.post(`/api/mobile/banners/${id}/archive`);
       return response.data;
     } catch (error) {
       console.error('Archive banner error:', error);
@@ -254,7 +254,7 @@ class TemplatesBannersApiService {
   // Export banner
   async exportBanner(id: string, format: 'png' | 'jpg' | 'pdf' = 'png', quality: number = 90): Promise<Blob> {
     try {
-      const response = await api.get(`/banners/${id}/export`, {
+      const response = await api.get(`/api/mobile/banners/${id}/export`, {
         params: { format, quality },
         responseType: 'blob'
       });
@@ -268,7 +268,7 @@ class TemplatesBannersApiService {
   // Share banner
   async shareBanner(id: string, data: ShareRequest): Promise<{ success: boolean; message: string }> {
     try {
-      const response = await api.post(`/banners/${id}/share`, data);
+      const response = await api.post(`/api/mobile/banners/${id}/share`, data);
       return response.data;
     } catch (error) {
       console.error('Share banner error:', error);
@@ -279,7 +279,7 @@ class TemplatesBannersApiService {
   // Like template
   async likeTemplate(id: string): Promise<{ success: boolean; message: string; isLiked: boolean }> {
     try {
-      const response = await api.post(`/templates/${id}/like`);
+      const response = await api.post(`/api/mobile/templates/${id}/like`);
       return response.data;
     } catch (error) {
       console.error('Like template error:', error);
@@ -290,7 +290,7 @@ class TemplatesBannersApiService {
   // Download template
   async downloadTemplate(id: string): Promise<{ success: boolean; message: string }> {
     try {
-      const response = await api.post(`/templates/${id}/download`);
+      const response = await api.post(`/api/mobile/templates/${id}/download`);
       return response.data;
     } catch (error) {
       console.error('Download template error:', error);
@@ -301,7 +301,7 @@ class TemplatesBannersApiService {
   // Get template categories
   async getTemplateCategories(): Promise<{ success: boolean; data: string[]; message: string }> {
     try {
-      const response = await api.get('/templates/categories');
+      const response = await api.get('/api/mobile/templates/categories');
       return response.data;
     } catch (error) {
       console.log('Using mock template categories due to API error:', error);

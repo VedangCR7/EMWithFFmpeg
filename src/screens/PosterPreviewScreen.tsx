@@ -17,6 +17,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import axios from 'axios';
+import authService from '../services/auth';
 // import RNFS from 'react-native-fs'; // Removed - package uninstalled
 import { CameraRoll } from '@react-native-camera-roll/camera-roll';
 import downloadedPostersService from '../services/downloadedPosters';
@@ -309,8 +310,12 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
        
        console.log('Image saved to gallery successfully');
        
-       // Save poster information to local storage
+       // Save poster information to local storage with user ID
        try {
+         // Get current user ID for user-specific downloads
+         const currentUser = authService.getCurrentUser();
+         const userId = currentUser?.id;
+         
          await downloadedPostersService.savePosterInfo({
            title: selectedImage.title || 'Custom Poster',
            description: selectedImage.description || 'Event poster created with EventMarketers',
@@ -322,7 +327,7 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
              width: canvasWidth || 1080,
              height: canvasHeight || 1920,
            },
-         });
+         }, userId);
          console.log('Poster information saved successfully');
        } catch (error) {
          console.error('Error saving poster information:', error);

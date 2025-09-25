@@ -66,7 +66,7 @@ class AuthApiService {
   // Register new user
   async register(data: RegisterRequest): Promise<AuthResponse> {
     try {
-      const response = await api.post('/auth/register', data);
+      const response = await api.post('/api/mobile/auth/register', data);
       return response.data;
     } catch (error) {
       console.error('Registration error:', error);
@@ -77,7 +77,7 @@ class AuthApiService {
   // User login
   async login(data: LoginRequest): Promise<AuthResponse> {
     try {
-      const response = await api.post('/auth/login', data);
+      const response = await api.post('/api/mobile/auth/login', data);
       return response.data;
     } catch (error) {
       console.error('Login error:', error);
@@ -88,7 +88,7 @@ class AuthApiService {
   // Google OAuth login
   async googleLogin(data: GoogleAuthRequest): Promise<AuthResponse> {
     try {
-      const response = await api.post('/auth/google', data);
+      const response = await api.post('/api/mobile/auth/google', data);
       return response.data;
     } catch (error) {
       console.error('Google login error:', error);
@@ -99,7 +99,7 @@ class AuthApiService {
   // Get user profile
   async getProfile(): Promise<ProfileResponse> {
     try {
-      const response = await api.get('/auth/profile');
+      const response = await api.get('/api/mobile/auth/profile');
       return response.data;
     } catch (error) {
       console.error('Get profile error:', error);
@@ -110,7 +110,7 @@ class AuthApiService {
   // Update user profile
   async updateProfile(data: UpdateProfileRequest): Promise<ProfileResponse> {
     try {
-      const response = await api.put('/auth/profile', data);
+      const response = await api.put('/api/mobile/auth/profile', data);
       return response.data;
     } catch (error) {
       console.error('Update profile error:', error);
@@ -121,7 +121,7 @@ class AuthApiService {
   // Logout user
   async logout(): Promise<{ success: boolean; message: string }> {
     try {
-      const response = await api.post('/auth/logout');
+      const response = await api.post('/api/mobile/auth/logout');
       return response.data;
     } catch (error) {
       console.error('Logout error:', error);

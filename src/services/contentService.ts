@@ -14,8 +14,7 @@ import userService from './userService';
 
 class ContentService {
   private static instance: ContentService;
-  private cachedCategories: BusinessCategory[] | null = null;
-  private lastCategoriesFetch: number = 0;
+  private userCachedCategories: Map<string, { data: BusinessCategory[], timestamp: number }> = new Map();
   private categoriesCacheTimeout: number = 5 * 60 * 1000; // 5 minutes
 
   public static getInstance(): ContentService {
@@ -41,22 +40,29 @@ class ContentService {
   /**
    * Get business categories with caching
    */
-  async getBusinessCategories(forceRefresh: boolean = false): Promise<BusinessCategory[]> {
+  async getBusinessCategories(forceRefresh: boolean = false, userId?: string): Promise<BusinessCategory[]> {
     try {
       const now = Date.now();
+      const cacheKey = userId || 'anonymous';
       
       // Return cached categories if not expired and not forcing refresh
-      if (!forceRefresh && 
-          this.cachedCategories && 
-          (now - this.lastCategoriesFetch) < this.categoriesCacheTimeout) {
-        return this.cachedCategories;
+      if (!forceRefresh && this.userCachedCategories.has(cacheKey)) {
+        const cached = this.userCachedCategories.get(cacheKey)!;
+        if ((now - cached.timestamp) < this.categoriesCacheTimeout) {
+          console.log('✅ Using cached categories for user:', cacheKey);
+          return cached.data;
+        }
       }
 
       const response = await getBusinessCategories();
       
       if (response.success && response.categories) {
-        this.cachedCategories = response.categories;
-        this.lastCategoriesFetch = now;
+        // Cache categories for this user
+        this.userCachedCategories.set(cacheKey, {
+          data: response.categories,
+          timestamp: now,
+        });
+        console.log('✅ Cached categories for user:', cacheKey);
         return response.categories;
       } else {
         throw new Error(response.error || 'Failed to fetch categories');
@@ -65,8 +71,9 @@ class ContentService {
       console.log('Using mock business categories due to API error:', error);
       
       // Return cached categories if available, even if expired
-      if (this.cachedCategories) {
-        return this.cachedCategories;
+      const cacheKey = userId || 'anonymous';
+      if (this.userCachedCategories.has(cacheKey)) {
+        return this.userCachedCategories.get(cacheKey)!.data;
       }
       
       return this.getMockBusinessCategories();
@@ -270,18 +277,25 @@ class ContentService {
   }
 
   /**
-   * Clear cache
+   * Get cached categories for specific user
    */
-  clearCache(): void {
-    this.cachedCategories = null;
-    this.lastCategoriesFetch = 0;
+  getCachedCategories(userId?: string): BusinessCategory[] | null {
+    const cacheKey = userId || 'anonymous';
+    const cached = this.userCachedCategories.get(cacheKey);
+    return cached ? cached.data : null;
   }
 
   /**
-   * Get cached categories
+   * Clear cache for specific user
    */
-  getCachedCategories(): BusinessCategory[] | null {
-    return this.cachedCategories;
+  clearUserCache(userId?: string): void {
+    if (userId) {
+      this.userCachedCategories.delete(userId);
+      console.log('✅ Cleared cache for user:', userId);
+    } else {
+      this.userCachedCategories.clear();
+      console.log('✅ Cleared all user cache');
+    }
   }
 
   // ============================================================================

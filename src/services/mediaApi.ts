@@ -80,7 +80,7 @@ class MediaApiService {
       if (filters?.page) params.append('page', filters.page.toString());
       if (filters?.limit) params.append('limit', filters.limit.toString());
 
-      const response = await api.get(`/media?${params.toString()}`);
+      const response = await api.get(`/api/mobile/media?${params.toString()}`);
       return response.data;
     } catch (error) {
       console.error('Get media assets error:', error);
@@ -100,7 +100,7 @@ class MediaApiService {
         formData.append('description', data.description);
       }
 
-      const response = await api.post('/media/upload', formData, {
+      const response = await api.post('/api/mobile/media/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -115,7 +115,7 @@ class MediaApiService {
   // Delete media
   async deleteMedia(id: string): Promise<{ success: boolean; message: string }> {
     try {
-      const response = await api.delete(`/media/${id}`);
+      const response = await api.delete(`/api/mobile/media/${id}`);
       return response.data;
     } catch (error) {
       console.error('Delete media error:', error);
@@ -126,7 +126,7 @@ class MediaApiService {
   // Get media by ID
   async getMediaById(id: string): Promise<MediaResponse> {
     try {
-      const response = await api.get(`/media/${id}`);
+      const response = await api.get(`/api/mobile/media/${id}`);
       return response.data;
     } catch (error) {
       console.error('Get media by ID error:', error);
@@ -137,7 +137,7 @@ class MediaApiService {
   // Update media metadata
   async updateMedia(id: string, data: UpdateMediaRequest): Promise<MediaResponse> {
     try {
-      const response = await api.put(`/media/${id}`, data);
+      const response = await api.put(`/api/mobile/media/${id}`, data);
       return response.data;
     } catch (error) {
       console.error('Update media error:', error);
@@ -148,7 +148,7 @@ class MediaApiService {
   // Get media by type
   async getMediaByType(type: 'image' | 'video'): Promise<MediaListResponse> {
     try {
-      const response = await api.get(`/media/type/${type}`);
+      const response = await api.get(`/api/mobile/media/type/${type}`);
       return response.data;
     } catch (error) {
       console.error('Get media by type error:', error);
@@ -170,7 +170,7 @@ class MediaApiService {
         params.append('limit', searchData.limit.toString());
       }
 
-      const response = await api.get(`/media/search?${params.toString()}`);
+      const response = await api.get(`/api/mobile/media/search?${params.toString()}`);
       return response.data;
     } catch (error) {
       console.error('Search media by tags error:', error);
@@ -181,7 +181,7 @@ class MediaApiService {
   // Get media statistics
   async getMediaStats(): Promise<MediaStatsResponse> {
     try {
-      const response = await api.get('/media/stats');
+      const response = await api.get('/api/mobile/media/stats');
       return response.data;
     } catch (error) {
       console.error('Get media stats error:', error);

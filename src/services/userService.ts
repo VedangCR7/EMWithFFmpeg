@@ -144,22 +144,31 @@ class UserService {
     resourceType: string;
     resourceId: string;
     metadata?: any;
+    userId?: string;
   }): Promise<void> {
     try {
-      if (!this.deviceId) {
-        console.warn('Device ID not initialized, skipping activity recording');
+      // Use provided userId or fallback to deviceId for backward compatibility
+      const identifier = activityData.userId || this.deviceId;
+      
+      if (!identifier) {
+        console.warn('No user identifier available, skipping activity recording');
         return;
       }
 
       const activity: UserActivity = {
-        deviceId: this.deviceId,
+        deviceId: identifier, // This will be userId if provided, deviceId as fallback
         action: activityData.action,
         resourceType: activityData.resourceType,
         resourceId: activityData.resourceId,
-        metadata: activityData.metadata,
+        metadata: {
+          ...activityData.metadata,
+          userId: activityData.userId,
+          deviceId: this.deviceId,
+        },
       };
 
       await recordUserActivity(activity);
+      console.log('✅ User activity recorded:', activityData.action, 'for user:', identifier);
     } catch (error) {
       console.error('Failed to record user activity:', error);
       // Don't throw error for activity recording failures
@@ -169,11 +178,12 @@ class UserService {
   /**
    * Track content view
    */
-  async trackContentView(contentId: string, contentType: 'image' | 'video', metadata?: any): Promise<void> {
+  async trackContentView(contentId: string, contentType: 'image' | 'video', metadata?: any, userId?: string): Promise<void> {
     await this.recordActivity({
       action: 'view',
       resourceType: contentType,
       resourceId: contentId,
+      userId,
       metadata: {
         ...metadata,
         timestamp: new Date().toISOString(),
@@ -184,11 +194,12 @@ class UserService {
   /**
    * Track content download
    */
-  async trackContentDownload(contentId: string, contentType: 'image' | 'video', metadata?: any): Promise<void> {
+  async trackContentDownload(contentId: string, contentType: 'image' | 'video', metadata?: any, userId?: string): Promise<void> {
     await this.recordActivity({
       action: 'download',
       resourceType: contentType,
       resourceId: contentId,
+      userId,
       metadata: {
         ...metadata,
         timestamp: new Date().toISOString(),

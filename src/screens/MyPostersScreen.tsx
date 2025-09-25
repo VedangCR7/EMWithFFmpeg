@@ -21,6 +21,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Share } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import downloadedPostersService, { DownloadedPoster } from '../services/downloadedPosters';
+import authService from '../services/auth';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -54,7 +55,12 @@ const MyPostersScreen: React.FC = () => {
   const loadPosters = async () => {
     try {
       setLoading(true);
-      const downloadedPosters = await downloadedPostersService.getDownloadedPosters();
+      
+      // Get current user ID for user-specific downloads
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id;
+      
+      const downloadedPosters = await downloadedPostersService.getDownloadedPosters(userId);
       setPosters(downloadedPosters);
       
       // Extract unique categories
@@ -123,7 +129,11 @@ const MyPostersScreen: React.FC = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              const success = await downloadedPostersService.deletePoster(poster.id);
+              // Get current user ID for user-specific deletion
+              const currentUser = authService.getCurrentUser();
+              const userId = currentUser?.id;
+              
+              const success = await downloadedPostersService.deletePoster(poster.id, userId);
               if (success) {
                 setPosters(prev => prev.filter(p => p.id !== poster.id));
                 Alert.alert('Success', 'Poster deleted successfully');

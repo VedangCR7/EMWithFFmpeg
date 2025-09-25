@@ -62,7 +62,7 @@ class BusinessProfileService {
 
     try {
       console.log('Fetching business profiles from API...');
-      const response = await api.get('/business-profiles');
+      const response = await api.get('/api/mobile/business-profiles');
       
       if (response.data.success) {
         const profiles = response.data.data.profiles;
@@ -89,7 +89,7 @@ class BusinessProfileService {
   async getBusinessProfile(id: string): Promise<BusinessProfile> {
     try {
       console.log('Fetching business profile by ID:', id);
-      const response = await api.get(`/business-profiles/${id}`);
+      const response = await api.get(`/api/mobile/business-profiles/${id}`);
       
       if (response.data.success) {
         console.log('✅ Business profile loaded from API:', response.data.data.name);
@@ -175,7 +175,7 @@ class BusinessProfileService {
       
       // Fallback to original API
       try {
-        const response = await api.post('/business-profiles', data);
+        const response = await api.post('/api/mobile/business-profiles', data);
         
         if (response.data.success) {
           console.log('✅ Business profile created via original API:', response.data.data.name);
@@ -233,7 +233,7 @@ class BusinessProfileService {
   async updateBusinessProfile(id: string, data: Partial<CreateBusinessProfileData>): Promise<BusinessProfile> {
     try {
       console.log('Updating business profile via API:', id);
-      const response = await api.put(`/business-profiles/${id}`, data);
+      const response = await api.put(`/api/mobile/business-profiles/${id}`, data);
       
       if (response.data.success) {
         console.log('✅ Business profile updated via API:', response.data.data.name);
@@ -290,7 +290,7 @@ class BusinessProfileService {
   async deleteBusinessProfile(id: string): Promise<void> {
     try {
       console.log('Deleting business profile via API:', id);
-      const response = await api.delete(`/business-profiles/${id}`);
+      const response = await api.delete(`/api/mobile/business-profiles/${id}`);
       
       if (response.data.success) {
         console.log('✅ Business profile deleted via API:', id);
@@ -319,7 +319,7 @@ class BusinessProfileService {
       } as any);
       formData.append('type', imageType);
 
-      const response = await api.post(`/business-profiles/${profileId}/upload`, formData, {
+      const response = await api.post(`/api/mobile/business-profiles/${profileId}/upload`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -345,7 +345,7 @@ class BusinessProfileService {
   async searchBusinessProfiles(query: string): Promise<BusinessProfile[]> {
     try {
       console.log('Searching business profiles via API:', query);
-      const response = await api.get(`/business-profiles?search=${encodeURIComponent(query)}`);
+      const response = await api.get(`/api/mobile/business-profiles?search=${encodeURIComponent(query)}`);
       
       if (response.data.success) {
         const profiles = response.data.data.profiles;
@@ -371,7 +371,7 @@ class BusinessProfileService {
   async getBusinessProfilesByCategory(category: string): Promise<BusinessProfile[]> {
     try {
       console.log('Fetching business profiles by category via API:', category);
-      const response = await api.get(`/business-profiles?category=${encodeURIComponent(category)}`);
+      const response = await api.get(`/api/mobile/business-profiles?category=${encodeURIComponent(category)}`);
       
       if (response.data.success) {
         const profiles = response.data.data.profiles;

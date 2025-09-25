@@ -11,6 +11,7 @@ export interface DownloadedPoster {
   templateId?: string;
   category?: string;
   tags?: string[];
+  userId?: string; // Add user ID to make downloads user-specific
   size?: {
     width: number;
     height: number;
@@ -20,20 +21,22 @@ export interface DownloadedPoster {
 class DownloadedPostersService {
   private readonly STORAGE_KEY = 'downloaded_posters';
 
-  // Save poster information to local storage
-  async savePosterInfo(poster: Omit<DownloadedPoster, 'id' | 'downloadDate'>): Promise<DownloadedPoster> {
+  // Save poster information to local storage with user ID
+  async savePosterInfo(poster: Omit<DownloadedPoster, 'id' | 'downloadDate' | 'userId'>, userId?: string): Promise<DownloadedPoster> {
     try {
-      const existingPosters = await this.getDownloadedPosters();
+      const existingPosters = await this.getAllDownloadedPosters();
       
       const newPoster: DownloadedPoster = {
         ...poster,
         id: Date.now().toString(),
         downloadDate: new Date().toISOString(),
+        userId: userId || 'anonymous', // Add user ID
       };
 
       const updatedPosters = [...existingPosters, newPoster];
       await AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(updatedPosters));
 
+      console.log('✅ Downloaded poster saved for user:', userId);
       return newPoster;
     } catch (error) {
       console.error('Error saving poster info:', error);
@@ -41,8 +44,8 @@ class DownloadedPostersService {
     }
   }
 
-  // Get all downloaded posters
-  async getDownloadedPosters(): Promise<DownloadedPoster[]> {
+  // Get all downloaded posters (internal method - no filtering)
+  private async getAllDownloadedPosters(): Promise<DownloadedPoster[]> {
     try {
       const postersJson = await AsyncStorage.getItem(this.STORAGE_KEY);
       if (!postersJson) {
@@ -50,15 +53,33 @@ class DownloadedPostersService {
       }
       return JSON.parse(postersJson);
     } catch (error) {
-      console.error('Error getting downloaded posters:', error);
+      console.error('Error getting all downloaded posters:', error);
       return [];
     }
   }
 
-  // Get poster by ID
-  async getPosterById(id: string): Promise<DownloadedPoster | null> {
+  // Get downloaded posters for specific user
+  async getDownloadedPosters(userId?: string): Promise<DownloadedPoster[]> {
     try {
-      const posters = await this.getDownloadedPosters();
+      const allPosters = await this.getAllDownloadedPosters();
+      
+      // Filter by user ID if provided
+      const userPosters = userId 
+        ? allPosters.filter(poster => poster.userId === userId)
+        : allPosters.filter(poster => !poster.userId || poster.userId === 'anonymous');
+      
+      // Sort by download date (newest first)
+      return userPosters.sort((a, b) => new Date(b.downloadDate).getTime() - new Date(a.downloadDate).getTime());
+    } catch (error) {
+      console.error('Error getting downloaded posters for user:', error);
+      return [];
+    }
+  }
+
+  // Get poster by ID for specific user
+  async getPosterById(id: string, userId?: string): Promise<DownloadedPoster | null> {
+    try {
+      const posters = await this.getDownloadedPosters(userId);
       return posters.find(poster => poster.id === id) || null;
     } catch (error) {
       console.error('Error getting poster by ID:', error);
@@ -66,12 +87,18 @@ class DownloadedPostersService {
     }
   }
 
-  // Delete poster by ID
-  async deletePoster(id: string): Promise<boolean> {
+  // Delete poster by ID for specific user
+  async deletePoster(id: string, userId?: string): Promise<boolean> {
     try {
-      const posters = await this.getDownloadedPosters();
-      const updatedPosters = posters.filter(poster => poster.id !== id);
+      const allPosters = await this.getAllDownloadedPosters();
+      
+      // Remove only the poster that belongs to the current user
+      const updatedPosters = allPosters.filter(poster => 
+        !(poster.id === id && poster.userId === userId)
+      );
+      
       await AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(updatedPosters));
+      console.log('✅ Poster deleted for user:', userId);
       return true;
     } catch (error) {
       console.error('Error deleting poster:', error);
@@ -79,10 +106,10 @@ class DownloadedPostersService {
     }
   }
 
-  // Get posters by category
-  async getPostersByCategory(category: string): Promise<DownloadedPoster[]> {
+  // Get posters by category for specific user
+  async getPostersByCategory(category: string, userId?: string): Promise<DownloadedPoster[]> {
     try {
-      const posters = await this.getDownloadedPosters();
+      const posters = await this.getDownloadedPosters(userId);
       return posters.filter(poster => poster.category === category);
     } catch (error) {
       console.error('Error getting posters by category:', error);
@@ -90,10 +117,10 @@ class DownloadedPostersService {
     }
   }
 
-  // Search posters by title or description
-  async searchPosters(query: string): Promise<DownloadedPoster[]> {
+  // Search posters by title or description for specific user
+  async searchPosters(query: string, userId?: string): Promise<DownloadedPoster[]> {
     try {
-      const posters = await this.getDownloadedPosters();
+      const posters = await this.getDownloadedPosters(userId);
       const lowercaseQuery = query.toLowerCase();
       
       return posters.filter(poster => 
@@ -107,10 +134,10 @@ class DownloadedPostersService {
     }
   }
 
-  // Get recent posters (last 10)
-  async getRecentPosters(limit: number = 10): Promise<DownloadedPoster[]> {
+  // Get recent posters (last 10) for specific user
+  async getRecentPosters(limit: number = 10, userId?: string): Promise<DownloadedPoster[]> {
     try {
-      const posters = await this.getDownloadedPosters();
+      const posters = await this.getDownloadedPosters(userId);
       return posters
         .sort((a, b) => new Date(b.downloadDate).getTime() - new Date(a.downloadDate).getTime())
         .slice(0, limit);
@@ -120,14 +147,14 @@ class DownloadedPostersService {
     }
   }
 
-  // Get poster statistics
-  async getPosterStats(): Promise<{
+  // Get poster statistics for specific user
+  async getPosterStats(userId?: string): Promise<{
     total: number;
     byCategory: Record<string, number>;
     recentCount: number;
   }> {
     try {
-      const posters = await this.getDownloadedPosters();
+      const posters = await this.getDownloadedPosters(userId);
       const byCategory: Record<string, number> = {};
       
       posters.forEach(poster => {
@@ -156,10 +183,10 @@ class DownloadedPostersService {
     }
   }
 
-  // Check if poster exists in downloads
-  async isPosterDownloaded(templateId: string): Promise<boolean> {
+  // Check if poster exists in downloads for specific user
+  async isPosterDownloaded(templateId: string, userId?: string): Promise<boolean> {
     try {
-      const posters = await this.getDownloadedPosters();
+      const posters = await this.getDownloadedPosters(userId);
       return posters.some(poster => poster.templateId === templateId);
     } catch (error) {
       console.error('Error checking if poster is downloaded:', error);
@@ -167,10 +194,22 @@ class DownloadedPostersService {
     }
   }
 
-  // Clear all downloaded poster data
-  async clearAllPosters(): Promise<boolean> {
+  // Clear all downloaded poster data for specific user
+  async clearAllPosters(userId?: string): Promise<boolean> {
     try {
-      await AsyncStorage.removeItem(this.STORAGE_KEY);
+      if (userId) {
+        // Clear only user-specific posters
+        const allPosters = await this.getAllDownloadedPosters();
+        const otherUsersPosters = allPosters.filter(poster => poster.userId !== userId);
+        await AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(otherUsersPosters));
+        console.log('✅ Cleared all posters for user:', userId);
+      } else {
+        // Clear all posters (for anonymous users)
+        const allPosters = await this.getAllDownloadedPosters();
+        const nonAnonymousPosters = allPosters.filter(poster => poster.userId && poster.userId !== 'anonymous');
+        await AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(nonAnonymousPosters));
+        console.log('✅ Cleared all anonymous posters');
+      }
       return true;
     } catch (error) {
       console.error('Error clearing all posters:', error);

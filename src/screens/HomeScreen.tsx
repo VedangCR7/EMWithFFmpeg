@@ -31,6 +31,8 @@ import homeApi, {
   VideoContent 
 } from '../services/homeApi';
 import { useTheme } from '../context/ThemeContext';
+import authService from '../services/auth';
+import userLikesService from '../services/userLikes';
 import responsiveUtils, { 
   responsiveSpacing, 
   responsiveFontSize, 
@@ -244,7 +246,7 @@ const HomeScreen: React.FC = React.memo(() => {
       category: 'Event Planners',
       likes: 234,
       downloads: 167,
-      isLiked: true,
+      isLiked: false,
       isDownloaded: false,
     },
     {
@@ -274,7 +276,7 @@ const HomeScreen: React.FC = React.memo(() => {
       category: 'Decorators',
       likes: 178,
       downloads: 123,
-      isLiked: true,
+      isLiked: false,
       isDownloaded: false,
     },
     {
@@ -304,7 +306,7 @@ const HomeScreen: React.FC = React.memo(() => {
       category: 'Sound Suppliers',
       likes: 167,
       downloads: 98,
-      isLiked: true,
+      isLiked: false,
       isDownloaded: false,
     },
     {
@@ -334,7 +336,7 @@ const HomeScreen: React.FC = React.memo(() => {
       category: 'Event Planners',
       likes: 234,
       downloads: 156,
-      isLiked: true,
+      isLiked: false,
       isDownloaded: false,
     },
     {
@@ -411,7 +413,11 @@ const HomeScreen: React.FC = React.memo(() => {
       try {
         // Use mock data only
         setBanners(mockBanners);
-        setTemplates(mockTemplates);
+        
+        // Apply user-specific like status to templates
+        const templatesWithUserLikes = await applyUserLikeStatus(mockTemplates);
+        setTemplates(templatesWithUserLikes);
+        
         setCategories(mockCategories);
       } catch (error) {
         console.log('Error loading mock data:', error);
@@ -421,7 +427,7 @@ const HomeScreen: React.FC = React.memo(() => {
     };
     
     loadInitialData();
-  }, [activeTab]);
+  }, [activeTab, applyUserLikeStatus]);
 
   // Load data from APIs with mock data fallback
   const loadApiData = useCallback(async () => {
@@ -488,13 +494,30 @@ const HomeScreen: React.FC = React.memo(() => {
     loadApiData();
   }, [loadApiData]);
 
+  // Handle search query changes and apply user-specific like status
+  useEffect(() => {
+    const handleSearchQueryChange = async () => {
+      if (searchQuery.trim() === '') {
+        // Reset to show all templates with user-specific likes
+        const templatesWithUserLikes = await applyUserLikeStatus(mockTemplates);
+        setTemplates(templatesWithUserLikes);
+      }
+    };
+
+    handleSearchQueryChange();
+  }, [searchQuery, applyUserLikeStatus]);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     
     try {
       // Refresh both mock data and API data
       setBanners(mockBanners);
-      setTemplates(mockTemplates);
+      
+      // Apply user-specific like status to templates
+      const templatesWithUserLikes = await applyUserLikeStatus(mockTemplates);
+      setTemplates(templatesWithUserLikes);
+      
       setCategories(mockCategories);
       
       // Also refresh API data
@@ -504,7 +527,7 @@ const HomeScreen: React.FC = React.memo(() => {
     } finally {
       setRefreshing(false);
     }
-  }, [mockBanners, mockTemplates, mockCategories, loadApiData]);
+  }, [mockBanners, mockTemplates, mockCategories, loadApiData, applyUserLikeStatus]);
 
   const handleTabChange = useCallback(async (tab: string) => {
     setActiveTab(tab);
@@ -526,22 +549,47 @@ const HomeScreen: React.FC = React.memo(() => {
     }
   }, [mockTemplates]);
 
+  // Apply user-specific like status to templates
+  const applyUserLikeStatus = useCallback(async (templates: Template[]) => {
+    try {
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id;
+      
+      const templatesWithUserLikes = await userLikesService.applyLikeStatusToContent(
+        templates, 
+        'template', 
+        userId
+      );
+      
+      console.log('🔍 Applied user-specific like status for user:', userId);
+      return templatesWithUserLikes;
+    } catch (error) {
+      console.error('Error applying user like status:', error);
+      return templates.map(template => ({ ...template, isLiked: false }));
+    }
+  }, []);
+
   const handleLikeTemplate = useCallback(async (templateId: string) => {
-    // Update local state immediately for better UX
-    setTemplates(prev => prev.map(template => 
-      template.id === templateId 
-        ? { ...template, isLiked: !template.isLiked, likes: template.isLiked ? template.likes - 1 : template.likes + 1 }
-        : template
-    ));
-    
-    // Try API call in background
-    setTimeout(async () => {
-      try {
-        await dashboardService.likeTemplate(templateId);
-      } catch (error) {
-        console.error('Error liking template:', error);
+    try {
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id;
+      
+      // Toggle like in user-specific service
+      const success = await userLikesService.toggleLike(templateId, 'template', userId);
+      
+      if (success) {
+        // Update local state immediately for better UX
+        setTemplates(prev => prev.map(template => 
+          template.id === templateId 
+            ? { ...template, isLiked: !template.isLiked, likes: template.isLiked ? template.likes - 1 : template.likes + 1 }
+            : template
+        ));
+        
+        console.log('✅ Template like toggled for user:', userId);
       }
-    }, 100);
+    } catch (error) {
+      console.error('❌ Error toggling template like:', error);
+    }
   }, []);
 
   // New API-based like handlers
