@@ -325,6 +325,7 @@ model MobileUser {
   deviceId    String   @unique
   name        String?
   email       String?  @unique
+  password    String?  // Hashed password for email/password authentication
   phone       String?
   alternatePhone String?  // Alternate phone number
   description String?  // User bio/description

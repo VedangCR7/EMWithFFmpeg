@@ -197,7 +197,7 @@ const ProfileScreen: React.FC = () => {
   const handleSignOut = async () => {
     Alert.alert(
       'Sign Out',
-      'Are you sure you want to sign out?',
+      'Are you sure you want to sign out? This will clear all your local data.',
       [
         {
           text: 'Cancel',
@@ -209,11 +209,24 @@ const ProfileScreen: React.FC = () => {
           onPress: async () => {
             try {
               console.log('ProfileScreen: Starting sign out process...');
+              
+              // Show loading state or disable UI during signout
+              // You could add a loading spinner here if needed
+              
               await authService.signOut();
+              
               console.log('ProfileScreen: Sign out completed successfully');
+              
+              // Navigate to login screen or show success message
+              // The navigation will be handled by the auth state change listener
+              
             } catch (error) {
               console.error('ProfileScreen: Sign out error:', error);
-              Alert.alert('Error', 'Failed to sign out. Please try again.');
+              Alert.alert(
+                'Sign Out Error', 
+                'There was an issue signing out. Your local data has been cleared, but you may need to sign in again.',
+                [{ text: 'OK' }]
+              );
             }
           },
         },

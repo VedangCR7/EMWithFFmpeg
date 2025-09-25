@@ -6,6 +6,23 @@ import jwt from 'jsonwebtoken';
 const router = Router();
 const prisma = new PrismaClient();
 
+// Middleware to extract user ID from JWT token (placeholder for mobile users)
+const extractUserId = (req: Request, res: Response, next: any) => {
+  // TODO: Implement actual JWT verification for mobile users
+  // For now, we'll use a placeholder user ID
+  req.userId = 'demo-mobile-user-id';
+  next();
+};
+
+// Extend Request interface to include userId
+declare global {
+  namespace Express {
+    interface Request {
+      userId?: string;
+    }
+  }
+}
+
 /**
  * POST /api/mobile/auth/register
  * Register new mobile user
@@ -16,6 +33,7 @@ router.post('/register', async (req: Request, res: Response) => {
       deviceId, 
       name, 
       email, 
+      password,
       phone, 
       appVersion, 
       platform, 
@@ -37,7 +55,33 @@ router.post('/register', async (req: Request, res: Response) => {
       });
     }
 
-    // Check if user already exists
+    // If email/password registration, validate required fields
+    if (email && password) {
+      if (!email || !password) {
+        return res.status(400).json({
+          success: false,
+          error: 'Email and password are required for email registration'
+        });
+      }
+
+      // Check if user with this email already exists
+      const existingEmailUser = await prisma.mobileUser.findUnique({
+        where: { email }
+      });
+
+      if (existingEmailUser) {
+        return res.status(409).json({
+          success: false,
+          error: 'User with this email already exists'
+        });
+      }
+
+      // Hash password
+      const bcrypt = require('bcryptjs');
+      const hashedPassword = await bcrypt.hash(password, 12);
+    }
+
+    // Check if user already exists by deviceId
     const existingUser = await prisma.mobileUser.findUnique({
       where: { deviceId }
     });
@@ -50,13 +94,20 @@ router.post('/register', async (req: Request, res: Response) => {
     }
 
     // Create new mobile user
+    const bcrypt = require('bcryptjs');
     const mobileUser = await prisma.mobileUser.create({
       data: {
         deviceId,
         name: name || companyName || displayName,
         email,
+        password: password ? await bcrypt.hash(password, 12) : null,
         phone,
         alternatePhone,
+        description,
+        category,
+        address,
+        website,
+        companyLogo,
         appVersion,
         platform,
         fcmToken,
@@ -129,28 +180,63 @@ router.post('/register', async (req: Request, res: Response) => {
 
 /**
  * POST /api/mobile/auth/login
- * Login mobile user by device ID
+ * Login mobile user by email/password or device ID
  */
 router.post('/login', async (req: Request, res: Response) => {
   try {
-    const { deviceId } = req.body;
+    const { email, password, deviceId, rememberMe } = req.body;
 
-    if (!deviceId) {
+    let mobileUser = null;
+
+    // Email/password login
+    if (email && password) {
+      // Find mobile user by email
+      mobileUser = await prisma.mobileUser.findUnique({
+        where: { email }
+      });
+
+      if (!mobileUser) {
+        return res.status(404).json({
+          success: false,
+          error: 'Invalid email or password'
+        });
+      }
+
+      if (!mobileUser.password) {
+        return res.status(400).json({
+          success: false,
+          error: 'Account was created without password. Please register again.'
+        });
+      }
+
+      // Verify password
+      const bcrypt = require('bcryptjs');
+      const isPasswordValid = await bcrypt.compare(password, mobileUser.password);
+      
+      if (!isPasswordValid) {
+        return res.status(401).json({
+          success: false,
+          error: 'Invalid email or password'
+        });
+      }
+    }
+    // Device ID login (legacy support)
+    else if (deviceId) {
+      mobileUser = await prisma.mobileUser.findUnique({
+        where: { deviceId }
+      });
+
+      if (!mobileUser) {
+        return res.status(404).json({
+          success: false,
+          error: 'Mobile user not found'
+        });
+      }
+    }
+    else {
       return res.status(400).json({
         success: false,
-        error: 'Device ID is required'
-      });
-    }
-
-    // Find mobile user
-    const mobileUser = await prisma.mobileUser.findUnique({
-      where: { deviceId }
-    });
-
-    if (!mobileUser) {
-      return res.status(404).json({
-        success: false,
-        error: 'Mobile user not found'
+        error: 'Email/password or device ID is required'
       });
     }
 
@@ -175,7 +261,7 @@ router.post('/login', async (req: Request, res: Response) => {
         userType: 'MOBILE_USER' 
       },
       process.env.JWT_SECRET!,
-      { expiresIn: '7d' }
+      { expiresIn: rememberMe ? '30d' : '7d' }
     );
 
     res.json({
@@ -188,13 +274,22 @@ router.post('/login', async (req: Request, res: Response) => {
           name: mobileUser.name,
           email: mobileUser.email,
           phone: mobileUser.phone,
+          alternatePhone: mobileUser.alternatePhone,
+          description: mobileUser.description,
+          category: mobileUser.category,
+          address: mobileUser.address,
+          website: mobileUser.website,
+          companyLogo: mobileUser.companyLogo,
           platform: mobileUser.platform,
           isActive: mobileUser.isActive,
-          lastActiveAt: mobileUser.lastActiveAt
+          lastActiveAt: mobileUser.lastActiveAt,
+          createdAt: mobileUser.createdAt,
+          updatedAt: mobileUser.updatedAt
         },
+        accessToken: token,
         token,
         refreshToken: null, // Can be implemented later
-        expiresIn: 604800 // 7 days in seconds
+        expiresIn: rememberMe ? 2592000 : 604800 // 30 days or 7 days in seconds
       }
     });
 
@@ -463,30 +558,58 @@ router.post('/verify-email', async (req: Request, res: Response) => {
 
 /**
  * POST /api/mobile/auth/logout
- * Logout mobile user
+ * Logout mobile user (user-specific)
  */
-router.post('/logout', async (req: Request, res: Response) => {
+router.post('/logout', extractUserId, async (req: Request, res: Response) => {
   try {
-    const token = req.headers.authorization?.replace('Bearer ', '');
-    
-    if (!token) {
+    const mobileUserId = req.userId;
+
+    if (!mobileUserId) {
       return res.status(401).json({
         success: false,
-        error: 'Authorization token required'
+        error: 'User authentication required'
       });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
-    
+    // Check if user exists
+    const user = await prisma.mobileUser.findUnique({
+      where: { id: mobileUserId }
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
     // Update last active time
     await prisma.mobileUser.update({
-      where: { id: decoded.id },
+      where: { id: mobileUserId },
       data: { lastActiveAt: new Date() }
+    });
+
+    // Log the logout activity
+    await prisma.mobileActivity.create({
+      data: {
+        mobileUserId: mobileUserId,
+        action: 'LOGOUT',
+        resourceType: 'Authentication',
+        resourceId: null,
+        metadata: JSON.stringify({
+          logoutTime: new Date().toISOString(),
+          userAgent: req.headers['user-agent'] || 'unknown'
+        })
+      }
     });
 
     res.json({
       success: true,
-      message: 'Logout successful'
+      message: 'Logout successful',
+      data: {
+        userId: mobileUserId,
+        logoutTime: new Date().toISOString()
+      }
     });
 
   } catch (error) {

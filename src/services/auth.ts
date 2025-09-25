@@ -187,11 +187,13 @@ class AuthService {
       // Only try API logout for real users, not demo users
       if (isDemoUser !== 'true') {
         try {
+          console.log('Attempting API logout...');
           await authApi.logout();
-          console.log('API logout successful');
-        } catch (apiError) {
-          console.error('API logout failed:', apiError);
+          console.log('✅ API logout successful');
+        } catch (apiError: any) {
+          console.error('❌ API logout failed:', apiError);
           // Continue with local cleanup even if API logout fails
+          // This ensures the user can still sign out locally
         }
       } else {
         console.log('Demo user logout - skipping API call');
@@ -200,23 +202,46 @@ class AuthService {
       // Sign out from Google if user was signed in with Google
       if (this.currentUser?.providerId === 'google') {
         try {
+          console.log('Signing out from Google...');
           await GoogleSignin.signOut();
-          console.log('Google Sign-Out successful');
+          console.log('✅ Google Sign-Out successful');
         } catch (googleError) {
-          console.error('Google Sign-Out error:', googleError);
+          console.error('❌ Google Sign-Out error:', googleError);
+          // Continue with local cleanup even if Google sign-out fails
         }
       }
       
-      // Clear local data
+      // Clear all local data
+      console.log('Clearing local data...');
       this.currentUser = null;
       await AsyncStorage.removeItem('currentUser');
       await AsyncStorage.removeItem('authToken');
       await AsyncStorage.removeItem('user'); // Clear demo user data
       await AsyncStorage.removeItem('isDemoUser'); // Clear demo flag
+      
+      // Clear any other user-related data
+      await AsyncStorage.removeItem('user_likes');
+      await AsyncStorage.removeItem('transaction_history');
+      await AsyncStorage.removeItem('user_business_profiles');
+      await AsyncStorage.removeItem('user_preferences');
+      
+      // Notify auth state listeners
       this.notifyAuthStateListeners(null);
-      console.log('Sign out successful');
+      console.log('✅ Sign out completed successfully');
     } catch (error) {
-      console.error('Sign out error:', error);
+      console.error('❌ Sign out error:', error);
+      // Even if there's an error, we should clear local data
+      try {
+        this.currentUser = null;
+        await AsyncStorage.removeItem('currentUser');
+        await AsyncStorage.removeItem('authToken');
+        await AsyncStorage.removeItem('user');
+        await AsyncStorage.removeItem('isDemoUser');
+        this.notifyAuthStateListeners(null);
+        console.log('✅ Local cleanup completed despite error');
+      } catch (cleanupError) {
+        console.error('❌ Error during cleanup:', cleanupError);
+      }
       throw error;
     }
   }
