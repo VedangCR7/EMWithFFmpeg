@@ -4,14 +4,30 @@ import { PrismaClient } from '@prisma/client';
 const router = Router();
 const prisma = new PrismaClient();
 
+// Middleware to extract user ID from JWT token (placeholder for mobile users)
+const extractUserId = (req: Request, res: Response, next: any) => {
+  // TODO: Implement actual JWT verification for mobile users
+  // For now, we'll use a placeholder user ID
+  req.userId = 'demo-mobile-user-id';
+  next();
+};
+
+// Extend Request interface to include userId
+declare global {
+  namespace Express {
+    interface Request {
+      userId?: string;
+    }
+  }
+}
+
 /**
  * POST /api/mobile/transactions
  * Create new transaction
  */
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', extractUserId, async (req: Request, res: Response) => {
   try {
     const {
-      mobileUserId,
       transactionId,
       orderId,
       amount,
@@ -24,10 +40,19 @@ router.post('/', async (req: Request, res: Response) => {
       metadata
     } = req.body;
 
-    if (!mobileUserId || !transactionId || !amount) {
+    const mobileUserId = req.userId;
+
+    if (!transactionId || !amount) {
       return res.status(400).json({
         success: false,
-        error: 'Mobile user ID, transaction ID, and amount are required'
+        error: 'Transaction ID and amount are required'
+      });
+    }
+
+    if (!mobileUserId) {
+      return res.status(401).json({
+        success: false,
+        error: 'User authentication required'
       });
     }
 
@@ -80,10 +105,19 @@ router.post('/', async (req: Request, res: Response) => {
  * GET /api/mobile/transactions/user/:userId
  * Get user's transactions
  */
-router.get('/user/:userId', async (req: Request, res: Response) => {
+router.get('/user/:userId', extractUserId, async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
     const { status, page = '1', limit = '20' } = req.query;
+    const authenticatedUserId = req.userId;
+
+    // Ensure user can only access their own transactions
+    if (authenticatedUserId !== userId) {
+      return res.status(403).json({
+        success: false,
+        error: 'Access denied. You can only access your own transactions.'
+      });
+    }
 
     const where: any = { mobileUserId: userId };
     if (status) where.status = status;
@@ -128,9 +162,10 @@ router.get('/user/:userId', async (req: Request, res: Response) => {
  * GET /api/mobile/transactions/:id
  * Get transaction details
  */
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', extractUserId, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const authenticatedUserId = req.userId;
 
     const transaction = await prisma.mobileTransaction.findUnique({
       where: { id }
@@ -140,6 +175,14 @@ router.get('/:id', async (req: Request, res: Response) => {
       return res.status(404).json({
         success: false,
         error: 'Transaction not found'
+      });
+    }
+
+    // Ensure user can only access their own transactions
+    if (transaction.mobileUserId !== authenticatedUserId) {
+      return res.status(403).json({
+        success: false,
+        error: 'Access denied. You can only access your own transactions.'
       });
     }
 
@@ -162,10 +205,11 @@ router.get('/:id', async (req: Request, res: Response) => {
  * PUT /api/mobile/transactions/:id/status
  * Update transaction status
  */
-router.put('/:id/status', async (req: Request, res: Response) => {
+router.put('/:id/status', extractUserId, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { status, paymentId, metadata } = req.body;
+    const authenticatedUserId = req.userId;
 
     if (!status) {
       return res.status(400).json({
@@ -183,6 +227,14 @@ router.put('/:id/status', async (req: Request, res: Response) => {
       return res.status(404).json({
         success: false,
         error: 'Transaction not found'
+      });
+    }
+
+    // Ensure user can only update their own transactions
+    if (existingTransaction.mobileUserId !== authenticatedUserId) {
+      return res.status(403).json({
+        success: false,
+        error: 'Access denied. You can only update your own transactions.'
       });
     }
 
@@ -215,9 +267,10 @@ router.put('/:id/status', async (req: Request, res: Response) => {
  * GET /api/mobile/transactions/transaction/:transactionId
  * Get transaction by transaction ID
  */
-router.get('/transaction/:transactionId', async (req: Request, res: Response) => {
+router.get('/transaction/:transactionId', extractUserId, async (req: Request, res: Response) => {
   try {
     const { transactionId } = req.params;
+    const authenticatedUserId = req.userId;
 
     const transaction = await prisma.mobileTransaction.findUnique({
       where: { transactionId }
@@ -227,6 +280,14 @@ router.get('/transaction/:transactionId', async (req: Request, res: Response) =>
       return res.status(404).json({
         success: false,
         error: 'Transaction not found'
+      });
+    }
+
+    // Ensure user can only access their own transactions
+    if (transaction.mobileUserId !== authenticatedUserId) {
+      return res.status(403).json({
+        success: false,
+        error: 'Access denied. You can only access your own transactions.'
       });
     }
 
@@ -249,9 +310,18 @@ router.get('/transaction/:transactionId', async (req: Request, res: Response) =>
  * GET /api/mobile/transactions/user/:userId/summary
  * Get user's transaction summary
  */
-router.get('/user/:userId/summary', async (req: Request, res: Response) => {
+router.get('/user/:userId/summary', extractUserId, async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
+    const authenticatedUserId = req.userId;
+
+    // Ensure user can only access their own transaction summary
+    if (authenticatedUserId !== userId) {
+      return res.status(403).json({
+        success: false,
+        error: 'Access denied. You can only access your own transaction summary.'
+      });
+    }
 
     // Get transaction statistics
     const [
@@ -313,10 +383,19 @@ router.get('/user/:userId/summary', async (req: Request, res: Response) => {
  * GET /api/mobile/transactions/user/:userId/recent
  * Get user's recent transactions
  */
-router.get('/user/:userId/recent', async (req: Request, res: Response) => {
+router.get('/user/:userId/recent', extractUserId, async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
     const { limit = '5' } = req.query;
+    const authenticatedUserId = req.userId;
+
+    // Ensure user can only access their own recent transactions
+    if (authenticatedUserId !== userId) {
+      return res.status(403).json({
+        success: false,
+        error: 'Access denied. You can only access your own recent transactions.'
+      });
+    }
 
     const transactions = await prisma.mobileTransaction.findMany({
       where: { mobileUserId: userId },

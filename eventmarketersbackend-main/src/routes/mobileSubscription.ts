@@ -2,10 +2,26 @@ import { Request, Response } from 'express';
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import { body, validationResult } from 'express-validator';
-import { authenticateCustomer } from '../middleware/auth';
 
 const router = express.Router();
 const prisma = new PrismaClient();
+
+// Middleware to extract user ID from JWT token (placeholder for mobile users)
+const extractMobileUserId = (req: Request, res: Response, next: any) => {
+  // TODO: Implement actual JWT verification for mobile users
+  // For now, we'll use a placeholder user ID
+  req.mobileUserId = 'demo-mobile-user-id';
+  next();
+};
+
+// Extend Request interface to include mobileUserId
+declare global {
+  namespace Express {
+    interface Request {
+      mobileUserId?: string;
+    }
+  }
+}
 
 // Get Subscription Plans
 router.get('/plans', async (req: Request, res: Response) => {
@@ -69,7 +85,7 @@ router.get('/plans', async (req: Request, res: Response) => {
 });
 
 // Create Payment Order (Mock Razorpay Integration)
-router.post('/create-order', authenticateCustomer, [
+router.post('/create-order', extractMobileUserId, [
   body('planId').notEmpty().withMessage('Plan ID is required'),
   body('amount').isNumeric().withMessage('Amount must be a number'),
 ], async (req: Request, res: Response) => {
@@ -87,22 +103,49 @@ router.post('/create-order', authenticateCustomer, [
     }
 
     const { planId, amount } = req.body;
-    const customerId = req.user!.id;
+    const mobileUserId = req.mobileUserId;
+
+    if (!mobileUserId) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: 'AUTH_REQUIRED',
+          message: 'User authentication required'
+        }
+      });
+    }
+
+    // Check if mobile user exists
+    const mobileUser = await prisma.mobileUser.findFirst({
+      where: { id: mobileUserId }
+    });
+
+    if (!mobileUser) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: 'USER_NOT_FOUND',
+          message: 'Mobile user not found'
+        }
+      });
+    }
 
     // In a real implementation, you would integrate with Razorpay here
     // For now, we'll create a mock order
     const orderId = `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     // Log the payment attempt
-    await prisma.auditLog.create({
+    await prisma.mobileActivity.create({
       data: {
-        customerId: customerId,
-        userType: 'CUSTOMER',
+        mobileUserId: mobileUserId,
         action: 'PAYMENT_INITIATED',
-        resource: 'Subscription',
-        details: `Payment order created for plan: ${planId}, amount: ${amount}`,
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent') || 'Unknown'
+        resourceType: 'Subscription',
+        resourceId: orderId,
+        metadata: JSON.stringify({
+          planId,
+          amount,
+          orderId
+        })
       }
     });
 
@@ -131,7 +174,7 @@ router.post('/create-order', authenticateCustomer, [
 });
 
 // Verify Payment (Mock Implementation)
-router.post('/verify-payment', authenticateCustomer, [
+router.post('/verify-payment', extractMobileUserId, [
   body('orderId').notEmpty().withMessage('Order ID is required'),
   body('paymentId').notEmpty().withMessage('Payment ID is required'),
   body('signature').notEmpty().withMessage('Signature is required'),
@@ -150,7 +193,32 @@ router.post('/verify-payment', authenticateCustomer, [
     }
 
     const { orderId, paymentId, signature } = req.body;
-    const customerId = req.user!.id;
+    const mobileUserId = req.mobileUserId;
+
+    if (!mobileUserId) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: 'AUTH_REQUIRED',
+          message: 'User authentication required'
+        }
+      });
+    }
+
+    // Check if mobile user exists
+    const mobileUser = await prisma.mobileUser.findFirst({
+      where: { id: mobileUserId }
+    });
+
+    if (!mobileUser) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: 'USER_NOT_FOUND',
+          message: 'Mobile user not found'
+        }
+      });
+    }
 
     // In a real implementation, you would verify the payment with Razorpay
     // For now, we'll mock a successful verification
@@ -166,39 +234,34 @@ router.post('/verify-payment', authenticateCustomer, [
       endDate.setMonth(endDate.getMonth() + 1);
     }
 
-    // Create subscription record
-    const subscription = await prisma.subscription.create({
+    // Create subscription record using MobileSubscription model
+    const subscription = await prisma.mobileSubscription.create({
       data: {
-        customerId,
-        plan: isYearlyPlan ? 'YEARLY' : 'MONTHLY',
+        mobileUserId: mobileUserId,
+        planId: isYearlyPlan ? 'yearly_pro' : 'monthly_pro',
         status: 'ACTIVE',
         startDate,
         endDate,
         amount: isYearlyPlan ? 1999 : 299,
-        currency: 'INR'
-      }
-    });
-
-    // Update customer subscription status
-    await prisma.customer.update({
-      where: { id: customerId },
-      data: {
-        subscriptionStatus: 'ACTIVE',
-        subscriptionEndDate: endDate
+        paymentId: paymentId,
+        paymentMethod: 'razorpay',
+        autoRenew: true
       }
     });
 
     // Log successful payment
-    await prisma.auditLog.create({
+    await prisma.mobileActivity.create({
       data: {
-        customerId: customerId,
-        userType: 'CUSTOMER',
+        mobileUserId: mobileUserId,
         action: 'PAYMENT_SUCCESS',
-        resource: 'Subscription',
+        resourceType: 'Subscription',
         resourceId: subscription.id,
-        details: `Payment verified successfully. Order: ${orderId}, Payment: ${paymentId}`,
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent') || 'Unknown'
+        metadata: JSON.stringify({
+          orderId,
+          paymentId,
+          planId: subscription.planId,
+          amount: subscription.amount
+        })
       }
     });
 
@@ -208,7 +271,7 @@ router.post('/verify-payment', authenticateCustomer, [
       data: {
         subscription: {
           id: subscription.id,
-          plan: subscription.plan,
+          plan: subscription.planId,
           status: subscription.status,
           startDate: subscription.startDate,
           endDate: subscription.endDate
@@ -220,18 +283,20 @@ router.post('/verify-payment', authenticateCustomer, [
     console.error('Verify payment error:', error);
     
     // Log failed payment
-    await prisma.auditLog.create({
-      data: {
-        customerId: req.user!.id,
-        userType: 'CUSTOMER',
-        action: 'PAYMENT_FAILED',
-        resource: 'Subscription',
-        details: `Payment verification failed. Order: ${req.body.orderId}`,
-        status: 'FAILED',
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent') || 'Unknown'
-      }
-    }).catch(console.error);
+    if (req.mobileUserId) {
+      await prisma.mobileActivity.create({
+        data: {
+          mobileUserId: req.mobileUserId,
+          action: 'PAYMENT_FAILED',
+          resourceType: 'Subscription',
+          resourceId: req.body.orderId,
+          metadata: JSON.stringify({
+            orderId: req.body.orderId,
+            error: 'Payment verification failed'
+          })
+        }
+      }).catch(console.error);
+    }
 
     res.status(500).json({
       success: false,
@@ -244,12 +309,22 @@ router.post('/verify-payment', authenticateCustomer, [
 });
 
 // Get Subscription Status
-router.get('/status', authenticateCustomer, async (req: Request, res: Response) => {
+router.get('/status', extractMobileUserId, async (req: Request, res: Response) => {
   try {
-    const customerId = req.user!.id;
+    const mobileUserId = req.mobileUserId;
 
-    const customer = await prisma.customer.findUnique({
-      where: { id: customerId },
+    if (!mobileUserId) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: 'AUTH_REQUIRED',
+          message: 'User authentication required'
+        }
+      });
+    }
+
+    const mobileUser = await prisma.mobileUser.findUnique({
+      where: { id: mobileUserId },
       include: {
         subscriptions: {
           where: { status: 'ACTIVE' },
@@ -259,30 +334,26 @@ router.get('/status', authenticateCustomer, async (req: Request, res: Response) 
       }
     });
 
-    if (!customer) {
+    if (!mobileUser) {
       return res.status(404).json({
         success: false,
         error: {
           code: 'USER_NOT_FOUND',
-          message: 'Customer not found'
+          message: 'Mobile user not found'
         }
       });
     }
 
-    const activeSubscription = customer.subscriptions[0];
+    const activeSubscription = mobileUser.subscriptions[0];
     const now = new Date();
 
     // Check if subscription is expired
     if (activeSubscription && activeSubscription.endDate < now) {
       // Update subscription status to expired
       await Promise.all([
-        prisma.subscription.update({
+        prisma.mobileSubscription.update({
           where: { id: activeSubscription.id },
           data: { status: 'EXPIRED' }
-        }),
-        prisma.customer.update({
-          where: { id: customerId },
-          data: { subscriptionStatus: 'EXPIRED' }
         })
       ]);
     }
@@ -292,7 +363,7 @@ router.get('/status', authenticateCustomer, async (req: Request, res: Response) 
       data: {
         subscription: activeSubscription && activeSubscription.endDate >= now ? {
           id: activeSubscription.id,
-          plan: activeSubscription.plan,
+          plan: activeSubscription.planId,
           status: activeSubscription.status,
           startDate: activeSubscription.startDate,
           endDate: activeSubscription.endDate,
@@ -320,13 +391,23 @@ router.get('/status', authenticateCustomer, async (req: Request, res: Response) 
 });
 
 // Cancel Subscription
-router.post('/cancel', authenticateCustomer, async (req: Request, res: Response) => {
+router.post('/cancel', extractMobileUserId, async (req: Request, res: Response) => {
   try {
-    const customerId = req.user!.id;
+    const mobileUserId = req.mobileUserId;
 
-    const activeSubscription = await prisma.subscription.findFirst({
+    if (!mobileUserId) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: 'AUTH_REQUIRED',
+          message: 'User authentication required'
+        }
+      });
+    }
+
+    const activeSubscription = await prisma.mobileSubscription.findFirst({
       where: {
-        customerId,
+        mobileUserId,
         status: 'ACTIVE'
       }
     });
@@ -343,25 +424,22 @@ router.post('/cancel', authenticateCustomer, async (req: Request, res: Response)
 
     // Update subscription status
     await Promise.all([
-      prisma.subscription.update({
+      prisma.mobileSubscription.update({
         where: { id: activeSubscription.id },
         data: { status: 'CANCELLED' }
       }),
-      prisma.customer.update({
-        where: { id: customerId },
-        data: { subscriptionStatus: 'CANCELLED' }
-      }),
       // Log cancellation
-      prisma.auditLog.create({
+      prisma.mobileActivity.create({
         data: {
-          customerId: customerId,
-          userType: 'CUSTOMER',
+          mobileUserId: mobileUserId,
           action: 'SUBSCRIPTION_CANCELLED',
-          resource: 'Subscription',
+          resourceType: 'Subscription',
           resourceId: activeSubscription.id,
-          details: 'Customer cancelled subscription',
-          ipAddress: req.ip,
-          userAgent: req.get('User-Agent') || 'Unknown'
+          metadata: JSON.stringify({
+            subscriptionId: activeSubscription.id,
+            planId: activeSubscription.planId,
+            reason: 'User cancelled subscription'
+          })
         }
       })
     ]);
@@ -391,22 +469,32 @@ router.post('/cancel', authenticateCustomer, async (req: Request, res: Response)
 });
 
 // Get Payment History
-router.get('/history', authenticateCustomer, async (req: Request, res: Response) => {
+router.get('/history', extractMobileUserId, async (req: Request, res: Response) => {
   try {
-    const customerId = req.user!.id;
+    const mobileUserId = req.mobileUserId;
+
+    if (!mobileUserId) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: 'AUTH_REQUIRED',
+          message: 'User authentication required'
+        }
+      });
+    }
+
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     const skip = (page - 1) * limit;
 
     const [subscriptions, total] = await Promise.all([
-      prisma.subscription.findMany({
-        where: { customerId },
+      prisma.mobileSubscription.findMany({
+        where: { mobileUserId },
         select: {
           id: true,
-          plan: true,
+          planId: true,
           status: true,
           amount: true,
-          currency: true,
           startDate: true,
           endDate: true,
           paymentId: true,
@@ -417,21 +505,21 @@ router.get('/history', authenticateCustomer, async (req: Request, res: Response)
         skip,
         take: limit
       }),
-      prisma.subscription.count({ where: { customerId } })
+      prisma.mobileSubscription.count({ where: { mobileUserId } })
     ]);
 
     const paymentHistory = subscriptions.map(subscription => ({
       id: subscription.id,
-      plan: subscription.plan,
+      plan: subscription.planId,
       status: subscription.status,
       amount: subscription.amount,
-      currency: subscription.currency,
+      currency: 'INR',
       startDate: subscription.startDate,
       endDate: subscription.endDate,
       paymentId: subscription.paymentId || `mock_${subscription.id.slice(-8)}`,
       paymentMethod: subscription.paymentMethod || 'Razorpay',
       paidAt: subscription.createdAt,
-      description: `${subscription.plan.charAt(0).toUpperCase() + subscription.plan.slice(1).toLowerCase()} Plan Subscription`,
+      description: `${subscription.planId === 'monthly_pro' ? 'Monthly' : 'Yearly'} Pro Plan Subscription`,
       isActive: subscription.status === 'ACTIVE' && subscription.endDate > new Date()
     }));
 
@@ -448,7 +536,7 @@ router.get('/history', authenticateCustomer, async (req: Request, res: Response)
         summary: {
           totalPayments: total,
           totalAmount: subscriptions.reduce((sum, sub) => sum + sub.amount, 0),
-          currency: subscriptions[0]?.currency || 'INR'
+          currency: 'INR'
         }
       }
     });
