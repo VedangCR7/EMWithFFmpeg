@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Create axios instance for EventMarketers backend
 const eventMarketersApi = axios.create({
-  baseURL: 'http://localhost:3001', // Local development server
+  baseURL: 'http://192.168.1.22:3001', // Local development server (Android compatible)
   // baseURL: 'https://eventmarketersbackend.onrender.com', // Production backend server
   timeout: 30000, // 30 seconds timeout
   headers: {

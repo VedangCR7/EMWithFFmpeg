@@ -171,9 +171,15 @@ router.post('/register', async (req: Request, res: Response) => {
 
   } catch (error) {
     console.error('Mobile user registration error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    });
     res.status(500).json({
       success: false,
-      error: 'Failed to register mobile user'
+      error: 'Failed to register mobile user',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
