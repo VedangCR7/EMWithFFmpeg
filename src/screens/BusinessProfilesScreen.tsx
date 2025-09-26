@@ -11,6 +11,7 @@ import {
   Dimensions,
   Alert,
   Image,
+  Modal,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -51,6 +52,10 @@ const BusinessProfilesScreen: React.FC = () => {
   const [showBottomSheet, setShowBottomSheet] = useState(false);
   const [editingProfile, setEditingProfile] = useState<any>(null);
   const [formLoading, setFormLoading] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [profileToDelete, setProfileToDelete] = useState<string | null>(null);
 
   // Memoized mock data for immediate loading
   const mockProfiles = useMemo(() => [
@@ -163,30 +168,33 @@ const BusinessProfilesScreen: React.FC = () => {
     }
   }, [searchQuery, loadBusinessProfiles]);
 
-  const handleDeleteProfile = useCallback(async (profileId: string) => {
-    Alert.alert(
-      'Delete Profile',
-      'Are you sure you want to delete this business profile?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await businessProfileService.deleteBusinessProfile(profileId);
-              setProfiles(prev => prev.filter(p => p.id !== profileId));
-              Alert.alert('Success', 'Business profile deleted successfully');
-              console.log('✅ Business profile deleted:', profileId);
-            } catch (error) {
-              console.error('Error deleting profile:', error);
-              Alert.alert('Error', 'Failed to delete profile');
-            }
-          },
-        },
-      ]
-    );
+  const handleDeleteProfile = useCallback((profileId: string) => {
+    setProfileToDelete(profileId);
+    setShowDeleteModal(true);
   }, []);
+
+  const confirmDeleteProfile = useCallback(async () => {
+    if (!profileToDelete) return;
+    
+    try {
+      await businessProfileService.deleteBusinessProfile(profileToDelete);
+      setProfiles(prev => prev.filter(p => p.id !== profileToDelete));
+      setSuccessMessage('Business profile deleted successfully');
+      setShowSuccessModal(true);
+      console.log('✅ Business profile deleted:', profileToDelete);
+      
+      // Refresh the profiles list to ensure consistency
+      setTimeout(() => {
+        loadBusinessProfiles();
+      }, 1000);
+    } catch (error) {
+      console.error('Error deleting profile:', error);
+      Alert.alert('Error', 'Failed to delete profile');
+    } finally {
+      setShowDeleteModal(false);
+      setProfileToDelete(null);
+    }
+  }, [profileToDelete]);
 
   const handleEditProfile = useCallback((profile: any) => {
     setEditingProfile(profile);
@@ -203,16 +211,39 @@ const BusinessProfilesScreen: React.FC = () => {
     try {
       if (editingProfile) {
         // Update existing profile
+        console.log('🔄 Updating profile with ID:', editingProfile.id);
+        console.log('📤 Form data being sent:', formData);
+        
         const updatedProfile = await businessProfileService.updateBusinessProfile(editingProfile.id, formData);
-        setProfiles(prev => prev.map(p => p.id === editingProfile.id ? updatedProfile : p));
-        Alert.alert('Success', 'Business profile updated successfully');
+        console.log('✅ Updated profile received:', updatedProfile);
+        
+        setProfiles(prev => {
+          const newProfiles = prev.map(p => p.id === editingProfile.id ? updatedProfile : p);
+          console.log('📋 Updated profiles list:', newProfiles);
+          return newProfiles;
+        });
+        
+        setSuccessMessage('Business profile updated successfully');
+        setShowSuccessModal(true);
         console.log('✅ Business profile updated:', editingProfile.id);
+        
+        // Refresh the profiles list to ensure consistency
+        setTimeout(() => {
+          console.log('🔄 Refreshing profiles list after update...');
+          loadBusinessProfiles();
+        }, 1000);
       } else {
         // Create new profile
         const newProfile = await businessProfileService.createBusinessProfile(formData);
         setProfiles(prev => [...prev, newProfile]);
-        Alert.alert('Success', 'Business profile created successfully');
+        setSuccessMessage('Business profile created successfully');
+        setShowSuccessModal(true);
         console.log('✅ Business profile created:', newProfile.id);
+        
+        // Refresh the profiles list to ensure consistency
+        setTimeout(() => {
+          loadBusinessProfiles();
+        }, 1000);
       }
       
       setShowForm(false);
@@ -430,6 +461,121 @@ const BusinessProfilesScreen: React.FC = () => {
             loading={formLoading}
           />
         </BottomSheet>
+
+        {/* Success Modal */}
+        <Modal
+          visible={showSuccessModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowSuccessModal(false)}
+          statusBarTranslucent={true}
+        >
+          <TouchableOpacity 
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowSuccessModal(false)}
+          >
+            <TouchableOpacity 
+              activeOpacity={1}
+              onPress={() => {}} // Prevent closing when tapping inside modal
+            >
+              <View style={[styles.successModalContainer, { backgroundColor: theme.colors.surface }]}>
+                <View style={styles.successModalHeader}>
+                  <View style={[styles.successIconContainer, { backgroundColor: `${theme.colors.primary}20` }]}>
+                    <Icon name="check-circle" size={Math.min(screenWidth * 0.08, 32)} color={theme.colors.primary} />
+                  </View>
+                  <Text 
+                    style={[styles.successModalTitle, { color: theme.colors.text }]}
+                  >
+                    Success
+                  </Text>
+                  <TouchableOpacity 
+                    style={[styles.closeModalButton, { backgroundColor: theme.colors.inputBackground }]}
+                    onPress={() => setShowSuccessModal(false)}
+                    activeOpacity={0.7}
+                  >
+                    <Icon name="close" size={Math.min(screenWidth * 0.06, 24)} color={theme.colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+                
+                <View style={styles.successModalContent}>
+                  <Text style={[styles.successModalMessage, { color: theme.colors.text }]}>
+                    {successMessage}
+                  </Text>
+                </View>
+                
+                <TouchableOpacity 
+                  style={[styles.successModalButton, { backgroundColor: theme.colors.primary }]}
+                  onPress={() => setShowSuccessModal(false)}
+                >
+                  <Text style={styles.successModalButtonText}>OK</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* Delete Confirmation Modal */}
+        <Modal
+          visible={showDeleteModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowDeleteModal(false)}
+          statusBarTranslucent={true}
+        >
+          <TouchableOpacity 
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowDeleteModal(false)}
+          >
+            <TouchableOpacity 
+              activeOpacity={1}
+              onPress={() => {}} // Prevent closing when tapping inside modal
+            >
+              <View style={[styles.deleteModalContainer, { backgroundColor: theme.colors.surface }]}>
+                <View style={styles.deleteModalHeader}>
+                  <View style={[styles.deleteIconContainer, { backgroundColor: `${theme.colors.error}20` }]}>
+                    <Icon name="warning" size={Math.min(screenWidth * 0.08, 32)} color={theme.colors.error} />
+                  </View>
+                  <Text 
+                    style={[styles.deleteModalTitle, { color: theme.colors.text }]}
+                  >
+                    Delete Profile
+                  </Text>
+                  <TouchableOpacity 
+                    style={[styles.closeModalButton, { backgroundColor: theme.colors.inputBackground }]}
+                    onPress={() => setShowDeleteModal(false)}
+                    activeOpacity={0.7}
+                  >
+                    <Icon name="close" size={Math.min(screenWidth * 0.06, 24)} color={theme.colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+                
+                <View style={styles.deleteModalContent}>
+                  <Text style={[styles.deleteModalMessage, { color: theme.colors.text }]}>
+                    Are you sure you want to delete this business profile? This action cannot be undone.
+                  </Text>
+                </View>
+                
+                <View style={styles.deleteModalButtons}>
+                  <TouchableOpacity 
+                    style={[styles.deleteModalCancelButton, { backgroundColor: theme.colors.inputBackground }]}
+                    onPress={() => setShowDeleteModal(false)}
+                  >
+                    <Text style={[styles.deleteModalCancelText, { color: theme.colors.text }]}>Cancel</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={[styles.deleteModalDeleteButton, { backgroundColor: theme.colors.error }]}
+                    onPress={confirmDeleteProfile}
+                  >
+                    <Text style={styles.deleteModalDeleteText}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
       </LinearGradient>
     </SafeAreaView>
   );
@@ -583,6 +729,174 @@ const styles = StyleSheet.create({
   serviceText: {
     fontSize: Math.min(screenWidth * 0.025, 10),
     fontWeight: '500',
+  },
+  // Success Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: Math.min(screenWidth * 0.05, 20),
+  },
+  successModalContainer: {
+    borderRadius: Math.min(screenWidth * 0.06, 24),
+    padding: Math.min(screenWidth * 0.05, 20),
+    width: '100%',
+    maxWidth: Math.min(screenWidth * 0.9, 400),
+    minWidth: Math.min(screenWidth * 0.8, 320),
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 20,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 40,
+    elevation: 25,
+    alignSelf: 'center',
+  },
+  successModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Math.min(screenHeight * 0.02, 16),
+    paddingBottom: Math.min(screenHeight * 0.015, 12),
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    minHeight: Math.min(screenWidth * 0.12, 48),
+  },
+  successIconContainer: {
+    width: Math.min(screenWidth * 0.12, 48),
+    height: Math.min(screenWidth * 0.12, 48),
+    borderRadius: Math.min(screenWidth * 0.06, 24),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Math.min(screenWidth * 0.04, 16),
+  },
+  successModalTitle: {
+    fontSize: Math.min(screenWidth * 0.05, 20),
+    fontWeight: '700',
+    flex: 1,
+    marginHorizontal: Math.min(screenWidth * 0.02, 8),
+    textAlign: 'center',
+  },
+  successModalContent: {
+    paddingVertical: Math.min(screenHeight * 0.01, 8),
+    marginBottom: Math.min(screenHeight * 0.02, 16),
+  },
+  successModalMessage: {
+    fontSize: Math.min(screenWidth * 0.04, 16),
+    lineHeight: Math.min(screenWidth * 0.05, 20),
+    textAlign: 'center',
+    opacity: 0.9,
+  },
+  successModalButton: {
+    borderRadius: Math.min(screenWidth * 0.03, 12),
+    paddingVertical: Math.min(screenHeight * 0.018, 14),
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  successModalButtonText: {
+    fontSize: Math.min(screenWidth * 0.042, 17),
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  // Delete Modal Styles
+  deleteModalContainer: {
+    borderRadius: Math.min(screenWidth * 0.06, 24),
+    padding: Math.min(screenWidth * 0.05, 20),
+    width: '100%',
+    maxWidth: Math.min(screenWidth * 0.9, 400),
+    minWidth: Math.min(screenWidth * 0.8, 320),
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 20,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 40,
+    elevation: 25,
+    alignSelf: 'center',
+  },
+  deleteModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Math.min(screenHeight * 0.02, 16),
+    paddingBottom: Math.min(screenHeight * 0.015, 12),
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    minHeight: Math.min(screenWidth * 0.12, 48),
+  },
+  deleteIconContainer: {
+    width: Math.min(screenWidth * 0.12, 48),
+    height: Math.min(screenWidth * 0.12, 48),
+    borderRadius: Math.min(screenWidth * 0.06, 24),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Math.min(screenWidth * 0.04, 16),
+  },
+  deleteModalTitle: {
+    fontSize: Math.min(screenWidth * 0.05, 20),
+    fontWeight: '700',
+    flex: 1,
+    marginHorizontal: Math.min(screenWidth * 0.02, 8),
+    textAlign: 'center',
+  },
+  deleteModalContent: {
+    paddingVertical: Math.min(screenHeight * 0.01, 8),
+    marginBottom: Math.min(screenHeight * 0.02, 16),
+  },
+  deleteModalMessage: {
+    fontSize: Math.min(screenWidth * 0.04, 16),
+    lineHeight: Math.min(screenWidth * 0.05, 20),
+    textAlign: 'center',
+    opacity: 0.9,
+  },
+  deleteModalButtons: {
+    flexDirection: 'row',
+    gap: Math.min(screenWidth * 0.03, 12),
+  },
+  deleteModalCancelButton: {
+    flex: 1,
+    borderRadius: Math.min(screenWidth * 0.03, 12),
+    paddingVertical: Math.min(screenHeight * 0.018, 14),
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  deleteModalCancelText: {
+    fontSize: Math.min(screenWidth * 0.042, 17),
+    fontWeight: '600',
+  },
+  deleteModalDeleteButton: {
+    flex: 1,
+    borderRadius: Math.min(screenWidth * 0.03, 12),
+    paddingVertical: Math.min(screenHeight * 0.018, 14),
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  deleteModalDeleteText: {
+    fontSize: Math.min(screenWidth * 0.042, 17),
+    fontWeight: '600',
+    color: '#ffffff',
   },
 });
 

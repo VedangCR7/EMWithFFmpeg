@@ -112,6 +112,8 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
   const [showUploadOptions, setShowUploadOptions] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showImagePickerModal, setShowImagePickerModal] = useState(false);
+  const [showValidationModal, setShowValidationModal] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   const categories = [
     'Event Planners',
@@ -194,22 +196,63 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
   };
 
 
-  const handleSubmit = () => {
-    // Validation - Only company name, business category, phone number, and email are required
+  // Validation functions
+  const validatePhoneNumber = (phone: string): boolean => {
+    const phoneRegex = /^\d{10}$/;
+    return phoneRegex.test(phone);
+  };
+
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validateForm = (): { isValid: boolean; errors: string[] } => {
+    const errors: string[] = [];
+
+    // Company name validation
     if (!formData.name.trim()) {
-      Alert.alert('Error', 'Company name is required');
-      return;
+      errors.push('Company name is required');
     }
+
+    // Business category validation
     if (!formData.category.trim()) {
-      Alert.alert('Error', 'Business category is required');
-      return;
+      errors.push('Business category is required');
     }
+
+    // Phone number validation
     if (!formData.phone.trim()) {
-      Alert.alert('Error', 'Phone number is required');
-      return;
+      errors.push('Phone number is required');
+    } else if (!validatePhoneNumber(formData.phone.trim())) {
+      errors.push('Phone number must be exactly 10 digits');
     }
+
+    // Alternate phone number validation (if provided)
+    if (formData.alternatePhone && formData.alternatePhone.trim()) {
+      if (!validatePhoneNumber(formData.alternatePhone.trim())) {
+        errors.push('Alternate phone number must be exactly 10 digits');
+      }
+    }
+
+    // Email validation
     if (!formData.email.trim()) {
-      Alert.alert('Error', 'Email is required');
+      errors.push('Email is required');
+    } else if (!validateEmail(formData.email.trim())) {
+      errors.push('Please enter a valid email address');
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
+  };
+
+  const handleSubmit = () => {
+    const validation = validateForm();
+    
+    if (!validation.isValid) {
+      setValidationErrors(validation.errors);
+      setShowValidationModal(true);
       return;
     }
 
@@ -524,6 +567,72 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
       onClose={handleCloseImagePicker}
       onImageSelected={handleImageSelected}
     />
+
+    {/* Validation Error Modal */}
+    <Modal
+      visible={showValidationModal}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={() => setShowValidationModal(false)}
+      statusBarTranslucent={true}
+    >
+      <TouchableOpacity 
+        style={styles.modalOverlay}
+        activeOpacity={1}
+        onPress={() => setShowValidationModal(false)}
+      >
+        <TouchableOpacity 
+          activeOpacity={1}
+          onPress={() => {}} // Prevent closing when tapping inside modal
+        >
+          <View style={[styles.validationModalContainer, { backgroundColor: theme.colors.surface }]}>
+            <View style={styles.validationModalHeader}>
+              <View style={[styles.validationIconContainer, { backgroundColor: `${theme.colors.error}20` }]}>
+                <Icon name="error-outline" size={Math.min(screenWidth * 0.08, 32)} color={theme.colors.error} />
+              </View>
+              <Text 
+                style={[styles.validationModalTitle, { color: theme.colors.text }]}
+              >
+                Validation Error
+              </Text>
+              <TouchableOpacity 
+                style={[styles.closeModalButton, { backgroundColor: theme.colors.inputBackground }]}
+                onPress={() => setShowValidationModal(false)}
+                activeOpacity={0.7}
+              >
+                <Icon name="close" size={Math.min(screenWidth * 0.06, 24)} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView 
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.validationModalScrollContent}
+              keyboardShouldPersistTaps="handled"
+            >
+              <Text style={[styles.validationModalSubtitle, { color: theme.colors.textSecondary }]}>
+                Please fix the following errors:
+              </Text>
+              
+              <View style={styles.validationErrorsList}>
+                {validationErrors.map((error, index) => (
+                  <View key={index} style={styles.validationErrorItem}>
+                    <Icon name="error" size={Math.min(screenWidth * 0.04, 16)} color={theme.colors.error} />
+                    <Text style={[styles.validationErrorText, { color: theme.colors.text }]}>{error}</Text>
+                  </View>
+                ))}
+              </View>
+            </ScrollView>
+            
+            <TouchableOpacity 
+              style={[styles.validationModalButton, { backgroundColor: theme.colors.primary }]}
+              onPress={() => setShowValidationModal(false)}
+            >
+              <Text style={styles.validationModalButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
   </>
 );
  };
@@ -1021,6 +1130,93 @@ const styles = StyleSheet.create({
   cancelModalText: {
     fontSize: Math.min(screenWidth * 0.042, 17),
     fontWeight: '600',
+  },
+  // Validation Modal Styles
+  validationModalContainer: {
+    borderRadius: Math.min(screenWidth * 0.06, 24),
+    padding: Math.min(screenWidth * 0.05, 20),
+    width: '100%',
+    maxWidth: Math.min(screenWidth * 0.95, 450),
+    minWidth: Math.min(screenWidth * 0.85, 340),
+    maxHeight: screenHeight * 0.7,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 20,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 40,
+    elevation: 25,
+    position: 'relative',
+  },
+  validationModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Math.min(screenHeight * 0.025, 20),
+    paddingBottom: Math.min(screenHeight * 0.015, 12),
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    minHeight: Math.min(screenWidth * 0.12, 48),
+  },
+  validationIconContainer: {
+    width: Math.min(screenWidth * 0.12, 48),
+    height: Math.min(screenWidth * 0.12, 48),
+    borderRadius: Math.min(screenWidth * 0.06, 24),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Math.min(screenWidth * 0.04, 16),
+  },
+  validationModalTitle: {
+    fontSize: Math.min(screenWidth * 0.05, 20),
+    fontWeight: '700',
+    flex: 1,
+    marginHorizontal: Math.min(screenWidth * 0.02, 8),
+    textAlign: 'center',
+  },
+  validationModalScrollContent: {
+    paddingBottom: Math.min(screenHeight * 0.02, 16),
+  },
+  validationModalSubtitle: {
+    fontSize: Math.min(screenWidth * 0.04, 16),
+    marginBottom: Math.min(screenHeight * 0.02, 16),
+    lineHeight: Math.min(screenWidth * 0.05, 20),
+    opacity: 0.8,
+  },
+  validationErrorsList: {
+    gap: Math.min(screenHeight * 0.015, 12),
+  },
+  validationErrorItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: Math.min(screenWidth * 0.03, 12),
+    paddingVertical: Math.min(screenHeight * 0.01, 8),
+    borderRadius: Math.min(screenWidth * 0.02, 8),
+    backgroundColor: 'rgba(255, 0, 0, 0.05)',
+  },
+  validationErrorText: {
+    fontSize: Math.min(screenWidth * 0.04, 16),
+    lineHeight: Math.min(screenWidth * 0.05, 20),
+    marginLeft: Math.min(screenWidth * 0.03, 12),
+    flex: 1,
+  },
+  validationModalButton: {
+    borderRadius: Math.min(screenWidth * 0.03, 12),
+    paddingVertical: Math.min(screenHeight * 0.018, 14),
+    alignItems: 'center',
+    marginTop: Math.min(screenHeight * 0.02, 16),
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  validationModalButtonText: {
+    fontSize: Math.min(screenWidth * 0.042, 17),
+    fontWeight: '600',
+    color: '#ffffff',
   },
 });
 

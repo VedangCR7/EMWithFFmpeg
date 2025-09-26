@@ -287,7 +287,7 @@ router.get('/:userId', async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
 
-    const businessProfile = await prisma.businessProfile.findFirst({
+    const businessProfiles = await prisma.businessProfile.findMany({
       where: { 
         mobileUserId: userId,
         isActive: true 
@@ -301,35 +301,43 @@ router.get('/:userId', async (req: Request, res: Response) => {
             phone: true
           }
         }
+      },
+      orderBy: {
+        createdAt: 'desc'
       }
     });
 
-    if (!businessProfile) {
+    if (!businessProfiles || businessProfiles.length === 0) {
       return res.status(404).json({
         success: false,
-        error: 'Business profile not found'
+        error: 'No business profiles found for this user'
       });
     }
 
-    // Parse social media if it exists
-    let socialMedia = null;
-    if (businessProfile.socialMedia) {
-      try {
-        socialMedia = JSON.parse(businessProfile.socialMedia);
-      } catch (e) {
-        console.warn('Failed to parse social media JSON:', e);
+    // Parse social media for all profiles
+    const profilesWithParsedSocialMedia = businessProfiles.map(profile => {
+      let socialMedia = null;
+      if (profile.socialMedia) {
+        try {
+          socialMedia = JSON.parse(profile.socialMedia);
+        } catch (e) {
+          console.warn('Failed to parse social media JSON:', e);
+        }
       }
-    }
 
-    const profileData = {
-      ...businessProfile,
-      socialMedia
-    };
+      return {
+        ...profile,
+        socialMedia
+      };
+    });
 
     res.json({
       success: true,
-      message: 'Business profile fetched successfully',
-      data: profileData
+      message: 'Business profiles fetched successfully',
+      data: {
+        profiles: profilesWithParsedSocialMedia,
+        count: profilesWithParsedSocialMedia.length
+      }
     });
 
   } catch (error) {

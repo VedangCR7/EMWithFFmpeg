@@ -59,10 +59,11 @@ class BusinessProfileService {
       const response = await api.get(`/api/mobile/business-profile/${userId}`);
       
       if (response.data.success) {
-        const profile = response.data.data;
-        if (profile) {
-          // Convert single profile to array format
-          const businessProfile: BusinessProfile = {
+        const profiles = response.data.data.profiles;
+        if (profiles && profiles.length > 0) {
+          console.log(`✅ Found ${profiles.length} business profiles for user`);
+          // Convert backend profiles to frontend format
+          const businessProfiles: BusinessProfile[] = profiles.map((profile: any) => ({
             id: profile.id,
             name: profile.businessName,
             description: profile.description || '',
@@ -96,12 +97,13 @@ class BusinessProfileService {
             isVerified: false,
             createdAt: profile.createdAt,
             updatedAt: profile.updatedAt,
-          };
-          return [businessProfile];
+          }));
+          return businessProfiles;
         }
+        console.log('No user-specific business profiles found');
         return [];
       } else {
-        console.log('No user-specific business profile found');
+        console.log('API returned unsuccessful response for user profiles');
         return [];
       }
     } catch (error) {
