@@ -234,7 +234,7 @@ class BusinessCategoryPostersApiService {
         downloadUrl: 'https://example.com/posters/1.jpg',
         likes: Math.floor(Math.random() * 200) + 50,
         downloads: Math.floor(Math.random() * 100) + 20,
-        isPremium: Math.random() > 0.7,
+        isPremium: false, // Removed premium posters
         tags: [category.toLowerCase(), 'business', 'professional'],
         createdAt: '2024-01-15T10:00:00Z',
         updatedAt: '2024-01-20T14:30:00Z'
@@ -249,7 +249,7 @@ class BusinessCategoryPostersApiService {
         downloadUrl: 'https://example.com/posters/2.jpg',
         likes: Math.floor(Math.random() * 150) + 30,
         downloads: Math.floor(Math.random() * 80) + 15,
-        isPremium: Math.random() > 0.8,
+        isPremium: false, // Removed premium posters
         tags: [category.toLowerCase(), 'marketing', 'creative'],
         createdAt: '2024-01-10T09:00:00Z',
         updatedAt: '2024-01-18T16:45:00Z'
@@ -264,7 +264,7 @@ class BusinessCategoryPostersApiService {
         downloadUrl: 'https://example.com/posters/3.jpg',
         likes: Math.floor(Math.random() * 180) + 40,
         downloads: Math.floor(Math.random() * 90) + 25,
-        isPremium: Math.random() > 0.6,
+        isPremium: false, // Removed premium posters
         tags: [category.toLowerCase(), 'event', 'elegant'],
         createdAt: '2024-01-05T14:30:00Z',
         updatedAt: '2024-01-22T11:20:00Z'
@@ -279,7 +279,7 @@ class BusinessCategoryPostersApiService {
         downloadUrl: 'https://example.com/posters/4.jpg',
         likes: Math.floor(Math.random() * 220) + 60,
         downloads: Math.floor(Math.random() * 110) + 30,
-        isPremium: Math.random() > 0.5,
+        isPremium: false, // Removed premium posters
         tags: [category.toLowerCase(), 'promotional', 'modern'],
         createdAt: '2024-01-12T11:15:00Z',
         updatedAt: '2024-01-25T09:30:00Z'
@@ -294,7 +294,7 @@ class BusinessCategoryPostersApiService {
         downloadUrl: 'https://example.com/posters/5.jpg',
         likes: Math.floor(Math.random() * 190) + 45,
         downloads: Math.floor(Math.random() * 95) + 20,
-        isPremium: Math.random() > 0.7,
+        isPremium: false, // Removed premium posters
         tags: [category.toLowerCase(), 'brand', 'identity'],
         createdAt: '2024-01-08T16:20:00Z',
         updatedAt: '2024-01-19T13:45:00Z'
@@ -309,7 +309,7 @@ class BusinessCategoryPostersApiService {
         downloadUrl: 'https://example.com/posters/6.jpg',
         likes: Math.floor(Math.random() * 160) + 35,
         downloads: Math.floor(Math.random() * 85) + 18,
-        isPremium: Math.random() > 0.8,
+        isPremium: false, // Removed premium posters
         tags: [category.toLowerCase(), 'service', 'clean'],
         createdAt: '2024-01-14T08:30:00Z',
         updatedAt: '2024-01-21T15:10:00Z'

@@ -1065,23 +1065,6 @@ const HomeScreen: React.FC = React.memo(() => {
       }
     };
 
-    const handleDownloadPoster = async (posterId: string) => {
-      try {
-        const result = await businessCategoryPostersApi.downloadPoster(posterId);
-        if (result.success) {
-          // Update local state to reflect the download
-          setBusinessCategoryPosters(prev => 
-            prev.map(poster => 
-              poster.id === posterId 
-                ? { ...poster, downloads: poster.downloads + 1 }
-                : poster
-            )
-          );
-        }
-      } catch (error) {
-        console.error('Error downloading poster:', error);
-      }
-    };
 
     return (
       <TouchableOpacity
@@ -1119,46 +1102,6 @@ const HomeScreen: React.FC = React.memo(() => {
                   color="#E74C3C" 
                 />
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.actionButton, 
-                  { backgroundColor: 'rgba(255, 255, 255, 0.9)' }
-                ]}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  handleDownloadPoster(item.id);
-                }}
-              >
-                <Icon 
-                  name="download" 
-                  size={16} 
-                  color="#2ECC71" 
-                />
-              </TouchableOpacity>
-            </View>
-            {item.isPremium && (
-              <View style={styles.premiumBadge}>
-                <Text style={styles.premiumBadgeText}>Premium</Text>
-              </View>
-            )}
-          </View>
-          <View style={styles.templateInfo}>
-            <Text style={[styles.templateTitle, { color: theme.colors.text }]} numberOfLines={2}>
-              {item.title}
-            </Text>
-            <View style={styles.templateStats}>
-              <View style={styles.statItem}>
-                <Icon name="favorite" size={12} color="#E74C3C" />
-                <Text style={[styles.statText, { color: theme.colors.textSecondary }]}>
-                  {item.likes}
-                </Text>
-              </View>
-              <View style={styles.statItem}>
-                <Icon name="download" size={12} color="#2ECC71" />
-                <Text style={[styles.statText, { color: theme.colors.textSecondary }]}>
-                  {item.downloads}
-                </Text>
-              </View>
             </View>
           </View>
         </Animated.View>
