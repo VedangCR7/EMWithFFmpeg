@@ -36,6 +36,7 @@ import mobileUsersRoutes from './routes/mobile/users';
 import mobileTransactionsRoutes from './routes/mobile/transactions';
 import mobileDownloadsRoutes from './routes/mobile/downloads';
 import mobileLikesRoutes from './routes/mobile/likes';
+import mobilePostersRoutes from './routes/mobile/posters'; // Added posters routes
 import { checkSubscription } from './middleware/subscription'; // Added subscription middleware
 
 // Load environment variables
@@ -165,6 +166,7 @@ app.use('/api/business-profile', businessProfileRoutes);
     app.use('/api/mobile/transactions', mobileTransactionsRoutes);
     app.use('/api/mobile/downloads', mobileDownloadsRoutes);
     app.use('/api/mobile/likes', mobileLikesRoutes); // Added likes route
+    app.use('/api/mobile/posters', mobilePostersRoutes); // Added posters route
 
 // Mobile API aliases (cleaner paths for mobile app)
 app.use('/api/v1', mobileApiAliases);

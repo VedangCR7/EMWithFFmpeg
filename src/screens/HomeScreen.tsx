@@ -31,6 +31,7 @@ import homeApi, {
   VideoContent 
 } from '../services/homeApi';
 import genericLikesApi from '../services/genericLikesApi';
+import businessCategoryPostersApi, { BusinessCategoryPoster } from '../services/businessCategoryPostersApi';
 import { useTheme } from '../context/ThemeContext';
 import authService from '../services/auth';
 import userLikesService from '../services/userLikes';
@@ -81,6 +82,11 @@ const HomeScreen: React.FC = React.memo(() => {
   const [videoContent, setVideoContent] = useState<VideoContent[]>([]);
   const [apiLoading, setApiLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+
+  // Business category posters states
+  const [businessCategoryPosters, setBusinessCategoryPosters] = useState<BusinessCategoryPoster[]>([]);
+  const [postersLoading, setPostersLoading] = useState(false);
+  const [userBusinessCategory, setUserBusinessCategory] = useState<string>('General');
 
 
 
@@ -494,6 +500,34 @@ const HomeScreen: React.FC = React.memo(() => {
   useEffect(() => {
     loadApiData();
   }, [loadApiData]);
+
+  // Load business category posters
+  const loadBusinessCategoryPosters = useCallback(async () => {
+    setPostersLoading(true);
+    try {
+      console.log('🎯 Loading business category posters...');
+      const response = await businessCategoryPostersApi.getUserCategoryPosters();
+      
+      if (response.success) {
+        setBusinessCategoryPosters(response.data.posters);
+        setUserBusinessCategory(response.data.category);
+        console.log('✅ Business category posters loaded:', response.data.posters.length, 'posters for category:', response.data.category);
+      } else {
+        console.log('⚠️ Failed to load business category posters');
+        setBusinessCategoryPosters([]);
+      }
+    } catch (error) {
+      console.error('❌ Error loading business category posters:', error);
+      setBusinessCategoryPosters([]);
+    } finally {
+      setPostersLoading(false);
+    }
+  }, []);
+
+  // Load business category posters on component mount
+  useEffect(() => {
+    loadBusinessCategoryPosters();
+  }, [loadBusinessCategoryPosters]);
 
   // Handle search query changes and apply user-specific like status
   useEffect(() => {
@@ -985,6 +1019,153 @@ const HomeScreen: React.FC = React.memo(() => {
     );
   }, [handleLikeTemplate, handleTemplatePress, theme]);
 
+  const renderBusinessCategoryPoster = useCallback(({ item }: { item: BusinessCategoryPoster }) => {
+    const scaleAnim = new Animated.Value(1);
+
+    const handlePressIn = () => {
+      Animated.timing(scaleAnim, {
+        toValue: 0.95,
+        duration: 150,
+        useNativeDriver: true,
+      }).start();
+    };
+
+    const handlePressOut = () => {
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true,
+      }).start();
+    };
+
+    const handleCardPress = () => {
+      // Navigate to poster editor with the selected poster
+      navigation.navigate('PosterEditor', {
+        selectedPoster: item,
+        selectedLanguage: 'en',
+        selectedTemplateId: item.id,
+      });
+    };
+
+    const handleLikePoster = async (posterId: string) => {
+      try {
+        const result = await businessCategoryPostersApi.likePoster(posterId);
+        if (result.success) {
+          // Update local state to reflect the like
+          setBusinessCategoryPosters(prev => 
+            prev.map(poster => 
+              poster.id === posterId 
+                ? { ...poster, likes: poster.likes + 1 }
+                : poster
+            )
+          );
+        }
+      } catch (error) {
+        console.error('Error liking poster:', error);
+      }
+    };
+
+    const handleDownloadPoster = async (posterId: string) => {
+      try {
+        const result = await businessCategoryPostersApi.downloadPoster(posterId);
+        if (result.success) {
+          // Update local state to reflect the download
+          setBusinessCategoryPosters(prev => 
+            prev.map(poster => 
+              poster.id === posterId 
+                ? { ...poster, downloads: poster.downloads + 1 }
+                : poster
+            )
+          );
+        }
+      } catch (error) {
+        console.error('Error downloading poster:', error);
+      }
+    };
+
+    return (
+      <TouchableOpacity
+        activeOpacity={1}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        onPress={handleCardPress}
+        style={styles.templateCardWrapper}
+      >
+        <Animated.View 
+          style={[
+            styles.templateCard, 
+            { 
+              backgroundColor: theme.colors.cardBackground,
+              transform: [{ scale: scaleAnim }],
+            }
+          ]}
+        >
+          <View style={styles.templateImageContainer}>
+            <Image source={{ uri: item.thumbnail }} style={styles.templateImage} />
+            <View style={styles.templateActions}>
+              <TouchableOpacity
+                style={[
+                  styles.actionButton, 
+                  { backgroundColor: 'rgba(255, 255, 255, 0.9)' }
+                ]}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handleLikePoster(item.id);
+                }}
+              >
+                <Icon 
+                  name="favorite-border" 
+                  size={16} 
+                  color="#E74C3C" 
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.actionButton, 
+                  { backgroundColor: 'rgba(255, 255, 255, 0.9)' }
+                ]}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handleDownloadPoster(item.id);
+                }}
+              >
+                <Icon 
+                  name="download" 
+                  size={16} 
+                  color="#2ECC71" 
+                />
+              </TouchableOpacity>
+            </View>
+            {item.isPremium && (
+              <View style={styles.premiumBadge}>
+                <Text style={styles.premiumBadgeText}>Premium</Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.templateInfo}>
+            <Text style={[styles.templateTitle, { color: theme.colors.text }]} numberOfLines={2}>
+              {item.title}
+            </Text>
+            <View style={styles.templateStats}>
+              <View style={styles.statItem}>
+                <Icon name="favorite" size={12} color="#E74C3C" />
+                <Text style={[styles.statText, { color: theme.colors.textSecondary }]}>
+                  {item.likes}
+                </Text>
+              </View>
+              <View style={styles.statItem}>
+                <Icon name="download" size={12} color="#2ECC71" />
+                <Text style={[styles.statText, { color: theme.colors.textSecondary }]}>
+                  {item.downloads}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </Animated.View>
+      </TouchableOpacity>
+    );
+  }, [navigation, theme]);
+
   const renderVideoTemplate = useCallback(({ item }: { item: Template }) => {
     const scaleAnim = new Animated.Value(1);
 
@@ -1302,6 +1483,38 @@ const HomeScreen: React.FC = React.memo(() => {
               contentContainerStyle={{ paddingBottom: responsiveSpacing.xl }}
             />
           </View>
+
+          {/* Business Category Posters Section */}
+          {businessCategoryPosters.length > 0 && (
+            <View style={styles.templatesSection}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>
+                  {userBusinessCategory} Posters
+                </Text>
+                {postersLoading && (
+                  <ActivityIndicator 
+                    size="small" 
+                    color={theme.colors.primary} 
+                    style={styles.sectionLoadingIndicator}
+                  />
+                )}
+              </View>
+              <FlatList
+                data={businessCategoryPosters}
+                renderItem={renderBusinessCategoryPoster}
+                keyExtractor={(item) => item.id}
+                numColumns={3}
+                columnWrapperStyle={styles.templateRow}
+                showsVerticalScrollIndicator={false}
+                scrollEnabled={false}
+                nestedScrollEnabled={true}
+                removeClippedSubviews={true}
+                maxToRenderPerBatch={6}
+                windowSize={10}
+                contentContainerStyle={{ paddingBottom: responsiveSpacing.xl }}
+              />
+            </View>
+          )}
 
           {/* Video Section */}
           <View style={styles.videoSection}>
@@ -1861,6 +2074,32 @@ const styles = StyleSheet.create({
   templateStats: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+  },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statText: {
+    fontSize: responsiveFontSize.xs,
+    fontWeight: '500',
+  },
+  premiumBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: '#FFD700',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  premiumBadgeText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#000',
+  },
+  sectionLoadingIndicator: {
+    marginLeft: 8,
   },
      templateStat: {
      fontSize: responsiveFontSize.xs,
