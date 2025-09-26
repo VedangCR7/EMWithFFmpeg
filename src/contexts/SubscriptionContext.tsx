@@ -1,9 +1,13 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import transactionHistoryService, { Transaction } from '../services/transactionHistory';
+import subscriptionApi, { SubscriptionStatus } from '../services/subscriptionApi';
+import authService from '../services/auth';
 
 interface SubscriptionContextType {
   isSubscribed: boolean;
   setIsSubscribed: (value: boolean) => void;
+  subscriptionStatus: SubscriptionStatus | null;
+  isLoading: boolean;
   transactions: Transaction[];
   transactionStats: {
     total: number;
@@ -14,10 +18,12 @@ interface SubscriptionContextType {
     monthlySubscriptions: number;
     yearlySubscriptions: number;
   };
+  refreshSubscription: () => Promise<void>;
   refreshTransactions: () => Promise<void>;
   addTransaction: (transaction: Omit<Transaction, 'id' | 'timestamp'>) => Promise<Transaction>;
   generateDemoTransactions: () => Promise<void>;
   clearTransactions: () => Promise<void>;
+  checkPremiumAccess: (feature: string) => boolean;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
@@ -27,7 +33,9 @@ interface SubscriptionProviderProps {
 }
 
 export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ children }) => {
-  const [isSubscribed, setIsSubscribed] = useState(false); // Default to false (not subscribed) for demo
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [transactionStats, setTransactionStats] = useState({
     total: 0,
@@ -39,10 +47,54 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
     yearlySubscriptions: 0,
   });
 
-  // Load transactions on mount
+  // Load subscription status and transactions on mount
   useEffect(() => {
+    refreshSubscription();
     refreshTransactions();
   }, []);
+
+  // Refresh subscription status from backend
+  const refreshSubscription = async () => {
+    try {
+      setIsLoading(true);
+      console.log('🔄 Refreshing subscription status...');
+      
+      const currentUser = authService.getCurrentUser();
+      if (!currentUser?.id) {
+        console.log('⚠️ No user ID available, setting default subscription status');
+        setIsSubscribed(false);
+        setSubscriptionStatus(null);
+        return;
+      }
+
+      const response = await subscriptionApi.getStatus();
+      
+      if (response.success) {
+        const status = response.data;
+        console.log('✅ Subscription status fetched:', status);
+        
+        // Check if subscription is active and not expired
+        const isActive = status.isActive && 
+          status.status === 'active' && 
+          (status.expiryDate ? new Date(status.expiryDate) > new Date() : true);
+        
+        setIsSubscribed(isActive);
+        setSubscriptionStatus(status);
+        
+        console.log('🔐 Subscription access:', isActive ? 'GRANTED' : 'DENIED');
+      } else {
+        console.log('⚠️ Failed to fetch subscription status, defaulting to not subscribed');
+        setIsSubscribed(false);
+        setSubscriptionStatus(null);
+      }
+    } catch (error) {
+      console.error('❌ Error refreshing subscription status:', error);
+      setIsSubscribed(false);
+      setSubscriptionStatus(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Refresh transactions and stats
   const refreshTransactions = async () => {
@@ -91,16 +143,43 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
     }
   };
 
+  // Check if user has premium access for a specific feature
+  const checkPremiumAccess = (feature: string): boolean => {
+    if (!isSubscribed || !subscriptionStatus) {
+      console.log(`🔒 Premium access denied for feature: ${feature} (not subscribed)`);
+      return false;
+    }
+
+    // Check if subscription is expired
+    if (subscriptionStatus.expiryDate && new Date(subscriptionStatus.expiryDate) <= new Date()) {
+      console.log(`🔒 Premium access denied for feature: ${feature} (subscription expired)`);
+      return false;
+    }
+
+    // Check if subscription status is active
+    if (subscriptionStatus.status !== 'active') {
+      console.log(`🔒 Premium access denied for feature: ${feature} (subscription not active)`);
+      return false;
+    }
+
+    console.log(`✅ Premium access granted for feature: ${feature}`);
+    return true;
+  };
+
   return (
     <SubscriptionContext.Provider value={{ 
       isSubscribed, 
       setIsSubscribed,
+      subscriptionStatus,
+      isLoading,
       transactions,
       transactionStats,
+      refreshSubscription,
       refreshTransactions,
       addTransaction,
       generateDemoTransactions,
       clearTransactions,
+      checkPremiumAccess,
     }}>
       {children}
     </SubscriptionContext.Provider>

@@ -36,6 +36,7 @@ import mobileUsersRoutes from './routes/mobile/users';
 import mobileTransactionsRoutes from './routes/mobile/transactions';
 import mobileDownloadsRoutes from './routes/mobile/downloads';
 import mobileLikesRoutes from './routes/mobile/likes';
+import { checkSubscription } from './middleware/subscription'; // Added subscription middleware
 
 // Load environment variables
 dotenv.config();
@@ -96,6 +97,9 @@ app.use('/api/', limiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
+
+// Apply subscription check middleware to all mobile API routes
+app.use('/api/mobile', checkSubscription);
 
 // Logging middleware
 app.use(morgan('combined'));

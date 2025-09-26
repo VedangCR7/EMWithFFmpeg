@@ -266,7 +266,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { selectedImage, selectedLanguage, selectedTemplateId } = route.params;
-  const { isSubscribed } = useSubscription();
+  const { isSubscribed, checkPremiumAccess, refreshSubscription } = useSubscription();
   const { isDarkMode, theme } = useTheme();
   
   // State for orientation changes
@@ -2086,7 +2086,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
           ))}
           
           {/* Watermark - Only shown during capture if user is not subscribed */}
-          {isCapturing && <Watermark isSubscribed={isSubscribed} />}
+          {isCapturing && <Watermark isSubscribed={checkPremiumAccess('poster_export')} />}
         </View>
             </ViewShot>
           

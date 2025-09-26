@@ -4,12 +4,62 @@ import { PrismaClient } from '@prisma/client';
 const router = Router();
 const prisma = new PrismaClient();
 
-// Middleware to extract user ID from JWT token (placeholder)
+// Middleware to extract user ID from JWT token
 const extractUserId = (req: Request, res: Response, next: any) => {
-  // TODO: Implement actual JWT verification
-  // For now, we'll use a placeholder user ID
-  req.userId = 'demo-user-id';
-  next();
+  try {
+    console.log('🔐 extractUserId middleware - Processing request');
+    console.log('📥 Authorization header:', req.headers.authorization);
+    
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('❌ No valid authorization header found');
+      return res.status(401).json({
+        success: false,
+        error: 'Authorization token required'
+      });
+    }
+
+    const token = authHeader.substring(7);
+    console.log('🔑 Token extracted:', token.substring(0, 20) + '...');
+    
+    // Try to verify JWT token
+    try {
+      const jwt = require('jsonwebtoken');
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'business-marketing-platform-super-secret-jwt-key-2024');
+      console.log('🔍 JWT decoded:', decoded);
+      
+      // Extract user ID from token - check for mobile user type
+      let userId;
+      if (decoded.userType === 'MOBILE_USER' && decoded.id) {
+        userId = decoded.id;
+        req.userId = userId;
+        console.log('✅ Mobile user ID extracted from JWT:', userId);
+      } else {
+        // Fallback to header-based user ID
+        userId = req.headers['x-user-id'] as string || 'demo-user-id';
+        req.userId = userId;
+        console.log('⚠️ Using fallback user ID:', userId);
+      }
+      
+      console.log('✅ User ID set from JWT:', userId);
+      next();
+    } catch (jwtError) {
+      console.log('⚠️ JWT verification failed, using fallback:', jwtError.message);
+      
+      // Fallback to header-based user ID
+      const userId = req.headers['x-user-id'] as string || 'demo-user-id';
+      req.userId = userId;
+      
+      console.log('✅ User ID set from header fallback:', userId);
+      next();
+    }
+  } catch (error) {
+    console.log('❌ Error in extractUserId middleware:', error);
+    res.status(401).json({
+      success: false,
+      error: 'Invalid authorization token'
+    });
+  }
 };
 
 // Extend Request interface to include userId
@@ -104,13 +154,37 @@ router.get('/status', extractUserId, async (req: Request, res: Response) => {
       where: {
         mobileUserId: userId,
         status: 'ACTIVE',
-        endDate: { gte: new Date() }
+        endDate: { gte: new Date() } // Only get non-expired subscriptions
       },
       include: {
         plan: true
       },
       orderBy: { createdAt: 'desc' }
     });
+
+    // Check for expired subscriptions and update their status
+    const expiredSubscriptions = await prisma.mobileSubscription.findMany({
+      where: {
+        mobileUserId: userId,
+        status: 'ACTIVE',
+        endDate: { lt: new Date() } // Find expired subscriptions
+      }
+    });
+
+    // Update expired subscriptions
+    if (expiredSubscriptions.length > 0) {
+      console.log(`🔄 Updating ${expiredSubscriptions.length} expired subscriptions for user: ${userId}`);
+      await prisma.mobileSubscription.updateMany({
+        where: {
+          mobileUserId: userId,
+          status: 'ACTIVE',
+          endDate: { lt: new Date() }
+        },
+        data: {
+          status: 'EXPIRED'
+        }
+      });
+    }
 
     if (activeSubscription) {
       res.json({

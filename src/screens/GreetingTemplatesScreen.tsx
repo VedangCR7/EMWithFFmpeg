@@ -50,7 +50,7 @@ const isLargeScreen = screenWidth >= 414;
 const GreetingTemplatesScreen: React.FC = () => {
   const { theme } = useTheme();
   const navigation = useNavigation<StackNavigationProp<MainStackParamList>>();
-  const { isSubscribed } = useSubscription();
+  const { isSubscribed, checkPremiumAccess, refreshSubscription } = useSubscription();
   const insets = useSafeAreaInsets();
 
   // Get responsive values - memoized to prevent unnecessary re-renders
@@ -142,7 +142,8 @@ const GreetingTemplatesScreen: React.FC = () => {
   }, [filterTemplatesByCategory, allTemplates]);
 
   const handleTemplatePress = useCallback((template: GreetingTemplate) => {
-    if (template.isPremium && !isSubscribed) {
+    if (template.isPremium && !checkPremiumAccess('premium_greetings')) {
+      console.log('🔒 Premium greeting access denied, showing upgrade modal');
       setSelectedPremiumTemplate(template);
       setUpgradeModalVisible(true);
       return;
@@ -390,8 +391,10 @@ const GreetingTemplatesScreen: React.FC = () => {
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.upgradeButton}
-                onPress={() => {
+                onPress={async () => {
                   setUpgradeModalVisible(false);
+                  // Refresh subscription status before navigating
+                  await refreshSubscription();
                   navigation.navigate('Subscription');
                 }}
               >

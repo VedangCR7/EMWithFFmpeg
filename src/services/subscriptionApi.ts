@@ -148,16 +148,35 @@ class SubscriptionApiService {
         };
       }
 
+      console.log('🔍 Fetching subscription status for user:', userId);
       const response = await api.get('/api/mobile/subscriptions/status');
       
+      console.log('📊 Subscription API response:', response.data);
+      
+      // Check if response has the expected structure
+      if (!response.data.success) {
+        console.log('⚠️ Subscription API returned unsuccessful response');
+        return {
+          success: true,
+          data: {
+            isActive: false,
+            plan: null,
+            expiryDate: null,
+            autoRenew: false,
+            status: 'inactive'
+          },
+          message: 'No active subscription'
+        };
+      }
+      
       // Transform the response to match expected format
-      const subscriptionData = response.data.data.subscription;
+      const subscriptionData = response.data.data;
       
       return {
         success: true,
         data: {
-          isActive: subscriptionData.status === 'active' && subscriptionData.daysRemaining > 0,
-          plan: subscriptionData.plan !== 'free' ? {
+          isActive: subscriptionData.isActive || (subscriptionData.status === 'active' && subscriptionData.daysRemaining > 0),
+          plan: subscriptionData.plan && subscriptionData.plan !== 'free' ? {
             id: subscriptionData.plan === 'monthly_pro' ? 'monthly_pro' : 'yearly_pro',
             name: subscriptionData.plan === 'monthly_pro' ? 'Monthly Pro' : 'Yearly Pro',
             description: 'Premium subscription',
@@ -167,12 +186,12 @@ class SubscriptionApiService {
             features: [],
             isPopular: subscriptionData.plan === 'yearly_pro'
           } : null,
-          planId: subscriptionData.plan !== 'free' ? subscriptionData.plan : null,
-          planName: subscriptionData.plan !== 'free' ? (subscriptionData.plan === 'monthly_pro' ? 'Monthly Pro' : 'Yearly Pro') : null,
+          planId: subscriptionData.planId || (subscriptionData.plan !== 'free' ? subscriptionData.plan : null),
+          planName: subscriptionData.planName || (subscriptionData.plan !== 'free' ? (subscriptionData.plan === 'monthly_pro' ? 'Monthly Pro' : 'Yearly Pro') : null),
           startDate: subscriptionData.startDate,
           endDate: subscriptionData.endDate,
-          expiryDate: subscriptionData.endDate,
-          autoRenew: true,
+          expiryDate: subscriptionData.expiryDate || subscriptionData.endDate,
+          autoRenew: subscriptionData.autoRenew || true,
           status: subscriptionData.status
         },
         message: 'Status fetched successfully'

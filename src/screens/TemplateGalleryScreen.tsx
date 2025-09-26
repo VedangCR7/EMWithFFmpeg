@@ -60,7 +60,7 @@ const TemplateGalleryScreen: React.FC = () => {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<StackNavigationProp<MainStackParamList>>();
-  const { isSubscribed } = useSubscription();
+  const { isSubscribed, checkPremiumAccess, refreshSubscription } = useSubscription();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [filteredTemplates, setFilteredTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
@@ -143,8 +143,9 @@ const TemplateGalleryScreen: React.FC = () => {
 
   // Handle template selection
   const handleTemplatePress = (template: Template) => {
-    // Check if template is premium and user is not subscribed
-    if (template.category === 'premium' && !isSubscribed) {
+    // Check if template is premium and user doesn't have premium access
+    if (template.category === 'premium' && !checkPremiumAccess('premium_templates')) {
+      console.log('🔒 Premium template access denied, showing upgrade modal');
       setSelectedPremiumTemplate(template);
       setUpgradeModalVisible(true);
       return;
@@ -336,8 +337,10 @@ const TemplateGalleryScreen: React.FC = () => {
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.upgradeButton}
-                onPress={() => {
+                onPress={async () => {
                   setUpgradeModalVisible(false);
+                  // Refresh subscription status before navigating
+                  await refreshSubscription();
                   navigation.navigate('Subscription');
                 }}
               >

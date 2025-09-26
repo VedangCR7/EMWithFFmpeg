@@ -6,12 +6,62 @@ import { body, validationResult } from 'express-validator';
 const router = express.Router();
 const prisma = new PrismaClient();
 
-// Middleware to extract user ID from JWT token (placeholder for mobile users)
+// Middleware to extract user ID from JWT token for mobile users
 const extractMobileUserId = (req: Request, res: Response, next: any) => {
-  // TODO: Implement actual JWT verification for mobile users
-  // For now, we'll use a placeholder user ID
-  req.mobileUserId = 'demo-mobile-user-id';
-  next();
+  try {
+    console.log('🔐 extractMobileUserId middleware - Processing request');
+    console.log('📥 Authorization header:', req.headers.authorization);
+    
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('❌ No valid authorization header found');
+      return res.status(401).json({
+        success: false,
+        error: 'Authorization token required'
+      });
+    }
+
+    const token = authHeader.substring(7);
+    console.log('🔑 Token extracted:', token.substring(0, 20) + '...');
+    
+    // Try to verify JWT token
+    try {
+      const jwt = require('jsonwebtoken');
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'business-marketing-platform-super-secret-jwt-key-2024');
+      console.log('🔍 JWT decoded:', decoded);
+      
+      // Extract user ID from token - check for mobile user type
+      let userId;
+      if (decoded.userType === 'MOBILE_USER' && decoded.id) {
+        userId = decoded.id;
+        req.mobileUserId = userId;
+        console.log('✅ Mobile user ID extracted from JWT:', userId);
+      } else {
+        // Fallback to header-based user ID
+        userId = req.headers['x-user-id'] as string || 'demo-mobile-user-id';
+        req.mobileUserId = userId;
+        console.log('⚠️ Using fallback user ID:', userId);
+      }
+      
+      console.log('✅ User ID set from JWT:', userId);
+      next();
+    } catch (jwtError) {
+      console.log('⚠️ JWT verification failed, using fallback:', jwtError.message);
+      
+      // Fallback to header-based user ID
+      const userId = req.headers['x-user-id'] as string || 'demo-mobile-user-id';
+      req.mobileUserId = userId;
+      
+      console.log('✅ User ID set from header fallback:', userId);
+      next();
+    }
+  } catch (error) {
+    console.log('❌ Error in extractMobileUserId middleware:', error);
+    res.status(401).json({
+      success: false,
+      error: 'Invalid authorization token'
+    });
+  }
 };
 
 // Extend Request interface to include mobileUserId

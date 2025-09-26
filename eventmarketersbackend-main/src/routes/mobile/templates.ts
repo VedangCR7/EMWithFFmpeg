@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { requireSubscription, checkSubscription } from '../../middleware/subscription';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -414,9 +415,9 @@ router.delete('/:id/like', async (req: Request, res: Response) => {
 
 /**
  * POST /api/mobile/templates/:id/download
- * Download a template
+ * Download a template (requires subscription for premium templates)
  */
-router.post('/:id/download', async (req: Request, res: Response) => {
+router.post('/:id/download', checkSubscription, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const token = req.headers.authorization?.replace('Bearer ', '');
@@ -441,6 +442,17 @@ router.post('/:id/download', async (req: Request, res: Response) => {
       return res.status(404).json({
         success: false,
         error: 'Template not found'
+      });
+    }
+
+    // Check if template is premium and user has subscription
+    if (template.category === 'premium' && !req.subscriptionStatus?.isActive) {
+      console.log('🔒 Premium template download denied for user:', userId);
+      return res.status(403).json({
+        success: false,
+        error: 'Premium subscription required',
+        code: 'SUBSCRIPTION_REQUIRED',
+        message: 'This template requires an active premium subscription'
       });
     }
 

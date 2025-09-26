@@ -89,7 +89,7 @@ const VideoEditorScreen: React.FC<VideoEditorScreenProps> = ({ route }) => {
   const insets = useSafeAreaInsets();
   const { selectedLanguage, selectedTemplateId, selectedVideo } = route.params;
   
-  const { isSubscribed } = useSubscription();
+  const { isSubscribed, checkPremiumAccess, refreshSubscription } = useSubscription();
   const { isDarkMode, theme } = useTheme();
 
   // Video refs
@@ -1904,7 +1904,7 @@ const VideoEditorScreen: React.FC<VideoEditorScreenProps> = ({ route }) => {
                   if (l.fieldType && !visibleFields[l.fieldType]) return null;
                   return renderLayer(l);
                 })}
-                {isCapturing && <Watermark isSubscribed={isSubscribed} />}
+                {isCapturing && <Watermark isSubscribed={checkPremiumAccess('video_export')} />}
               </View>
             </ViewShot>
           </View>
