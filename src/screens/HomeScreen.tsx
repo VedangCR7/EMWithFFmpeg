@@ -30,6 +30,7 @@ import homeApi, {
   ProfessionalTemplate, 
   VideoContent 
 } from '../services/homeApi';
+import genericLikesApi from '../services/genericLikesApi';
 import { useTheme } from '../context/ThemeContext';
 import authService from '../services/auth';
 import userLikesService from '../services/userLikes';
@@ -603,7 +604,7 @@ const HomeScreen: React.FC = React.memo(() => {
     
     // Try API call
     try {
-      await homeApi.likeContent(templateId, 'template');
+      await genericLikesApi.toggleLike('TEMPLATE', templateId);
       console.log('✅ Template liked successfully');
     } catch (error) {
       console.error('❌ Error liking template:', error);
@@ -626,7 +627,7 @@ const HomeScreen: React.FC = React.memo(() => {
     
     // Try API call
     try {
-      await homeApi.likeContent(videoId, 'video');
+      await genericLikesApi.toggleLike('VIDEO', videoId);
       console.log('✅ Video liked successfully');
     } catch (error) {
       console.error('❌ Error liking video:', error);

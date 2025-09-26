@@ -17,6 +17,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { Template } from '../services/templates';
 import { useTheme } from '../context/ThemeContext';
 import templatesBannersApi from '../services/templatesBannersApi';
+import genericLikesApi from '../services/genericLikesApi';
 
 interface TemplateCardProps {
   template: Template;
@@ -96,17 +97,12 @@ const TemplateCard: React.FC<TemplateCardProps> = React.memo(({ template, onPres
     try {
       setIsLiking(true);
       
-      if (isLiked) {
-        // Unlike the template
-        await templatesBannersApi.unlikeTemplate(template.id);
-        setIsLiked(false);
-        onLikeChange?.(template.id, false);
-      } else {
-        // Like the template
-        await templatesBannersApi.likeTemplate(template.id);
-        setIsLiked(true);
-        onLikeChange?.(template.id, true);
-      }
+      // Use generic likes API
+      const newLikeStatus = await genericLikesApi.toggleLike('TEMPLATE', template.id);
+      setIsLiked(newLikeStatus);
+      onLikeChange?.(template.id, newLikeStatus);
+      
+      console.log('✅ Template like toggled:', template.id, 'isLiked:', newLikeStatus);
     } catch (error) {
       console.error('Error toggling like:', error);
       Alert.alert(

@@ -11,6 +11,7 @@ import {
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import { GreetingTemplate } from '../services/greetingTemplates';
+import genericLikesApi from '../services/genericLikesApi';
 import { useTheme } from '../context/ThemeContext';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -94,9 +95,17 @@ const GreetingTemplateCard: React.FC<GreetingTemplateCardProps> = ({
     }
   };
 
-  const handleLike = () => {
-    setIsLiked(!isLiked);
-    onLike(template.id);
+  const handleLike = async () => {
+    try {
+      // Use generic likes API
+      const newLikeStatus = await genericLikesApi.toggleLike('GREETING', template.id);
+      setIsLiked(newLikeStatus);
+      onLike(template.id);
+      
+      console.log('✅ Greeting template like toggled:', template.id, 'isLiked:', newLikeStatus);
+    } catch (error) {
+      console.error('Error toggling greeting like:', error);
+    }
   };
 
   const handlePress = () => {

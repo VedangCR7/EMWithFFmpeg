@@ -171,6 +171,8 @@ const GreetingTemplatesScreen: React.FC = () => {
 
       setAllTemplates(prev => prev.map(updateTemplate));
       setFilteredTemplates(prev => prev.map(updateTemplate));
+      
+      console.log('✅ Greeting template like toggled:', templateId, 'isLiked:', isLiked);
     } catch (error) {
       console.error('Error toggling like:', error);
     }

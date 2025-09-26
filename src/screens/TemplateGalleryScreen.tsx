@@ -24,6 +24,8 @@ import { MainStackParamList } from '../navigation/AppNavigator';
 
 import TemplateCard from '../components/TemplateCard';
 import templateService, { Template, TemplateFilters } from '../services/templates';
+import templatesBannersApi from '../services/templatesBannersApi';
+import genericLikesApi from '../services/genericLikesApi';
 import { useTheme } from '../context/ThemeContext';
 import { useSubscription } from '../contexts/SubscriptionContext';
 
@@ -179,21 +181,46 @@ const TemplateGalleryScreen: React.FC = () => {
   }, [applyFilters]);
 
   // Handle like change
-  const handleLikeChange = useCallback((templateId: string, isLiked: boolean) => {
-    setTemplates(prevTemplates => 
-      prevTemplates.map(template => 
-        template.id === templateId 
-          ? { ...template, isLiked, likes: isLiked ? template.likes + 1 : Math.max(0, template.likes - 1) }
-          : template
-      )
-    );
-    setFilteredTemplates(prevFiltered => 
-      prevFiltered.map(template => 
-        template.id === templateId 
-          ? { ...template, isLiked, likes: isLiked ? template.likes + 1 : Math.max(0, template.likes - 1) }
-          : template
-      )
-    );
+  const handleLikeChange = useCallback(async (templateId: string, isLiked: boolean) => {
+    try {
+      // Update local state immediately
+      setTemplates(prevTemplates => 
+        prevTemplates.map(template => 
+          template.id === templateId 
+            ? { ...template, isLiked, likes: isLiked ? template.likes + 1 : Math.max(0, template.likes - 1) }
+            : template
+        )
+      );
+      setFilteredTemplates(prevFiltered => 
+        prevFiltered.map(template => 
+          template.id === templateId 
+            ? { ...template, isLiked, likes: isLiked ? template.likes + 1 : Math.max(0, template.likes - 1) }
+            : template
+        )
+      );
+      
+      // Call backend API
+      await genericLikesApi.toggleLike('TEMPLATE', templateId);
+      
+      console.log('✅ Template like toggled:', templateId, 'isLiked:', isLiked);
+    } catch (error) {
+      console.error('❌ Error toggling template like:', error);
+      // Revert local state on error
+      setTemplates(prevTemplates => 
+        prevTemplates.map(template => 
+          template.id === templateId 
+            ? { ...template, isLiked: !isLiked, likes: !isLiked ? template.likes + 1 : Math.max(0, template.likes - 1) }
+            : template
+        )
+      );
+      setFilteredTemplates(prevFiltered => 
+        prevFiltered.map(template => 
+          template.id === templateId 
+            ? { ...template, isLiked: !isLiked, likes: !isLiked ? template.likes + 1 : Math.max(0, template.likes - 1) }
+            : template
+        )
+      );
+    }
   }, []);
 
   // Render template item

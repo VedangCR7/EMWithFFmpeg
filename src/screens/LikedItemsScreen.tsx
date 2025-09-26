@@ -19,6 +19,9 @@ import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 import authService from '../services/auth';
 import userLikesService from '../services/userLikes';
+import userLikesBackendService from '../services/userLikesBackend';
+import genericLikesApi from '../services/genericLikesApi';
+import api from '../services/api';
 import Video from 'react-native-video';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -195,22 +198,28 @@ const LikedItemsScreen: React.FC = () => {
       
       console.log('🔍 Loading liked items for user:', userId);
       
-      // Get user's liked items from all content types
+      if (!userId) {
+        console.log('⚠️ No user ID available, using mock data');
+        setLikedItems(mockLikedItems);
+        return;
+      }
+      
+      // Get user's liked items from backend API
       const [templateLikes, videoLikes, posterLikes, greetingLikes] = await Promise.all([
-        userLikesService.getLikesByType('template', userId),
-        userLikesService.getLikesByType('video', userId),
-        userLikesService.getLikesByType('poster', userId),
-        userLikesService.getLikesByType('business-profile', userId), // Using business-profile for greetings
+        genericLikesApi.getUserLikes(userId, 'TEMPLATE'),
+        genericLikesApi.getUserLikes(userId, 'VIDEO'),
+        genericLikesApi.getUserLikes(userId, 'POSTER'),
+        genericLikesApi.getUserLikes(userId, 'GREETING'),
       ]);
       
       // Convert user likes to LikedItem format
       const userLikedItems: LikedItem[] = [];
       
       // Add template likes
-      templateLikes.forEach(like => {
+      templateLikes.data.likes.forEach(like => {
         userLikedItems.push({
-          id: like.contentId,
-          name: `Template ${like.contentId}`,
+          id: like.resourceId,
+          name: `Template ${like.resourceId}`,
           thumbnail: 'https://images.unsplash.com/photo-1511578314322-379afb476865?w=300&h=200&fit=crop',
           type: 'template',
           category: 'Templates',
@@ -219,10 +228,10 @@ const LikedItemsScreen: React.FC = () => {
       });
       
       // Add video likes
-      videoLikes.forEach(like => {
+      videoLikes.data.likes.forEach(like => {
         userLikedItems.push({
-          id: like.contentId,
-          name: `Video ${like.contentId}`,
+          id: like.resourceId,
+          name: `Video ${like.resourceId}`,
           thumbnail: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=300&h=200&fit=crop',
           type: 'video',
           category: 'Videos',
@@ -232,10 +241,10 @@ const LikedItemsScreen: React.FC = () => {
       });
       
       // Add poster likes
-      posterLikes.forEach(like => {
+      posterLikes.data.likes.forEach(like => {
         userLikedItems.push({
-          id: like.contentId,
-          name: `Poster ${like.contentId}`,
+          id: like.resourceId,
+          name: `Poster ${like.resourceId}`,
           thumbnail: 'https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=300&h=200&fit=crop',
           type: 'poster',
           category: 'Posters',
@@ -244,11 +253,11 @@ const LikedItemsScreen: React.FC = () => {
         });
       });
       
-      // Add greeting likes (using business-profile type)
-      greetingLikes.forEach(like => {
+      // Add greeting likes
+      greetingLikes.data.likes.forEach(like => {
         userLikedItems.push({
-          id: like.contentId,
-          name: `Greeting ${like.contentId}`,
+          id: like.resourceId,
+          name: `Greeting ${like.resourceId}`,
           thumbnail: 'https://images.unsplash.com/photo-1511578314322-379afb476865?w=300&h=200&fit=crop',
           type: 'greeting',
           category: 'Greetings',
@@ -257,9 +266,9 @@ const LikedItemsScreen: React.FC = () => {
       });
       
       setLikedItems(userLikedItems);
-      console.log('✅ Loaded user-specific liked items:', userLikedItems.length);
+      console.log('✅ Loaded user-specific liked items from backend:', userLikedItems.length);
     } catch (error) {
-      console.error('❌ Error loading user liked items:', error);
+      console.error('❌ Error loading user liked items from backend:', error);
       // Fallback to mock data if there's an error
       setLikedItems(mockLikedItems);
     } finally {
@@ -320,34 +329,38 @@ const LikedItemsScreen: React.FC = () => {
       const currentUser = authService.getCurrentUser();
       const userId = currentUser?.id;
       
-      // Map LikedItem type to userLikesService content type
-      let contentType: 'template' | 'video' | 'poster' | 'business-profile';
+      if (!userId) {
+        console.error('❌ No user ID available for unlike operation');
+        return;
+      }
+      
+      // Map LikedItem type to backend resource type
+      let resourceType: 'TEMPLATE' | 'VIDEO' | 'POSTER' | 'GREETING' | 'CONTENT';
+      
       switch (item.type) {
         case 'template':
-          contentType = 'template';
+          resourceType = 'TEMPLATE';
           break;
         case 'video':
-          contentType = 'video';
+          resourceType = 'VIDEO';
           break;
         case 'poster':
-          contentType = 'poster';
+          resourceType = 'POSTER';
           break;
         case 'greeting':
-          contentType = 'business-profile';
+          resourceType = 'GREETING';
           break;
         default:
           console.error('Unknown item type for unlike:', item.type);
           return;
       }
       
-      // Unlike the item
-      const success = await userLikesService.unlikeContent(item.id, contentType, userId);
+      // Unlike the item via generic API
+      await genericLikesApi.unlikeResource(resourceType, item.id);
       
-      if (success) {
-        // Remove from local state
-        setLikedItems(prev => prev.filter(likedItem => likedItem.id !== item.id));
-        console.log('✅ Item unliked successfully:', item.id);
-      }
+      // Remove from local state
+      setLikedItems(prev => prev.filter(likedItem => likedItem.id !== item.id));
+      console.log('✅ Item unliked successfully:', item.id);
     } catch (error) {
       console.error('❌ Error unliking item:', error);
     }
