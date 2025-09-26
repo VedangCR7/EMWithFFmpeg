@@ -195,17 +195,13 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
 
 
   const handleSubmit = () => {
-    // Validation
+    // Validation - Only company name, business category, phone number, and email are required
     if (!formData.name.trim()) {
       Alert.alert('Error', 'Company name is required');
       return;
     }
     if (!formData.category.trim()) {
       Alert.alert('Error', 'Business category is required');
-      return;
-    }
-    if (!formData.address.trim()) {
-      Alert.alert('Error', 'Address is required');
       return;
     }
     if (!formData.phone.trim()) {

@@ -48,8 +48,13 @@ const upload = multer({
 // Middleware to extract user ID from JWT token
 const extractUserId = (req: Request, res: Response, next: any) => {
   try {
+    console.log('🔐 extractUserId middleware - Processing request');
+    console.log('📥 Authorization header:', req.headers.authorization);
+    console.log('📥 X-User-ID header:', req.headers['x-user-id']);
+    
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('❌ No valid authorization header found');
       return res.status(401).json({
         success: false,
         error: 'Authorization token required'
@@ -57,12 +62,41 @@ const extractUserId = (req: Request, res: Response, next: any) => {
     }
 
     const token = authHeader.substring(7);
-    // For now, we'll use a simple approach - in production, you'd verify the JWT properly
-    // This is a placeholder - replace with actual JWT verification
-    const userId = req.headers['x-user-id'] as string || 'demo-user-id';
-    req.userId = userId;
-    next();
+    console.log('🔑 Token extracted:', token.substring(0, 20) + '...');
+    
+    // Try to verify JWT token
+    try {
+      const jwt = require('jsonwebtoken');
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'business-marketing-platform-super-secret-jwt-key-2024');
+      console.log('🔍 JWT decoded:', decoded);
+      
+      // Extract user ID from token - check for mobile user type
+      let userId;
+      if (decoded.userType === 'MOBILE_USER' && decoded.id) {
+        userId = decoded.id;
+        req.userId = userId;
+        console.log('✅ Mobile user ID extracted from JWT:', userId);
+      } else {
+        // Fallback to header-based user ID
+        userId = req.headers['x-user-id'] as string || 'demo-user-id';
+        req.userId = userId;
+        console.log('⚠️ Using fallback user ID:', userId);
+      }
+      
+      console.log('✅ User ID set from JWT:', userId);
+      next();
+    } catch (jwtError) {
+      console.log('⚠️ JWT verification failed, using fallback:', jwtError.message);
+      
+      // Fallback to header-based user ID
+      const userId = req.headers['x-user-id'] as string || 'demo-user-id';
+      req.userId = userId;
+      
+      console.log('✅ User ID set from header fallback:', userId);
+      next();
+    }
   } catch (error) {
+    console.log('❌ Error in extractUserId middleware:', error);
     res.status(401).json({
       success: false,
       error: 'Invalid authorization token'
@@ -313,8 +347,15 @@ router.get('/:userId', async (req: Request, res: Response) => {
  */
 router.put('/:id', extractUserId, async (req: Request, res: Response) => {
   try {
+    console.log('🔍 PUT /api/mobile/business-profile/:id - Request received');
+    console.log('📥 Request params:', req.params);
+    console.log('📥 Request body:', req.body);
+    console.log('📥 Request headers:', req.headers);
+    
     const { id } = req.params;
     const mobileUserId = req.userId;
+    
+    console.log('👤 User ID from token:', mobileUserId);
     const {
       businessName,
       ownerName,
@@ -405,10 +446,19 @@ router.put('/:id', extractUserId, async (req: Request, res: Response) => {
  */
 router.delete('/:id', extractUserId, async (req: Request, res: Response) => {
   try {
+    console.log('🔍 DELETE /api/mobile/business-profile/:id - Request received');
+    console.log('📥 Request params:', req.params);
+    console.log('📥 Request headers:', req.headers);
+    
     const { id } = req.params;
     const mobileUserId = req.userId;
+    
+    console.log('👤 User ID from token:', mobileUserId);
+    console.log('🆔 Profile ID to delete:', id);
 
     // Check if business profile exists and belongs to the user
+    console.log('🔍 Searching for profile with ID:', id, 'and user ID:', mobileUserId);
+    
     const existingProfile = await prisma.businessProfile.findFirst({
       where: { 
         id,
@@ -416,7 +466,21 @@ router.delete('/:id', extractUserId, async (req: Request, res: Response) => {
       }
     });
 
+    console.log('🔍 Profile search result:', existingProfile ? 'Found' : 'Not found');
+    
     if (!existingProfile) {
+      // Let's also check if the profile exists at all (regardless of ownership)
+      const anyProfile = await prisma.businessProfile.findUnique({
+        where: { id }
+      });
+      
+      console.log('🔍 Profile exists in database:', anyProfile ? 'Yes' : 'No');
+      if (anyProfile) {
+        console.log('🔍 Profile owner:', anyProfile.mobileUserId);
+        console.log('🔍 Requesting user:', mobileUserId);
+        console.log('🔍 Ownership match:', anyProfile.mobileUserId === mobileUserId);
+      }
+      
       return res.status(404).json({
         success: false,
         error: 'Business profile not found or access denied'

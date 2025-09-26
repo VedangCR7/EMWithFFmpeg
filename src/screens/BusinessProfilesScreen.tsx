@@ -10,6 +10,7 @@ import {
   StatusBar,
   Dimensions,
   Alert,
+  Image,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -91,14 +92,25 @@ const BusinessProfilesScreen: React.FC = () => {
   const loadBusinessProfiles = useCallback(async () => {
     setLoading(true);
     try {
-      console.log('🔍 Loading business profiles from API...');
+      // Get current user ID
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id;
       
-      // Try to get profiles from API first
-      const apiProfiles = await businessProfileService.getBusinessProfiles();
+      if (!userId) {
+        console.log('⚠️ No user ID available, using mock business profiles');
+        const mockProfiles = businessProfileService.getMockProfiles();
+        setProfiles(mockProfiles);
+        return;
+      }
+      
+      console.log('🔍 Loading user-specific business profiles for user:', userId);
+      
+      // Try to get user-specific profiles from API first
+      const apiProfiles = await businessProfileService.getUserBusinessProfiles(userId);
       
       if (apiProfiles.length > 0) {
         setProfiles(apiProfiles);
-        console.log('✅ Loaded business profiles from API:', apiProfiles.length);
+        console.log('✅ Loaded user-specific business profiles from API:', apiProfiles.length);
       } else {
         // Fallback to mock data
         const mockProfiles = businessProfileService.getMockProfiles();
@@ -223,16 +235,34 @@ const BusinessProfilesScreen: React.FC = () => {
   const renderBusinessCard = useCallback(({ item }: { item: any }) => (
     <View style={[styles.businessCard, { backgroundColor: theme.colors.cardBackground }]}>
       <View style={styles.cardHeader}>
-        <View style={styles.businessInfo}>
-          <Text style={[styles.businessName, { color: theme.colors.text }]}>
-            {item.name || 'Business Name'}
-          </Text>
-          {item.category && (
-            <Text style={[styles.businessCategory, { color: theme.colors.primary }]}>
-              {item.category}
+        <View style={styles.businessInfoWithLogo}>
+          {/* Business Logo */}
+          <View style={styles.logoContainer}>
+            {item.companyLogo || item.logo ? (
+              <Image
+                source={{ uri: item.companyLogo || item.logo }}
+                style={styles.businessLogo}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={[styles.logoPlaceholder, { backgroundColor: `${theme.colors.primary}20` }]}>
+                <Icon name="business" size={24} color={theme.colors.primary} />
+              </View>
+            )}
+          </View>
+          
+          <View style={styles.businessInfo}>
+            <Text style={[styles.businessName, { color: theme.colors.text }]}>
+              {item.name || 'Business Name'}
             </Text>
-          )}
+            {item.category && (
+              <Text style={[styles.businessCategory, { color: theme.colors.primary }]}>
+                {item.category}
+              </Text>
+            )}
+          </View>
         </View>
+        
         <View style={styles.cardActions}>
           <TouchableOpacity
             style={[styles.actionButton, { backgroundColor: `${theme.colors.primary}20` }]}
@@ -465,6 +495,30 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: screenHeight * 0.015,
+  },
+  businessInfoWithLogo: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    flex: 1,
+  },
+  logoContainer: {
+    marginRight: screenWidth * 0.03,
+  },
+  businessLogo: {
+    width: screenWidth * 0.12,
+    height: screenWidth * 0.12,
+    borderRadius: screenWidth * 0.06,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  logoPlaceholder: {
+    width: screenWidth * 0.12,
+    height: screenWidth * 0.12,
+    borderRadius: screenWidth * 0.06,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   businessInfo: {
     flex: 1,

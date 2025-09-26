@@ -157,7 +157,7 @@ class BusinessProfileService {
     }
   }
 
-  // Validate business profile data
+  // Validate business profile data - Only company name, business category, phone number, and email are required
   validateBusinessProfileData(profileData: BusinessProfileRequest): { isValid: boolean; errors: string[] } {
     const errors: string[] = [];
 
@@ -173,14 +173,6 @@ class BusinessProfileService {
 
     if (!profileData.businessPhone?.trim()) {
       errors.push('Business phone is required');
-    }
-
-    if (!profileData.businessAddress?.trim()) {
-      errors.push('Business address is required');
-    }
-
-    if (!profileData.businessDescription?.trim()) {
-      errors.push('Business description is required');
     }
 
     if (!profileData.businessCategory?.trim()) {

@@ -250,7 +250,7 @@ class BusinessProfileService {
         logo: data.companyLogo || '',
         description: data.description || '',
         website: data.website || '',
-        socialMedia: data.socialMedia || null
+        socialMedia: (data as any).socialMedia || null
       };
       
       const response = await api.post('/api/mobile/business-profile', backendData);
@@ -356,13 +356,16 @@ class BusinessProfileService {
         ownerName: data.name, // Use business name as owner name for now
         email: data.email,
         phone: data.phone,
-        address: data.address,
+        address: data.address || '',
         category: data.category,
         logo: data.companyLogo || '',
         description: data.description || '',
         website: data.website || '',
-        socialMedia: data.socialMedia || null
+        socialMedia: (data as any).socialMedia || null
       };
+      
+      console.log('🔍 Making PUT request to:', `/api/mobile/business-profile/${id}`);
+      console.log('📤 Request data:', backendData);
       
       const response = await api.put(`/api/mobile/business-profile/${id}`, backendData);
       
@@ -459,6 +462,7 @@ class BusinessProfileService {
   async deleteBusinessProfile(id: string): Promise<void> {
     try {
       console.log('Deleting business profile via API:', id);
+      console.log('🔍 Making DELETE request to:', `/api/mobile/business-profile/${id}`);
       const response = await api.delete(`/api/mobile/business-profile/${id}`);
       
       if (response.data.success) {
