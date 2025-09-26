@@ -64,15 +64,15 @@ const ProfileScreen: React.FC = () => {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [editFormData, setEditFormData] = useState({
-    name: currentUser?.displayName || currentUser?.companyName || currentUser?.name || currentUser?.businessName || '',
-    description: currentUser?.description || currentUser?.bio || currentUser?.businessDescription || '',
-    category: currentUser?.category || currentUser?.businessCategory || '',
-    address: currentUser?.address || currentUser?.businessAddress || '',
-    phone: currentUser?.phoneNumber || currentUser?.phone || currentUser?.businessPhone || '',
+    name: currentUser?.displayName || currentUser?.companyName || currentUser?.name || currentUser?.businessName || currentUser?.businessProfiles?.[0]?.businessName || '',
+    description: currentUser?.description || currentUser?.bio || currentUser?.businessDescription || currentUser?.businessProfiles?.[0]?.description || '',
+    category: currentUser?.category || currentUser?.businessCategory || currentUser?.businessProfiles?.[0]?.category || '',
+    address: currentUser?.address || currentUser?.businessAddress || currentUser?.businessProfiles?.[0]?.address || '',
+    phone: currentUser?.phoneNumber || currentUser?.phone || currentUser?.businessPhone || currentUser?.businessProfiles?.[0]?.phone || '',
     alternatePhone: currentUser?.alternatePhone || currentUser?.alternateBusinessPhone || '',
-    email: currentUser?.email || currentUser?.businessEmail || '',
-    website: currentUser?.website || currentUser?.businessWebsite || '',
-    companyLogo: currentUser?.companyLogo || currentUser?.businessLogo || currentUser?.logo || '',
+    email: currentUser?.email || currentUser?.businessEmail || currentUser?.businessProfiles?.[0]?.email || '',
+    website: currentUser?.website || currentUser?.businessWebsite || currentUser?.businessProfiles?.[0]?.website || '',
+    companyLogo: currentUser?.companyLogo || currentUser?.businessLogo || currentUser?.logo || currentUser?.businessProfiles?.[0]?.logo || '',
   });
   const [isUpdating, setIsUpdating] = useState(false);
   const [posterStats, setPosterStats] = useState({ total: 0, recentCount: 0 });
@@ -343,15 +343,15 @@ const ProfileScreen: React.FC = () => {
         
         // Update edit form with existing data
         setEditFormData({
-          name: currentUser?.displayName || currentUser?.companyName || currentUser?.name || currentUser?.businessName || '',
-          description: currentUser?.description || currentUser?.bio || currentUser?.businessDescription || '',
-          category: currentUser?.category || currentUser?.businessCategory || '',
-          address: currentUser?.address || currentUser?.businessAddress || '',
-          phone: currentUser?.phoneNumber || currentUser?.businessPhone || currentUser?.phone || '',
+          name: currentUser?.displayName || currentUser?.companyName || currentUser?.name || currentUser?.businessName || currentUser?.businessProfiles?.[0]?.businessName || '',
+          description: currentUser?.description || currentUser?.bio || currentUser?.businessDescription || currentUser?.businessProfiles?.[0]?.description || '',
+          category: currentUser?.category || currentUser?.businessCategory || currentUser?.businessProfiles?.[0]?.category || '',
+          address: currentUser?.address || currentUser?.businessAddress || currentUser?.businessProfiles?.[0]?.address || '',
+          phone: currentUser?.phoneNumber || currentUser?.businessPhone || currentUser?.phone || currentUser?.businessProfiles?.[0]?.phone || '',
           alternatePhone: currentUser?.alternateBusinessPhone || currentUser?.alternatePhone || '',
-          email: currentUser?.email || currentUser?.businessEmail || '',
-          website: currentUser?.website || currentUser?.businessWebsite || '',
-          companyLogo: currentUser?.companyLogo || currentUser?.businessLogo || currentUser?.logo || '',
+          email: currentUser?.email || currentUser?.businessEmail || currentUser?.businessProfiles?.[0]?.email || '',
+          website: currentUser?.website || currentUser?.businessWebsite || currentUser?.businessProfiles?.[0]?.website || '',
+          companyLogo: currentUser?.companyLogo || currentUser?.businessLogo || currentUser?.logo || currentUser?.businessProfiles?.[0]?.logo || '',
         });
         
         // Update profile image if available
@@ -390,15 +390,15 @@ const ProfileScreen: React.FC = () => {
       authService.setCurrentUser(updatedUserData);
       
       setEditFormData({
-        name: completeUserData?.displayName || completeUserData?.companyName || completeUserData?.name || completeUserData?.businessName || '',
-        description: completeUserData?.description || completeUserData?.bio || completeUserData?.businessDescription || '',
-        category: completeUserData?.category || completeUserData?.businessCategory || '',
-        address: completeUserData?.address || completeUserData?.businessAddress || '',
-        phone: completeUserData?.phoneNumber || completeUserData?.phone || completeUserData?.businessPhone || '',
+        name: completeUserData?.displayName || completeUserData?.companyName || completeUserData?.name || completeUserData?.businessName || completeUserData?.businessProfiles?.[0]?.businessName || '',
+        description: completeUserData?.description || completeUserData?.bio || completeUserData?.businessDescription || completeUserData?.businessProfiles?.[0]?.description || '',
+        category: completeUserData?.category || completeUserData?.businessCategory || completeUserData?.businessProfiles?.[0]?.category || '',
+        address: completeUserData?.address || completeUserData?.businessAddress || completeUserData?.businessProfiles?.[0]?.address || '',
+        phone: completeUserData?.phoneNumber || completeUserData?.phone || completeUserData?.businessPhone || completeUserData?.businessProfiles?.[0]?.phone || '',
         alternatePhone: completeUserData?.alternatePhone || completeUserData?.alternateBusinessPhone || '',
-        email: completeUserData?.email || completeUserData?.businessEmail || '',
-        website: completeUserData?.website || completeUserData?.businessWebsite || '',
-        companyLogo: completeUserData?.companyLogo || completeUserData?.businessLogo || completeUserData?.logo || '',
+        email: completeUserData?.email || completeUserData?.businessEmail || completeUserData?.businessProfiles?.[0]?.email || '',
+        website: completeUserData?.website || completeUserData?.businessWebsite || completeUserData?.businessProfiles?.[0]?.website || '',
+        companyLogo: completeUserData?.companyLogo || completeUserData?.businessLogo || completeUserData?.logo || completeUserData?.businessProfiles?.[0]?.logo || '',
       });
       
       setShowEditProfileModal(true);
@@ -511,15 +511,15 @@ const ProfileScreen: React.FC = () => {
     const user = authService.getCurrentUser();
     setShowEditProfileModal(false);
     setEditFormData({
-      name: user?.displayName || user?.companyName || user?.name || user?.businessName || '',
-      description: user?.description || user?.bio || user?.businessDescription || '',
-      category: user?.category || user?.businessCategory || '',
-      address: user?.address || user?.businessAddress || '',
-      phone: user?.phoneNumber || user?.phone || user?.businessPhone || '',
+      name: user?.displayName || user?.companyName || user?.name || user?.businessName || user?.businessProfiles?.[0]?.businessName || '',
+      description: user?.description || user?.bio || user?.businessDescription || user?.businessProfiles?.[0]?.description || '',
+      category: user?.category || user?.businessCategory || user?.businessProfiles?.[0]?.category || '',
+      address: user?.address || user?.businessAddress || user?.businessProfiles?.[0]?.address || '',
+      phone: user?.phoneNumber || user?.phone || user?.businessPhone || user?.businessProfiles?.[0]?.phone || '',
       alternatePhone: user?.alternatePhone || user?.alternateBusinessPhone || '',
-      email: user?.email || user?.businessEmail || '',
-      website: user?.website || user?.businessWebsite || '',
-      companyLogo: user?.companyLogo || user?.businessLogo || user?.logo || '',
+      email: user?.email || user?.businessEmail || user?.businessProfiles?.[0]?.email || '',
+      website: user?.website || user?.businessWebsite || user?.businessProfiles?.[0]?.website || '',
+      companyLogo: user?.companyLogo || user?.businessLogo || user?.logo || user?.businessProfiles?.[0]?.logo || '',
     });
   };
 

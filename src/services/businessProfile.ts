@@ -55,49 +55,62 @@ class BusinessProfileService {
   // Get user-specific business profiles
   async getUserBusinessProfiles(userId: string): Promise<BusinessProfile[]> {
     try {
-      console.log('Fetching user-specific business profiles for user:', userId);
+      console.log('🔍 Fetching user-specific business profiles for user:', userId);
+      console.log('🔍 API URL:', `/api/mobile/business-profile/${userId}`);
+      
       const response = await api.get(`/api/mobile/business-profile/${userId}`);
+      
+      console.log('🔍 API Response status:', response.status);
+      console.log('🔍 API Response data:', JSON.stringify(response.data, null, 2));
       
       if (response.data.success) {
         const profiles = response.data.data.profiles;
         if (profiles && profiles.length > 0) {
           console.log(`✅ Found ${profiles.length} business profiles for user`);
+          console.log('🔍 Raw profile data:', JSON.stringify(profiles, null, 2));
+          
           // Convert backend profiles to frontend format
-          const businessProfiles: BusinessProfile[] = profiles.map((profile: any) => ({
-            id: profile.id,
-            name: profile.businessName,
-            description: profile.description || '',
-            category: profile.category,
-            address: profile.address || '',
-            phone: profile.phone || '',
-            alternatePhone: '',
-            email: profile.email || '',
-            website: profile.website || '',
-            logo: profile.logo || '',
-            companyLogo: profile.logo || '',
-            banner: '',
-            socialMedia: profile.socialMedia || {
-              facebook: '',
-              instagram: '',
-              twitter: '',
-              linkedin: '',
-            },
-            services: [],
-            workingHours: {
-              monday: { open: '09:00', close: '18:00', isOpen: true },
-              tuesday: { open: '09:00', close: '18:00', isOpen: true },
-              wednesday: { open: '09:00', close: '18:00', isOpen: true },
-              thursday: { open: '09:00', close: '18:00', isOpen: true },
-              friday: { open: '09:00', close: '18:00', isOpen: true },
-              saturday: { open: '10:00', close: '16:00', isOpen: true },
-              sunday: { open: '00:00', close: '00:00', isOpen: false },
-            },
-            rating: 0,
-            reviewCount: 0,
-            isVerified: false,
-            createdAt: profile.createdAt,
-            updatedAt: profile.updatedAt,
-          }));
+          const businessProfiles: BusinessProfile[] = profiles.map((profile: any) => {
+            console.log('🔍 Processing profile:', profile.businessName, 'Category:', profile.category);
+            
+            return {
+              id: profile.id,
+              name: profile.businessName,
+              description: profile.description || '',
+              category: profile.category,
+              address: profile.address || '',
+              phone: profile.phone || '',
+              alternatePhone: '',
+              email: profile.email || '',
+              website: profile.website || '',
+              logo: profile.logo || '',
+              companyLogo: profile.logo || '',
+              banner: '',
+              socialMedia: profile.socialMedia || {
+                facebook: '',
+                instagram: '',
+                twitter: '',
+                linkedin: '',
+              },
+              services: [],
+              workingHours: {
+                monday: { open: '09:00', close: '18:00', isOpen: true },
+                tuesday: { open: '09:00', close: '18:00', isOpen: true },
+                wednesday: { open: '09:00', close: '18:00', isOpen: true },
+                thursday: { open: '09:00', close: '18:00', isOpen: true },
+                friday: { open: '09:00', close: '18:00', isOpen: true },
+                saturday: { open: '10:00', close: '16:00', isOpen: true },
+                sunday: { open: '00:00', close: '00:00', isOpen: false },
+              },
+              rating: 0,
+              reviewCount: 0,
+              isVerified: false,
+              createdAt: profile.createdAt,
+              updatedAt: profile.updatedAt,
+            };
+          });
+          
+          console.log('🔍 Mapped business profiles:', JSON.stringify(businessProfiles, null, 2));
           return businessProfiles;
         }
         console.log('No user-specific business profiles found');
@@ -107,7 +120,8 @@ class BusinessProfileService {
         return [];
       }
     } catch (error) {
-      console.error('Error fetching user-specific business profiles:', error);
+      console.error('❌ Error fetching user-specific business profiles:', error);
+      console.error('❌ Error details:', error.response?.data);
       return [];
     }
   }

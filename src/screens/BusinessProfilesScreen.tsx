@@ -101,6 +101,9 @@ const BusinessProfilesScreen: React.FC = () => {
       const currentUser = authService.getCurrentUser();
       const userId = currentUser?.id;
       
+      console.log('🔍 BusinessProfilesScreen - Current User:', JSON.stringify(currentUser, null, 2));
+      console.log('🔍 BusinessProfilesScreen - User ID:', userId);
+      
       if (!userId) {
         console.log('⚠️ No user ID available, using mock business profiles');
         const mockProfiles = businessProfileService.getMockProfiles();
@@ -116,6 +119,7 @@ const BusinessProfilesScreen: React.FC = () => {
       if (apiProfiles.length > 0) {
         setProfiles(apiProfiles);
         console.log('✅ Loaded user-specific business profiles from API:', apiProfiles.length);
+        console.log('🔍 Loaded profiles:', JSON.stringify(apiProfiles, null, 2));
       } else {
         // Fallback to mock data
         const mockProfiles = businessProfileService.getMockProfiles();

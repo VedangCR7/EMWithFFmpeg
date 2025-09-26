@@ -39,13 +39,13 @@ router.post('/register', async (req: Request, res: Response) => {
       platform, 
       fcmToken,
       companyName,
-      description,
+      alternatePhone,
+      displayName,
       category,
       address,
-      alternatePhone,
-      website,
       companyLogo,
-      displayName
+      description,
+      website
     } = req.body;
 
     if (!deviceId) {
@@ -55,7 +55,8 @@ router.post('/register', async (req: Request, res: Response) => {
       });
     }
 
-    // If email/password registration, validate required fields
+    // Hash password if provided
+    let hashedPassword = null;
     if (email && password) {
       if (!email || !password) {
         return res.status(400).json({
@@ -78,7 +79,7 @@ router.post('/register', async (req: Request, res: Response) => {
 
       // Hash password
       const bcrypt = require('bcryptjs');
-      const hashedPassword = await bcrypt.hash(password, 12);
+      hashedPassword = await bcrypt.hash(password, 12);
     }
 
     // Check if user already exists by deviceId
@@ -94,20 +95,14 @@ router.post('/register', async (req: Request, res: Response) => {
     }
 
     // Create new mobile user
-    const bcrypt = require('bcryptjs');
     const mobileUser = await prisma.mobileUser.create({
       data: {
         deviceId,
         name: name || companyName || displayName,
         email,
-        password: password ? await bcrypt.hash(password, 12) : null,
+        password: email && password ? hashedPassword : null,
         phone,
         alternatePhone,
-        description,
-        category,
-        address,
-        website,
-        companyLogo,
         appVersion,
         platform,
         fcmToken,
@@ -225,6 +220,8 @@ router.post('/login', async (req: Request, res: Response) => {
           error: 'Invalid email or password'
         });
       }
+
+      console.log('✅ Mobile user authenticated with email/password:', mobileUser.email);
     }
     // Device ID login (legacy support)
     else if (deviceId) {
@@ -354,12 +351,9 @@ router.get('/me', async (req: Request, res: Response) => {
         email: mobileUser.email,
         phone: mobileUser.phone,
         alternatePhone: mobileUser.alternatePhone,
-        description: mobileUser.description,
-        category: mobileUser.category,
-        address: mobileUser.address,
-        website: mobileUser.website,
-        companyLogo: mobileUser.companyLogo,
+        appVersion: mobileUser.appVersion,
         platform: mobileUser.platform,
+        fcmToken: mobileUser.fcmToken,
         isActive: mobileUser.isActive,
         lastActiveAt: mobileUser.lastActiveAt,
         createdAt: mobileUser.createdAt,

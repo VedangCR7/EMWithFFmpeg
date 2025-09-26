@@ -1,4 +1,3 @@
-// Business Marketing Platform Database Schema (PostgreSQL Compatible)
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,215 +7,185 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Admin Users
 model Admin {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String
-  password  String
-  role      String   @default("ADMIN")
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  images    Image[]
-  videos    Video[]
-  categories BusinessCategory[]
+  id               String             @id @default(cuid())
+  email            String             @unique
+  name             String
+  password         String
+  role             String             @default("ADMIN")
+  isActive         Boolean            @default(true)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  auditLogs        AuditLog[]
+  categories       BusinessCategory[]
+  images           Image[]
   createdSubadmins Subadmin[]
-  auditLogs AuditLog[]
+  videos           Video[]
 
   @@map("admins")
 }
 
-// Subadmin Users
 model Subadmin {
-  id                    String   @id @default(cuid())
-  email                 String   @unique
-  name                  String
-  password              String
-  mobileNumber          String?
-  role                  String
-  permissions           String   // JSON string of permissions array
-  status                String   @default("ACTIVE")
-  assignedCategories    String   // JSON string of assigned categories
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  lastLogin             DateTime?
-  createdBy             String
-
-  admin     Admin @relation(fields: [createdBy], references: [id])
-  images    Image[]
-  videos    Video[]
-  auditLogs AuditLog[]
+  id                 String     @id @default(cuid())
+  email              String     @unique
+  name               String
+  password           String
+  mobileNumber       String?
+  role               String
+  permissions        String
+  status             String     @default("ACTIVE")
+  assignedCategories String
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  lastLogin          DateTime?
+  createdBy          String
+  auditLogs          AuditLog[]
+  images             Image[]
+  admin              Admin      @relation(fields: [createdBy], references: [id])
+  videos             Video[]
 
   @@map("subadmins")
 }
 
-// Business Categories
 model BusinessCategory {
-  id          String   @id @default(cuid())
-  name        String   @unique
+  id          String     @id @default(cuid())
+  name        String     @unique
   description String?
   icon        String?
-  isActive    Boolean  @default(true)
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isActive    Boolean    @default(true)
+  sortOrder   Int        @default(0)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
   createdBy   String
-
-  admin     Admin @relation(fields: [createdBy], references: [id])
-  images    Image[]
-  videos    Video[]
-  customers Customer[]
+  admin       Admin      @relation(fields: [createdBy], references: [id])
+  customers   Customer[]
+  images      Image[]
+  videos      Video[]
 
   @@map("business_categories")
 }
 
-// Images
 model Image {
-  id              String   @id @default(cuid())
-  title           String
-  description     String?
-  url             String
-  thumbnailUrl    String?
-  category        String   // "BUSINESS", "FESTIVAL", "GENERAL"
+  id                 String            @id @default(cuid())
+  title              String
+  description        String?
+  url                String
+  thumbnailUrl       String?
+  category           String
   businessCategoryId String?
-  tags            String?  // JSON string of tags array
-  fileSize        Int
-  dimensions      String?
-  format          String
-  adminUploaderId String?
+  tags               String?
+  fileSize           Int
+  dimensions         String?
+  format             String
+  adminUploaderId    String?
   subadminUploaderId String?
-  uploaderType    String   // "ADMIN" or "SUBADMIN"
-  approvalStatus  String   @default("PENDING")
-  approvedBy      String?
-  approvedAt      DateTime?
-  downloads       Int      @default(0)
-  views           Int      @default(0)
-  
-  // Content Sync Fields
-  isMobileSynced  Boolean  @default(false)
-  mobileSyncAt    DateTime?
-  mobileTemplateId String? @unique
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  businessCategory BusinessCategory? @relation(fields: [businessCategoryId], references: [id])
-  adminUploader    Admin?            @relation(fields: [adminUploaderId], references: [id])
-  subadminUploader Subadmin?         @relation(fields: [subadminUploaderId], references: [id])
-  
-  // Mobile Template relation
-  mobileTemplate  MobileTemplate?
+  uploaderType       String
+  approvalStatus     String            @default("PENDING")
+  approvedBy         String?
+  approvedAt         DateTime?
+  downloads          Int               @default(0)
+  views              Int               @default(0)
+  isMobileSynced     Boolean           @default(false)
+  mobileSyncAt       DateTime?
+  mobileTemplateId   String?           @unique
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  adminUploader      Admin?            @relation(fields: [adminUploaderId], references: [id])
+  businessCategory   BusinessCategory? @relation(fields: [businessCategoryId], references: [id])
+  subadminUploader   Subadmin?         @relation(fields: [subadminUploaderId], references: [id])
+  mobileTemplate     MobileTemplate?
 
   @@map("images")
 }
 
-// Videos
 model Video {
-  id              String   @id @default(cuid())
-  title           String
-  description     String?
-  url             String
-  thumbnailUrl    String?
-  category        String   // "BUSINESS", "FESTIVAL", "GENERAL"
+  id                 String            @id @default(cuid())
+  title              String
+  description        String?
+  url                String
+  thumbnailUrl       String?
+  category           String
   businessCategoryId String?
-  tags            String?  // JSON string of tags array
-  duration        Int?
-  fileSize        Int
-  resolution      String?
-  format          String
-  adminUploaderId String?
+  tags               String?
+  duration           Int?
+  fileSize           Int
+  resolution         String?
+  format             String
+  adminUploaderId    String?
   subadminUploaderId String?
-  uploaderType    String   // "ADMIN" or "SUBADMIN"
-  approvalStatus  String   @default("PENDING")
-  approvedBy      String?
-  approvedAt      DateTime?
-  downloads       Int      @default(0)
-  views           Int      @default(0)
-  
-  // Content Sync Fields
-  isMobileSynced  Boolean  @default(false)
-  mobileSyncAt    DateTime?
-  mobileVideoId   String? @unique
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  businessCategory BusinessCategory? @relation(fields: [businessCategoryId], references: [id])
-  adminUploader    Admin?            @relation(fields: [adminUploaderId], references: [id])
-  subadminUploader Subadmin?         @relation(fields: [subadminUploaderId], references: [id])
-  
-  // Mobile Video relation
-  mobileVideo     MobileVideo?
+  uploaderType       String
+  approvalStatus     String            @default("PENDING")
+  approvedBy         String?
+  approvedAt         DateTime?
+  downloads          Int               @default(0)
+  views              Int               @default(0)
+  isMobileSynced     Boolean           @default(false)
+  mobileSyncAt       DateTime?
+  mobileVideoId      String?           @unique
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  mobileVideo        MobileVideo?
+  adminUploader      Admin?            @relation(fields: [adminUploaderId], references: [id])
+  businessCategory   BusinessCategory? @relation(fields: [businessCategoryId], references: [id])
+  subadminUploader   Subadmin?         @relation(fields: [subadminUploaderId], references: [id])
 
   @@map("videos")
 }
 
-// Installed Users (App users before subscription)
 model InstalledUser {
-  id                     String   @id @default(cuid())
-  deviceId               String   @unique
-  name                   String?
-  email                  String?  @unique
-  phone                  String?
-  appVersion             String?
-  installDate            DateTime @default(now())
-  lastActiveAt           DateTime?
-  totalViews             Int      @default(0)
-  downloadAttempts       Int      @default(0)
-  isConverted            Boolean  @default(false)
-  convertedAt            DateTime?
-  convertedToCustomerId  String?
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
-
-  auditLogs              AuditLog[]
+  id                    String     @id @default(cuid())
+  deviceId              String     @unique
+  name                  String?
+  email                 String?    @unique
+  phone                 String?
+  appVersion            String?
+  installDate           DateTime   @default(now())
+  lastActiveAt          DateTime?
+  totalViews            Int        @default(0)
+  downloadAttempts      Int        @default(0)
+  isConverted           Boolean    @default(false)
+  convertedAt           DateTime?
+  convertedToCustomerId String?
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+  auditLogs             AuditLog[]
 
   @@map("installed_users")
 }
 
-// Customers (Subscribed users with business profiles)
 model Customer {
-  id                     String   @id @default(cuid())
-  name                   String
-  email                  String   @unique
-  phone                  String?
-  deviceId               String?
-  selectedBusinessCategoryId String?
-  subscriptionStatus     String   @default("INACTIVE")
-  subscriptionStartDate  DateTime?
-  subscriptionEndDate    DateTime?
-  subscriptionAmount     Float?
-  paymentMethod          String?
-  appVersion             String?
-  lastActiveAt           DateTime?
-  totalDownloads         Int      @default(0)
-  
-  // Business Profile Information
-  businessName           String?
-  businessPhone          String?
-  businessEmail          String?
-  businessWebsite        String?
-  businessAddress        String?
-  businessLogo           String?
-  businessDescription    String?
-  businessCategory       String?
-  
-  // Conversion tracking
+  id                           String            @id @default(cuid())
+  name                         String
+  email                        String            @unique
+  phone                        String?
+  deviceId                     String?
+  selectedBusinessCategoryId   String?
+  subscriptionStatus           String            @default("INACTIVE")
+  subscriptionStartDate        DateTime?
+  subscriptionEndDate          DateTime?
+  subscriptionAmount           Float?
+  paymentMethod                String?
+  appVersion                   String?
+  lastActiveAt                 DateTime?
+  totalDownloads               Int               @default(0)
+  businessName                 String?
+  businessPhone                String?
+  businessEmail                String?
+  businessWebsite              String?
+  businessAddress              String?
+  businessLogo                 String?
+  businessDescription          String?
+  businessCategory             String?
   convertedFromInstalledUserId String?
-  
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
-
-  selectedBusinessCategory BusinessCategory? @relation(fields: [selectedBusinessCategoryId], references: [id])
-  subscriptions           Subscription[]
-  auditLogs               AuditLog[]
+  createdAt                    DateTime          @default(now())
+  updatedAt                    DateTime          @updatedAt
+  auditLogs                    AuditLog[]
+  selectedBusinessCategory     BusinessCategory? @relation(fields: [selectedBusinessCategoryId], references: [id])
+  subscriptions                Subscription[]
 
   @@map("customers")
 }
 
-// Subscriptions
 model Subscription {
   id            String   @id @default(cuid())
   customerId    String
@@ -231,15 +200,13 @@ model Subscription {
   autoRenew     Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
-
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer      Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@map("subscriptions")
 }
 
-// Audit Logs
 model AuditLog {
-  id              String   @id @default(cuid())
+  id              String         @id @default(cuid())
   adminId         String?
   subadminId      String?
   customerId      String?
@@ -251,27 +218,24 @@ model AuditLog {
   details         String?
   ipAddress       String?
   userAgent       String?
-  status          String   @default("SUCCESS")
-  createdAt       DateTime @default(now())
-
-  admin         Admin?         @relation(fields: [adminId], references: [id])
-  subadmin      Subadmin?      @relation(fields: [subadminId], references: [id])
-  customer      Customer?      @relation(fields: [customerId], references: [id])
-  installedUser InstalledUser? @relation(fields: [installedUserId], references: [id])
+  status          String         @default("SUCCESS")
+  createdAt       DateTime       @default(now())
+  admin           Admin?         @relation(fields: [adminId], references: [id])
+  customer        Customer?      @relation(fields: [customerId], references: [id])
+  installedUser   InstalledUser? @relation(fields: [installedUserId], references: [id])
+  subadmin        Subadmin?      @relation(fields: [subadminId], references: [id])
 
   @@map("audit_logs")
 }
 
-// Legacy models for compatibility
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
+  id        String             @id @default(cuid())
+  email     String             @unique
   name      String
   password  String
-  role      String   @default("USER")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  role      String             @default("USER")
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
   campaigns Campaign[]
   metrics   MarketingMetrics[]
 
@@ -279,20 +243,19 @@ model User {
 }
 
 model Campaign {
-  id             String   @id @default(cuid())
+  id             String             @id @default(cuid())
   name           String
   description    String?
-  status         String   @default("DRAFT")
+  status         String             @default("DRAFT")
   startDate      DateTime
   endDate        DateTime?
   budget         Float
   targetAudience String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
   userId         String
-
-  user    User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  metrics MarketingMetrics[]
+  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  metrics        MarketingMetrics[]
 
   @@map("campaigns")
 }
@@ -308,161 +271,132 @@ model MarketingMetrics {
   createdAt   DateTime @default(now())
   campaignId  String
   userId      String
-
-  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("marketing_metrics")
 }
 
-// ============================================
-// MOBILE APP TABLES (Content Sync System)
-// ============================================
-
-// Mobile Users (separate from existing users)
 model MobileUser {
-  id          String   @id @default(cuid())
-  deviceId    String   @unique
-  name        String?
-  email       String?  @unique
-  password    String?  // Hashed password for email/password authentication
-  phone       String?
-  alternatePhone String?  // Alternate phone number
-  description String?  // User bio/description
-  category    String?  // Business category
-  address     String?  // Business address
-  website     String?  // Website URL
-  companyLogo String?  // Company logo URL
-  appVersion  String?
-  platform    String?  // "ios", "android"
-  fcmToken    String?  // For push notifications
-  isActive    Boolean  @default(true)
-  lastActiveAt DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  // Relations
-  businessProfiles BusinessProfile[]
-  subscriptions    MobileSubscription[]
-  activities       MobileActivity[]
-  likes           MobileLike[]
-  downloads       MobileDownload[]
-  templateLikes   TemplateLike[]
-  templateDownloads TemplateDownload[]
-  videoLikes      VideoLike[]
-  videoDownloads  VideoDownload[]
-  greetingLikes   GreetingLike[]
+  id                String               @id @default(cuid())
+  deviceId          String               @unique
+  name              String?
+  email             String?              @unique
+  password          String?
+  phone             String?
+  alternatePhone    String?
+  appVersion        String?
+  platform          String?
+  fcmToken          String?
+  isActive          Boolean              @default(true)
+  lastActiveAt      DateTime?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
   greetingDownloads GreetingDownload[]
-  
+  greetingLikes     GreetingLike[]
+  activities        MobileActivity[]
+  businessProfiles  BusinessProfile[]
+  downloads         MobileDownload[]
+  likes             MobileLike[]
+  subscriptions     MobileSubscription[]
+  templateDownloads TemplateDownload[]
+  templateLikes     TemplateLike[]
+  videoDownloads    VideoDownload[]
+  videoLikes        VideoLike[]
+
   @@map("mobile_users")
 }
 
-// Mobile Business Profiles
 model BusinessProfile {
-  id                String   @id @default(cuid())
-  mobileUserId      String
-  businessName      String
-  ownerName         String
-  email             String
-  phone             String
-  address           String?
-  category          String
-  logo              String?
-  description       String?
-  website           String?
-  socialMedia       String?  // JSON string
-  isActive          Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  
-  mobileUser MobileUser @relation(fields: [mobileUserId], references: [id])
-  
+  id           String     @id @default(cuid())
+  mobileUserId String
+  businessName String
+  ownerName    String
+  email        String
+  phone        String
+  address      String?
+  category     String
+  logo         String?
+  description  String?
+  website      String?
+  socialMedia  String?
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  mobileUser   MobileUser @relation(fields: [mobileUserId], references: [id])
+
   @@map("mobile_business_profiles")
 }
 
-// Mobile Templates (synced from admin images)
 model MobileTemplate {
-  id          String   @id @default(cuid())
-  title       String
-  description String?
-  imageUrl    String
-  fileUrl     String
-  category    String
-  language    String   @default("en")
-  type        String   // "daily", "festival", "business"
-  isPremium   Boolean  @default(false)
-  tags        String?  // JSON string
-  downloads   Int      @default(0)
-  likes       Int      @default(0)
-  isActive    Boolean  @default(true)
-  
-  // Sync tracking
-  sourceImageId String? @unique
-  syncedAt     DateTime @default(now())
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  // Relations
-  sourceImage     Image?            @relation(fields: [sourceImageId], references: [id])
-  templateLikes    TemplateLike[]
+  id                String             @id @default(cuid())
+  title             String
+  description       String?
+  imageUrl          String
+  fileUrl           String
+  category          String
+  language          String             @default("en")
+  type              String
+  isPremium         Boolean            @default(false)
+  tags              String?
+  downloads         Int                @default(0)
+  likes             Int                @default(0)
+  isActive          Boolean            @default(true)
+  sourceImageId     String?            @unique
+  syncedAt          DateTime           @default(now())
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  sourceImage       Image?             @relation(fields: [sourceImageId], references: [id])
   templateDownloads TemplateDownload[]
-  
+  templateLikes     TemplateLike[]
+
   @@map("mobile_templates")
 }
 
-// Mobile Videos (synced from admin videos)
 model MobileVideo {
-  id          String   @id @default(cuid())
-  title       String
-  description String?
-  videoUrl    String
-  thumbnailUrl String?
-  category    String
-  language    String   @default("en")
-  type        String   // "tutorial", "promotional", "educational"
-  duration    Int?
-  isPremium   Boolean  @default(false)
-  tags        String?  // JSON string
-  downloads   Int      @default(0)
-  likes       Int      @default(0)
-  isActive    Boolean  @default(true)
-  
-  // Sync tracking
-  sourceVideoId String? @unique
-  syncedAt     DateTime @default(now())
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  // Relations
-  sourceVideo     Video?            @relation(fields: [sourceVideoId], references: [id])
-  videoLikes      VideoLike[]
-  videoDownloads  VideoDownload[]
-  
+  id             String          @id @default(cuid())
+  title          String
+  description    String?
+  videoUrl       String
+  thumbnailUrl   String?
+  category       String
+  language       String          @default("en")
+  type           String
+  duration       Int?
+  isPremium      Boolean         @default(false)
+  tags           String?
+  downloads      Int             @default(0)
+  likes          Int             @default(0)
+  isActive       Boolean         @default(true)
+  sourceVideoId  String?         @unique
+  syncedAt       DateTime        @default(now())
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  sourceVideo    Video?          @relation(fields: [sourceVideoId], references: [id])
+  videoDownloads VideoDownload[]
+  videoLikes     VideoLike[]
+
   @@map("mobile_videos")
 }
 
-// Featured Content for Home Screen
 model FeaturedContent {
-  id          String   @id @default(cuid())
-  title       String   @unique
+  id          String    @id @default(cuid())
+  title       String    @unique
   description String?
   imageUrl    String
   videoUrl    String?
-  type        String   // "banner", "event", "template", "video"
+  type        String
   category    String?
-  priority    Int      @default(0)
-  isActive    Boolean  @default(true)
+  priority    Int       @default(0)
+  isActive    Boolean   @default(true)
   startDate   DateTime?
   endDate     DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
   @@map("featured_content")
 }
 
-// Upcoming Events
 model UpcomingEvent {
   id          String   @id @default(cuid())
   title       String   @unique
@@ -474,11 +408,10 @@ model UpcomingEvent {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
   @@map("upcoming_events")
 }
 
-// Template Categories
 model TemplateCategory {
   id          String   @id @default(cuid())
   name        String   @unique
@@ -488,48 +421,43 @@ model TemplateCategory {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
   @@map("template_categories")
 }
 
-// Template Languages
 model TemplateLanguage {
-  id          String   @id @default(cuid())
-  code        String   @unique  // "en", "hi", "mr"
-  name        String
-  nativeName  String
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  id         String   @id @default(cuid())
+  code       String   @unique
+  name       String
+  nativeName String
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
   @@map("template_languages")
 }
 
-// Greeting Templates
 model GreetingTemplate {
-  id          String   @id @default(cuid())
-  title       String
-  description String?
-  imageUrl    String
-  fileUrl     String
-  category    String
-  language    String   @default("en")
-  isPremium   Boolean  @default(false)
-  tags        String?  // JSON string
-  downloads   Int      @default(0)
-  likes       Int      @default(0)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  // Relations
-  greetingLikes    GreetingLike[]
+  id                String             @id @default(cuid())
+  title             String
+  description       String?
+  imageUrl          String
+  fileUrl           String
+  category          String
+  language          String             @default("en")
+  isPremium         Boolean            @default(false)
+  tags              String?
+  downloads         Int                @default(0)
+  likes             Int                @default(0)
+  isActive          Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
   greetingDownloads GreetingDownload[]
-  
+  greetingLikes     GreetingLike[]
+
   @@map("greeting_templates")
 }
 
-// Greeting Categories
 model GreetingCategory {
   id          String   @id @default(cuid())
   name        String   @unique
@@ -539,207 +467,181 @@ model GreetingCategory {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
   @@map("greeting_categories")
 }
 
-// Stickers
 model Sticker {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  imageUrl    String
-  category    String?
-  tags        String?  // JSON string
-  downloads   Int      @default(0)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  id        String   @id @default(cuid())
+  name      String   @unique
+  imageUrl  String
+  category  String?
+  tags      String?
+  downloads Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@map("stickers")
 }
 
-// Emojis
 model Emoji {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  unicode     String
-  imageUrl    String
-  category    String?
-  tags        String?  // JSON string
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  id        String   @id @default(cuid())
+  name      String   @unique
+  unicode   String
+  imageUrl  String
+  category  String?
+  tags      String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@map("emojis")
 }
 
-// Mobile Subscription Plans
 model MobileSubscriptionPlan {
-  id            String   @id @default(cuid())
-  name          String   @unique
+  id            String               @id @default(cuid())
+  name          String               @unique
   description   String?
   price         Float
   originalPrice Float?
-  currency      String   @default("INR")
-  period        String   // "month", "year"
-  features      String   // JSON string of features array
-  isActive      Boolean  @default(true)
-  sortOrder     Int      @default(0)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  // Relations
+  currency      String               @default("INR")
+  period        String
+  features      String
+  isActive      Boolean              @default(true)
+  sortOrder     Int                  @default(0)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
   subscriptions MobileSubscription[]
-  
+
   @@map("mobile_subscription_plans")
 }
 
-// Mobile User Subscriptions
 model MobileSubscription {
-  id            String   @id @default(cuid())
+  id            String                 @id @default(cuid())
   mobileUserId  String
   planId        String
-  status        String   @default("ACTIVE") // "ACTIVE", "INACTIVE", "CANCELLED"
+  status        String                 @default("ACTIVE")
   startDate     DateTime
   endDate       DateTime
   amount        Float
   paymentId     String?
   paymentMethod String?
-  autoRenew     Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  mobileUser MobileUser            @relation(fields: [mobileUserId], references: [id])
-  plan       MobileSubscriptionPlan @relation(fields: [planId], references: [id])
-  
+  autoRenew     Boolean                @default(true)
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+  mobileUser    MobileUser             @relation(fields: [mobileUserId], references: [id])
+  plan          MobileSubscriptionPlan @relation(fields: [planId], references: [id])
+
   @@map("mobile_subscriptions")
 }
 
-// Mobile User Activities
 model MobileActivity {
-  id           String   @id @default(cuid())
+  id           String     @id @default(cuid())
   mobileUserId String
-  action       String   // "VIEW", "LIKE", "DOWNLOAD", "SEARCH"
-  resourceType String   // "TEMPLATE", "GREETING", "CONTENT"
+  action       String
+  resourceType String
   resourceId   String?
-  metadata     String?  // JSON string
-  createdAt    DateTime @default(now())
-  
-  mobileUser MobileUser @relation(fields: [mobileUserId], references: [id])
-  
+  metadata     String?
+  createdAt    DateTime   @default(now())
+  mobileUser   MobileUser @relation(fields: [mobileUserId], references: [id])
+
   @@map("mobile_activities")
 }
 
-// Mobile Likes
 model MobileLike {
-  id           String   @id @default(cuid())
+  id           String     @id @default(cuid())
   mobileUserId String
-  resourceType String   // "TEMPLATE", "GREETING", "CONTENT"
+  resourceType String
   resourceId   String
-  createdAt    DateTime @default(now())
-  
-  mobileUser MobileUser @relation(fields: [mobileUserId], references: [id])
-  
+  createdAt    DateTime   @default(now())
+  mobileUser   MobileUser @relation(fields: [mobileUserId], references: [id])
+
   @@unique([mobileUserId, resourceType, resourceId])
   @@map("mobile_likes")
 }
 
-// Mobile Downloads
 model MobileDownload {
-  id           String   @id @default(cuid())
+  id           String     @id @default(cuid())
   mobileUserId String
-  resourceType String   // "TEMPLATE", "GREETING", "CONTENT"
+  resourceType String
   resourceId   String
   fileUrl      String
-  createdAt    DateTime @default(now())
-  
-  mobileUser MobileUser @relation(fields: [mobileUserId], references: [id])
-  
+  createdAt    DateTime   @default(now())
+  mobileUser   MobileUser @relation(fields: [mobileUserId], references: [id])
+
   @@map("mobile_downloads")
 }
 
-// Template Likes
 model TemplateLike {
-  id           String   @id @default(cuid())
+  id           String         @id @default(cuid())
   templateId   String
   mobileUserId String
-  createdAt    DateTime @default(now())
-  
-  template   MobileTemplate @relation(fields: [templateId], references: [id])
-  mobileUser MobileUser     @relation(fields: [mobileUserId], references: [id])
-  
+  createdAt    DateTime       @default(now())
+  mobileUser   MobileUser     @relation(fields: [mobileUserId], references: [id])
+  template     MobileTemplate @relation(fields: [templateId], references: [id])
+
   @@unique([templateId, mobileUserId])
   @@map("template_likes")
 }
 
-// Template Downloads
 model TemplateDownload {
-  id           String   @id @default(cuid())
+  id           String         @id @default(cuid())
   templateId   String
   mobileUserId String
-  createdAt    DateTime @default(now())
-  
-  template   MobileTemplate @relation(fields: [templateId], references: [id])
-  mobileUser MobileUser     @relation(fields: [mobileUserId], references: [id])
-  
+  createdAt    DateTime       @default(now())
+  mobileUser   MobileUser     @relation(fields: [mobileUserId], references: [id])
+  template     MobileTemplate @relation(fields: [templateId], references: [id])
+
   @@map("template_downloads")
 }
 
-// Video Likes
 model VideoLike {
-  id           String   @id @default(cuid())
+  id           String      @id @default(cuid())
   videoId      String
   mobileUserId String
-  createdAt    DateTime @default(now())
-  
-  video      MobileVideo @relation(fields: [videoId], references: [id])
-  mobileUser MobileUser  @relation(fields: [mobileUserId], references: [id])
-  
+  createdAt    DateTime    @default(now())
+  mobileUser   MobileUser  @relation(fields: [mobileUserId], references: [id])
+  video        MobileVideo @relation(fields: [videoId], references: [id])
+
   @@unique([videoId, mobileUserId])
   @@map("video_likes")
 }
 
-// Video Downloads
 model VideoDownload {
-  id           String   @id @default(cuid())
+  id           String      @id @default(cuid())
   videoId      String
   mobileUserId String
-  createdAt    DateTime @default(now())
-  
-  video      MobileVideo @relation(fields: [videoId], references: [id])
-  mobileUser MobileUser  @relation(fields: [mobileUserId], references: [id])
-  
+  createdAt    DateTime    @default(now())
+  mobileUser   MobileUser  @relation(fields: [mobileUserId], references: [id])
+  video        MobileVideo @relation(fields: [videoId], references: [id])
+
   @@map("video_downloads")
 }
 
-// Greeting Likes
 model GreetingLike {
-  id           String   @id @default(cuid())
+  id           String           @id @default(cuid())
   greetingId   String
   mobileUserId String
-  createdAt    DateTime @default(now())
-  
-  greeting   GreetingTemplate @relation(fields: [greetingId], references: [id])
-  mobileUser MobileUser       @relation(fields: [mobileUserId], references: [id])
-  
+  createdAt    DateTime         @default(now())
+  greeting     GreetingTemplate @relation(fields: [greetingId], references: [id])
+  mobileUser   MobileUser       @relation(fields: [mobileUserId], references: [id])
+
   @@unique([greetingId, mobileUserId])
   @@map("greeting_likes")
 }
 
-// Greeting Downloads
 model GreetingDownload {
-  id           String   @id @default(cuid())
+  id           String           @id @default(cuid())
   greetingId   String
   mobileUserId String
-  createdAt    DateTime @default(now())
-  
-  greeting   GreetingTemplate @relation(fields: [greetingId], references: [id])
-  mobileUser MobileUser       @relation(fields: [mobileUserId], references: [id])
-  
+  createdAt    DateTime         @default(now())
+  greeting     GreetingTemplate @relation(fields: [greetingId], references: [id])
+  mobileUser   MobileUser       @relation(fields: [mobileUserId], references: [id])
+
   @@map("greeting_downloads")
 }
 
-// Mobile Transactions
 model MobileTransaction {
   id            String   @id @default(cuid())
   mobileUserId  String
@@ -747,32 +649,15 @@ model MobileTransaction {
   orderId       String?
   amount        Float
   currency      String   @default("INR")
-  status        String   // "PENDING", "SUCCESS", "FAILED", "CANCELLED"
+  status        String
   plan          String?
   planName      String?
   description   String?
   paymentMethod String?
   paymentId     String?
-  metadata      String?  // JSON string
+  metadata      String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
-  
-  @@map("mobile_transactions")
-}
 
-// User Preferences
-model UserPreferences {
-  id                    String   @id @default(cuid())
-  userId                String   @unique
-  notificationsEnabled  Boolean  @default(true)
-  darkModeEnabled       Boolean  @default(false)
-  defaultViewMode       String   @default("grid") // "grid" or "list"
-  preferredCategories   String?  // JSON array of category names
-  language              String   @default("en")
-  autoSave              Boolean  @default(true)
-  highQualityDownloads  Boolean  @default(true)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  
-  @@map("user_preferences")
+  @@map("mobile_transactions")
 }

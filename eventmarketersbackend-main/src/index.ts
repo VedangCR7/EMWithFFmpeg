@@ -34,12 +34,13 @@ import mobileBusinessProfileRoutes from './routes/mobile/businessProfile';
 import mobileContentRoutes from './routes/mobile/content';
 import mobileUsersRoutes from './routes/mobile/users';
 import mobileTransactionsRoutes from './routes/mobile/transactions';
+import mobileDownloadsRoutes from './routes/mobile/downloads';
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = parseInt(process.env.PORT || '3001', 10);
 
 // ============================================
 // MIDDLEWARE SETUP
@@ -156,6 +157,7 @@ app.use('/api/business-profile', businessProfileRoutes);
     app.use('/api/mobile/content', mobileContentRoutes);
     app.use('/api/mobile/users', mobileUsersRoutes);
     app.use('/api/mobile/transactions', mobileTransactionsRoutes);
+    app.use('/api/mobile/downloads', mobileDownloadsRoutes);
 
 // Mobile API aliases (cleaner paths for mobile app)
 app.use('/api/v1', mobileApiAliases);
@@ -278,12 +280,13 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 // SERVER STARTUP
 // ============================================
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Business Marketing Platform API`);
   console.log(`📡 Server running on port ${PORT}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`🔗 API base URL: http://localhost:${PORT}/api`);
+  console.log(`📱 Android access: http://192.168.0.106:${PORT}/api`);
   console.log(`📁 Static files: http://localhost:${PORT}/uploads`);
   
   if (process.env.NODE_ENV === 'development') {

@@ -87,12 +87,7 @@ router.put('/:id', async (req: Request, res: Response) => {
         email,
         phone,
         fcmToken,
-        description,
-        category,
-        address,
         alternatePhone,
-        website,
-        companyLogo,
         lastActiveAt: new Date()
       }
     });
