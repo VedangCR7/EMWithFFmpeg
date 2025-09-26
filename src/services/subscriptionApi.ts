@@ -65,7 +65,7 @@ class SubscriptionApiService {
   // Get subscription plans
   async getPlans(): Promise<PlansResponse> {
     try {
-      const response = await api.get('/api/mobile/subscription/plans');
+      const response = await api.get('/api/mobile/subscriptions/plans');
       
       // Transform the response to match expected format
       const transformedData = response.data.data.plans.map((plan: any) => ({
@@ -148,7 +148,7 @@ class SubscriptionApiService {
         };
       }
 
-      const response = await api.get('/api/mobile/subscription/status');
+      const response = await api.get('/api/mobile/subscriptions/status');
       
       // Transform the response to match expected format
       const subscriptionData = response.data.data.subscription;
@@ -248,7 +248,7 @@ class SubscriptionApiService {
         };
       }
 
-      const response = await api.get('/api/mobile/subscription/history');
+      const response = await api.get('/api/mobile/subscriptions/history');
       
       // Transform the response to match expected format
       const transformedData = response.data.data.payments.map((payment: any) => ({
@@ -296,7 +296,7 @@ class SubscriptionApiService {
 
       console.log('Cancelling subscription for user:', userId);
       
-      const response = await api.post('/api/mobile/subscription/cancel');
+      const response = await api.post('/api/mobile/subscriptions/cancel');
       return response.data;
     } catch (error) {
       console.error('Cancel subscription error:', error);

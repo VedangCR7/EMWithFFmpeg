@@ -62,6 +62,19 @@ const gridColumns = isTablet ? (isLandscape ? 4 : 3) : 2;
 // Card width calculation
 const cardWidth = (screenWidth - (responsiveSpacing.md * 2) - (responsiveSpacing.sm * (gridColumns - 1))) / gridColumns;
 
+// Get responsive values function
+const getResponsiveValues = () => {
+  return {
+    responsiveSpacing,
+    responsiveFontSize,
+    cardHeight,
+    cardWidth,
+    gridColumns,
+    isTablet,
+    isLandscape
+  };
+};
+
 interface LikedItem {
   id: string;
   name: string;

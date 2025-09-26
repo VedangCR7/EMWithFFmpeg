@@ -61,11 +61,11 @@ class APITestService {
       console.log('Testing subscription endpoints...');
       
       // Test getting subscription plans
-      const plansResponse = await api.get('/api/mobile/subscription/plans');
+      const plansResponse = await api.get('/api/mobile/subscriptions/plans');
       this.testResults.subscriptionPlans = { success: true, data: plansResponse.data };
 
       // Test getting subscription status
-      const statusResponse = await api.get('/api/mobile/subscription/status');
+      const statusResponse = await api.get('/api/mobile/subscriptions/status');
       this.testResults.subscriptionStatus = { success: true, data: statusResponse.data };
 
       console.log('✅ Subscription test passed');
