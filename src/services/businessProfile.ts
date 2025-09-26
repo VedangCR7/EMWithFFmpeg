@@ -55,23 +55,35 @@ class BusinessProfileService {
   // Get user-specific business profiles
   async getUserBusinessProfiles(userId: string): Promise<BusinessProfile[]> {
     try {
-      console.log('🔍 Fetching user-specific business profiles for user:', userId);
-      console.log('🔍 API URL:', `/api/mobile/business-profile/${userId}`);
+      console.log('🎬 businessProfileService: Fetching user-specific business profiles for user:', userId);
+      console.log('🎬 businessProfileService: API URL:', `/api/mobile/business-profile/${userId}`);
       
+      // First check if backend is available with a quick health check
+      try {
+        console.log('🎬 businessProfileService: Checking backend health...');
+        await api.get('/health', { timeout: 5000 });
+        console.log('🎬 businessProfileService: ✅ Backend server is available');
+      } catch (healthError) {
+        console.log('🎬 businessProfileService: ⚠️ Backend server not available, will use mock data');
+        console.log('🎬 businessProfileService: ⚠️ Health check error:', healthError.message);
+        throw new Error('Backend server not available');
+      }
+      
+      console.log('🎬 businessProfileService: Making API call to fetch profiles...');
       const response = await api.get(`/api/mobile/business-profile/${userId}`);
       
-      console.log('🔍 API Response status:', response.status);
-      console.log('🔍 API Response data:', JSON.stringify(response.data, null, 2));
+      console.log('🎬 businessProfileService: API Response status:', response.status);
+      console.log('🎬 businessProfileService: API Response data:', JSON.stringify(response.data, null, 2));
       
       if (response.data.success) {
         const profiles = response.data.data.profiles;
         if (profiles && profiles.length > 0) {
-          console.log(`✅ Found ${profiles.length} business profiles for user`);
-          console.log('🔍 Raw profile data:', JSON.stringify(profiles, null, 2));
+          console.log(`🎬 businessProfileService: ✅ Found ${profiles.length} business profiles for user`);
+          console.log('🎬 businessProfileService: Raw profile data:', JSON.stringify(profiles, null, 2));
           
           // Convert backend profiles to frontend format
           const businessProfiles: BusinessProfile[] = profiles.map((profile: any) => {
-            console.log('🔍 Processing profile:', profile.businessName, 'Category:', profile.category);
+            console.log('🎬 businessProfileService: Processing profile:', profile.businessName, 'Category:', profile.category);
             
             return {
               id: profile.id,
@@ -110,18 +122,29 @@ class BusinessProfileService {
             };
           });
           
-          console.log('🔍 Mapped business profiles:', JSON.stringify(businessProfiles, null, 2));
+          console.log('🎬 businessProfileService: Mapped business profiles:', JSON.stringify(businessProfiles, null, 2));
           return businessProfiles;
         }
-        console.log('No user-specific business profiles found');
+        console.log('🎬 businessProfileService: No user-specific business profiles found');
         return [];
       } else {
-        console.log('API returned unsuccessful response for user profiles');
+        console.log('🎬 businessProfileService: API returned unsuccessful response for user profiles');
         return [];
       }
     } catch (error) {
-      console.error('❌ Error fetching user-specific business profiles:', error);
-      console.error('❌ Error details:', error.response?.data);
+      console.error('🎬 businessProfileService: ❌ Error fetching user-specific business profiles:', error);
+      console.error('🎬 businessProfileService: ❌ Error details:', error.response?.data);
+      
+      // If it's a network/timeout error, throw it so the calling code can handle it
+      if (error instanceof Error && (
+        error.message === 'Backend server not available' ||
+        error.message === 'TIMEOUT' ||
+        error.message === 'NETWORK_ERROR' ||
+        error.message.includes('timeout')
+      )) {
+        throw error;
+      }
+      
       return [];
     }
   }

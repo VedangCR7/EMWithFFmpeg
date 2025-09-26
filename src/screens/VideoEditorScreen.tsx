@@ -255,12 +255,16 @@ const VideoEditorScreen: React.FC<VideoEditorScreenProps> = ({ route }) => {
   // Fetch business profiles with optimized loading - now user-specific
   const fetchBusinessProfiles = async () => {
     try {
+      console.log('🎬 VideoEditorScreen: Starting to fetch business profiles...');
       // Show loading state immediately
       setLoadingProfiles(true);
       
       // Get current user ID
       const currentUser = authService.getCurrentUser();
       const userId = currentUser?.id;
+      
+      console.log('🎬 VideoEditorScreen: Current user:', currentUser);
+      console.log('🎬 VideoEditorScreen: User ID:', userId);
       
       if (!userId) {
         console.log('⚠️ No user ID available, using fallback business profiles');
@@ -281,11 +285,52 @@ const VideoEditorScreen: React.FC<VideoEditorScreenProps> = ({ route }) => {
             isVerified: true,
             createdAt: '2024-01-15T10:00:00Z',
             updatedAt: '2024-01-20T14:30:00Z',
+          },
+          {
+            id: '2',
+            name: 'Creative Design Studio',
+            description: 'Professional design and branding services',
+            category: 'Design',
+            address: '456 Creative Avenue, Design District',
+            phone: '+1 (555) 987-6543',
+            email: 'hello@creativedesign.com',
+            services: ['Logo Design', 'Brand Identity', 'Web Design'],
+            workingHours: {},
+            rating: 4.9,
+            reviewCount: 89,
+            isVerified: true,
+            createdAt: '2024-01-10T09:00:00Z',
+            updatedAt: '2024-01-18T16:45:00Z',
+          },
+          {
+            id: '3',
+            name: 'Marketing Pro Agency',
+            description: 'Full-service digital marketing solutions',
+            category: 'Marketing',
+            address: '789 Business Plaza, Downtown',
+            phone: '+1 (555) 456-7890',
+            email: 'info@marketingpro.com',
+            services: ['Digital Marketing', 'Social Media', 'SEO'],
+            workingHours: {},
+            rating: 4.7,
+            reviewCount: 203,
+            isVerified: true,
+            createdAt: '2024-01-05T14:30:00Z',
+            updatedAt: '2024-01-22T11:20:00Z',
           }
         ];
         setBusinessProfiles(mockProfiles);
-        setSelectedProfile(mockProfiles[0]);
-        applyBusinessProfileToVideo(mockProfiles[0]);
+        console.log('🎬 VideoEditorScreen: Set mock profiles:', mockProfiles.length, 'profiles');
+        
+        // Show selection modal for multiple profiles
+        if (mockProfiles.length > 1) {
+          console.log('🎬 VideoEditorScreen: Showing profile selection modal (multiple profiles)');
+          setShowProfileSelectionModal(true);
+        } else {
+          console.log('🎬 VideoEditorScreen: Auto-selecting single profile');
+          setSelectedProfile(mockProfiles[0]);
+          applyBusinessProfileToVideo(mockProfiles[0]);
+        }
         return;
       }
       
@@ -294,21 +339,24 @@ const VideoEditorScreen: React.FC<VideoEditorScreenProps> = ({ route }) => {
       // Use Promise.race to timeout quickly if API is slow
       const profilesPromise = businessProfileService.getUserBusinessProfiles(userId);
       const timeoutPromise = new Promise<BusinessProfile[]>((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout')), 3000) // 3 second timeout
+        setTimeout(() => reject(new Error('Timeout')), 8000) // 8 second timeout
       );
       
       const profiles = await Promise.race([profilesPromise, timeoutPromise]);
       
       if (profiles.length > 0) {
         setBusinessProfiles(profiles);
-        console.log('✅ Loaded user-specific business profiles:', profiles.length);
+        console.log('🎬 VideoEditorScreen: ✅ Loaded user-specific business profiles:', profiles.length);
+        console.log('🎬 VideoEditorScreen: Profile names:', profiles.map(p => p.name));
         
         if (profiles.length === 1) {
           // If only one profile, auto-select it
+          console.log('🎬 VideoEditorScreen: Auto-selecting single profile:', profiles[0].name);
           setSelectedProfile(profiles[0]);
           applyBusinessProfileToVideo(profiles[0]);
         } else if (profiles.length > 1) {
           // If multiple profiles, show selection modal
+          console.log('🎬 VideoEditorScreen: Showing profile selection modal (multiple profiles)');
           setShowProfileSelectionModal(true);
         }
       } else {
@@ -330,14 +378,64 @@ const VideoEditorScreen: React.FC<VideoEditorScreenProps> = ({ route }) => {
             isVerified: true,
             createdAt: '2024-01-15T10:00:00Z',
             updatedAt: '2024-01-20T14:30:00Z',
+          },
+          {
+            id: '2',
+            name: 'Creative Design Studio',
+            description: 'Professional design and branding services',
+            category: 'Design',
+            address: '456 Creative Avenue, Design District',
+            phone: '+1 (555) 987-6543',
+            email: 'hello@creativedesign.com',
+            services: ['Logo Design', 'Brand Identity', 'Web Design'],
+            workingHours: {},
+            rating: 4.9,
+            reviewCount: 89,
+            isVerified: true,
+            createdAt: '2024-01-10T09:00:00Z',
+            updatedAt: '2024-01-18T16:45:00Z',
+          },
+          {
+            id: '3',
+            name: 'Marketing Pro Agency',
+            description: 'Full-service digital marketing solutions',
+            category: 'Marketing',
+            address: '789 Business Plaza, Downtown',
+            phone: '+1 (555) 456-7890',
+            email: 'info@marketingpro.com',
+            services: ['Digital Marketing', 'Social Media', 'SEO'],
+            workingHours: {},
+            rating: 4.7,
+            reviewCount: 203,
+            isVerified: true,
+            createdAt: '2024-01-05T14:30:00Z',
+            updatedAt: '2024-01-22T11:20:00Z',
           }
         ];
         setBusinessProfiles(mockProfiles);
-        setSelectedProfile(mockProfiles[0]);
-        applyBusinessProfileToVideo(mockProfiles[0]);
+        console.log('🎬 VideoEditorScreen: Set fallback mock profiles:', mockProfiles.length, 'profiles');
+        
+        // Show selection modal for multiple profiles
+        if (mockProfiles.length > 1) {
+          console.log('🎬 VideoEditorScreen: Showing profile selection modal (fallback multiple profiles)');
+          setShowProfileSelectionModal(true);
+        } else {
+          console.log('🎬 VideoEditorScreen: Auto-selecting fallback single profile');
+          setSelectedProfile(mockProfiles[0]);
+          applyBusinessProfileToVideo(mockProfiles[0]);
+        }
       }
     } catch (error) {
       console.error('Error fetching user-specific business profiles:', error);
+      
+      // Check if it's a timeout or network error
+      if (error instanceof Error && (error.message === 'Timeout' || error.message === 'TIMEOUT' || error.message === 'NETWORK_ERROR' || error.message === 'Backend server not available')) {
+        console.log('⚠️ Backend server not available, using mock data');
+        console.log('⚠️ This is normal if the backend server is not running or not accessible from Android device');
+      } else {
+        console.log('⚠️ API error, using mock data:', error);
+      }
+      
       // Use mock data immediately on error
       const mockProfiles = [
         {
@@ -355,20 +453,65 @@ const VideoEditorScreen: React.FC<VideoEditorScreenProps> = ({ route }) => {
           isVerified: true,
           createdAt: '2024-01-15T10:00:00Z',
           updatedAt: '2024-01-20T14:30:00Z',
+        },
+        {
+          id: '2',
+          name: 'Creative Design Studio',
+          description: 'Professional design and branding services',
+          category: 'Design',
+          address: '456 Creative Avenue, Design District',
+          phone: '+1 (555) 987-6543',
+          email: 'hello@creativedesign.com',
+          services: ['Logo Design', 'Brand Identity', 'Web Design'],
+          workingHours: {},
+          rating: 4.9,
+          reviewCount: 89,
+          isVerified: true,
+          createdAt: '2024-01-10T09:00:00Z',
+          updatedAt: '2024-01-18T16:45:00Z',
+        },
+        {
+          id: '3',
+          name: 'Marketing Pro Agency',
+          description: 'Full-service digital marketing solutions',
+          category: 'Marketing',
+          address: '789 Business Plaza, Downtown',
+          phone: '+1 (555) 456-7890',
+          email: 'info@marketingpro.com',
+          services: ['Digital Marketing', 'Social Media', 'SEO'],
+          workingHours: {},
+          rating: 4.7,
+          reviewCount: 203,
+          isVerified: true,
+          createdAt: '2024-01-05T14:30:00Z',
+          updatedAt: '2024-01-22T11:20:00Z',
         }
       ];
       setBusinessProfiles(mockProfiles);
-      setSelectedProfile(mockProfiles[0]);
-      applyBusinessProfileToVideo(mockProfiles[0]);
+      console.log('🎬 VideoEditorScreen: Set error fallback mock profiles:', mockProfiles.length, 'profiles');
+      
+      // Show selection modal for multiple profiles
+      if (mockProfiles.length > 1) {
+        console.log('🎬 VideoEditorScreen: Showing profile selection modal (error fallback multiple profiles)');
+        setShowProfileSelectionModal(true);
+      } else {
+        console.log('🎬 VideoEditorScreen: Auto-selecting error fallback single profile');
+        setSelectedProfile(mockProfiles[0]);
+        applyBusinessProfileToVideo(mockProfiles[0]);
+      }
     } finally {
       setLoadingProfiles(false);
     }
   };
 
   useEffect(() => {
+    console.log('🎬 VideoEditorScreen: useEffect triggered, businessProfiles.length:', businessProfiles.length);
     // Only fetch profiles if we don't have any cached data
     if (businessProfiles.length === 0) {
+      console.log('🎬 VideoEditorScreen: No cached profiles, calling fetchBusinessProfiles()');
       fetchBusinessProfiles();
+    } else {
+      console.log('🎬 VideoEditorScreen: Using cached profiles, skipping fetch');
     }
   }, []);
 
