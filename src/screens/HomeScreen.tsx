@@ -2439,6 +2439,8 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
 
   const featuredCarouselRef = useRef<FlatList<FeaturedContent>>(null);
   const [featuredCarouselIndex, setFeaturedCarouselIndex] = useState(0);
+  const featuredCarouselIndexRef = useRef(0); // Ref for immediate updates
+  const scrollX = useRef(new Animated.Value(0)).current; // Animated value for scroll position
   const scrollViewRef = useRef<ScrollView>(null);
   const businessCategoriesSectionRef = useRef<View>(null);
   const autoScrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -2461,6 +2463,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
         
         setFeaturedCarouselIndex(prevIndex => {
           const nextIndex = (prevIndex + 1) % featuredContent.length;
+          featuredCarouselIndexRef.current = nextIndex;
           featuredCarouselRef.current?.scrollToIndex({
             index: nextIndex,
             animated: true,
@@ -2530,19 +2533,41 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
   }, [featuredCarouselSnapInterval]);
 
   const handleFeaturedCarouselScroll = useCallback((event: any) => {
-    const scrollOffset = event.nativeEvent.contentOffset.x;
-    // Calculate index - use Math.round for better accuracy with snap intervals
-    const calculatedIndex = scrollOffset / featuredCarouselSnapInterval;
-    const currentIndex = Math.round(calculatedIndex);
-    
-    // Update immediately if within valid range
-    // Only update if index actually changed to prevent unnecessary re-renders
-    if (currentIndex >= 0 && currentIndex < featuredContent.length) {
-      setFeaturedCarouselIndex(prevIndex => {
-        return currentIndex !== prevIndex ? currentIndex : prevIndex;
-      });
+    // Completely disable onScroll updates - onViewableItemsChanged is the single source of truth
+    // This prevents conflicts and jumping dots
+    // Only keep this handler for the Animated.Value if needed, but don't update state
+  }, []);
+
+  // Use onViewableItemsChanged as the SINGLE source of truth for dot updates
+  // This prevents conflicts and jumping dots
+  const handleViewableItemsChanged = useCallback(({ viewableItems }: any) => {
+    if (viewableItems && viewableItems.length > 0) {
+      // Sort by index and get the most forward (highest index) visible item
+      const sortedItems = viewableItems
+        .map((item: any) => ({ index: item.index, isViewable: item.isViewable }))
+        .filter((item: any) => item.index !== undefined && item.index !== null)
+        .sort((a: any, b: any) => b.index - a.index); // Sort descending (highest first)
+      
+      if (sortedItems.length > 0) {
+        // Always use the highest index (most forward item)
+        const visibleIndex = sortedItems[0].index;
+        
+        // Update immediately if index changed - no backward jump prevention needed
+        // since we're always picking the most forward item
+        if (visibleIndex !== featuredCarouselIndexRef.current) {
+          featuredCarouselIndexRef.current = visibleIndex;
+          // Update immediately - this is the ONLY update mechanism
+          setFeaturedCarouselIndex(visibleIndex);
+        }
+      }
     }
-  }, [featuredCarouselSnapInterval, featuredContent.length]);
+  }, []);
+
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 50, // 50% visible - more stable, prevents flickering
+    minimumViewTime: 0, // No minimum view time for immediate updates
+    waitForInteraction: false, // Don't wait for interaction to complete
+  }).current;
 
   const handleFeaturedCarouselMomentumScrollEnd = useCallback((event: any) => {
     const scrollOffset = event.nativeEvent.contentOffset.x;
@@ -2552,6 +2577,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
     
     // Update to final position - this should match what onScroll already set
     if (currentIndex >= 0 && currentIndex < featuredContent.length) {
+      featuredCarouselIndexRef.current = currentIndex;
       setFeaturedCarouselIndex(currentIndex);
     }
     
@@ -2566,6 +2592,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
           
           setFeaturedCarouselIndex(prevIndex => {
             const nextIndex = (prevIndex + 1) % featuredContent.length;
+            featuredCarouselIndexRef.current = nextIndex;
             featuredCarouselRef.current?.scrollToIndex({
               index: nextIndex,
               animated: true,
@@ -3097,11 +3124,11 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                 decelerationRate="fast"
                 getItemLayout={getFeaturedCarouselItemLayout}
                 onScrollToIndexFailed={handleFeaturedCarouselScrollFailure}
-                onScroll={handleFeaturedCarouselScroll}
                 onScrollBeginDrag={handleFeaturedCarouselScrollBeginDrag}
                 onScrollEndDrag={handleFeaturedCarouselScrollEndDrag}
                 onMomentumScrollEnd={handleFeaturedCarouselMomentumScrollEnd}
-                scrollEventThrottle={8}
+                onViewableItemsChanged={handleViewableItemsChanged}
+                viewabilityConfig={viewabilityConfig}
                 contentContainerStyle={styles.featuredCarouselList}
               />
               <View style={styles.featuredCarouselIndicators}>
