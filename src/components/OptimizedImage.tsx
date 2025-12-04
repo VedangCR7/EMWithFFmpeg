@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { View, ActivityIndicator, StyleSheet, ViewStyle, ImageStyle, Image, Text, Dimensions, StyleProp } from 'react-native';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
+import { View, ActivityIndicator, StyleSheet, ViewStyle, ImageStyle, Image, Text, Dimensions, StyleProp, Animated } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import ThumbnailImage from './ThumbnailImage';
 import LazyFullImage from './LazyFullImage';
@@ -191,12 +191,37 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
   // Fallback to original behavior for backward compatibility
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const shimmerAnim = useRef(new Animated.Value(0)).current;
   const targetWidth = useMemo(() => getTargetWidth(style), [style]);
   const displayUri = useMemo(() => (sanitizedUri ? ensureImageUri(sanitizedUri) : ''), [sanitizedUri]);
   const optimizedUri = useMemo(
     () => (displayUri ? applyCloudinaryTransform(displayUri, targetWidth) : ''),
     [displayUri, targetWidth],
   );
+
+  // Shimmer animation effect
+  useEffect(() => {
+    if (loading && sanitizedUri && !error) {
+      // Start shimmer animation
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(shimmerAnim, {
+            toValue: 1,
+            duration: 1200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(shimmerAnim, {
+            toValue: 0,
+            duration: 1200,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    } else {
+      // Stop animation when not loading
+      shimmerAnim.setValue(0);
+    }
+  }, [loading, sanitizedUri, error, shimmerAnim]);
 
   const handleLoadStart = () => {
     if (!sanitizedUri) {
@@ -241,8 +266,29 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
 
   const shouldShowFallback = error || !sanitizedUri;
 
+  // Shimmer opacity interpolation
+  const shimmerOpacity = shimmerAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.3, 0.7],
+  });
+
   return (
     <View style={style}>
+      {/* Show skeleton placeholder with shimmer effect while loading */}
+      {loading && sanitizedUri && !error && (
+        <View style={[StyleSheet.absoluteFill, styles.placeholderContainer]}>
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              {
+                opacity: shimmerOpacity,
+                backgroundColor: 'rgba(255, 255, 255, 0.4)',
+              },
+            ]}
+          />
+        </View>
+      )}
+      
       {shouldShowFallback ? (
         fallbackSource ? (
           <Image
@@ -277,11 +323,15 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
 };
 
 const styles = StyleSheet.create({
+  placeholderContainer: {
+    backgroundColor: 'rgba(0, 0, 0, 0.08)',
+    overflow: 'hidden',
+  },
   loaderContainer: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    backgroundColor: 'transparent',
   },
   errorContainer: {
     justifyContent: 'center',

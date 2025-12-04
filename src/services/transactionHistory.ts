@@ -1,5 +1,6 @@
 import api from './api';
 import authService from './auth';
+import cacheService from './cacheService';
 
 export type TransactionPlan = 'quarterly' | 'yearly' | 'business_profile';
 
@@ -26,92 +27,100 @@ export interface Transaction {
 }
 
 class TransactionHistoryService {
+  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache
 
-  // Get all transactions from backend API only
+  // Get all transactions from backend API (with caching)
   async getTransactions(): Promise<Transaction[]> {
-    try {
-      const currentUser = authService.getCurrentUser();
-      const userId = currentUser?.id;
-      
-      console.log('🔍 getTransactions - Current user ID:', userId);
-      
-      if (!userId) {
-        console.log('⚠️ No user ID available, cannot fetch transactions');
-        return [];
-      }
+    const currentUser = authService.getCurrentUser();
+    const userId = currentUser?.id;
+    
+    if (!userId) {
+      console.log('⚠️ No user ID available, cannot fetch transactions');
+      return [];
+    }
 
-      // Get transactions from backend API (using authenticated endpoint)
-      const endpoint = `/api/mobile/transactions`;
-      console.log('================================================================================');
-      console.log('🔵 TRANSACTION API CALL - GET ALL TRANSACTIONS');
-      console.log('================================================================================');
-      console.log('📡 Endpoint:', endpoint);
-      console.log('🔗 Full URL:', api.defaults.baseURL + endpoint);
-      console.log('📤 Request Method: GET');
-      console.log('🔑 Auth Token:', currentUser?.token ? '✅ Present (length: ' + currentUser.token.length + ')' : '❌ Missing');
-      console.log('⏰ Request Time:', new Date().toISOString());
-      console.log('--------------------------------------------------------------------------------');
-      
-      const response = await api.get(endpoint);
-      
-      console.log('📥 RESPONSE RECEIVED:');
-      console.log('📊 Status Code:', response.status);
-      console.log('📊 Status Text:', response.statusText);
-      console.log('📊 Response Headers:', JSON.stringify(response.headers, null, 2));
-      console.log('📊 Response Data (Full):', JSON.stringify(response.data, null, 2));
-      console.log('================================================================================');
-      
-      if (response.data.success) {
-        const backendTransactions = response.data.data.transactions || [];
-        console.log('📦 Backend transactions count:', backendTransactions.length);
-        console.log('📦 Backend transactions raw:', JSON.stringify(backendTransactions, null, 2));
+    const cacheKey = `transactions_user_${userId}`;
+
+    return await cacheService.getOrFetch(
+      cacheKey,
+      async () => {
+        console.log('🔍 getTransactions - Current user ID:', userId);
+
+        // Get transactions from backend API (using authenticated endpoint)
+        const endpoint = `/api/mobile/transactions`;
+        console.log('================================================================================');
+        console.log('🔵 TRANSACTION API CALL - GET ALL TRANSACTIONS');
+        console.log('================================================================================');
+        console.log('📡 Endpoint:', endpoint);
+        console.log('🔗 Full URL:', api.defaults.baseURL + endpoint);
+        console.log('📤 Request Method: GET');
+        console.log('🔑 Auth Token:', currentUser?.token ? '✅ Present (length: ' + currentUser.token.length + ')' : '❌ Missing');
+        console.log('⏰ Request Time:', new Date().toISOString());
+        console.log('--------------------------------------------------------------------------------');
         
-        // Transform backend transactions to frontend format
-        const transformedTransactions = backendTransactions.map((txn: any) => {
-          const normalizedPlanRaw = (txn.plan || txn.planId || txn.type || '').toLowerCase();
-          let plan: TransactionPlan = 'quarterly';
-          if (normalizedPlanRaw.includes('business')) {
-            plan = 'business_profile';
-          } else if (normalizedPlanRaw.includes('year')) {
-            plan = 'yearly';
-          } else {
-            plan = 'quarterly';
-          }
+        const response = await api.get(endpoint);
+        
+        console.log('📥 RESPONSE RECEIVED:');
+        console.log('📊 Status Code:', response.status);
+        console.log('📊 Status Text:', response.statusText);
+        console.log('📊 Response Headers:', JSON.stringify(response.headers, null, 2));
+        console.log('📊 Response Data (Full):', JSON.stringify(response.data, null, 2));
+        console.log('================================================================================');
+        
+        if (response.data.success) {
+          const backendTransactions = response.data.data.transactions || [];
+          console.log('📦 Backend transactions count:', backendTransactions.length);
+          console.log('📦 Backend transactions raw:', JSON.stringify(backendTransactions, null, 2));
+          
+          // Transform backend transactions to frontend format
+          const transformedTransactions = backendTransactions.map((txn: any) => {
+            const normalizedPlanRaw = (txn.plan || txn.planId || txn.type || '').toLowerCase();
+            let plan: TransactionPlan = 'quarterly';
+            if (normalizedPlanRaw.includes('business')) {
+              plan = 'business_profile';
+            } else if (normalizedPlanRaw.includes('year')) {
+              plan = 'yearly';
+            } else {
+              plan = 'quarterly';
+            }
 
-          const planName =
-            txn.planName ||
-            (plan === 'business_profile'
-              ? 'Business Profile'
-              : plan === 'yearly'
-                ? 'Yearly Pro'
-                : 'Quarterly Pro');
+            const planName =
+              txn.planName ||
+              (plan === 'business_profile'
+                ? 'Business Profile'
+                : plan === 'yearly'
+                  ? 'Yearly Pro'
+                  : 'Quarterly Pro');
 
-          const description =
-            txn.description ||
-            (plan === 'business_profile' ? 'Business Profile Payment' : `${planName} Subscription`);
-          return {
-            id: txn.id,
-            paymentId: txn.paymentId || txn.transactionId,
-            orderId: txn.orderId || txn.transactionId || 'N/A',
-            amount: txn.amount,
-            currency: txn.currency || 'INR',
-            status: txn.status.toLowerCase(),
-            plan,
-            planName,
-            timestamp: new Date(txn.createdAt).getTime(),
-            description,
-            method: 'razorpay',
-            metadata: txn.metadata ? JSON.parse(txn.metadata) : undefined,
-            type: plan === 'business_profile' ? 'business_profile' : 'subscription',
-          };
-        });
-        console.log('✅ Retrieved transactions:', transformedTransactions.length);
-        return transformedTransactions;
-      } else {
-        console.log('⚠️ Backend returned unsuccessful response:', response.data);
-        return [];
-      }
-    } catch (error: any) {
+            const description =
+              txn.description ||
+              (plan === 'business_profile' ? 'Business Profile Payment' : `${planName} Subscription`);
+            return {
+              id: txn.id,
+              paymentId: txn.paymentId || txn.transactionId,
+              orderId: txn.orderId || txn.transactionId || 'N/A',
+              amount: txn.amount,
+              currency: txn.currency || 'INR',
+              status: txn.status.toLowerCase(),
+              plan,
+              planName,
+              timestamp: new Date(txn.createdAt).getTime(),
+              description,
+              method: 'razorpay',
+              metadata: txn.metadata ? JSON.parse(txn.metadata) : undefined,
+              type: plan === 'business_profile' ? 'business_profile' : 'subscription',
+            };
+          });
+          console.log('✅ Retrieved transactions:', transformedTransactions.length);
+          return transformedTransactions;
+        } else {
+          console.log('⚠️ Backend returned unsuccessful response:', response.data);
+          return [];
+        }
+      },
+      this.CACHE_TTL,
+      true // Allow stale data
+    ).catch((error: any) => {
       console.log('================================================================================');
       console.log('🔴 TRANSACTION API ERROR - GET ALL TRANSACTIONS');
       console.log('================================================================================');
@@ -120,21 +129,9 @@ class TransactionHistoryService {
       console.error('❌ Error Status:', error.response?.status);
       console.error('❌ Error Status Text:', error.response?.statusText);
       console.error('❌ Error Response Data:', JSON.stringify(error.response?.data, null, 2));
-      console.error('❌ Full Error Object:', JSON.stringify({
-        message: error.message,
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        code: error.code,
-        config: {
-          url: error.config?.url,
-          method: error.config?.method,
-          baseURL: error.config?.baseURL
-        }
-      }, null, 2));
       console.log('================================================================================');
       return [];
-    }
+    });
   }
 
 
@@ -195,6 +192,11 @@ class TransactionHistoryService {
         };
 
         console.log('✅ Transaction recorded via API:', mappedTransaction.id);
+        // Clear cache after adding transaction
+        const currentUser = authService.getCurrentUser();
+        if (currentUser?.id) {
+          cacheService.clear(`transactions_user_${currentUser.id}`);
+        }
         return mappedTransaction;
       }
 
@@ -295,7 +297,7 @@ class TransactionHistoryService {
         };
       }
 
-      // Calculate stats from transactions list
+      // Calculate stats from transactions list (uses cached transactions)
       const transactions = await this.getTransactions();
       
       const stats = {

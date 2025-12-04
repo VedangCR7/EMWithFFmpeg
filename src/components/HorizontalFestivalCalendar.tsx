@@ -296,7 +296,11 @@ const moderateScale = (size: number, factor = 0.5) => {
   return size + (scale(size) - size) * factor;
 };
 
-const HorizontalFestivalCalendar: React.FC = () => {
+interface HorizontalFestivalCalendarProps {
+  refreshKey?: number;
+}
+
+const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({ refreshKey = 0 }) => {
   const { theme } = useTheme();
   const navigation = useNavigation<StackNavigationProp<MainStackParamList>>();
   const [selectedDate, setSelectedDate] = useState<string>('');
@@ -382,9 +386,10 @@ const HorizontalFestivalCalendar: React.FC = () => {
       resolvedPosters = mockPosters;
     }
     
-    // Fetch posters from API
+    // Fetch posters from API (force refresh if refreshKey > 0)
     try {
-      const response = await calendarApi.getPostersByDate(dateString);
+      const forceRefresh = refreshKey > 0;
+      const response = await calendarApi.getPostersByDate(dateString, forceRefresh);
       if (response.success && response.data.posters.length > 0) {
         // Convert CalendarPoster to Template format
         const templates: Template[] = response.data.posters.map((poster) => ({
@@ -405,7 +410,7 @@ const HorizontalFestivalCalendar: React.FC = () => {
     
     setSelectedDate(dateString);
     setSelectedDatePosters(resolvedPosters);
-  }, [formatDateKey]);
+  }, [formatDateKey, refreshKey]);
 
   // Check if date is today
   const isToday = useCallback((date: Date) => {
@@ -440,8 +445,9 @@ const HorizontalFestivalCalendar: React.FC = () => {
   }, [SCREEN_WIDTH, isTablet]);
 
   // Pre-load posters for upcoming dates (optional - improves performance)
+  // Also refresh when refreshKey changes (parent refresh)
   useEffect(() => {
-    const loadUpcomingPosters = async () => {
+    const loadUpcomingPosters = async (forceRefresh: boolean = false) => {
       try {
         // Pre-load posters for all upcoming dates
         const loadPromises = upcomingDates.map(async (date) => {
@@ -450,7 +456,7 @@ const HorizontalFestivalCalendar: React.FC = () => {
           const day = date.getDate();
           const dateString = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
           try {
-            await calendarApi.getPostersByDate(dateString);
+            await calendarApi.getPostersByDate(dateString, forceRefresh);
           } catch (error) {
             // Silently fail for individual dates
           }
@@ -464,8 +470,30 @@ const HorizontalFestivalCalendar: React.FC = () => {
       }
     };
     
-    loadUpcomingPosters();
-  }, [upcomingDates]);
+    // If refreshKey changed, force refresh; otherwise normal pre-load
+    const forceRefresh = refreshKey > 0;
+    loadUpcomingPosters(forceRefresh);
+    
+    // If refreshKey changed, also refresh the currently selected date
+    if (forceRefresh) {
+      if (selectedDate) {
+        // Parse the selected date string and refresh it
+        const [year, month, day] = selectedDate.split('-').map(Number);
+        const date = new Date(year, month - 1, day);
+        // Use setTimeout to ensure cache is cleared first
+        setTimeout(() => {
+          handleDateSelect(date);
+        }, 100);
+      } else {
+        // If no date is selected, select today's date to show refreshed data
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        setTimeout(() => {
+          handleDateSelect(today);
+        }, 100);
+      }
+    }
+  }, [upcomingDates, refreshKey, selectedDate, handleDateSelect]);
 
   useEffect(() => {
     if (upcomingDates.length === 0) {

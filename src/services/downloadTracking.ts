@@ -1,4 +1,5 @@
 import api from './api';
+import cacheService from './cacheService';
 
 export interface DownloadedContent {
   id: string;
@@ -31,7 +32,9 @@ export interface DownloadFilters {
 }
 
 class DownloadTrackingService {
-  // Get all downloads for a user
+  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache
+
+  // Get all downloads for a user (with caching)
   async getUserDownloads(userId: string, filters?: DownloadFilters): Promise<{
     downloads: DownloadedContent[];
     statistics: {
@@ -50,62 +53,71 @@ class DownloadTrackingService {
       totalPages: number;
     };
   }> {
-    try {
-      const params = new URLSearchParams();
-      if (filters?.type) params.append('type', filters.type);
-      if (filters?.page) params.append('page', filters.page.toString());
-      if (filters?.limit) params.append('limit', filters.limit.toString());
+    // Create cache key with filters
+    const filterKey = filters ? JSON.stringify(filters) : 'all';
+    const cacheKey = `user_downloads_${userId}_${filterKey}`;
 
-      const response = await api.get(`/api/mobile/users/${userId}/downloads?${params.toString()}`);
-      
-      if (response.data.success) {
+    return await cacheService.getOrFetch(
+      cacheKey,
+      async () => {
+        const params = new URLSearchParams();
+        if (filters?.type) params.append('type', filters.type);
+        if (filters?.page) params.append('page', filters.page.toString());
+        if (filters?.limit) params.append('limit', filters.limit.toString());
+
+        const response = await api.get(`/api/mobile/users/${userId}/downloads?${params.toString()}`);
         
-        // Map backend response to frontend format with resource fetching
-        const mappedDownloads = await Promise.all(response.data.data.downloads.map(async (download: any) => {
-          // API returns: type, downloadUrl, title, resourceId, downloadedAt
-          const downloadUrl = download.downloadUrl;
-          const resourceType = download.type; // API uses 'type' not 'resourceType'
-          const isValidDownloadUrl = downloadUrl?.startsWith('http://') || downloadUrl?.startsWith('https://');
+        if (response.data.success) {
           
-          // Use downloadUrl if valid, otherwise try to fetch from resource
-          let imageUrl = isValidDownloadUrl ? downloadUrl : null;
-          let title = download.title || this.getResourceTitle(resourceType, download.resourceId);
-          let category = download.category || this.getResourceCategory(resourceType, download.resourceId);
-          
-          // If no valid image URL, try to fetch actual resource data
-          if (!imageUrl) {
-            const resourceData = await this.fetchResourceData(resourceType, download.resourceId);
-            if (resourceData) {
-              imageUrl = resourceData.thumbnail;
-              title = resourceData.title || title;
-              category = resourceData.category || category;
+          // Map backend response to frontend format with resource fetching
+          const mappedDownloads = await Promise.all(response.data.data.downloads.map(async (download: any) => {
+            // API returns: type, downloadUrl, title, resourceId, downloadedAt
+            const downloadUrl = download.downloadUrl;
+            const resourceType = download.type; // API uses 'type' not 'resourceType'
+            const isValidDownloadUrl = downloadUrl?.startsWith('http://') || downloadUrl?.startsWith('https://');
+            
+            // Use downloadUrl if valid, otherwise try to fetch from resource
+            let imageUrl = isValidDownloadUrl ? downloadUrl : null;
+            let title = download.title || this.getResourceTitle(resourceType, download.resourceId);
+            let category = download.category || this.getResourceCategory(resourceType, download.resourceId);
+            
+            // If no valid image URL, try to fetch actual resource data
+            if (!imageUrl) {
+              const resourceData = await this.fetchResourceData(resourceType, download.resourceId);
+              if (resourceData) {
+                imageUrl = resourceData.thumbnail;
+                title = resourceData.title || title;
+                category = resourceData.category || category;
+              }
             }
-          }
-          
-          return {
-            id: download.id,
-            resourceType: resourceType,
-            resourceId: download.resourceId,
-            fileUrl: imageUrl,
-            createdAt: download.downloadedAt || download.createdAt,
-            title: title,
-            thumbnail: imageUrl,
-            category: category
-          };
-        }));
+            
+            return {
+              id: download.id,
+              resourceType: resourceType,
+              resourceId: download.resourceId,
+              fileUrl: imageUrl,
+              createdAt: download.downloadedAt || download.createdAt,
+              title: title,
+              thumbnail: imageUrl,
+              category: category
+            };
+          }));
 
-        return {
-          downloads: mappedDownloads,
-          statistics: response.data.data.statistics,
-          pagination: response.data.data.pagination
-        };
-      } else {
-        throw new Error('API returned unsuccessful response');
-      }
-    } catch (error) {
+          return {
+            downloads: mappedDownloads,
+            statistics: response.data.data.statistics,
+            pagination: response.data.data.pagination
+          };
+        } else {
+          throw new Error('API returned unsuccessful response');
+        }
+      },
+      this.CACHE_TTL,
+      true // Allow stale data
+    ).catch((error) => {
       console.log('Using mock downloads due to API error:', error);
       return this.getMockDownloads(filters);
-    }
+    });
   }
 
   // Get download statistics for a user
@@ -145,6 +157,8 @@ class DownloadTrackingService {
       
       if (response.data.success) {
         console.log('✅ [TRACK DOWNLOAD] Download tracked successfully');
+        // Clear cache after tracking download
+        cacheService.clearPattern(`user_downloads_${userId}_`);
         return true;
       } else {
         console.log('⚠️ [TRACK DOWNLOAD] API returned unsuccessful response');

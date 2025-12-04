@@ -1,6 +1,7 @@
 import api from './api';
 import eventMarketersBusinessProfileService from './eventMarketersBusinessProfileService';
 import authService from './auth';
+import cacheService from './cacheService';
 
 export interface BusinessProfile {
   id: string;
@@ -33,58 +34,110 @@ export interface CreateBusinessProfileData {
 }
 
 class BusinessProfileService {
-  private profilesCache: BusinessProfile[] | null = null;
-  private cacheTimestamp: number = 0;
-  private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
+  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache
 
-  // Get user-specific business profiles (with caching)
+  // Get user-specific business profiles (with centralized caching)
   async getUserBusinessProfiles(userId: string): Promise<BusinessProfile[]> {
-    // Check cache first
-    if (this.profilesCache && (Date.now() - this.cacheTimestamp) < this.CACHE_DURATION) {
-      console.log('✅ [CACHE] Returning cached business profiles');
-      return this.profilesCache;
-    }
+    const cacheKey = `business_profiles_user_${userId}`;
 
-    try {
-      console.log('📡 [BUSINESS PROFILES] Fetching from server...');
+    return await cacheService.getOrFetch(
+      cacheKey,
+      async () => {
+        console.log('📡 [BUSINESS PROFILES] Fetching from server...');
+        
+        // First check if backend is available with a quick health check
+        try {
+          await api.get('/health', { timeout: 5000 });
+        } catch (healthError: any) {
+          throw new Error('Backend server not available');
+        }
+        
+        const response = await api.get(`/api/mobile/business-profile/${userId}`);
+        
+        if (response.data.success) {
+          const profiles = response.data.data.profiles;
+          
+          if (profiles && profiles.length > 0) {
+            console.log('═══════════════════════════════════════════════════════════');
+            console.log('📡 BACKEND RESPONSE - RAW BUSINESS PROFILES DATA');
+            console.log('═══════════════════════════════════════════════════════════');
+            profiles.forEach((profile: any, index: number) => {
+              console.log(`\n📋 Profile ${index + 1}:`);
+              console.log(`   🆔 ID: ${profile.id}`);
+              console.log(`   🏢 Name: ${profile.name || profile.businessName}`);
+              console.log(`   📍 Address: ${profile.address || '(empty)'}`);
+              console.log(`   🌐 Website: ${profile.website || '(empty)'}`);
+              console.log(`   🏷️ Category: ${profile.category || '(empty)'}`);
+              console.log(`   📝 Description: ${profile.description || '(empty)'}`);
+              console.log(`   📱 Phone: ${profile.phone || '(empty)'}`);
+              console.log(`   📱 Alt Phone: ${profile.alternatePhone || '(empty)'}`);
+              console.log(`   📧 Email: ${profile.email || '(empty)'}`);
+              console.log(`   🖼️ Logo: ${profile.logo || '(empty)'}`);
+              console.log(`   📅 Created: ${profile.createdAt}`);
+              console.log(`   📅 Updated: ${profile.updatedAt}`);
+            });
+            console.log('\n═══════════════════════════════════════════════════════════');
+            
+            // Convert backend profiles to frontend format (optimized - no per-item logging)
+            const businessProfiles: BusinessProfile[] = profiles.map((profile: any) => ({
+              id: profile.id,
+              name: profile.name || profile.businessName,
+              description: profile.description || '',
+              category: profile.category,
+              address: profile.address || '',
+              phone: profile.phone || '',
+              alternatePhone: profile.alternatePhone || '',
+              email: profile.email || '',
+              website: profile.website || '',
+              logo: profile.logo || '',
+              companyLogo: profile.logo || '',
+              banner: '',
+              services: [],
+              createdAt: profile.createdAt,
+              updatedAt: profile.updatedAt,
+            }));
+            
+            console.log(`✅ [BUSINESS PROFILES] Fetched ${businessProfiles.length} profiles`);
+            return businessProfiles;
+          }
+          return [];
+        } else {
+          return [];
+        }
+      },
+      this.CACHE_TTL,
+      true // Allow stale data
+    ).catch((error: any) => {
+      console.error('Error fetching business profiles:', error);
       
-      // First check if backend is available with a quick health check
-      try {
-        await api.get('/health', { timeout: 5000 });
-      } catch (healthError: any) {
-        throw new Error('Backend server not available');
+      // If it's a network/timeout error, throw it so the calling code can handle it
+      if (error instanceof Error && (
+        error.message === 'Backend server not available' ||
+        error.message === 'TIMEOUT' ||
+        error.message === 'NETWORK_ERROR' ||
+        error.message.includes('timeout')
+      )) {
+        throw error;
       }
       
-      const response = await api.get(`/api/mobile/business-profile/${userId}`);
-      
-      if (response.data.success) {
-        const profiles = response.data.data.profiles;
+      return [];
+    });
+  }
+
+  // Get all business profiles with centralized caching
+  async getBusinessProfiles(): Promise<BusinessProfile[]> {
+    const cacheKey = 'business_profiles_all';
+
+    return await cacheService.getOrFetch(
+      cacheKey,
+      async () => {
+        console.log('Fetching business profiles from API...');
+        const response = await api.get('/api/mobile/business-profile');
         
-        if (profiles && profiles.length > 0) {
-          console.log('═══════════════════════════════════════════════════════════');
-          console.log('📡 BACKEND RESPONSE - RAW BUSINESS PROFILES DATA');
-          console.log('═══════════════════════════════════════════════════════════');
-          profiles.forEach((profile: any, index: number) => {
-            console.log(`\n📋 Profile ${index + 1}:`);
-            console.log(`   🆔 ID: ${profile.id}`);
-            console.log(`   🏢 Name: ${profile.name || profile.businessName}`);
-            console.log(`   📍 Address: ${profile.address || '(empty)'}`);
-            console.log(`   🌐 Website: ${profile.website || '(empty)'}`);
-            console.log(`   🏷️ Category: ${profile.category || '(empty)'}`);
-            console.log(`   📝 Description: ${profile.description || '(empty)'}`);
-            console.log(`   📱 Phone: ${profile.phone || '(empty)'}`);
-            console.log(`   📱 Alt Phone: ${profile.alternatePhone || '(empty)'}`);
-            console.log(`   📧 Email: ${profile.email || '(empty)'}`);
-            console.log(`   🖼️ Logo: ${profile.logo || '(empty)'}`);
-            console.log(`   📅 Created: ${profile.createdAt}`);
-            console.log(`   📅 Updated: ${profile.updatedAt}`);
-          });
-          console.log('\n═══════════════════════════════════════════════════════════');
-          
-          // Convert backend profiles to frontend format (optimized - no per-item logging)
-          const businessProfiles: BusinessProfile[] = profiles.map((profile: any) => ({
+        if (response.data.success) {
+          const profiles = response.data.data.profiles.map((profile: any) => ({
             id: profile.id,
-            name: profile.name || profile.businessName,
+            name: profile.businessName,
             description: profile.description || '',
             category: profile.category,
             address: profile.address || '',
@@ -99,120 +152,64 @@ class BusinessProfileService {
             createdAt: profile.createdAt,
             updatedAt: profile.updatedAt,
           }));
-          
-          // Cache the result
-          this.profilesCache = businessProfiles;
-          this.cacheTimestamp = Date.now();
-          
-          console.log(`✅ [BUSINESS PROFILES] Fetched and cached ${businessProfiles.length} profiles`);
-          return businessProfiles;
+          console.log('✅ Business profiles loaded from API:', profiles.length, 'profiles');
+          return profiles;
+        } else {
+          throw new Error('API returned unsuccessful response');
         }
-        return [];
-      } else {
-        return [];
-      }
-    } catch (error: any) {
-      console.error('Error fetching business profiles:', error);
-      
-      // If it's a network/timeout error, throw it so the calling code can handle it
-      if (error instanceof Error && (
-        error.message === 'Backend server not available' ||
-        error.message === 'TIMEOUT' ||
-        error.message === 'NETWORK_ERROR' ||
-        error.message.includes('timeout')
-      )) {
-        throw error;
-      }
-      
-      return [];
-    }
-  }
-
-  // Get all business profiles with caching
-  async getBusinessProfiles(): Promise<BusinessProfile[]> {
-    // Check if cache is valid
-    if (this.profilesCache && (Date.now() - this.cacheTimestamp) < this.CACHE_DURATION) {
-      console.log('Returning cached business profiles');
-      return this.profilesCache;
-    }
-
-    try {
-      console.log('Fetching business profiles from API...');
-      const response = await api.get('/api/mobile/business-profile');
-      
-      if (response.data.success) {
-        const profiles = response.data.data.profiles.map((profile: any) => ({
-          id: profile.id,
-          name: profile.businessName,
-          description: profile.description || '',
-          category: profile.category,
-          address: profile.address || '',
-          phone: profile.phone || '',
-          alternatePhone: profile.alternatePhone || '',
-          email: profile.email || '',
-          website: profile.website || '',
-          logo: profile.logo || '',
-          companyLogo: profile.logo || '',
-          banner: '',
-          services: [],
-          createdAt: profile.createdAt,
-          updatedAt: profile.updatedAt,
-        }));
-        this.profilesCache = profiles;
-        this.cacheTimestamp = Date.now();
-        console.log('✅ Business profiles loaded from API:', profiles.length, 'profiles');
-        return profiles;
-      } else {
-        throw new Error('API returned unsuccessful response');
-      }
-    } catch (error) {
+      },
+      this.CACHE_TTL,
+      true // Allow stale data
+    ).catch((error) => {
       console.error('❌ Error fetching business profiles from API:', error);
-      // Return cached data if available, otherwise empty array
-      if (this.profilesCache) {
-        console.log('⚠️ Using cached profiles due to API error');
-        return this.profilesCache;
-      }
       console.log('⚠️ No profiles available due to API error');
       return [];
-    }
+    });
   }
 
-  // Get single business profile
+  // Get single business profile (with caching)
   async getBusinessProfile(id: string): Promise<BusinessProfile> {
-    try {
-      console.log('Fetching business profile by ID:', id);
-      const response = await api.get(`/api/mobile/business-profile/${id}`);
-      
-      if (response.data.success) {
-        const profile = response.data.data;
-        const mappedProfile = {
-          id: profile.id,
-          name: profile.businessName,
-          description: profile.description || '',
-          category: profile.category,
-          address: profile.address || '',
-          phone: profile.phone || '',
-          alternatePhone: profile.alternatePhone || '',
-          email: profile.email || '',
-          website: profile.website || '',
-          logo: profile.logo || '',
-          companyLogo: profile.logo || '',
-          banner: '',
-          services: [],
-          createdAt: profile.createdAt,
-          updatedAt: profile.updatedAt,
-        };
-        console.log('✅ Business profile loaded from API:', mappedProfile.name);
-        return mappedProfile;
-      } else {
-        throw new Error('API returned unsuccessful response');
-      }
-    } catch (error) {
+    const cacheKey = `business_profile_${id}`;
+
+    return await cacheService.getOrFetch(
+      cacheKey,
+      async () => {
+        console.log('Fetching business profile by ID:', id);
+        const response = await api.get(`/api/mobile/business-profile/${id}`);
+        
+        if (response.data.success) {
+          const profile = response.data.data;
+          const mappedProfile = {
+            id: profile.id,
+            name: profile.businessName,
+            description: profile.description || '',
+            category: profile.category,
+            address: profile.address || '',
+            phone: profile.phone || '',
+            alternatePhone: profile.alternatePhone || '',
+            email: profile.email || '',
+            website: profile.website || '',
+            logo: profile.logo || '',
+            companyLogo: profile.logo || '',
+            banner: '',
+            services: [],
+            createdAt: profile.createdAt,
+            updatedAt: profile.updatedAt,
+          };
+          console.log('✅ Business profile loaded from API:', mappedProfile.name);
+          return mappedProfile;
+        } else {
+          throw new Error('API returned unsuccessful response');
+        }
+      },
+      this.CACHE_TTL,
+      true // Allow stale data
+    ).catch((error) => {
       console.error('❌ Error fetching business profile from API:', error);
       console.log('⚠️ No profile available due to API error');
       // Throw error instead of returning mock data
       throw new Error(`Business profile with ID ${id} not found`);
-    }
+    });
   }
 
   // Create new business profile
@@ -265,7 +262,7 @@ class BusinessProfileService {
       if (response.data.success) {
         console.log('✅ Business profile created via API:', response.data.data.id);
         // Clear cache to force refresh
-        this.clearCache();
+        this.clearCache(userId);
         
         // Map backend response to frontend format
         const backendProfile = response.data.data;
@@ -347,7 +344,10 @@ class BusinessProfileService {
       if (response.data.success) {
         console.log('✅ Business profile updated via API:', response.data.data.businessName);
         // Clear cache to force refresh
-        this.clearCache();
+        const currentUser = authService.getCurrentUser();
+        this.clearCache(currentUser?.id);
+        // Also clear the specific profile cache
+        cacheService.clear(`business_profile_${id}`);
         
         // Map backend response to frontend format
         const backendProfile = response.data.data;
@@ -402,7 +402,10 @@ class BusinessProfileService {
       if (response.data.success) {
         console.log('✅ Business profile deleted via API:', id);
         // Clear cache to force refresh
-        this.clearCache();
+        const currentUser = authService.getCurrentUser();
+        this.clearCache(currentUser?.id);
+        // Also clear the specific profile cache
+        cacheService.clear(`business_profile_${id}`);
       } else {
         throw new Error('API returned unsuccessful response');
       }
@@ -467,7 +470,10 @@ class BusinessProfileService {
           const uploadedUrl = response.data.data?.url || response.data.url;
           console.log('✅ [UPLOAD] Business profile image uploaded successfully:', uploadedUrl);
           // Clear cache to force refresh
-          this.clearCache();
+          const currentUser = authService.getCurrentUser();
+          this.clearCache(currentUser?.id);
+          // Also clear the specific profile cache
+          cacheService.clear(`business_profile_${profileId}`);
           return { url: uploadedUrl };
         } else {
           throw new Error('API returned unsuccessful response');
@@ -749,9 +755,18 @@ class BusinessProfileService {
   }
 
   // Clear cache (useful for testing or when data needs to be refreshed)
-  clearCache(): void {
-    this.profilesCache = null;
-    this.cacheTimestamp = 0;
+  clearCache(userId?: string): void {
+    if (userId) {
+      // Clear user-specific cache
+      cacheService.clear(`business_profiles_user_${userId}`);
+      // Also clear individual profile caches for this user's profiles
+      cacheService.clearPattern(`business_profile_`);
+    } else {
+      // Clear all business profile caches
+      cacheService.clearPattern('business_profiles_');
+      cacheService.clearPattern('business_profile_');
+    }
+    console.log('🗑️ [BUSINESS PROFILES] Cache cleared');
   }
 
   // Mock data method removed - using only API data

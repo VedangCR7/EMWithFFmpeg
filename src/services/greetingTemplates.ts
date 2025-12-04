@@ -129,6 +129,7 @@ class GreetingTemplatesService {
   clearCache(): void {
     cacheService.clear('greeting_categories');
     cacheService.clearPattern('greeting_templates_');
+    cacheService.clearPattern('greeting_search_'); // Clear search results cache
   }
 
   // Get all greeting categories
@@ -307,17 +308,23 @@ class GreetingTemplatesService {
     });
   }
 
-  // Search greeting templates
+  // Search greeting templates (with caching - 2 min TTL for search results)
   async searchTemplates(query: string, language?: string): Promise<GreetingTemplate[]> {
-    try {
-      const params = new URLSearchParams();
-      params.append('search', encodeURIComponent(query));
-      if (language) {
-        params.append('language', language);
-      }
-      params.append('limit', '200');
-      
-      const response = await api.get(`/api/mobile/greetings/templates?${params.toString()}`);
+    // Create cache key from query and language
+    const searchKey = `greeting_search_${query}_${language || 'all'}`;
+    const SEARCH_CACHE_TTL = 2 * 60 * 1000; // 2 minutes for search results
+
+    return await cacheService.getOrFetch(
+      searchKey,
+      async () => {
+        const params = new URLSearchParams();
+        params.append('search', encodeURIComponent(query));
+        if (language) {
+          params.append('language', language);
+        }
+        params.append('limit', '200');
+        
+        const response = await api.get(`/api/mobile/greetings/templates?${params.toString()}`);
       
       if (response.data.success) {
         // API returns images in businessCategoryImages, not templates
@@ -369,10 +376,13 @@ class GreetingTemplatesService {
       } else {
         throw new Error('API returned unsuccessful response');
       }
-    } catch (error) {
+      },
+      SEARCH_CACHE_TTL,
+      true // Allow stale data
+    ).catch((error) => {
       console.error('Error searching greeting templates:', error);
       return []; // Return empty array instead of mock data
-    }
+    });
   }
 
   // Download a template

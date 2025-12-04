@@ -1,4 +1,5 @@
 import api from './api';
+import cacheService from './cacheService';
 
 // ============================================================================
 // CALENDAR API SERVICE
@@ -47,105 +48,173 @@ export interface CalendarMonthPostersResponse {
 }
 
 class CalendarApiService {
-  private postersCache: Map<string, { data: CalendarPoster[]; timestamp: number }> = new Map();
-  private readonly CACHE_DURATION = 10 * 60 * 1000; // 10 minutes cache
+  private readonly CACHE_TTL = 2 * 60 * 1000; // 2 minutes cache (reduced from 10 minutes for faster updates)
 
   /**
-   * Get posters for a specific date
+   * Get posters for a specific date (with centralized caching)
    * @param date - Date string in format YYYY-MM-DD
+   * @param forceRefresh - If true, bypasses cache and fetches fresh data
    * @returns CalendarPostersResponse
    */
-  async getPostersByDate(date: string): Promise<CalendarPostersResponse> {
-    try {
-      const cacheKey = `date_${date}`;
-      const now = Date.now();
+  async getPostersByDate(date: string, forceRefresh: boolean = false): Promise<CalendarPostersResponse> {
+    const cacheKey = `calendar_posters_date_${date}`;
 
-      // Check cache first
-      if (this.postersCache.has(cacheKey)) {
-        const cached = this.postersCache.get(cacheKey)!;
-        const cacheAge = now - cached.timestamp;
+    // If force refresh, clear cache first and wait a bit to ensure it's cleared
+    if (forceRefresh) {
+      await cacheService.clear(cacheKey);
+      console.log(`🔄 [CALENDAR API] Force refreshing posters for date: ${date} (cache cleared)`);
+    }
 
-        if (cacheAge < this.CACHE_DURATION) {
-          console.log(`✅ [CALENDAR API] Returning ${cached.data.length} cached posters for date: ${date}`);
+    // If force refresh, bypass cache entirely and fetch directly
+    if (forceRefresh) {
+      try {
+        // Fetch directly without using cache
+        console.log(`📡 [CALENDAR API] Fetching fresh data (bypassing cache) for date: ${date}`);
+        const response = await api.get(`/api/mobile/calendar/posters/${date}`);
+        
+        console.log('═══════════════════════════════════════════════════════');
+        console.log(`📦 [CALENDAR API] COMPLETE RESPONSE FOR DATE: ${date}`);
+        console.log('═══════════════════════════════════════════════════════');
+        console.log('📋 Response Status:', response.status);
+        console.log('📋 Full Response Data:', JSON.stringify(response.data, null, 2));
+        console.log('═══════════════════════════════════════════════════════');
+
+        if (response.data.success) {
+          const posters = response.data.data?.posters || response.data.posters || [];
+          console.log(`✅ [CALENDAR API] ${posters.length} poster(s) fetched for ${date}`);
+
+          // Convert backend response to frontend format and fix URLs
+          const baseUrl = 'https://eventmarketersbackend.onrender.com';
+          const postersWithAbsoluteUrls = posters.map((poster: any) => {
+            const thumbnailUrl = poster.thumbnailUrl || poster.thumbnail || poster.imageUrl;
+            const imageUrl = poster.imageUrl || poster.thumbnailUrl || poster.thumbnail;
+
+            return {
+              id: poster.id,
+              name: poster.name || poster.title || 'Calendar Poster',
+              title: poster.title || poster.name,
+              description: poster.description || '',
+              thumbnail:
+                thumbnailUrl && !thumbnailUrl.startsWith('http')
+                  ? `${baseUrl}${thumbnailUrl}`
+                  : thumbnailUrl,
+              imageUrl:
+                imageUrl && !imageUrl.startsWith('http') ? `${baseUrl}${imageUrl}` : imageUrl,
+              category: poster.category || 'Festival',
+              downloads: poster.downloads || 0,
+              isDownloaded: poster.isDownloaded || false,
+              tags: poster.tags || [],
+              date: poster.date || date,
+              festivalName: poster.festivalName || poster.festival?.name,
+              festivalEmoji: poster.festivalEmoji || poster.festival?.emoji,
+              createdAt: poster.createdAt,
+              updatedAt: poster.updatedAt || poster.createdAt,
+            } as CalendarPoster;
+          });
+
+          // Update cache with fresh data
+          await cacheService.set(cacheKey, {
+            success: true,
+            data: {
+              posters: postersWithAbsoluteUrls,
+              date,
+              total: postersWithAbsoluteUrls.length,
+            },
+            message: 'Posters fetched successfully',
+          }, this.CACHE_TTL);
+
           return {
             success: true,
             data: {
-              posters: cached.data,
+              posters: postersWithAbsoluteUrls,
               date,
-              total: cached.data.length,
+              total: postersWithAbsoluteUrls.length,
             },
-            message: 'Posters fetched from cache',
+            message: 'Posters fetched successfully',
           };
+        } else {
+          console.log('⚠️ [CALENDAR API] Response Success = false (force refresh)');
+          console.log('⚠️ Error from API:', response.data.error || response.data.message);
+          throw new Error(response.data.error || response.data.message || 'Failed to fetch posters');
         }
+      } catch (forceRefreshError) {
+        console.error('❌ [CALENDAR API] Error during force refresh:', forceRefreshError);
+        throw forceRefreshError;
       }
+    }
 
-      console.log(`📡 [CALENDAR API] Fetching posters for date: ${date}`);
-      console.log(`📡 [CALENDAR API] Endpoint: /api/mobile/calendar/posters/${date}`);
+    // Normal cached fetch path (when forceRefresh is false)
+    try {
+      const cachedData = await cacheService.getOrFetch(
+        cacheKey,
+        async () => {
+          console.log(`📡 [CALENDAR API] Fetching posters for date: ${date}`);
+          console.log(`📡 [CALENDAR API] Endpoint: /api/mobile/calendar/posters/${date}`);
 
-      const response = await api.get(`/api/mobile/calendar/posters/${date}`);
+          const response = await api.get(`/api/mobile/calendar/posters/${date}`);
 
-      console.log('═══════════════════════════════════════════════════════');
-      console.log(`📦 [CALENDAR API] COMPLETE RESPONSE FOR DATE: ${date}`);
-      console.log('═══════════════════════════════════════════════════════');
-      console.log('📋 Response Status:', response.status);
-      console.log('📋 Full Response Data:', JSON.stringify(response.data, null, 2));
-      console.log('═══════════════════════════════════════════════════════');
+          console.log('═══════════════════════════════════════════════════════');
+          console.log(`📦 [CALENDAR API] COMPLETE RESPONSE FOR DATE: ${date}`);
+          console.log('═══════════════════════════════════════════════════════');
+          console.log('📋 Response Status:', response.status);
+          console.log('📋 Full Response Data:', JSON.stringify(response.data, null, 2));
+          console.log('═══════════════════════════════════════════════════════');
 
-      if (response.data.success) {
-        const posters = response.data.data?.posters || response.data.posters || [];
-        console.log(`✅ [CALENDAR API] ${posters.length} poster(s) fetched for ${date}`);
+          if (response.data.success) {
+            const posters = response.data.data?.posters || response.data.posters || [];
+            console.log(`✅ [CALENDAR API] ${posters.length} poster(s) fetched for ${date}`);
 
-        // Convert backend response to frontend format and fix URLs
-        const baseUrl = 'https://eventmarketersbackend.onrender.com';
-        const postersWithAbsoluteUrls = posters.map((poster: any) => {
-          const thumbnailUrl = poster.thumbnailUrl || poster.thumbnail || poster.imageUrl;
-          const imageUrl = poster.imageUrl || poster.thumbnailUrl || poster.thumbnail;
+            // Convert backend response to frontend format and fix URLs
+            const baseUrl = 'https://eventmarketersbackend.onrender.com';
+            const postersWithAbsoluteUrls = posters.map((poster: any) => {
+              const thumbnailUrl = poster.thumbnailUrl || poster.thumbnail || poster.imageUrl;
+              const imageUrl = poster.imageUrl || poster.thumbnailUrl || poster.thumbnail;
 
-          return {
-            id: poster.id,
-            name: poster.name || poster.title || 'Calendar Poster',
-            title: poster.title || poster.name,
-            description: poster.description || '',
-            thumbnail:
-              thumbnailUrl && !thumbnailUrl.startsWith('http')
-                ? `${baseUrl}${thumbnailUrl}`
-                : thumbnailUrl,
-            imageUrl:
-              imageUrl && !imageUrl.startsWith('http') ? `${baseUrl}${imageUrl}` : imageUrl,
-            category: poster.category || 'Festival',
-            downloads: poster.downloads || 0,
-            isDownloaded: poster.isDownloaded || false,
-            tags: poster.tags || [],
-            date: poster.date || date,
-            festivalName: poster.festivalName || poster.festival?.name,
-            festivalEmoji: poster.festivalEmoji || poster.festival?.emoji,
-            createdAt: poster.createdAt,
-            updatedAt: poster.updatedAt || poster.createdAt,
-          } as CalendarPoster;
-        });
+              return {
+                id: poster.id,
+                name: poster.name || poster.title || 'Calendar Poster',
+                title: poster.title || poster.name,
+                description: poster.description || '',
+                thumbnail:
+                  thumbnailUrl && !thumbnailUrl.startsWith('http')
+                    ? `${baseUrl}${thumbnailUrl}`
+                    : thumbnailUrl,
+                imageUrl:
+                  imageUrl && !imageUrl.startsWith('http') ? `${baseUrl}${imageUrl}` : imageUrl,
+                category: poster.category || 'Festival',
+                downloads: poster.downloads || 0,
+                isDownloaded: poster.isDownloaded || false,
+                tags: poster.tags || [],
+                date: poster.date || date,
+                festivalName: poster.festivalName || poster.festival?.name,
+                festivalEmoji: poster.festivalEmoji || poster.festival?.emoji,
+                createdAt: poster.createdAt,
+                updatedAt: poster.updatedAt || poster.createdAt,
+              } as CalendarPoster;
+            });
 
-        // Cache the results
-        this.postersCache.set(cacheKey, {
-          data: postersWithAbsoluteUrls,
-          timestamp: now,
-        });
+            console.log(`✅ [CALENDAR API] Cached ${postersWithAbsoluteUrls.length} poster(s) for date: ${date}`);
 
-        console.log(`✅ [CALENDAR API] Cached ${postersWithAbsoluteUrls.length} poster(s) for date: ${date}`);
+            return {
+              success: true,
+              data: {
+                posters: postersWithAbsoluteUrls,
+                date,
+                total: postersWithAbsoluteUrls.length,
+              },
+              message: 'Posters fetched successfully',
+            };
+          } else {
+            console.log('⚠️ [CALENDAR API] Response Success = false');
+            console.log('⚠️ Error from API:', response.data.error || response.data.message);
+            throw new Error(response.data.error || response.data.message || 'Failed to fetch posters');
+          }
+        },
+        this.CACHE_TTL,
+        true // Allow stale data
+      );
 
-        return {
-          success: true,
-          data: {
-            posters: postersWithAbsoluteUrls,
-            date,
-            total: postersWithAbsoluteUrls.length,
-          },
-          message: 'Posters fetched successfully',
-        };
-      } else {
-        console.log('⚠️ [CALENDAR API] Response Success = false');
-        console.log('⚠️ Error from API:', response.data.error || response.data.message);
-        throw new Error(response.data.error || response.data.message || 'Failed to fetch posters');
-      }
+      return cachedData;
     } catch (error: any) {
       console.error('❌ [CALENDAR API] Error fetching posters:', error.message);
       if (error.response) {
@@ -167,7 +236,7 @@ class CalendarApiService {
   }
 
   /**
-   * Get posters for an entire month
+   * Get posters for an entire month (with centralized caching)
    * @param year - Year (e.g., 2025)
    * @param month - Month (1-12)
    * @returns CalendarMonthPostersResponse
@@ -176,105 +245,78 @@ class CalendarApiService {
     year: number,
     month: number,
   ): Promise<CalendarMonthPostersResponse> {
+    const cacheKey = `calendar_posters_month_${year}_${month}`;
+
     try {
-      const cacheKey = `month_${year}_${month}`;
-      const now = Date.now();
+      const cachedData = await cacheService.getOrFetch(
+        cacheKey,
+        async () => {
+          console.log(`📡 [CALENDAR API] Fetching posters for month: ${year}-${month}`);
+          console.log(`📡 [CALENDAR API] Endpoint: /api/mobile/calendar/posters/month/${year}/${month}`);
 
-      // Check cache first
-      if (this.postersCache.has(cacheKey)) {
-        const cached = this.postersCache.get(cacheKey)!;
-        const cacheAge = now - cached.timestamp;
+          const response = await api.get(`/api/mobile/calendar/posters/month/${year}/${month}`);
 
-        if (cacheAge < this.CACHE_DURATION) {
-          console.log(`✅ [CALENDAR API] Returning cached posters for month: ${year}-${month}`);
-          // Convert array to date-keyed object
-          const postersByDate: { [date: string]: CalendarPoster[] } = {};
-          cached.data.forEach((poster) => {
-            if (!postersByDate[poster.date]) {
-              postersByDate[poster.date] = [];
-            }
-            postersByDate[poster.date].push(poster);
-          });
+          if (response.data.success) {
+            const posters = response.data.data?.posters || response.data.posters || [];
+            console.log(`✅ [CALENDAR API] ${posters.length} poster(s) fetched for month ${year}-${month}`);
 
-          return {
-            success: true,
-            data: {
-              posters: postersByDate,
-              month,
-              year,
-              total: cached.data.length,
-            },
-            message: 'Posters fetched from cache',
-          };
-        }
-      }
+            // Convert backend response to frontend format
+            const baseUrl = 'https://eventmarketersbackend.onrender.com';
+            const postersWithAbsoluteUrls = posters.map((poster: any) => {
+              const thumbnailUrl = poster.thumbnailUrl || poster.thumbnail || poster.imageUrl;
+              const imageUrl = poster.imageUrl || poster.thumbnailUrl || poster.thumbnail;
 
-      console.log(`📡 [CALENDAR API] Fetching posters for month: ${year}-${month}`);
-      console.log(`📡 [CALENDAR API] Endpoint: /api/mobile/calendar/posters/month/${year}/${month}`);
+              return {
+                id: poster.id,
+                name: poster.name || poster.title || 'Calendar Poster',
+                title: poster.title || poster.name,
+                description: poster.description || '',
+                thumbnail:
+                  thumbnailUrl && !thumbnailUrl.startsWith('http')
+                    ? `${baseUrl}${thumbnailUrl}`
+                    : thumbnailUrl,
+                imageUrl:
+                  imageUrl && !imageUrl.startsWith('http') ? `${baseUrl}${imageUrl}` : imageUrl,
+                category: poster.category || 'Festival',
+                downloads: poster.downloads || 0,
+                isDownloaded: poster.isDownloaded || false,
+                tags: poster.tags || [],
+                date: poster.date,
+                festivalName: poster.festivalName || poster.festival?.name,
+                festivalEmoji: poster.festivalEmoji || poster.festival?.emoji,
+                createdAt: poster.createdAt,
+                updatedAt: poster.updatedAt || poster.createdAt,
+              } as CalendarPoster;
+            });
 
-      const response = await api.get(`/api/mobile/calendar/posters/month/${year}/${month}`);
+            // Group posters by date
+            const postersByDate: { [date: string]: CalendarPoster[] } = {};
+            postersWithAbsoluteUrls.forEach((poster) => {
+              if (!postersByDate[poster.date]) {
+                postersByDate[poster.date] = [];
+              }
+              postersByDate[poster.date].push(poster);
+            });
 
-      if (response.data.success) {
-        const posters = response.data.data?.posters || response.data.posters || [];
-        console.log(`✅ [CALENDAR API] ${posters.length} poster(s) fetched for month ${year}-${month}`);
-
-        // Convert backend response to frontend format
-        const baseUrl = 'https://eventmarketersbackend.onrender.com';
-        const postersWithAbsoluteUrls = posters.map((poster: any) => {
-          const thumbnailUrl = poster.thumbnailUrl || poster.thumbnail || poster.imageUrl;
-          const imageUrl = poster.imageUrl || poster.thumbnailUrl || poster.thumbnail;
-
-          return {
-            id: poster.id,
-            name: poster.name || poster.title || 'Calendar Poster',
-            title: poster.title || poster.name,
-            description: poster.description || '',
-            thumbnail:
-              thumbnailUrl && !thumbnailUrl.startsWith('http')
-                ? `${baseUrl}${thumbnailUrl}`
-                : thumbnailUrl,
-            imageUrl:
-              imageUrl && !imageUrl.startsWith('http') ? `${baseUrl}${imageUrl}` : imageUrl,
-            category: poster.category || 'Festival',
-            downloads: poster.downloads || 0,
-            isDownloaded: poster.isDownloaded || false,
-            tags: poster.tags || [],
-            date: poster.date,
-            festivalName: poster.festivalName || poster.festival?.name,
-            festivalEmoji: poster.festivalEmoji || poster.festival?.emoji,
-            createdAt: poster.createdAt,
-            updatedAt: poster.updatedAt || poster.createdAt,
-          } as CalendarPoster;
-        });
-
-        // Group posters by date
-        const postersByDate: { [date: string]: CalendarPoster[] } = {};
-        postersWithAbsoluteUrls.forEach((poster) => {
-          if (!postersByDate[poster.date]) {
-            postersByDate[poster.date] = [];
+            return {
+              success: true,
+              data: {
+                posters: postersByDate,
+                month,
+                year,
+                total: postersWithAbsoluteUrls.length,
+              },
+              message: 'Posters fetched successfully',
+            };
+          } else {
+            throw new Error(response.data.error || response.data.message || 'Failed to fetch posters');
           }
-          postersByDate[poster.date].push(poster);
-        });
+        },
+        this.CACHE_TTL,
+        true // Allow stale data
+      );
 
-        // Cache all posters (flattened)
-        this.postersCache.set(cacheKey, {
-          data: postersWithAbsoluteUrls,
-          timestamp: now,
-        });
-
-        return {
-          success: true,
-          data: {
-            posters: postersByDate,
-            month,
-            year,
-            total: postersWithAbsoluteUrls.length,
-          },
-          message: 'Posters fetched successfully',
-        };
-      } else {
-        throw new Error(response.data.error || response.data.message || 'Failed to fetch posters');
-      }
+      return cachedData;
     } catch (error: any) {
       console.error('❌ [CALENDAR API] Error fetching month posters:', error.message);
       return {
@@ -295,10 +337,11 @@ class CalendarApiService {
    */
   clearCache(date?: string): void {
     if (date) {
-      this.postersCache.delete(`date_${date}`);
+      cacheService.clear(`calendar_posters_date_${date}`);
       console.log(`🗑️ [CALENDAR API] Cleared cache for date: ${date}`);
     } else {
-      this.postersCache.clear();
+      // Clear all calendar poster caches
+      cacheService.clearPattern('calendar_posters_');
       console.log('🗑️ [CALENDAR API] Cleared all cache');
     }
   }

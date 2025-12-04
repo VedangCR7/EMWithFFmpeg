@@ -1,5 +1,5 @@
-import React, { useMemo, useState, useEffect } from 'react';
-import { View, ActivityIndicator, StyleSheet, ViewStyle, ImageStyle, Image, Text, StyleProp } from 'react-native';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { View, ActivityIndicator, StyleSheet, ViewStyle, ImageStyle, Image, Text, StyleProp, Animated } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
@@ -53,6 +53,7 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({
   const [error, setError] = useState(false);
   const [cachedUri, setCachedUri] = useState<string | null>(null);
   const [uriVariant, setUriVariant] = useState<'optimized' | 'low' | 'original'>('optimized');
+  const shimmerAnim = useRef(new Animated.Value(0)).current;
   
   const sanitizedUri = useMemo(() => (typeof uri === 'string' ? uri.trim() : ''), [uri]);
   const storageKey = useMemo(() => {
@@ -115,6 +116,30 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({
     setError(false);
     setCachedUri(null);
   }, [sanitizedUri, optimizedThumbnailUri]);
+
+  // Shimmer animation effect
+  useEffect(() => {
+    if (loading && sanitizedUri && !error) {
+      // Start shimmer animation
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(shimmerAnim, {
+            toValue: 1,
+            duration: 1200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(shimmerAnim, {
+            toValue: 0,
+            duration: 1200,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    } else {
+      // Stop animation when not loading
+      shimmerAnim.setValue(0);
+    }
+  }, [loading, sanitizedUri, error, shimmerAnim]);
 
   const targetUri = useMemo(() => {
     if (uriVariant === 'low') {
@@ -228,8 +253,29 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({
   const displayUri = cachedUri || targetUri || sanitizedUri;
   const shouldShowFallback = error || !sanitizedUri;
 
+  // Shimmer opacity interpolation
+  const shimmerOpacity = shimmerAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.3, 0.7],
+  });
+
   return (
     <View style={style}>
+      {/* Show skeleton placeholder with shimmer effect while loading */}
+      {loading && sanitizedUri && !error && (
+        <View style={[StyleSheet.absoluteFill, styles.placeholderContainer]}>
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              {
+                opacity: shimmerOpacity,
+                backgroundColor: 'rgba(255, 255, 255, 0.4)',
+              },
+            ]}
+          />
+        </View>
+      )}
+      
       {shouldShowFallback ? (
         fallbackSource ? (
           <Image
@@ -253,6 +299,7 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({
           onError={handleError}
         />
       )}
+      {/* Optional: Show spinner only if showLoader is true (shimmer is usually enough) */}
       {loading && showLoader && !error && sanitizedUri && (
         <View style={styles.loaderContainer}>
           <ActivityIndicator size={loaderSize} color={loaderColor} />
@@ -263,11 +310,15 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({
 };
 
 const styles = StyleSheet.create({
+  placeholderContainer: {
+    backgroundColor: 'rgba(0, 0, 0, 0.08)',
+    overflow: 'hidden',
+  },
   loaderContainer: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    backgroundColor: 'transparent',
   },
   errorContainer: {
     justifyContent: 'center',

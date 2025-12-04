@@ -445,7 +445,9 @@ const GreetingTemplatesScreen: React.FC = () => {
 
   const getItemLayout = useCallback(
     (_: any, index: number) => {
-      const rowHeight = categoryCardSize + categoryCardGap;
+      // Calculate row height including card size, gap, and row margin
+      const rowMargin = categoryColumns > 1 ? moderateScale(8) : 0;
+      const rowHeight = categoryCardSize + categoryCardGap + rowMargin;
       const rowIndex = Math.floor(index / categoryColumns);
       return {
         length: rowHeight,
@@ -610,6 +612,10 @@ const GreetingTemplatesScreen: React.FC = () => {
             styles.categoriesList,
             {
               paddingBottom: Math.max(insets.bottom, moderateScale(12)),
+              // Prevent bounce-back on small screens by ensuring content fills screen when empty
+              flexGrow: filteredCategories.length === 0 ? 1 : undefined,
+              // Ensure minimum content height to prevent bounce-back
+              minHeight: filteredCategories.length > 0 ? screenHeight * 0.5 : undefined,
             },
           ]}
           showsVerticalScrollIndicator={false}
@@ -695,6 +701,7 @@ const styles = StyleSheet.create({
   },
   categoryRow: {
     marginBottom: moderateScale(8),
+    justifyContent: 'flex-start',
   },
   categoryImage: {
     width: '100%',

@@ -796,6 +796,19 @@ const HomeScreen: React.FC = React.memo(() => {
   const [greetingCategoriesLoading, setGreetingCategoriesLoading] = useState(false);
   const [greetingCategoryImages, setGreetingCategoryImages] = useState<Record<string, string>>({});
   const memoizedGreetingCategoryImages = useMemo(() => greetingCategoryImages, [greetingCategoryImages]);
+  
+  // Filter greeting categories to only show those with images
+  const filteredGreetingCategoriesList = useMemo(() => {
+    return greetingCategoriesList.filter(category => {
+      // Check if category has an image in greetingCategoryImages
+      const hasMemoizedImage = Boolean(memoizedGreetingCategoryImages[category.id]);
+      // Check if category has an inline imageUrl
+      const hasInlineImage = Boolean(category.imageUrl);
+      // Only include categories that have at least one image
+      return hasMemoizedImage || hasInlineImage;
+    });
+  }, [greetingCategoriesList, memoizedGreetingCategoryImages]);
+  
   const generalCategoryModalColumns = modalColumns;
   const {
     generalCategoryModalCardWidth,
@@ -822,12 +835,12 @@ const HomeScreen: React.FC = React.memo(() => {
 
   const generalCategoryModalInitialRenderCount = useMemo(() => {
     const defaultCount = generalCategoryModalColumns * 2;
-    const listLength = greetingCategoriesList.length;
+    const listLength = filteredGreetingCategoriesList.length;
     if (listLength === 0) {
       return defaultCount;
     }
     return Math.min(listLength, defaultCount);
-  }, [greetingCategoriesList.length, generalCategoryModalColumns]);
+  }, [filteredGreetingCategoriesList.length, generalCategoryModalColumns]);
 
   const getGeneralCategoryModalItemLayout = useCallback((_: any, index: number) => {
     const rowIndex = Math.floor(index / generalCategoryModalColumns);
@@ -877,6 +890,7 @@ const HomeScreen: React.FC = React.memo(() => {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [calendarRefreshKey, setCalendarRefreshKey] = useState(0);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
@@ -947,125 +961,139 @@ const HomeScreen: React.FC = React.memo(() => {
         }
         
         // Track success count for error handling
-        let successCount = 0;
         let totalMainRequests = 4;
         const networkErrors: string[] = [];
         
-        // Load all 4 APIs in parallel with request deduplication
-        const [featuredResponse, eventsResponse, templatesResponse, videosResponse] = await Promise.allSettled([
+        // Load all 4 APIs in parallel with progressive state updates
+        // Update UI as each API completes instead of waiting for all
+        // Reduced initial limits for faster loading - can load more on demand
+        const apiPromises = [
           requestDeduplication.deduplicate(
             RequestDeduplication.generateKey('featuredContent', { limit: 10 }),
             () => homeApi.getFeaturedContent({ limit: 10 })
-          ).catch(err => {
-          if (__DEV__) {
-          }
-          if (err?.message === 'NETWORK_ERROR' || err?.message === 'TIMEOUT') {
-            networkErrors.push('featured');
-          }
-          throw err;
-          }),
-          requestDeduplication.deduplicate(
-            RequestDeduplication.generateKey('upcomingEvents', { limit: 200 }),
-            () => homeApi.getUpcomingEvents({ limit: 200 })
-          ).catch(err => {
-            if (__DEV__) {
+          ).then(response => {
+            // Update featured content immediately when ready
+            if (response.success) {
+              React.startTransition(() => {
+                setFeaturedContent(response.data);
+                const convertedBanners: Banner[] = response.data.map(item => ({
+                  id: item.id,
+                  title: item.title,
+                  imageUrl: item.imageUrl,
+                  link: item.link,
+                }));
+                setBanners(convertedBanners);
+              });
+            } else {
+              React.startTransition(() => {
+                setFeaturedContent([]);
+                setBanners([]);
+              });
             }
+            return { type: 'featured', response, success: response.success };
+          }).catch(err => {
+            if (err?.message === 'NETWORK_ERROR' || err?.message === 'TIMEOUT') {
+              networkErrors.push('featured');
+            }
+            React.startTransition(() => {
+              setFeaturedContent([]);
+              setBanners([]);
+            });
+            return { type: 'featured', response: null, success: false };
+          }),
+          
+          requestDeduplication.deduplicate(
+            RequestDeduplication.generateKey('upcomingEvents', { limit: 50 }),
+            () => homeApi.getUpcomingEvents({ limit: 50 })
+          ).then(response => {
+            // Update events immediately when ready
+            if (response.success) {
+              React.startTransition(() => {
+                setUpcomingEvents(response.data);
+              });
+            } else {
+              React.startTransition(() => {
+                setUpcomingEvents([]);
+              });
+            }
+            return { type: 'events', response, success: response.success };
+          }).catch(err => {
             if (err?.message === 'NETWORK_ERROR' || err?.message === 'TIMEOUT') {
               networkErrors.push('events');
             }
-            throw err;
+            React.startTransition(() => {
+              setUpcomingEvents([]);
+            });
+            return { type: 'events', response: null, success: false };
           }),
+          
           requestDeduplication.deduplicate(
-            RequestDeduplication.generateKey('professionalTemplates', { limit: 200 }),
-            () => homeApi.getProfessionalTemplates({ limit: 200 })
-          ).catch(err => {
-            if (__DEV__) {
+            RequestDeduplication.generateKey('professionalTemplates', { limit: 50 }),
+            () => homeApi.getProfessionalTemplates({ limit: 50 })
+          ).then(response => {
+            // Update templates immediately when ready
+            if (response.success) {
+              React.startTransition(() => {
+                setProfessionalTemplates(response.data);
+                if (!disableBackgroundUpdates) {
+                  setTemplates(response.data);
+                }
+              });
+            } else {
+              React.startTransition(() => {
+                setProfessionalTemplates([]);
+                if (!disableBackgroundUpdates) {
+                  setTemplates([]);
+                }
+              });
             }
+            return { type: 'templates', response, success: response.success };
+          }).catch(err => {
             if (err?.message === 'NETWORK_ERROR' || err?.message === 'TIMEOUT') {
               networkErrors.push('templates');
             }
-            throw err;
+            React.startTransition(() => {
+              setProfessionalTemplates([]);
+              if (!disableBackgroundUpdates) {
+                setTemplates([]);
+              }
+            });
+            return { type: 'templates', response: null, success: false };
           }),
+          
           requestDeduplication.deduplicate(
             RequestDeduplication.generateKey('videoContent', { limit: 20 }),
             () => homeApi.getVideoContent({ limit: 20 })
-          ).catch(err => {
-          if (__DEV__) {
-          }
-          if (err?.message === 'NETWORK_ERROR' || err?.message === 'TIMEOUT') {
-            networkErrors.push('videos');
-          }
-          throw err;
-        })
-      ]);
+          ).then(response => {
+            // Update videos immediately when ready
+            if (response.success) {
+              React.startTransition(() => {
+                setVideoContent(response.data);
+              });
+            } else {
+              React.startTransition(() => {
+                setVideoContent([]);
+              });
+            }
+            return { type: 'videos', response, success: response.success };
+          }).catch(err => {
+            if (err?.message === 'NETWORK_ERROR' || err?.message === 'TIMEOUT') {
+              networkErrors.push('videos');
+            }
+            React.startTransition(() => {
+              setVideoContent([]);
+            });
+            return { type: 'videos', response: null, success: false };
+          }),
+        ];
 
-      // Handle featured content
-      if (featuredResponse.status === 'fulfilled' && featuredResponse.value.success) {
-        const featured = featuredResponse.value.data;
-        setFeaturedContent(featured);
-        successCount++;
+        // Wait for all APIs but UI updates progressively as each completes
+        const results = await Promise.allSettled(apiPromises);
         
-        // Convert featured content to banners format
-        const convertedBanners: Banner[] = featured.map(item => ({
-          id: item.id,
-          title: item.title,
-          imageUrl: item.imageUrl,
-          link: item.link,
-        }));
-        setBanners(convertedBanners);
-      } else {
-        setFeaturedContent([]);
-        setBanners([]);
-        if (__DEV__ && featuredResponse.status === 'rejected') {
-        }
-      }
-
-      // Handle upcoming festivals
-      if (eventsResponse.status === 'fulfilled' && eventsResponse.value.success) {
-        const events = eventsResponse.value.data;
-        setUpcomingEvents(events);
-        successCount++;
-      } else {
-        setUpcomingEvents([]);
-        if (__DEV__ && eventsResponse.status === 'rejected') {
-        }
-      }
-
-      // Handle business events
-      if (templatesResponse.status === 'fulfilled' && templatesResponse.value.success) {
-        const templates = templatesResponse.value.data;
-        setProfessionalTemplates(templates);
-        successCount++;
-        // Initialize templates state with professional templates if not searching
-        if (!disableBackgroundUpdates) {
-          setTemplates(templates);
-        }
-        if (__DEV__) {
-        }
-      } else {
-        if (__DEV__) {
-          if (templatesResponse.status === 'rejected') {
-          }
-        }
-        setProfessionalTemplates([]);
-        if (!disableBackgroundUpdates) {
-          setTemplates([]);
-        }
-      }
-
-      // Handle video content
-      if (videosResponse.status === 'fulfilled' && videosResponse.value.success) {
-        setVideoContent(videosResponse.value.data);
-        successCount++;
-        if (__DEV__) {
-        }
-      } else {
-        if (__DEV__) {
-          if (videosResponse.status === 'rejected') {
-          }
-        }
-        setVideoContent([]);
-      }
+        // Count successful responses from results
+        const successCount = results.filter(result => 
+          result.status === 'fulfilled' && result.value.success
+        ).length;
 
       // Only show network error if ALL main requests failed AND they were network/timeout errors
       // Don't show error if at least one request succeeded (partial success is acceptable)
@@ -1089,97 +1117,102 @@ const HomeScreen: React.FC = React.memo(() => {
         }
       }
 
-      // Load greeting sections in parallel (these are secondary, failures here won't trigger network error)
-      const [
-        motivationResponse,
-        goodMorningResponse,
-        businessEthicsResponse,
-        devotionalResponse,
-        leaderQuotesResponse,
-        atmanirbharResponse,
-        goodThoughtsResponse,
-        trendingResponse,
-        bhagvatGitaResponse,
-        booksResponse,
-        celebratesResponse
-      ] = await Promise.allSettled([
-        greetingTemplatesService.searchTemplates('motivational').catch(() => []),
-        greetingTemplatesService.searchTemplates('good morning').catch(() => []),
-        greetingTemplatesService.searchTemplates('business ethics').catch(() => []),
-        greetingTemplatesService.searchTemplates('devotional').catch(() => []),
-        greetingTemplatesService.searchTemplates('leader quotes').catch(() => []),
-        greetingTemplatesService.searchTemplates('atmanirbhar bharat').catch(() => []),
-        greetingTemplatesService.searchTemplates('good thoughts').catch(() => []),
-        greetingTemplatesService.searchTemplates('trending').catch(() => []),
-        greetingTemplatesService.searchTemplates('bhagvat gita').catch(() => []),
-        greetingTemplatesService.searchTemplates('books').catch(() => []),
-        greetingTemplatesService.searchTemplates('celebrates the moments').catch(() => [])
-      ]);
+      // Load greeting sections lazily in background (don't block main content)
+      // This allows the UI to show main content immediately while greeting sections load
+      InteractionManager.runAfterInteractions(() => {
+        Promise.allSettled([
+          greetingTemplatesService.searchTemplates('motivational').catch(() => []),
+          greetingTemplatesService.searchTemplates('good morning').catch(() => []),
+          greetingTemplatesService.searchTemplates('business ethics').catch(() => []),
+          greetingTemplatesService.searchTemplates('devotional').catch(() => []),
+          greetingTemplatesService.searchTemplates('leader quotes').catch(() => []),
+          greetingTemplatesService.searchTemplates('atmanirbhar bharat').catch(() => []),
+          greetingTemplatesService.searchTemplates('good thoughts').catch(() => []),
+          greetingTemplatesService.searchTemplates('trending').catch(() => []),
+          greetingTemplatesService.searchTemplates('bhagvat gita').catch(() => []),
+          greetingTemplatesService.searchTemplates('books').catch(() => []),
+          greetingTemplatesService.searchTemplates('celebrates the moments').catch(() => [])
+        ]).then(([
+          motivationResponse,
+          goodMorningResponse,
+          businessEthicsResponse,
+          devotionalResponse,
+          leaderQuotesResponse,
+          atmanirbharResponse,
+          goodThoughtsResponse,
+          trendingResponse,
+          bhagvatGitaResponse,
+          booksResponse,
+          celebratesResponse
+        ]) => {
+          // Handle greeting sections responses - Batch state updates for better performance
+          const greetingUpdates = {
+            motivation: motivationResponse.status === 'fulfilled' && motivationResponse.value.length > 0
+              ? { display: motivationResponse.value.slice(0, 10), raw: motivationResponse.value }
+              : { display: [], raw: [] },
+            goodMorning: goodMorningResponse.status === 'fulfilled' && goodMorningResponse.value.length > 0
+              ? { display: goodMorningResponse.value.slice(0, 10), raw: goodMorningResponse.value }
+              : { display: [], raw: [] },
+            businessEthics: businessEthicsResponse.status === 'fulfilled' && businessEthicsResponse.value.length > 0
+              ? { display: businessEthicsResponse.value.slice(0, 10), raw: businessEthicsResponse.value }
+              : { display: [], raw: [] },
+            devotional: devotionalResponse.status === 'fulfilled' && devotionalResponse.value.length > 0
+              ? { display: devotionalResponse.value.slice(0, 10), raw: devotionalResponse.value }
+              : { display: [], raw: [] },
+            leaderQuotes: leaderQuotesResponse.status === 'fulfilled' && leaderQuotesResponse.value.length > 0
+              ? { display: leaderQuotesResponse.value.slice(0, 10), raw: leaderQuotesResponse.value }
+              : { display: [], raw: [] },
+            atmanirbharBharat: atmanirbharResponse.status === 'fulfilled' && atmanirbharResponse.value.length > 0
+              ? { display: atmanirbharResponse.value.slice(0, 10), raw: atmanirbharResponse.value }
+              : { display: [], raw: [] },
+            goodThoughts: goodThoughtsResponse.status === 'fulfilled' && goodThoughtsResponse.value.length > 0
+              ? { display: goodThoughtsResponse.value.slice(0, 10), raw: goodThoughtsResponse.value }
+              : { display: [], raw: [] },
+            trending: trendingResponse.status === 'fulfilled' && trendingResponse.value.length > 0
+              ? { display: trendingResponse.value.slice(0, 10), raw: trendingResponse.value }
+              : { display: [], raw: [] },
+            bhagvatGita: bhagvatGitaResponse.status === 'fulfilled' && bhagvatGitaResponse.value.length > 0
+              ? { display: bhagvatGitaResponse.value.slice(0, 10), raw: bhagvatGitaResponse.value }
+              : { display: [], raw: [] },
+            books: booksResponse.status === 'fulfilled' && booksResponse.value.length > 0
+              ? { display: booksResponse.value.slice(0, 10), raw: booksResponse.value }
+              : { display: [], raw: [] },
+            celebratesMoments: celebratesResponse.status === 'fulfilled' && celebratesResponse.value.length > 0
+              ? { display: celebratesResponse.value.slice(0, 10), raw: celebratesResponse.value }
+              : { display: [], raw: [] },
+          };
 
-      // Handle greeting sections responses - Batch state updates for better performance
-      // React 18+ automatically batches, but we'll process all responses first then update state
-      const greetingUpdates = {
-        motivation: motivationResponse.status === 'fulfilled' && motivationResponse.value.length > 0
-          ? { display: motivationResponse.value.slice(0, 10), raw: motivationResponse.value }
-          : { display: [], raw: [] },
-        goodMorning: goodMorningResponse.status === 'fulfilled' && goodMorningResponse.value.length > 0
-          ? { display: goodMorningResponse.value.slice(0, 10), raw: goodMorningResponse.value }
-          : { display: [], raw: [] },
-        businessEthics: businessEthicsResponse.status === 'fulfilled' && businessEthicsResponse.value.length > 0
-          ? { display: businessEthicsResponse.value.slice(0, 10), raw: businessEthicsResponse.value }
-          : { display: [], raw: [] },
-        devotional: devotionalResponse.status === 'fulfilled' && devotionalResponse.value.length > 0
-          ? { display: devotionalResponse.value.slice(0, 10), raw: devotionalResponse.value }
-          : { display: [], raw: [] },
-        leaderQuotes: leaderQuotesResponse.status === 'fulfilled' && leaderQuotesResponse.value.length > 0
-          ? { display: leaderQuotesResponse.value.slice(0, 10), raw: leaderQuotesResponse.value }
-          : { display: [], raw: [] },
-        atmanirbharBharat: atmanirbharResponse.status === 'fulfilled' && atmanirbharResponse.value.length > 0
-          ? { display: atmanirbharResponse.value.slice(0, 10), raw: atmanirbharResponse.value }
-          : { display: [], raw: [] },
-        goodThoughts: goodThoughtsResponse.status === 'fulfilled' && goodThoughtsResponse.value.length > 0
-          ? { display: goodThoughtsResponse.value.slice(0, 10), raw: goodThoughtsResponse.value }
-          : { display: [], raw: [] },
-        trending: trendingResponse.status === 'fulfilled' && trendingResponse.value.length > 0
-          ? { display: trendingResponse.value.slice(0, 10), raw: trendingResponse.value }
-          : { display: [], raw: [] },
-        bhagvatGita: bhagvatGitaResponse.status === 'fulfilled' && bhagvatGitaResponse.value.length > 0
-          ? { display: bhagvatGitaResponse.value.slice(0, 10), raw: bhagvatGitaResponse.value }
-          : { display: [], raw: [] },
-        books: booksResponse.status === 'fulfilled' && booksResponse.value.length > 0
-          ? { display: booksResponse.value.slice(0, 10), raw: booksResponse.value }
-          : { display: [], raw: [] },
-        celebratesMoments: celebratesResponse.status === 'fulfilled' && celebratesResponse.value.length > 0
-          ? { display: celebratesResponse.value.slice(0, 10), raw: celebratesResponse.value }
-          : { display: [], raw: [] },
-      };
-
-      // Batch all state updates together using React.startTransition for non-urgent updates
-      // This ensures UI remains responsive during large state updates
-      React.startTransition(() => {
-        setMotivationTemplates(greetingUpdates.motivation.display);
-        setMotivationTemplatesRaw(greetingUpdates.motivation.raw);
-        setGoodMorningTemplates(greetingUpdates.goodMorning.display);
-        setGoodMorningTemplatesRaw(greetingUpdates.goodMorning.raw);
-        setBusinessEthicsTemplates(greetingUpdates.businessEthics.display);
-        setBusinessEthicsTemplatesRaw(greetingUpdates.businessEthics.raw);
-        setDevotionalTemplates(greetingUpdates.devotional.display);
-        setDevotionalTemplatesRaw(greetingUpdates.devotional.raw);
-        setLeaderQuotesTemplates(greetingUpdates.leaderQuotes.display);
-        setLeaderQuotesTemplatesRaw(greetingUpdates.leaderQuotes.raw);
-        setAtmanirbharBharatTemplates(greetingUpdates.atmanirbharBharat.display);
-        setAtmanirbharBharatTemplatesRaw(greetingUpdates.atmanirbharBharat.raw);
-        setGoodThoughtsTemplates(greetingUpdates.goodThoughts.display);
-        setGoodThoughtsTemplatesRaw(greetingUpdates.goodThoughts.raw);
-        setTrendingTemplates(greetingUpdates.trending.display);
-        setTrendingTemplatesRaw(greetingUpdates.trending.raw);
-        setBhagvatGitaTemplates(greetingUpdates.bhagvatGita.display);
-        setBhagvatGitaTemplatesRaw(greetingUpdates.bhagvatGita.raw);
-        setBooksTemplates(greetingUpdates.books.display);
-        setBooksTemplatesRaw(greetingUpdates.books.raw);
-        setCelebratesMomentsTemplates(greetingUpdates.celebratesMoments.display);
-        setCelebratesMomentsTemplatesRaw(greetingUpdates.celebratesMoments.raw);
-      });
+          // Batch all state updates together using React.startTransition for non-urgent updates
+          React.startTransition(() => {
+            setMotivationTemplates(greetingUpdates.motivation.display);
+            setMotivationTemplatesRaw(greetingUpdates.motivation.raw);
+            setGoodMorningTemplates(greetingUpdates.goodMorning.display);
+            setGoodMorningTemplatesRaw(greetingUpdates.goodMorning.raw);
+            setBusinessEthicsTemplates(greetingUpdates.businessEthics.display);
+            setBusinessEthicsTemplatesRaw(greetingUpdates.businessEthics.raw);
+            setDevotionalTemplates(greetingUpdates.devotional.display);
+            setDevotionalTemplatesRaw(greetingUpdates.devotional.raw);
+            setLeaderQuotesTemplates(greetingUpdates.leaderQuotes.display);
+            setLeaderQuotesTemplatesRaw(greetingUpdates.leaderQuotes.raw);
+            setAtmanirbharBharatTemplates(greetingUpdates.atmanirbharBharat.display);
+            setAtmanirbharBharatTemplatesRaw(greetingUpdates.atmanirbharBharat.raw);
+            setGoodThoughtsTemplates(greetingUpdates.goodThoughts.display);
+            setGoodThoughtsTemplatesRaw(greetingUpdates.goodThoughts.raw);
+            setTrendingTemplates(greetingUpdates.trending.display);
+            setTrendingTemplatesRaw(greetingUpdates.trending.raw);
+            setBhagvatGitaTemplates(greetingUpdates.bhagvatGita.display);
+            setBhagvatGitaTemplatesRaw(greetingUpdates.bhagvatGita.raw);
+            setBooksTemplates(greetingUpdates.books.display);
+            setBooksTemplatesRaw(greetingUpdates.books.raw);
+            setCelebratesMomentsTemplates(greetingUpdates.celebratesMoments.display);
+            setCelebratesMomentsTemplatesRaw(greetingUpdates.celebratesMoments.raw);
+          });
+        }).catch((error) => {
+          if (__DEV__) {
+            devError('Error loading greeting sections:', error);
+          }
+        });
+      }); // Load greeting sections after main interactions complete
 
     } catch (error) {
       // Only catch unexpected errors (like state setting errors or promise.allSettled issues)
@@ -1804,6 +1837,10 @@ const HomeScreen: React.FC = React.memo(() => {
       // Clear all caches before refreshing
       homeApi.clearCache();
       greetingTemplatesService.clearCache(); // Clear greeting templates cache
+      calendarApi.clearCache(); // Clear calendar posters cache to show newly posted images
+      
+      // Force refresh calendar component by updating refresh key
+      setCalendarRefreshKey(prev => prev + 1);
       
       // Force refresh categories to ensure deleted categories are removed
       await greetingTemplatesService.refreshCategories();
@@ -3083,7 +3120,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
 
           {/* Festivals Calendar Section */}
           {!isSearching && searchQuery.trim() === '' && (
-            <HorizontalFestivalCalendar />
+            <HorizontalFestivalCalendar key={calendarRefreshKey} />
           )}
 
           {/* Business Categories Section */}
@@ -3104,9 +3141,9 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
           )}
 
           {/* General Categories Section */}
-          {!isSearching && searchQuery.trim() === '' && greetingCategoriesList.length > 0 && (
+          {!isSearching && searchQuery.trim() === '' && filteredGreetingCategoriesList.length > 0 && (
             <GeneralCategoriesSection
-              greetingCategoriesList={greetingCategoriesList}
+              greetingCategoriesList={filteredGreetingCategoriesList}
               greetingCategoryImages={memoizedGreetingCategoryImages}
               cardWidth={cardWidth}
               theme={theme}
@@ -3884,8 +3921,8 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
               </LinearGradient>
               <View style={styles.upcomingEventsModalBody}>
                 <FlatList
-                  key={`general-categories-modal-${generalCategoryModalColumns}-${greetingCategoriesList.length}`}
-                  data={greetingCategoriesList}
+                  key={`general-categories-modal-${generalCategoryModalColumns}-${filteredGreetingCategoriesList.length}`}
+                  data={filteredGreetingCategoriesList}
                   keyExtractor={(item) => item.id}
                   numColumns={generalCategoryModalColumns}
                   columnWrapperStyle={styles.generalCategoryModalRow}
@@ -3919,7 +3956,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                         item={item}
                         cardWidth={generalCategoryModalCardWidth}
                         theme={theme}
-                        categoryImage={memoizedGreetingCategoryImages[item.id] || null}
+                        categoryImage={memoizedGreetingCategoryImages[item.id] || item.imageUrl || null}
                         onPress={(category) => {
                           closeGeneralCategoriesModal();
                           handleGreetingCategoryPress(category);
@@ -4057,7 +4094,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                     <View style={styles.customerSupportOptionIconContainer}>
                       <MaterialCommunityIcons name="whatsapp" size={moderateScale(24)} color="#009688" />
                     </View>
-                    <Text style={styles.customerSupportOptionText}>Whatsapp Us</Text>
+                    <Text style={styles.customerSupportOptionText}>WhatsApp Us</Text>
                     <Icon name="chevron-right" size={moderateScale(24)} color="#009688" />
                   </TouchableOpacity>
 

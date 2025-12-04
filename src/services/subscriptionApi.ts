@@ -1,5 +1,6 @@
 import api from './api';
 import authService from './auth';
+import cacheService from './cacheService';
 
 // Types for subscription
 export interface SubscriptionPlan {
@@ -209,6 +210,19 @@ class SubscriptionApiService {
     }
   }
 
+  // Clear subscription status cache (call after subscribe/cancel/renew)
+  clearStatusCache(userId?: string): void {
+    if (userId) {
+      cacheService.clear(`subscription_status_${userId}`);
+    } else {
+      const currentUser = authService.getCurrentUser();
+      const currentUserId = currentUser?.id;
+      if (currentUserId) {
+        cacheService.clear(`subscription_status_${currentUserId}`);
+      }
+    }
+  }
+
   // Subscribe to plan
   async subscribe(data: SubscribeRequest): Promise<SubscriptionResponse> {
     try {
@@ -231,6 +245,8 @@ class SubscriptionApiService {
         
         if (response.data.success) {
           console.log('✅ Subscription created via backend API:', response.data);
+          // Clear cache after subscription
+          this.clearStatusCache(userId);
           return response.data;
         }
       } catch (backendError: any) {
@@ -252,7 +268,7 @@ class SubscriptionApiService {
     }
   }
 
-  // Get subscription status
+  // Get subscription status (with caching - 3 min TTL)
   async getStatus(): Promise<SubscriptionResponse> {
     try {
       const currentUser = authService.getCurrentUser();
@@ -273,63 +289,74 @@ class SubscriptionApiService {
         };
       }
 
-      console.log('🔍 Fetching subscription status for user:', userId);
-      
-      // Try to get status from backend first
-      try {
-        const response = await api.get('/api/mobile/subscriptions/status');
-        
-        console.log('📊 Subscription API response:', response.data);
-        
-        // Check if response has the expected structure
-        if (response.data.success) {
-          // Transform the response to match expected format
-          const subscriptionData = response.data.data;
+      // Use cache service with user-specific key
+      const cacheKey = `subscription_status_${userId}`;
+      const CACHE_TTL = 3 * 60 * 1000; // 3 minutes
+
+      return await cacheService.getOrFetch(
+        cacheKey,
+        async () => {
+          console.log('🔍 Fetching subscription status for user:', userId);
+          
+          // Try to get status from backend first
+          try {
+            const response = await api.get('/api/mobile/subscriptions/status');
+            
+            console.log('📊 Subscription API response:', response.data);
+            
+            // Check if response has the expected structure
+            if (response.data.success) {
+              // Transform the response to match expected format
+              const subscriptionData = response.data.data;
+              
+              return {
+                success: true,
+                data: {
+                  isActive: subscriptionData.isActive || (subscriptionData.status === 'active' && subscriptionData.daysRemaining > 0),
+                  plan: subscriptionData.plan && subscriptionData.plan !== 'free' ? {
+                    id: subscriptionData.plan === 'quarterly_pro' ? 'quarterly_pro' : 'yearly_pro',
+                    name: subscriptionData.plan === 'quarterly_pro' ? 'Quarterly Pro' : 'Yearly Pro',
+                    description: 'Premium subscription',
+                    price: subscriptionData.plan === 'quarterly_pro' ? 1 : 1999,
+                    currency: 'INR',
+                    duration: subscriptionData.plan === 'quarterly_pro' ? 'quarterly' : 'yearly',
+                    features: [],
+                    isPopular: subscriptionData.plan === 'yearly_pro'
+                  } : null,
+                  planId: subscriptionData.planId || (subscriptionData.plan !== 'free' ? subscriptionData.plan : null),
+                  planName: subscriptionData.planName || (subscriptionData.plan !== 'free' ? (subscriptionData.plan === 'quarterly_pro' ? 'Quarterly Pro' : 'Yearly Pro') : null),
+                  startDate: subscriptionData.startDate,
+                  endDate: subscriptionData.endDate,
+                  expiryDate: subscriptionData.expiryDate || subscriptionData.endDate,
+                  autoRenew: subscriptionData.autoRenew || true,
+                  status: subscriptionData.status
+                },
+                message: 'Status fetched successfully'
+              };
+            }
+          } catch (backendError: any) {
+            console.log('⚠️ Backend subscription status API error:', backendError.message);
+            
+            if (backendError.response?.status !== 404) {
+              console.error('Backend subscription status error:', backendError);
+            }
+          }
           
           return {
             success: true,
             data: {
-              isActive: subscriptionData.isActive || (subscriptionData.status === 'active' && subscriptionData.daysRemaining > 0),
-              plan: subscriptionData.plan && subscriptionData.plan !== 'free' ? {
-                id: subscriptionData.plan === 'quarterly_pro' ? 'quarterly_pro' : 'yearly_pro',
-                name: subscriptionData.plan === 'quarterly_pro' ? 'Quarterly Pro' : 'Yearly Pro',
-                description: 'Premium subscription',
-                price: subscriptionData.plan === 'quarterly_pro' ? 1 : 1999,
-                currency: 'INR',
-                duration: subscriptionData.plan === 'quarterly_pro' ? 'quarterly' : 'yearly',
-                features: [],
-                isPopular: subscriptionData.plan === 'yearly_pro'
-              } : null,
-              planId: subscriptionData.planId || (subscriptionData.plan !== 'free' ? subscriptionData.plan : null),
-              planName: subscriptionData.planName || (subscriptionData.plan !== 'free' ? (subscriptionData.plan === 'quarterly_pro' ? 'Quarterly Pro' : 'Yearly Pro') : null),
-              startDate: subscriptionData.startDate,
-              endDate: subscriptionData.endDate,
-              expiryDate: subscriptionData.expiryDate || subscriptionData.endDate,
-              autoRenew: subscriptionData.autoRenew || true,
-              status: subscriptionData.status
+              isActive: false,
+              plan: null,
+              expiryDate: null,
+              autoRenew: false,
+              status: 'inactive'
             },
-            message: 'Status fetched successfully'
+            message: 'No active subscription'
           };
-        }
-      } catch (backendError: any) {
-        console.log('⚠️ Backend subscription status API error:', backendError.message);
-        
-        if (backendError.response?.status !== 404) {
-          console.error('Backend subscription status error:', backendError);
-        }
-      }
-      
-      return {
-        success: true,
-        data: {
-          isActive: false,
-          plan: null,
-          expiryDate: null,
-          autoRenew: false,
-          status: 'inactive'
         },
-        message: 'No active subscription'
-      };
+        CACHE_TTL,
+        true // Allow stale data
+      );
     } catch (error: any) {
       console.error('Get subscription status error:', error);
       
@@ -363,7 +390,7 @@ class SubscriptionApiService {
       // For now, simulate renewal
       console.log('Simulating subscription renewal');
       
-      return {
+      const result = {
         success: true,
         data: {
           isActive: true,
@@ -376,6 +403,11 @@ class SubscriptionApiService {
         },
         message: 'Subscription renewed successfully'
       };
+      
+      // Clear cache after renewal
+      this.clearStatusCache(userId);
+      
+      return result;
     } catch (error) {
       console.error('Renew subscription error:', error);
       throw error;
@@ -447,6 +479,10 @@ class SubscriptionApiService {
       console.log('Cancelling subscription for user:', userId);
       
       const response = await api.post('/api/mobile/subscriptions/cancel');
+      
+      // Clear cache after cancellation
+      this.clearStatusCache(userId);
+      
       return response.data;
     } catch (error) {
       console.error('Cancel subscription error:', error);
@@ -514,6 +550,10 @@ class SubscriptionApiService {
       const response = await api.post('/api/mobile/subscriptions/verify-payment', payload);
       
       console.log('✅ Payment verified successfully:', response.data);
+      
+      // Clear subscription status cache after payment verification
+      this.clearStatusCache(userId);
+      
       return response.data;
     } catch (error: any) {
       console.error('❌ Payment verification error:', error);
