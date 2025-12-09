@@ -238,8 +238,17 @@ const MyBusinessScreen: React.FC = () => {
     });
   };
 
-  const renderPoster = useCallback(({ item, index }: { item: BusinessCategoryPoster; index: number }) => {
-    // Calculate if this card is the last in its row
+  // Memoized PosterItem component for better performance
+  const PosterItem = React.memo<{
+    item: BusinessCategoryPoster;
+    index: number;
+    cardWidth: number;
+    cardHeight: number;
+    columns: number;
+    gap: number;
+    onPress: (item: BusinessCategoryPoster) => void;
+    theme: any;
+  }>(({ item, index, cardWidth, cardHeight, columns, gap, onPress, theme }) => {
     const isLastInRow = (index + 1) % columns === 0;
     
     return (
@@ -253,7 +262,7 @@ const MyBusinessScreen: React.FC = () => {
               borderRadius: dynamicModerateScale(10),
             }
           ]}
-          onPress={() => handlePosterPress(item)}
+          onPress={() => onPress(item)}
           activeOpacity={0.8}
         >
           <OptimizedImage 
@@ -267,7 +276,33 @@ const MyBusinessScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
     );
-  }, [theme, navigation, cardWidth, cardHeight, columns, gap, dynamicModerateScale]);
+  }, (prevProps, nextProps) => {
+    return (
+      prevProps.item.id === nextProps.item.id &&
+      prevProps.item.thumbnail === nextProps.item.thumbnail &&
+      prevProps.index === nextProps.index &&
+      prevProps.cardWidth === nextProps.cardWidth &&
+      prevProps.cardHeight === nextProps.cardHeight &&
+      prevProps.columns === nextProps.columns &&
+      prevProps.gap === nextProps.gap &&
+      prevProps.theme.colors.primary === nextProps.theme.colors.primary
+    );
+  });
+
+  const renderPoster = useCallback(({ item, index }: { item: BusinessCategoryPoster; index: number }) => {
+    return (
+      <PosterItem
+        item={item}
+        index={index}
+        cardWidth={cardWidth}
+        cardHeight={cardHeight}
+        columns={columns}
+        gap={gap}
+        onPress={handlePosterPress}
+        theme={theme}
+      />
+    );
+  }, [cardWidth, cardHeight, columns, gap, handlePosterPress, theme]);
 
   const keyExtractor = useCallback((item: BusinessCategoryPoster) => item.id, []);
 

@@ -9,7 +9,9 @@ import {
   FlatList,
   Animated,
   Easing,
+  Modal,
 } from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useTheme } from '../context/ThemeContext';
 import OptimizedImage from './OptimizedImage';
 import { Template } from '../services/dashboard';
@@ -33,6 +35,11 @@ interface FestivalDays {
 
 interface DatePosters {
   [date: string]: Template[];
+}
+
+interface PosterWithDate extends Template {
+  dateString: string;
+  date: Date;
 }
 
 // Festival data with correct dates from Google Calendar 2025
@@ -275,7 +282,7 @@ const datePosters: DatePosters = {
 };
 
 // Get screen dimensions and helper functions
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const isTablet = SCREEN_WIDTH >= 768;
 
 const getGeneralCategoryCardWidth = () => {
@@ -305,6 +312,9 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
   const navigation = useNavigation<StackNavigationProp<MainStackParamList>>();
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedDatePosters, setSelectedDatePosters] = useState<Template[]>([]);
+  const [isViewMoreModalVisible, setIsViewMoreModalVisible] = useState(false);
+  const [allPostersWithDates, setAllPostersWithDates] = useState<PosterWithDate[]>([]);
+  const [isLoadingAllPosters, setIsLoadingAllPosters] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const borderAnimation = useRef(new Animated.Value(0)).current;
 
@@ -536,6 +546,117 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
     );
   }, [generalCategoryCardWidth, handlePosterPress, selectedDate]);
 
+  // Format date as "1 Nov"
+  const formatDateShort = useCallback((date: Date) => {
+    const day = date.getDate();
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = monthNames[date.getMonth()];
+    return `${day} ${month}`;
+  }, []);
+
+  // Fetch all posters from all dates
+  const fetchAllPosters = useCallback(async () => {
+    setIsLoadingAllPosters(true);
+    try {
+      const allPosters: PosterWithDate[] = [];
+      
+      // Fetch posters for all upcoming dates
+      const fetchPromises = upcomingDates.map(async (date) => {
+        const dateString = formatDateKey(date);
+        try {
+          const response = await calendarApi.getPostersByDate(dateString, false);
+          if (response.success && response.data.posters.length > 0) {
+            const templates: PosterWithDate[] = response.data.posters.map((poster) => ({
+              id: poster.id,
+              name: poster.name || poster.title || 'Calendar Poster',
+              thumbnail: poster.thumbnail,
+              category: poster.category || 'Festival',
+              downloads: poster.downloads || 0,
+              isDownloaded: poster.isDownloaded || false,
+              tags: poster.tags || [],
+              dateString: dateString,
+              date: date,
+            }));
+            allPosters.push(...templates);
+          } else {
+            // Check mock data as fallback
+            const mockPosters = datePosters[dateString] || [];
+            if (mockPosters.length > 0) {
+              const templates: PosterWithDate[] = mockPosters.map((poster) => ({
+                ...poster,
+                dateString: dateString,
+                date: date,
+              }));
+              allPosters.push(...templates);
+            }
+          }
+        } catch (error) {
+          // Silently fail for individual dates
+          const mockPosters = datePosters[dateString] || [];
+          if (mockPosters.length > 0) {
+            const templates: PosterWithDate[] = mockPosters.map((poster) => ({
+              ...poster,
+              dateString: dateString,
+              date: date,
+            }));
+            allPosters.push(...templates);
+          }
+        }
+      });
+      
+      await Promise.allSettled(fetchPromises);
+      setAllPostersWithDates(allPosters);
+    } catch (error) {
+      console.error('❌ [CALENDAR] Error fetching all posters:', error);
+    } finally {
+      setIsLoadingAllPosters(false);
+    }
+  }, [upcomingDates, formatDateKey]);
+
+  // Handle view more button press
+  const handleViewMore = useCallback(() => {
+    fetchAllPosters();
+    setIsViewMoreModalVisible(true);
+  }, [fetchAllPosters]);
+
+  // Render poster card for modal (2 columns)
+  const renderModalPosterCard = useCallback(({ item }: { item: PosterWithDate }) => {
+    const modalWidth = SCREEN_WIDTH * 0.95;
+    const maxModalWidth = 600;
+    const actualModalWidth = Math.min(modalWidth, maxModalWidth);
+    const padding = moderateScale(24); // 12 padding on each side
+    const gap = moderateScale(8); // Gap between cards
+    const cardWidth = (actualModalWidth - padding - gap) / 2;
+    
+    return (
+      <TouchableOpacity
+        style={[
+          styles.modalPosterCard,
+          { 
+            width: cardWidth,
+            marginBottom: moderateScale(12),
+          },
+        ]}
+        onPress={() => {
+          setIsViewMoreModalVisible(false);
+          handlePosterPress(item, item.dateString);
+        }}
+        activeOpacity={0.8}
+      >
+        <OptimizedImage 
+          uri={item.thumbnail} 
+          style={styles.modalPosterImage} 
+          resizeMode="cover" 
+        />
+        <View style={styles.modalPosterDateContainer}>
+          <Text style={[styles.modalPosterDateText, { color: theme.colors.text }]}>
+            {formatDateShort(item.date)}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  }, [handlePosterPress, formatDateShort, theme]);
+
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   return (
@@ -545,6 +666,20 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
         <Text style={[styles.sectionTitle, { color: theme.colors.text, fontWeight: 'bold' }]}>
           Festivals
         </Text>
+        <TouchableOpacity
+          style={styles.viewMoreButton}
+          onPress={handleViewMore}
+          activeOpacity={0.85}
+        >
+          <LinearGradient
+            colors={[theme.colors.secondary, theme.colors.primary]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.viewMoreButtonGradient}
+          >
+            <Text style={styles.viewMoreButtonText}>View More</Text>
+          </LinearGradient>
+        </TouchableOpacity>
       </View>
 
       {/* Horizontal Scrollable Calendar */}
@@ -665,6 +800,67 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
           />
         </View>
       )}
+
+      {/* View More Modal */}
+      <Modal
+        visible={isViewMoreModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setIsViewMoreModalVisible(false)}
+        statusBarTranslucent={true}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <LinearGradient
+              colors={['#f5f5f5', '#ffffff']}
+              style={styles.modalGradient}
+            >
+              {/* Modal Header */}
+              <View style={styles.modalHeader}>
+                <View style={styles.modalTitleContainer}>
+                  <Text style={styles.modalTitle}>
+                    All Festival Posters
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.modalCloseButton}
+                  onPress={() => setIsViewMoreModalVisible(false)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.modalCloseButtonText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            </LinearGradient>
+
+            {/* Modal Content */}
+            <View style={styles.modalBody}>
+              {isLoadingAllPosters ? (
+                <View style={styles.modalLoadingContainer}>
+                  <Text style={[styles.modalLoadingText, { color: theme.colors.textSecondary }]}>
+                    Loading posters...
+                  </Text>
+                </View>
+              ) : allPostersWithDates.length > 0 ? (
+                <FlatList
+                  data={allPostersWithDates}
+                  renderItem={renderModalPosterCard}
+                  keyExtractor={(item) => `${item.id}-${item.dateString}`}
+                  numColumns={2}
+                  columnWrapperStyle={styles.modalRow}
+                  contentContainerStyle={styles.modalContent}
+                  showsVerticalScrollIndicator={false}
+                />
+              ) : (
+                <View style={styles.modalEmptyContainer}>
+                  <Text style={[styles.modalEmptyText, { color: theme.colors.textSecondary }]}>
+                    No posters available
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -675,6 +871,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: moderateScale(8),
   },
   sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: moderateScale(8),
     paddingHorizontal: moderateScale(10),
   },
@@ -775,6 +974,149 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: moderateScale(8),
+  },
+  viewMoreButton: {
+    paddingHorizontal: moderateScale(2),
+    paddingVertical: moderateScale(2),
+    borderRadius: moderateScale(8),
+    overflow: 'hidden',
+  },
+  viewMoreButtonGradient: {
+    paddingHorizontal: moderateScale(6),
+    paddingVertical: moderateScale(3),
+    borderRadius: moderateScale(6),
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: moderateScale(2),
+  },
+  viewMoreButtonText: {
+    fontSize: SCREEN_WIDTH < 360 ? moderateScale(10) : moderateScale(9),
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    width: SCREEN_WIDTH >= 768 ? SCREEN_WIDTH * 0.90 : SCREEN_WIDTH * 0.96,
+    maxWidth: SCREEN_WIDTH >= 768 ? 900 : SCREEN_WIDTH * 0.96,
+    height: SCREEN_HEIGHT * 0.85,
+    backgroundColor: '#ffffff',
+    borderRadius: moderateScale(8),
+    overflow: 'hidden',
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: moderateScale(8),
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: moderateScale(12),
+    elevation: 10,
+  },
+  modalGradient: {
+    paddingTop: moderateScale(8),
+    paddingBottom: moderateScale(4),
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: moderateScale(12),
+  },
+  modalTitleContainer: {
+    flex: 1,
+    marginRight: moderateScale(6),
+  },
+  modalTitle: {
+    fontSize: SCREEN_WIDTH >= 768 ? moderateScale(15) : moderateScale(13),
+    fontWeight: 'bold',
+    color: '#333333',
+    marginBottom: 0,
+    textShadowColor: 'rgba(255,255,255,0.5)',
+    textShadowOffset: { width: 0, height: 0.5 },
+    textShadowRadius: 2,
+  },
+  modalCloseButton: {
+    width: SCREEN_WIDTH >= 768 ? moderateScale(28) : moderateScale(26),
+    height: SCREEN_WIDTH >= 768 ? moderateScale(28) : moderateScale(26),
+    borderRadius: SCREEN_WIDTH >= 768 ? moderateScale(14) : moderateScale(13),
+    backgroundColor: 'rgba(0,0,0,0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 0.3,
+    borderColor: 'rgba(0,0,0,0.1)',
+  },
+  modalCloseButtonText: {
+    fontSize: SCREEN_WIDTH >= 768 ? moderateScale(15) : moderateScale(14),
+    color: '#333333',
+    fontWeight: 'bold',
+  },
+  modalBody: {
+    flex: 1,
+    backgroundColor: '#f8f9fa',
+  },
+  modalContent: {
+    paddingHorizontal: 0,
+    paddingTop: moderateScale(12),
+    paddingBottom: moderateScale(12),
+  },
+  modalRow: {
+    justifyContent: 'flex-start',
+    marginBottom: moderateScale(6),
+    paddingLeft: moderateScale(8),
+    paddingRight: moderateScale(8),
+  },
+  modalPosterCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: moderateScale(8),
+    overflow: 'hidden',
+    borderWidth: 0.5,
+    borderColor: 'rgba(0,0,0,0.03)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  modalPosterImage: {
+    width: '100%',
+    aspectRatio: SCREEN_WIDTH >= 768 ? 1 : 0.9,
+    borderRadius: moderateScale(8),
+  },
+  modalPosterDateContainer: {
+    paddingTop: moderateScale(8),
+    paddingBottom: moderateScale(8),
+    paddingHorizontal: moderateScale(8),
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+  },
+  modalPosterDateText: {
+    fontSize: moderateScale(11),
+    fontWeight: '500',
+    color: '#666666',
+  },
+  modalLoadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: moderateScale(40),
+  },
+  modalLoadingText: {
+    fontSize: moderateScale(14),
+  },
+  modalEmptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: moderateScale(40),
+  },
+  modalEmptyText: {
+    fontSize: moderateScale(14),
   },
 });
 

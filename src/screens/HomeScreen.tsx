@@ -563,7 +563,7 @@ const HomeScreen: React.FC = React.memo(() => {
   const navigation = useNavigation<StackNavigationProp<MainStackParamList>>();
   
   // Get current user info
-  const userProfileSectionRef = useRef<View>(null);
+  const userProfileSectionRef = useRef<TouchableOpacity>(null);
   const [userProfile, setUserProfile] = useState(() => authService.getCurrentUser());
   const [userBusinessProfiles, setUserBusinessProfiles] = useState<BusinessProfile[]>([]);
   const [businessProfilesLoadingState, setBusinessProfilesLoadingState] = useState(false);
@@ -2401,22 +2401,161 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
   // Memoized key extractors
   const keyExtractor = useCallback((item: any) => item.id, []);
 
-  // Factory function to create category-specific render functions for greeting cards
-  const createGreetingCardRenderer = useCallback((categoryTemplates: any[], searchQuery?: string, onCardPress?: (template: any) => void) => {
-    return ({ item }: { item: any }) => {
-      return (
-        <GreetingCard
-          item={item}
-          cardWidth={cardWidth}
-          theme={theme}
-          categoryTemplates={categoryTemplates}
-          searchQuery={searchQuery}
-          navigation={navigation}
-          onCardPress={onCardPress}
-        />
-      );
-    };
-  }, [navigation, theme, cardWidth]);
+  // Memoized renderItem functions for each category to prevent re-creation
+  // These are stable functions that won't change on every render
+  const renderMotivationCard = useMemo(() => {
+    const categoryTemplates = motivationTemplatesRaw.length > 0 ? motivationTemplatesRaw : motivationTemplates;
+    return ({ item }: { item: any }) => (
+      <GreetingCard
+        item={item}
+        cardWidth={cardWidth}
+        theme={theme}
+        categoryTemplates={categoryTemplates}
+        searchQuery="motivational"
+        navigation={navigation}
+      />
+    );
+  }, [navigation, theme, cardWidth, motivationTemplatesRaw, motivationTemplates]);
+
+  const renderGoodMorningCard = useMemo(() => {
+    const categoryTemplates = goodMorningTemplatesRaw.length > 0 ? goodMorningTemplatesRaw : goodMorningTemplates;
+    return ({ item }: { item: any }) => (
+      <GreetingCard
+        item={item}
+        cardWidth={cardWidth}
+        theme={theme}
+        categoryTemplates={categoryTemplates}
+        searchQuery="good morning"
+        navigation={navigation}
+      />
+    );
+  }, [navigation, theme, cardWidth, goodMorningTemplatesRaw, goodMorningTemplates]);
+
+  const renderBusinessEthicsCard = useMemo(() => {
+    const categoryTemplates = businessEthicsTemplatesRaw.length > 0 ? businessEthicsTemplatesRaw : businessEthicsTemplates;
+    return ({ item }: { item: any }) => (
+      <GreetingCard
+        item={item}
+        cardWidth={cardWidth}
+        theme={theme}
+        categoryTemplates={categoryTemplates}
+        searchQuery="business ethics"
+        navigation={navigation}
+      />
+    );
+  }, [navigation, theme, cardWidth, businessEthicsTemplatesRaw, businessEthicsTemplates]);
+
+  const renderDevotionalCard = useMemo(() => {
+    const categoryTemplates = devotionalTemplatesRaw.length > 0 ? devotionalTemplatesRaw : devotionalTemplates;
+    return ({ item }: { item: any }) => (
+      <GreetingCard
+        item={item}
+        cardWidth={cardWidth}
+        theme={theme}
+        categoryTemplates={categoryTemplates}
+        searchQuery="devotional"
+        navigation={navigation}
+      />
+    );
+  }, [navigation, theme, cardWidth, devotionalTemplatesRaw, devotionalTemplates]);
+
+  const renderLeaderQuotesCard = useMemo(() => {
+    const categoryTemplates = leaderQuotesTemplatesRaw.length > 0 ? leaderQuotesTemplatesRaw : leaderQuotesTemplates;
+    return ({ item }: { item: any }) => (
+      <GreetingCard
+        item={item}
+        cardWidth={cardWidth}
+        theme={theme}
+        categoryTemplates={categoryTemplates}
+        searchQuery="leader quotes"
+        navigation={navigation}
+      />
+    );
+  }, [navigation, theme, cardWidth, leaderQuotesTemplatesRaw, leaderQuotesTemplates]);
+
+  const renderAtmanirbharBharatCard = useMemo(() => {
+    const categoryTemplates = atmanirbharBharatTemplatesRaw.length > 0 ? atmanirbharBharatTemplatesRaw : atmanirbharBharatTemplates;
+    return ({ item }: { item: any }) => (
+      <GreetingCard
+        item={item}
+        cardWidth={cardWidth}
+        theme={theme}
+        categoryTemplates={categoryTemplates}
+        searchQuery="atmanirbhar bharat"
+        navigation={navigation}
+      />
+    );
+  }, [navigation, theme, cardWidth, atmanirbharBharatTemplatesRaw, atmanirbharBharatTemplates]);
+
+  const renderGoodThoughtsCard = useMemo(() => {
+    const categoryTemplates = goodThoughtsTemplatesRaw.length > 0 ? goodThoughtsTemplatesRaw : goodThoughtsTemplates;
+    return ({ item }: { item: any }) => (
+      <GreetingCard
+        item={item}
+        cardWidth={cardWidth}
+        theme={theme}
+        categoryTemplates={categoryTemplates}
+        searchQuery="good thoughts"
+        navigation={navigation}
+      />
+    );
+  }, [navigation, theme, cardWidth, goodThoughtsTemplatesRaw, goodThoughtsTemplates]);
+
+  const renderTrendingCard = useMemo(() => {
+    const categoryTemplates = trendingTemplatesRaw.length > 0 ? trendingTemplatesRaw : trendingTemplates;
+    return ({ item }: { item: any }) => (
+      <GreetingCard
+        item={item}
+        cardWidth={cardWidth}
+        theme={theme}
+        categoryTemplates={categoryTemplates}
+        searchQuery="trending"
+        navigation={navigation}
+      />
+    );
+  }, [navigation, theme, cardWidth, trendingTemplatesRaw, trendingTemplates]);
+
+  const renderBhagvatGitaCard = useMemo(() => {
+    const categoryTemplates = bhagvatGitaTemplatesRaw.length > 0 ? bhagvatGitaTemplatesRaw : bhagvatGitaTemplates;
+    return ({ item }: { item: any }) => (
+      <GreetingCard
+        item={item}
+        cardWidth={cardWidth}
+        theme={theme}
+        categoryTemplates={categoryTemplates}
+        searchQuery="bhagvat gita"
+        navigation={navigation}
+      />
+    );
+  }, [navigation, theme, cardWidth, bhagvatGitaTemplatesRaw, bhagvatGitaTemplates]);
+
+  const renderBooksCard = useMemo(() => {
+    const categoryTemplates = booksTemplatesRaw.length > 0 ? booksTemplatesRaw : booksTemplates;
+    return ({ item }: { item: any }) => (
+      <GreetingCard
+        item={item}
+        cardWidth={cardWidth}
+        theme={theme}
+        categoryTemplates={categoryTemplates}
+        searchQuery="books"
+        navigation={navigation}
+      />
+    );
+  }, [navigation, theme, cardWidth, booksTemplatesRaw, booksTemplates]);
+
+  const renderCelebratesMomentsCard = useMemo(() => {
+    const categoryTemplates = celebratesMomentsTemplatesRaw.length > 0 ? celebratesMomentsTemplatesRaw : celebratesMomentsTemplates;
+    return ({ item }: { item: any }) => (
+      <GreetingCard
+        item={item}
+        cardWidth={cardWidth}
+        theme={theme}
+        categoryTemplates={categoryTemplates}
+        searchQuery="celebrates the moments"
+        navigation={navigation}
+      />
+    );
+  }, [navigation, theme, cardWidth, celebratesMomentsTemplatesRaw, celebratesMomentsTemplates]);
 
 
 
@@ -2888,13 +3027,15 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
         <View style={styles.header}>
           <View style={styles.headerTop}>
             {/* User Profile Info */}
-            <TouchableOpacity 
+            <View 
               style={styles.userProfileSection}
-              activeOpacity={0.7}
-              onPress={toggleBusinessProfileDropdown}
-              ref={userProfileSectionRef}
             >
-              <View style={styles.userAvatarContainer}>
+              <TouchableOpacity 
+                style={styles.userAvatarContainer}
+                onPress={toggleBusinessProfileDropdown}
+                ref={userProfileSectionRef}
+                activeOpacity={0.7}
+              >
                 <View style={[styles.userAvatar, { backgroundColor: theme.colors.primary }]}>
                   {userAvatarUri ? (
                     <OptimizedImage
@@ -2907,10 +3048,13 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                     <Text style={styles.userAvatarText}>{userInitials}</Text>
                   )}
                 </View>
-              </View>
+              </TouchableOpacity>
               <View style={styles.userInfoContainer}>
                 <Text style={[styles.userName, { color: theme.colors.text }]} numberOfLines={1}>
                   {userName}
+                </Text>
+                <Text style={[styles.headerSubtitle, { color: theme.colors.textSecondary }]}>
+                  Post, Promote, Grow
                 </Text>
                 {apiError && (
                   <View style={styles.apiStatusIndicator}>
@@ -2918,30 +3062,8 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                     <Text style={styles.apiStatusText}>Offline Mode</Text>
                   </View>
                 )}
-                {userBusinessProfiles.length > 0 && (
-                  <TouchableOpacity
-                    style={styles.businessProfilePill}
-                    onPress={toggleBusinessProfileDropdown}
-                    activeOpacity={0.8}
-                  >
-                    {businessProfilesLoadingState ? (
-                      <ActivityIndicator size="small" color={theme.colors.primary} />
-                    ) : (
-                      <>
-                        <Text style={styles.businessProfilePillText} numberOfLines={1}>
-                          {selectedBusinessProfile?.name || 'Select business'}
-                        </Text>
-                        <Icon
-                          name={isBusinessProfileDropdownVisible ? 'expand-less' : 'expand-more'}
-                          size={moderateScale(14)}
-                          color={theme.colors.primary}
-                        />
-                      </>
-                    )}
-                  </TouchableOpacity>
-                )}
               </View>
-            </TouchableOpacity>
+            </View>
 
             {/* Header Actions */}
             <View style={styles.headerActions}>
@@ -3306,12 +3428,11 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                   showsHorizontalScrollIndicator={false}
                   nestedScrollEnabled={true}
                   removeClippedSubviews={true}
-                  maxToRenderPerBatch={6}
-                  windowSize={3}
-                  initialNumToRender={6}
-                  updateCellsBatchingPeriod={100}
+                  maxToRenderPerBatch={3}
+                  windowSize={2}
+                  initialNumToRender={3}
+                  updateCellsBatchingPeriod={150}
                   getItemLayout={getItemLayout}
-                  maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
                   contentContainerStyle={styles.horizontalList}
                 />
               ) : (
@@ -3342,12 +3463,14 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                 showsHorizontalScrollIndicator={false}
                 nestedScrollEnabled={true}
                 removeClippedSubviews={true}
-                maxToRenderPerBatch={6}
-                windowSize={3}
-                initialNumToRender={6}
-                updateCellsBatchingPeriod={100}
+                maxToRenderPerBatch={3}
+                windowSize={2}
+                initialNumToRender={3}
+                updateCellsBatchingPeriod={150}
                 getItemLayout={getItemLayout}
                 contentContainerStyle={styles.horizontalList}
+                // Performance: disable autoscroll to content size
+                maintainVisibleContentPosition={null}
               />
             </View>
           )}
@@ -3363,21 +3486,20 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
             </View>
               <FlatList
                 data={motivationTemplates}
-                renderItem={createGreetingCardRenderer(
-                  motivationTemplatesRaw.length > 0 ? motivationTemplatesRaw : motivationTemplates,
-                  'motivational'
-                )}
+                renderItem={renderMotivationCard}
                 keyExtractor={keyExtractor}
                 horizontal={true}
                 showsHorizontalScrollIndicator={false}
                 nestedScrollEnabled={true}
                 contentContainerStyle={styles.horizontalList}
                 removeClippedSubviews={true}
-                maxToRenderPerBatch={6}
-                windowSize={3}
-                initialNumToRender={6}
-                updateCellsBatchingPeriod={100}
+                maxToRenderPerBatch={3}
+                windowSize={2}
+                initialNumToRender={3}
+                updateCellsBatchingPeriod={150}
                 getItemLayout={getItemLayout}
+                // Performance: disable autoscroll to content size
+                maintainVisibleContentPosition={null}
               />
             </View>
           )}
@@ -3393,22 +3515,17 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
             </View>
               <FlatList
                 data={goodMorningTemplates}
-                renderItem={createGreetingCardRenderer(
-                  goodMorningTemplatesRaw.length > 0 ? goodMorningTemplatesRaw : goodMorningTemplates,
-                  'good morning',
-                  () => {
-                  }
-                )}
+                renderItem={renderGoodMorningCard}
                 keyExtractor={keyExtractor}
                 horizontal={true}
                 showsHorizontalScrollIndicator={false}
                 nestedScrollEnabled={true}
                 contentContainerStyle={styles.horizontalList}
                 removeClippedSubviews={true}
-                maxToRenderPerBatch={6}
-                windowSize={3}
-                initialNumToRender={6}
-                updateCellsBatchingPeriod={100}
+                maxToRenderPerBatch={3}
+                windowSize={2}
+                initialNumToRender={3}
+                updateCellsBatchingPeriod={150}
                 getItemLayout={getItemLayout}
               />
             </View>
@@ -3425,20 +3542,17 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
             </View>
               <FlatList
                 data={businessEthicsTemplates}
-                renderItem={createGreetingCardRenderer(
-                  businessEthicsTemplatesRaw.length > 0 ? businessEthicsTemplatesRaw : businessEthicsTemplates,
-                  'business ethics'
-                )}
+                renderItem={renderBusinessEthicsCard}
                 keyExtractor={keyExtractor}
                 horizontal={true}
                 showsHorizontalScrollIndicator={false}
                 nestedScrollEnabled={true}
                 contentContainerStyle={styles.horizontalList}
                 removeClippedSubviews={true}
-                maxToRenderPerBatch={6}
-                windowSize={3}
-                initialNumToRender={6}
-                updateCellsBatchingPeriod={100}
+                maxToRenderPerBatch={3}
+                windowSize={2}
+                initialNumToRender={3}
+                updateCellsBatchingPeriod={150}
                 getItemLayout={getItemLayout}
               />
             </View>
@@ -3455,20 +3569,17 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
               </View>
               <FlatList
                 data={devotionalTemplates}
-                renderItem={createGreetingCardRenderer(
-                  devotionalTemplatesRaw.length > 0 ? devotionalTemplatesRaw : devotionalTemplates,
-                  'devotional'
-                )}
+                renderItem={renderDevotionalCard}
                 keyExtractor={keyExtractor}
                 horizontal={true}
                 showsHorizontalScrollIndicator={false}
                 nestedScrollEnabled={true}
                 contentContainerStyle={styles.horizontalList}
                 removeClippedSubviews={true}
-                maxToRenderPerBatch={6}
-                windowSize={3}
-                initialNumToRender={6}
-                updateCellsBatchingPeriod={100}
+                maxToRenderPerBatch={3}
+                windowSize={2}
+                initialNumToRender={3}
+                updateCellsBatchingPeriod={150}
                 getItemLayout={getItemLayout}
               />
             </View>
@@ -3485,20 +3596,17 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
               </View>
               <FlatList
                 data={leaderQuotesTemplates}
-                renderItem={createGreetingCardRenderer(
-                  leaderQuotesTemplatesRaw.length > 0 ? leaderQuotesTemplatesRaw : leaderQuotesTemplates,
-                  'leader quotes'
-                )}
+                renderItem={renderLeaderQuotesCard}
                 keyExtractor={keyExtractor}
                 horizontal={true}
                 showsHorizontalScrollIndicator={false}
                 nestedScrollEnabled={true}
                 contentContainerStyle={styles.horizontalList}
                 removeClippedSubviews={true}
-                maxToRenderPerBatch={6}
-                windowSize={3}
-                initialNumToRender={6}
-                updateCellsBatchingPeriod={100}
+                maxToRenderPerBatch={3}
+                windowSize={2}
+                initialNumToRender={3}
+                updateCellsBatchingPeriod={150}
                 getItemLayout={getItemLayout}
               />
             </View>
@@ -3515,20 +3623,17 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
               </View>
               <FlatList
                 data={atmanirbharBharatTemplates}
-                renderItem={createGreetingCardRenderer(
-                  atmanirbharBharatTemplatesRaw.length > 0 ? atmanirbharBharatTemplatesRaw : atmanirbharBharatTemplates,
-                  'atmanirbhar bharat'
-                )}
+                renderItem={renderAtmanirbharBharatCard}
                 keyExtractor={keyExtractor}
                 horizontal={true}
                 showsHorizontalScrollIndicator={false}
                 nestedScrollEnabled={true}
                 contentContainerStyle={styles.horizontalList}
                 removeClippedSubviews={true}
-                maxToRenderPerBatch={6}
-                windowSize={3}
-                initialNumToRender={6}
-                updateCellsBatchingPeriod={100}
+                maxToRenderPerBatch={3}
+                windowSize={2}
+                initialNumToRender={3}
+                updateCellsBatchingPeriod={150}
                 getItemLayout={getItemLayout}
               />
             </View>
@@ -3545,20 +3650,17 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
               </View>
               <FlatList
                 data={goodThoughtsTemplates}
-                renderItem={createGreetingCardRenderer(
-                  goodThoughtsTemplatesRaw.length > 0 ? goodThoughtsTemplatesRaw : goodThoughtsTemplates,
-                  'good thoughts'
-                )}
+                renderItem={renderGoodThoughtsCard}
                 keyExtractor={keyExtractor}
                 horizontal={true}
                 showsHorizontalScrollIndicator={false}
                 nestedScrollEnabled={true}
                 contentContainerStyle={styles.horizontalList}
                 removeClippedSubviews={true}
-                maxToRenderPerBatch={6}
-                windowSize={3}
-                initialNumToRender={6}
-                updateCellsBatchingPeriod={100}
+                maxToRenderPerBatch={3}
+                windowSize={2}
+                initialNumToRender={3}
+                updateCellsBatchingPeriod={150}
                 getItemLayout={getItemLayout}
               />
             </View>
@@ -3575,20 +3677,17 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
               </View>
               <FlatList
                 data={trendingTemplates}
-                renderItem={createGreetingCardRenderer(
-                  trendingTemplatesRaw.length > 0 ? trendingTemplatesRaw : trendingTemplates,
-                  'trending'
-                )}
+                renderItem={renderTrendingCard}
                 keyExtractor={keyExtractor}
                 horizontal={true}
                 showsHorizontalScrollIndicator={false}
                 nestedScrollEnabled={true}
                 contentContainerStyle={styles.horizontalList}
                 removeClippedSubviews={true}
-                maxToRenderPerBatch={6}
-                windowSize={3}
-                initialNumToRender={6}
-                updateCellsBatchingPeriod={100}
+                maxToRenderPerBatch={3}
+                windowSize={2}
+                initialNumToRender={3}
+                updateCellsBatchingPeriod={150}
                 getItemLayout={getItemLayout}
               />
             </View>
@@ -3605,20 +3704,17 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
               </View>
               <FlatList
                 data={bhagvatGitaTemplates}
-                renderItem={createGreetingCardRenderer(
-                  bhagvatGitaTemplatesRaw.length > 0 ? bhagvatGitaTemplatesRaw : bhagvatGitaTemplates,
-                  'bhagvat gita'
-                )}
+                renderItem={renderBhagvatGitaCard}
                 keyExtractor={keyExtractor}
                 horizontal={true}
                 showsHorizontalScrollIndicator={false}
                 nestedScrollEnabled={true}
                 contentContainerStyle={styles.horizontalList}
                 removeClippedSubviews={true}
-                maxToRenderPerBatch={6}
-                windowSize={3}
-                initialNumToRender={6}
-                updateCellsBatchingPeriod={100}
+                maxToRenderPerBatch={3}
+                windowSize={2}
+                initialNumToRender={3}
+                updateCellsBatchingPeriod={150}
                 getItemLayout={getItemLayout}
               />
             </View>
@@ -3635,20 +3731,17 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
               </View>
               <FlatList
                 data={booksTemplates}
-                renderItem={createGreetingCardRenderer(
-                  booksTemplatesRaw.length > 0 ? booksTemplatesRaw : booksTemplates,
-                  'books'
-                )}
+                renderItem={renderBooksCard}
                 keyExtractor={keyExtractor}
                 horizontal={true}
                 showsHorizontalScrollIndicator={false}
                 nestedScrollEnabled={true}
                 contentContainerStyle={styles.horizontalList}
                 removeClippedSubviews={true}
-                maxToRenderPerBatch={6}
-                windowSize={3}
-                initialNumToRender={6}
-                updateCellsBatchingPeriod={100}
+                maxToRenderPerBatch={3}
+                windowSize={2}
+                initialNumToRender={3}
+                updateCellsBatchingPeriod={150}
                 getItemLayout={getItemLayout}
               />
             </View>
@@ -3665,20 +3758,17 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
             </View>
               <FlatList
                 data={celebratesMomentsTemplates}
-                renderItem={createGreetingCardRenderer(
-                  celebratesMomentsTemplatesRaw.length > 0 ? celebratesMomentsTemplatesRaw : celebratesMomentsTemplates,
-                  'celebrates the moments'
-                )}
+                renderItem={renderCelebratesMomentsCard}
                 keyExtractor={keyExtractor}
                 horizontal={true}
                 showsHorizontalScrollIndicator={false}
                 nestedScrollEnabled={true}
                 contentContainerStyle={styles.horizontalList}
                 removeClippedSubviews={true}
-                maxToRenderPerBatch={6}
-                windowSize={3}
-                initialNumToRender={6}
-                updateCellsBatchingPeriod={100}
+                maxToRenderPerBatch={3}
+                windowSize={2}
+                initialNumToRender={3}
+                updateCellsBatchingPeriod={150}
                 getItemLayout={getItemLayout}
               />
             </View>
@@ -5037,6 +5127,11 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(8),
     color: 'rgba(51,51,51,0.7)',
     marginBottom: moderateScale(1.5),
+  },
+  headerSubtitle: {
+    fontSize: moderateScale(12),
+    fontWeight: '500',
+    marginTop: moderateScale(2),
   },
   userName: {
     fontSize: moderateScale(14),

@@ -1,5 +1,6 @@
 import api from './api';
 import cacheService from './cacheService';
+import logger from '../utils/logger';
 
 // ============================================================================
 // HOME SCREEN API SERVICE
@@ -496,9 +497,9 @@ class HomeApiService {
           // Ensure data is an array before converting
           if (Array.isArray(response.data.data)) {
             response.data.data = this.convertUpcomingEventsUrls(response.data.data);
-            console.log(`✅ [HOME API] Fetched ${response.data.data.length} events`);
+            logger.log(`✅ [HOME API] Fetched ${response.data.data.length} events`);
           } else {
-            console.warn('⚠️ [HOME API] Expected array for upcoming events data, got:', typeof response.data.data);
+            logger.warn('⚠️ [HOME API] Expected array for upcoming events data, got:', typeof response.data.data);
             response.data.data = [];
           }
         }
@@ -508,7 +509,7 @@ class HomeApiService {
       2 * 60 * 1000, // 2 minutes TTL (time-sensitive)
       true // Allow stale data
     ).catch(error => {
-      console.error('❌ [HOME API] Upcoming events error:', error);
+      logger.error('❌ [HOME API] Upcoming events error:', error);
       // Return empty response when network fails
       return {
         success: false,
@@ -549,7 +550,7 @@ class HomeApiService {
     return cacheService.getOrFetch(
       cacheKey,
       async () => {
-        console.log('📡 [HOME API] Fetching professional templates...');
+        logger.log('📡 [HOME API] Fetching professional templates...');
         
         const queryParams = new URLSearchParams();
         
@@ -568,37 +569,10 @@ class HomeApiService {
         
         const response = await api.get(url);
         
-        // ===== PRINT COMPLETE API RESPONSE =====
-        console.log('═══════════════════════════════════════════════════════');
-        console.log('📦 [BUSINESS EVENTS API] COMPLETE RESPONSE');
-        console.log('═══════════════════════════════════════════════════════');
-        console.log('📋 Response Status:', response.status);
-        console.log('📋 Response Headers:', JSON.stringify(response.headers, null, 2));
-        console.log('📋 Full Response Data:', JSON.stringify(response.data, null, 2));
-        console.log('═══════════════════════════════════════════════════════');
-        
         // Convert relative URLs to absolute URLs
         if (response.data.success && response.data.data) {
           response.data.data = this.convertProfessionalTemplatesUrls(response.data.data);
-          
-          console.log('✅ [BUSINESS EVENTS API] Response Details:');
-          console.log('   - Success:', response.data.success);
-          console.log('   - Message:', response.data.message);
-          console.log('   - Total Templates:', response.data.data.length);
-          
-          // Log first template as example
-          if (response.data.data.length > 0) {
-            console.log('📸 [FIRST TEMPLATE EXAMPLE]:');
-            console.log('   Raw Data:', JSON.stringify(response.data.data[0], null, 2));
-            console.log('   - ID:', response.data.data[0].id);
-            console.log('   - Name:', response.data.data[0].name);
-            console.log('   - Category:', response.data.data[0].category);
-            console.log('   - Thumbnail URL:', response.data.data[0].thumbnail);
-            console.log('   - Is Premium:', response.data.data[0].isPremium);
-            console.log('   - Downloads:', response.data.data[0].downloads);
-          }
-          
-          console.log(`✅ [HOME API] Fetched ${response.data.data.length} templates`);
+          logger.log(`✅ [HOME API] Fetched ${response.data.data.length} templates`);
         }
         
         return response.data;
@@ -606,7 +580,7 @@ class HomeApiService {
       5 * 60 * 1000, // 5 minutes TTL
       true // Allow stale data
     ).catch(error => {
-      console.error('❌ [HOME API] Professional templates error:', error);
+      logger.error('❌ [HOME API] Professional templates error:', error);
       // Return empty response when network fails
       return {
         success: false,

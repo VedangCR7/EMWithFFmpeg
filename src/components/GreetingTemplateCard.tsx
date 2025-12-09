@@ -66,7 +66,7 @@ interface GreetingTemplateCardProps {
   onPress: (template: GreetingTemplate) => void;
 }
 
-const GreetingTemplateCard: React.FC<GreetingTemplateCardProps> = ({
+const GreetingTemplateCard: React.FC<GreetingTemplateCardProps> = React.memo(({
   template,
   onPress,
 }) => {
@@ -194,7 +194,14 @@ const GreetingTemplateCard: React.FC<GreetingTemplateCardProps> = ({
      </TouchableOpacity>
    </Animated.View>
     );
-};
+}, (prevProps, nextProps) => {
+  // Only re-render if template ID or premium status changes
+  return prevProps.template.id === nextProps.template.id &&
+         prevProps.template.thumbnail === nextProps.template.thumbnail &&
+         prevProps.template.isPremium === nextProps.template.isPremium;
+});
+
+GreetingTemplateCard.displayName = 'GreetingTemplateCard';
 
 const styles = StyleSheet.create({
   container: {

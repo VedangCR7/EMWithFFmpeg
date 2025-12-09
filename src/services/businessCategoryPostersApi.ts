@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from './api';
 import authService from './auth';
+import logger from '../utils/logger';
 
 export interface BusinessCategoryPoster {
   id: string;
@@ -51,7 +52,7 @@ class BusinessCategoryPostersApiService {
         if (cacheAge < this.CACHE_DURATION) {
           // Apply limit if requested (for cache hits)
           const limitedPosters = requestLimit ? cached.data.slice(0, requestLimit) : cached.data;
-          console.log(`✅ [CACHE] Returning ${limitedPosters.length} cached posters for: ${category} (limited to ${requestLimit})`);
+          logger.log(`✅ [CACHE] Returning ${limitedPosters.length} cached posters for: ${category} (limited to ${requestLimit})`);
           return {
             success: true,
             data: {
@@ -63,29 +64,15 @@ class BusinessCategoryPostersApiService {
           };
         }
       }
-      console.log(`📡 [CATEGORY POSTERS API] Fetching posters for: ${category} (limit: ${requestLimit})`);
-      console.log(
-        `📡 [CATEGORY POSTERS API] Endpoint: /api/mobile/posters/category/${encodeURIComponent(
-          category,
-        )}?limit=${requestLimit}`,
-      );
+      logger.log(`📡 [CATEGORY POSTERS API] Fetching posters for: ${category} (limit: ${requestLimit})`);
       
       const response = await api.get(
         `/api/mobile/posters/category/${encodeURIComponent(category)}?limit=${requestLimit}`,
       );
       
-      // ===== PRINT COMPLETE API RESPONSE =====
-      console.log('═══════════════════════════════════════════════════════');
-      console.log(`📦 [CATEGORY POSTERS API] COMPLETE RESPONSE FOR: ${category}`);
-      console.log('═══════════════════════════════════════════════════════');
-      console.log('📋 Response Status:', response.status);
-      console.log('📋 Response Headers:', JSON.stringify(response.headers, null, 2));
-      console.log('📋 Full Response Data:', JSON.stringify(response.data, null, 2));
-      console.log('═══════════════════════════════════════════════════════');
-      
       if (response.data.success) {
         const posters = response.data.data.posters;
-        console.log(`✅ [CATEGORY POSTERS API] ${posters.length} poster(s) fetched for ${response.data.data.category || category}`);
+        logger.log(`✅ [CATEGORY POSTERS API] ${posters.length} poster(s) fetched for ${response.data.data.category || category}`);
         
         // Convert backend response to frontend format and fix URLs (optimized - no per-item logging)
         const baseUrl = 'https://eventmarketersbackend.onrender.com';
@@ -126,7 +113,7 @@ class BusinessCategoryPostersApiService {
           timestamp: now
         });
         
-        console.log(`✅ [CATEGORY POSTERS API] Cached ${postersWithAbsoluteUrls.length} poster(s), returning ${limitedPosters.length}`);
+        logger.log(`✅ [CATEGORY POSTERS API] Cached ${postersWithAbsoluteUrls.length} poster(s), returning ${limitedPosters.length}`);
         
         return {
           ...response.data,
@@ -137,15 +124,14 @@ class BusinessCategoryPostersApiService {
           }
         };
       } else {
-        console.log('⚠️ [CATEGORY POSTERS API] Response Success = false');
-        console.log('⚠️ Error from API:', response.data.error);
-        console.log('═══════════════════════════════════════════════════════');
+        logger.warn('⚠️ [CATEGORY POSTERS API] Response Success = false');
+        logger.warn('⚠️ Error from API:', response.data.error);
         throw new Error(response.data.error || 'Failed to fetch posters');
       }
     } catch (error: any) {
-      console.error('❌ [CATEGORY POSTERS API] Error fetching posters:', error.message);
+      logger.error('❌ [CATEGORY POSTERS API] Error fetching posters:', error.message);
       if (error.response) {
-        console.error('   ↳ Status:', error.response.status, 'Message:', error.response.data?.message);
+        logger.error('   ↳ Status:', error.response.status, 'Message:', error.response.data?.message);
       }
       
       // Return empty data when API fails
@@ -170,7 +156,7 @@ class BusinessCategoryPostersApiService {
       const userId = currentUser?.id;
       
       if (!userId) {
-        console.log('⚠️ [USER CATEGORY POSTERS] No user ID, using General category');
+        logger.warn('⚠️ [USER CATEGORY POSTERS] No user ID, using General category');
         return this.getPostersByCategory('General');
       }
 
@@ -190,14 +176,14 @@ class BusinessCategoryPostersApiService {
           }
         }
         const primaryCategory = profileToUse.category;
-        console.log(`✅ [USER CATEGORY POSTERS] Using category from profile ${profileToUse.name}: ${primaryCategory}`);
+        logger.log(`✅ [USER CATEGORY POSTERS] Using category from profile ${profileToUse.name}: ${primaryCategory}`);
         return this.getPostersByCategory(primaryCategory);
       } else {
         if (preferredCategory) {
-          console.log(`⚠️ [USER CATEGORY POSTERS] No profiles found, using stored category: ${preferredCategory}`);
+          logger.warn(`⚠️ [USER CATEGORY POSTERS] No profiles found, using stored category: ${preferredCategory}`);
           return this.getPostersByCategory(preferredCategory);
         }
-        console.log('⚠️ [USER CATEGORY POSTERS] No profiles found, using General category');
+        logger.warn('⚠️ [USER CATEGORY POSTERS] No profiles found, using General category');
         return this.getPostersByCategory('General');
       }
     } catch (error: unknown) {
@@ -205,7 +191,7 @@ class BusinessCategoryPostersApiService {
         typeof error === 'object' && error !== null && 'message' in error
           ? String((error as any).message)
           : 'Unknown error';
-      console.error('❌ [USER CATEGORY POSTERS] Error:', errorMessage);
+      logger.error('❌ [USER CATEGORY POSTERS] Error:', errorMessage);
       // Return empty data when there's an error
       return {
         success: false,
@@ -240,7 +226,7 @@ class BusinessCategoryPostersApiService {
       });
 
       if (downloadResponse.data.success) {
-        console.log('✅ Poster download tracked successfully:', posterId);
+        logger.log('✅ Poster download tracked successfully:', posterId);
         return { 
           success: true, 
           message: 'Poster download tracked successfully',
@@ -250,7 +236,7 @@ class BusinessCategoryPostersApiService {
         throw new Error(downloadResponse.data.error || 'Failed to track download');
       }
     } catch (error: any) {
-      console.error('❌ Error downloading poster:', error);
+      logger.error('❌ Error downloading poster:', error);
       return { success: false, message: error.message || 'Failed to download poster' };
     }
   }
@@ -265,7 +251,7 @@ class BusinessCategoryPostersApiService {
    */
   clearCache(): void {
     this.postersCache.clear();
-    console.log('🗑️ Business category posters cache cleared');
+    logger.log('🗑️ Business category posters cache cleared');
   }
 }
 

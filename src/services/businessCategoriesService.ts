@@ -1,5 +1,6 @@
 import api from './api';
 import cacheService from './cacheService';
+import logger from '../utils/logger';
 
 export interface BusinessCategory {
   id: string;
@@ -23,21 +24,12 @@ class BusinessCategoriesService {
     return cacheService.getOrFetch(
       cacheKey,
       async () => {
-        console.log('📡 [CATEGORY API] Calling: /api/mobile/business-categories/business');
+        logger.log('📡 [CATEGORY API] Calling: /api/mobile/business-categories/business');
         const response = await api.get('/api/mobile/business-categories/business');
-        
-        console.log('✅ [CATEGORY API] Response received');
-        console.log('📊 [CATEGORY API] Full Response:', JSON.stringify(response.data, null, 2));
-        console.log('📊 [CATEGORY API] Success:', response.data.success);
         
         // Handle new response structure: categories are in response.data.data.categories
         const categories = response.data.data?.categories || response.data.categories || [];
-        console.log('📊 [CATEGORY API] Categories count:', categories.length);
-        
-        if (categories && categories.length > 0) {
-          console.log('📊 [CATEGORY API] First category:', JSON.stringify(categories[0], null, 2));
-          console.log('📊 [CATEGORY API] All category names:', categories.map((cat: BusinessCategory) => cat.name));
-        }
+        logger.log(`✅ [CATEGORY API] ${categories.length} categories fetched`);
         
         // Return in expected format
         return {
@@ -48,11 +40,10 @@ class BusinessCategoriesService {
       10 * 60 * 1000, // 10 minutes TTL (categories rarely change)
       true // Allow stale data
     ).catch(error => {
-      console.error('❌ [CATEGORY API] Error:', error);
-      console.error('❌ [CATEGORY API] Error details:', JSON.stringify(error, null, 2));
+      logger.error('❌ [CATEGORY API] Error:', error);
       
       // Return mock data as fallback if cache also fails
-      console.log('⚠️ [CATEGORY API] Using mock business categories due to API error');
+      logger.warn('⚠️ [CATEGORY API] Using mock business categories due to API error');
       return this.getMockCategories();
     });
   }
@@ -64,20 +55,18 @@ class BusinessCategoriesService {
     return cacheService.getOrFetch(
       cacheKey,
       async () => {
-        console.log('📡 [CATEGORY API ALIAS] Calling: /api/v1/categories');
+        logger.log('📡 [CATEGORY API ALIAS] Calling: /api/v1/categories');
         const response = await api.get('/api/v1/categories');
         
-        console.log('✅ [CATEGORY API ALIAS] Response received');
-        console.log('📊 [CATEGORY API ALIAS] Full Response:', JSON.stringify(response.data, null, 2));
-        console.log('📊 [CATEGORY API ALIAS] Categories count:', response.data.categories?.length || 0);
+        logger.log(`✅ [CATEGORY API ALIAS] ${response.data.categories?.length || 0} categories fetched`);
         
         return response.data;
       },
       10 * 60 * 1000, // 10 minutes TTL
       true // Allow stale data
     ).catch(error => {
-      console.error('❌ [CATEGORY API ALIAS] Error:', error);
-      console.log('🔄 [CATEGORY API ALIAS] Falling back to main endpoint');
+      logger.error('❌ [CATEGORY API ALIAS] Error:', error);
+      logger.log('🔄 [CATEGORY API ALIAS] Falling back to main endpoint');
       
       // Fallback to main endpoint
       return this.getBusinessCategories();
@@ -93,7 +82,7 @@ class BusinessCategoriesService {
       }
       return null;
     } catch (error) {
-      console.error('Failed to get category by ID:', error);
+      logger.error('Failed to get category by ID:', error);
       return null;
     }
   }
@@ -110,7 +99,7 @@ class BusinessCategoriesService {
       }
       return [];
     } catch (error) {
-      console.error('Failed to search categories:', error);
+      logger.error('Failed to search categories:', error);
       return [];
     }
   }

@@ -2,6 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DeviceEventEmitter } from 'react-native';
 import cacheService from './cacheService';
+import logger from '../utils/logger';
 
 // Event name for token expiration
 export const TOKEN_EXPIRED_EVENT = 'TOKEN_EXPIRED';
@@ -151,7 +152,7 @@ api.interceptors.request.use(
 // Response interceptor to handle caching and errors
 api.interceptors.response.use(
   async (response) => {
-    console.log('✅ API Response received:', response.config.url, response.status);
+    // Removed verbose response logging - use logger for essential logs only
     
     // Cache successful GET responses
     if (response.config.method?.toLowerCase() === 'get' && response.status === 200) {
@@ -164,26 +165,7 @@ api.interceptors.response.use(
       }
     }
     
-    // Enhanced debugging for category-related endpoints
-    if (response.config.url?.includes('/business-categories') || 
-        response.config.url?.includes('/categories') ||
-        response.config.url?.includes('/posters/category')) {
-      console.log('🔍 [CATEGORY API DEBUG] Enhanced Response Details:');
-      console.log('🔍 [CATEGORY API DEBUG] URL:', response.config.url);
-      console.log('🔍 [CATEGORY API DEBUG] Status:', response.status);
-      console.log('🔍 [CATEGORY API DEBUG] Headers:', JSON.stringify(response.headers, null, 2));
-      console.log('🔍 [CATEGORY API DEBUG] Response Data:', JSON.stringify(response.data, null, 2));
-      
-      // Show specific data structure info
-      if (response.data?.categories) {
-        console.log('🔍 [CATEGORY API DEBUG] Categories Count:', response.data.categories.length);
-        console.log('🔍 [CATEGORY API DEBUG] Category Names:', response.data.categories.map((c: any) => c.name || c.title));
-      }
-      if (response.data?.data?.posters) {
-        console.log('🔍 [CATEGORY API DEBUG] Posters Count:', response.data.data.posters.length);
-        console.log('🔍 [CATEGORY API DEBUG] First Poster:', response.data.data.posters[0]);
-      }
-    }
+    // Category-related endpoints logging removed for cleaner console
     
     return response;
   },

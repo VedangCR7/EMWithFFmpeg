@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -9,6 +9,7 @@ import authService from '../services/auth';
 import { useTheme } from '../context/ThemeContext';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { navigationRef, navigate as navigateService } from './NavigationService';
+import logger from '../utils/logger';
 import {
   Image,
   View,
@@ -21,6 +22,8 @@ import {
   FlatList,
   StyleSheet,
   ScrollView,
+  Animated,
+  Easing,
 } from 'react-native';
 
 // Responsive scaling functions
@@ -120,6 +123,7 @@ export type MainStackParamList = {
   };
   MyPosters: undefined;
   HelpSupport: { scrollToFAQ?: boolean } | undefined;
+  TodaysPick: undefined;
 };
 
 export type TabParamList = {
@@ -157,6 +161,7 @@ import businessCategoryPostersApi from '../services/businessCategoryPostersApi';
 import AboutUsScreen from '../screens/AboutUsScreen';
 import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 import HelpSupportScreen from '../screens/HelpSupportScreen';
+import TodaysPickScreen from '../screens/TodaysPickScreen';
 import LinearGradient from 'react-native-linear-gradient';
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -254,6 +259,11 @@ const TabNavigator = () => {
         component={HelpSupportScreen}
         options={{ headerShown: false }}
       />
+      <MainStack.Screen 
+        name="TodaysPick" 
+        component={TodaysPickScreen}
+        options={{ headerShown: false }}
+      />
     </MainStack.Navigator>
   );
 };
@@ -339,14 +349,14 @@ const CustomTabBar = (props: any) => {
           }
         }
       } else {
-        console.warn('⚠️ [NAVBAR] No posters available for user category');
+        logger.warn('⚠️ [NAVBAR] No posters available for user category');
         Alert.alert(
           'No posters available',
           'We could not find posters for your business category right now. Please try again later.',
         );
       }
     } catch (error) {
-      console.error('❌ [NAVBAR] Error loading user category posters:', error);
+      logger.error('❌ [NAVBAR] Error loading user category posters:', error);
       Alert.alert(
         'Unable to load posters',
         'Something went wrong while loading your posters. Please try again later.',
@@ -360,12 +370,313 @@ const CustomTabBar = (props: any) => {
     await loadPostersForUserCategory();
   }, [loadPostersForUserCategory]);
 
+  const handleTodaysPickPress = React.useCallback(() => {
+    const parentNavigator = props.navigation.getParent();
+    if (parentNavigator) {
+      parentNavigator.navigate('TodaysPick');
+    } else {
+      props.navigation.navigate('TodaysPick' as any);
+    }
+  }, [props.navigation]);
+
+  // Animation for floating icon
+  const pulseAnim = React.useRef(new Animated.Value(1)).current;
+  const borderAnim = React.useRef(new Animated.Value(0)).current;
+  const shadowAnim = React.useRef(new Animated.Value(0)).current;
+  const floatAnim = React.useRef(new Animated.Value(0)).current;
+  const pressAnim = React.useRef(new Animated.Value(1)).current;
+  const rippleAnim1 = React.useRef(new Animated.Value(0)).current;
+  const rippleAnim2 = React.useRef(new Animated.Value(0)).current;
+  const logoRotateAnim = React.useRef(new Animated.Value(0)).current;
+  const sparkleAnim = React.useRef(new Animated.Value(0)).current;
+  const bgColorAnim = React.useRef(new Animated.Value(0)).current;
+  const entranceAnim = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    // Pulse animation
+    const pulseAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.1,
+          duration: 1000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    // Border animation - pulsing border
+    const borderAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(borderAnim, {
+          toValue: 1,
+          duration: 1500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: false, // Border width/color can't use native driver
+        }),
+        Animated.timing(borderAnim, {
+          toValue: 0,
+          duration: 1500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: false,
+        }),
+      ])
+    );
+
+    // Shadow/Glow animation - pulsing shadow
+    const shadowAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(shadowAnim, {
+          toValue: 1,
+          duration: 2000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: false, // Shadow can't use native driver
+        }),
+        Animated.timing(shadowAnim, {
+          toValue: 0,
+          duration: 2000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: false,
+        }),
+      ])
+    );
+
+    // Floating/Levitating animation - subtle up and down movement
+    const floatAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, {
+          toValue: 1,
+          duration: 2500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(floatAnim, {
+          toValue: 0,
+          duration: 2500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    // Ripple effect - expanding circles
+    const rippleAnimation1 = Animated.loop(
+      Animated.sequence([
+        Animated.timing(rippleAnim1, {
+          toValue: 1,
+          duration: 3000,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(rippleAnim1, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    const rippleAnimation2 = Animated.loop(
+      Animated.sequence([
+        Animated.delay(1500),
+        Animated.timing(rippleAnim2, {
+          toValue: 1,
+          duration: 3000,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(rippleAnim2, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    // Logo rotation animation - subtle rotation
+    const logoRotationAnimation = Animated.loop(
+      Animated.timing(logoRotateAnim, {
+        toValue: 1,
+        duration: 8000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+
+    // Sparkle/Shimmer animation
+    const sparkleAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(sparkleAnim, {
+          toValue: 1,
+          duration: 2000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(sparkleAnim, {
+          toValue: 0,
+          duration: 2000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    // Background color pulse animation
+    const bgColorAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(bgColorAnim, {
+          toValue: 1,
+          duration: 2500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: false, // Color can't use native driver
+        }),
+        Animated.timing(bgColorAnim, {
+          toValue: 0,
+          duration: 2500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: false,
+        }),
+      ])
+    );
+
+    // Entrance bounce animation - runs once on mount
+    const entranceAnimation = Animated.sequence([
+      Animated.spring(entranceAnim, {
+        toValue: 1,
+        tension: 50,
+        friction: 7,
+        useNativeDriver: true,
+      }),
+    ]);
+
+    pulseAnimation.start();
+    borderAnimation.start();
+    shadowAnimation.start();
+    floatAnimation.start();
+    rippleAnimation1.start();
+    rippleAnimation2.start();
+    logoRotationAnimation.start();
+    sparkleAnimation.start();
+    bgColorAnimation.start();
+    entranceAnimation.start();
+
+    return () => {
+      pulseAnimation.stop();
+      borderAnimation.stop();
+      shadowAnimation.stop();
+      floatAnimation.stop();
+      rippleAnimation1.stop();
+      rippleAnimation2.stop();
+      logoRotationAnimation.stop();
+      sparkleAnimation.stop();
+      bgColorAnimation.stop();
+    };
+  }, [pulseAnim, borderAnim, shadowAnim, floatAnim, rippleAnim1, rippleAnim2, logoRotateAnim, sparkleAnim, bgColorAnim, entranceAnim]);
+
+  const pulseScale = pulseAnim;
+  const animatedBorderWidth = borderAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [2, 4],
+  });
+  const animatedBorderColor = borderAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [theme.colors.primary, theme.colors.secondary],
+  });
+  
+  // Shadow animation values
+  const animatedShadowRadius = shadowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [8, 16],
+  });
+  const animatedShadowOpacity = shadowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.3, 0.6],
+  });
+  
+  // Floating animation - vertical movement
+  const floatTranslateY = floatAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -8],
+  });
+  
+  // Press animation handler
+  const handlePressIn = () => {
+    Animated.spring(pressAnim, {
+      toValue: 0.9,
+      useNativeDriver: true,
+      tension: 300,
+      friction: 10,
+    }).start();
+  };
+  
+  const handlePressOut = () => {
+    Animated.spring(pressAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 300,
+      friction: 10,
+    }).start();
+  };
+
+  // Ripple animation values
+  const ripple1Scale = rippleAnim1.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 2.5],
+  });
+  const ripple1Opacity = rippleAnim1.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [0.6, 0.3, 0],
+  });
+
+  const ripple2Scale = rippleAnim2.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 2.5],
+  });
+  const ripple2Opacity = rippleAnim2.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [0.6, 0.3, 0],
+  });
+
+  // Logo rotation
+  const logoRotation = logoRotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  // Sparkle opacity
+  const sparkleOpacity = sparkleAnim.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [0, 1, 0],
+  });
+
+  // Background color interpolation
+  const animatedBgColor = bgColorAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#ffffff', theme.colors.primary + '15'], // Primary color with low opacity
+  });
+
+  // Entrance animation
+  const entranceScale = entranceAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
+
   if (isPosterPlayerFocused) {
     return null;
   }
 
+  // Calculate FAB position - above the navbar
+  const fabSize = currentModerateScale(isCurrentlySmall ? 48 : 56);
+  const fabBottomOffset = tabBarHeight + tabBarPaddingBottom + currentModerateScale(16);
+
   return (
-    <>
+    <View style={{ position: 'relative', width: '100%' }}>
     <View style={{
       backgroundColor: theme.colors.surface,
       borderTopWidth: currentModerateScale(0.3), // Further reduced from 0.5
@@ -545,7 +856,132 @@ const CustomTabBar = (props: any) => {
       </View>
     </Modal>
 
-    </>
+    {/* Floating Action Button - Today's Pick */}
+    <Animated.View
+      style={{
+        position: 'absolute',
+        bottom: fabBottomOffset,
+        right: currentModerateScale(16),
+        transform: [
+          { scale: pulseScale },
+          { translateY: floatTranslateY },
+          { scale: entranceScale },
+        ],
+        zIndex: 1001,
+      }}
+    >
+      {/* Ripple Effect 1 */}
+      <Animated.View
+        style={{
+          position: 'absolute',
+          width: fabSize,
+          height: fabSize,
+          borderRadius: fabSize / 2,
+          borderWidth: 2,
+          borderColor: theme.colors.primary,
+          transform: [{ scale: ripple1Scale }],
+          opacity: ripple1Opacity,
+        }}
+      />
+      
+      {/* Ripple Effect 2 */}
+      <Animated.View
+        style={{
+          position: 'absolute',
+          width: fabSize,
+          height: fabSize,
+          borderRadius: fabSize / 2,
+          borderWidth: 2,
+          borderColor: theme.colors.secondary,
+          transform: [{ scale: ripple2Scale }],
+          opacity: ripple2Opacity,
+        }}
+      />
+
+      <Animated.View
+        style={{
+          width: fabSize,
+          height: fabSize,
+          borderRadius: fabSize / 2,
+          borderWidth: animatedBorderWidth,
+          borderColor: animatedBorderColor,
+          justifyContent: 'center',
+          alignItems: 'center',
+          shadowColor: theme.colors.primary,
+          shadowOffset: { width: 0, height: currentModerateScale(4) },
+          shadowOpacity: animatedShadowOpacity,
+          shadowRadius: animatedShadowRadius,
+          elevation: 12,
+        }}
+      >
+        <Animated.View
+          style={{
+            transform: [{ scale: pressAnim }],
+            width: fabSize,
+            height: fabSize,
+            borderRadius: fabSize / 2,
+            overflow: 'hidden',
+          }}
+        >
+          <TouchableOpacity
+            onPress={handleTodaysPickPress}
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
+            activeOpacity={1}
+            style={{
+              width: '100%',
+              height: '100%',
+              borderRadius: fabSize / 2,
+              backgroundColor: '#ffffff',
+              justifyContent: 'center',
+              alignItems: 'center',
+              padding: currentModerateScale(4),
+              overflow: 'hidden',
+            }}
+          >
+            {/* Sparkle/Shimmer overlay - reduced opacity */}
+            <Animated.View
+              style={{
+                position: 'absolute',
+                width: '100%',
+                height: '100%',
+                backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                opacity: sparkleOpacity,
+                borderRadius: fabSize / 2,
+                zIndex: 1,
+              }}
+            />
+            
+            <Animated.View
+              style={{
+                transform: [{ rotate: logoRotation }],
+                zIndex: 2,
+                width: '100%',
+                height: '100%',
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+            >
+              <Image 
+                source={require('../assets/floatingLogo/1.png')}
+                style={{
+                  width: '120%',
+                  height: '120%',
+                  resizeMode: 'contain',
+                }}
+                onError={(error) => {
+                  console.error('Error loading floating logo:', error);
+                }}
+                onLoad={() => {
+                  console.log('Floating logo loaded successfully');
+                }}
+              />
+            </Animated.View>
+          </TouchableOpacity>
+        </Animated.View>
+      </Animated.View>
+    </Animated.View>
+    </View>
   );
 };
 
@@ -621,7 +1057,7 @@ const AppNavigator = () => {
   const { refreshSubscription, refreshTransactions } = useSubscription();
 
   useEffect(() => {
-    console.log('🚀 AppNavigator: Starting initialization');
+    logger.log('🚀 AppNavigator: Starting initialization');
     let authStateReceived = false;
     let authUser: any = null;
     const startTime = Date.now();
@@ -630,7 +1066,7 @@ const AppNavigator = () => {
     // Extended timeout to allow intro video to play fully before checking auth state
     const timeout = setTimeout(() => {
       if (!authStateReceived) {
-        console.log('⚠️ AppNavigator: Timeout reached without auth state - showing login');
+        logger.warn('⚠️ AppNavigator: Timeout reached without auth state - showing login');
         setIsLoading(false);
         setIsAuthenticated(false);
       }
@@ -642,23 +1078,23 @@ const AppNavigator = () => {
       authUser = user;
       clearTimeout(timeout); // Clear timeout once we get auth state
       
-      console.log('🔔 AppNavigator: Auth state changed:', user ? '✅ User logged in' : '❌ User logged out');
+      logger.log('🔔 AppNavigator: Auth state changed:', user ? '✅ User logged in' : '❌ User logged out');
       if (user) {
-        console.log('👤 User ID:', user.id || user.uid);
-        console.log('📧 User Email:', user.email);
+        logger.log('👤 User ID:', user.id || user.uid);
+        logger.log('📧 User Email:', user.email);
         
         // Preload subscription and transaction data for logged-in users
-        console.log('📡 Preloading subscription and transaction data...');
+        logger.log('📡 Preloading subscription and transaction data...');
         refreshSubscription().then(() => {
-          console.log('✅ Subscription data preloaded');
+          logger.log('✅ Subscription data preloaded');
         }).catch((error) => {
-          console.error('❌ Error preloading subscription data:', error);
+          logger.error('❌ Error preloading subscription data:', error);
         });
         
         refreshTransactions().then(() => {
-          console.log('✅ Transaction data preloaded');
+          logger.log('✅ Transaction data preloaded');
         }).catch((error) => {
-          console.error('❌ Error preloading transaction data:', error);
+          logger.error('❌ Error preloading transaction data:', error);
         });
       }
       
@@ -666,19 +1102,19 @@ const AppNavigator = () => {
       const elapsedTime = Date.now() - startTime;
       const remainingTime = Math.max(0, MIN_SPLASH_TIME - elapsedTime);
       
-      console.log(`⏱️ Elapsed: ${elapsedTime}ms, Waiting: ${remainingTime}ms before navigation`);
+      logger.log(`⏱️ Elapsed: ${elapsedTime}ms, Waiting: ${remainingTime}ms before navigation`);
       
       // Wait for minimum splash time before navigating
       setTimeout(() => {
         setIsAuthenticated(!!authUser);
         setIsLoading(false);
-        console.log('🎬 Minimum splash time reached - navigating now');
+        logger.log('🎬 Minimum splash time reached - navigating now');
       }, remainingTime);
     });
 
     // Explicitly call initialize to ensure async loading completes
     authService.initialize().catch((error) => {
-      console.error('❌ AppNavigator: Error initializing auth service:', error);
+      logger.error('❌ AppNavigator: Error initializing auth service:', error);
       authStateReceived = true;
       clearTimeout(timeout);
       
@@ -698,11 +1134,11 @@ const AppNavigator = () => {
     };
   }, []);
 
-  console.log('🎨 AppNavigator: Rendering with isLoading:', isLoading, 'isAuthenticated:', isAuthenticated);
+  logger.log('🎨 AppNavigator: Rendering with isLoading:', isLoading, 'isAuthenticated:', isAuthenticated);
 
   // Show splash screen while loading
   if (isLoading) {
-    console.log('AppNavigator: Showing splash screen');
+    logger.log('AppNavigator: Showing splash screen');
     return (
       <NavigationContainer ref={navigationRef}>
         <Stack.Navigator>
@@ -717,7 +1153,7 @@ const AppNavigator = () => {
   }
 
   // Show main navigation
-  console.log('AppNavigator: Showing main navigation, isAuthenticated:', isAuthenticated);
+  logger.log('AppNavigator: Showing main navigation, isAuthenticated:', isAuthenticated);
   
   return (
     <NavigationContainer ref={navigationRef}>

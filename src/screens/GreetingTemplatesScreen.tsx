@@ -23,6 +23,7 @@ import greetingTemplatesService, { GreetingCategory, GreetingTemplate } from '..
 import { Template } from '../services/dashboard';
 import OptimizedImage from '../components/OptimizedImage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import logger from '../utils/logger';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -123,7 +124,7 @@ const GreetingTemplatesScreen: React.FC = () => {
           }
         }
       } catch (error) {
-        console.warn('[GreetingTemplatesScreen] Failed to load cache:', error);
+        logger.warn('[GreetingTemplatesScreen] Failed to load cache:', error);
       }
     };
 
@@ -143,7 +144,7 @@ const GreetingTemplatesScreen: React.FC = () => {
         AsyncStorage.setItem(CATEGORIES_CACHE_KEY, JSON.stringify(data)).catch(() => {});
       }
     } catch (error) {
-      console.error('Error fetching greeting categories:', error);
+      logger.error('Error fetching greeting categories:', error);
       if (!isRefresh) {
         Alert.alert('Error', 'Failed to load greeting categories. Please try again.');
       }
@@ -396,12 +397,20 @@ const GreetingTemplatesScreen: React.FC = () => {
     return Math.max(minSize, Math.min(rawSize, maxSize));
   }, [categoryColumns, categoryCardGap, screenWidth]);
 
-  const renderCategoryCard = useCallback(({ item, index }: { item: GreetingCategory; index: number }) => {
+  // Memoized CategoryCard component for better performance
+  const CategoryCard = React.memo<{
+    item: GreetingCategory;
+    index: number;
+    categoryCardSize: number;
+    categoryCardGap: number;
+    categoryColumns: number;
+    previewUri: string | null;
+    onPress: (item: GreetingCategory) => void;
+  }>(({ item, index, categoryCardSize, categoryCardGap, categoryColumns, previewUri, onPress }) => {
     const cardColor = item.color || '#667eea';
     const isLastInRow = (index + 1) % categoryColumns === 0;
     const isEmoji = Boolean(item.icon && EMOJI_REGEX.test(item.icon));
     const initials = item.name?.slice(0, 2).toUpperCase() || 'GC';
-    const previewUri = categoryPreviewImages[item.id];
     
     return (
       <TouchableOpacity
@@ -415,7 +424,7 @@ const GreetingTemplatesScreen: React.FC = () => {
             borderColor: addOpacityToColor(cardColor, 0.2),
           },
         ]}
-        onPress={() => handleCategoryPress(item)}
+        onPress={() => onPress(item)}
         activeOpacity={0.85}
       >
         {previewUri ? (
@@ -434,12 +443,41 @@ const GreetingTemplatesScreen: React.FC = () => {
         />
         <View style={styles.categoryLabelContainer}>
           <Text style={styles.categoryLabelText} numberOfLines={2}>
-          {item.name}
-        </Text>
+            {item.name}
+          </Text>
         </View>
       </TouchableOpacity>
     );
-  }, [categoryCardGap, categoryCardSize, categoryColumns, categoryPreviewImages, handleCategoryPress]);
+  }, (prevProps, nextProps) => {
+    // Only re-render if item ID, preview image, or position changes
+    return (
+      prevProps.item.id === nextProps.item.id &&
+      prevProps.item.name === nextProps.item.name &&
+      prevProps.item.color === nextProps.item.color &&
+      prevProps.item.icon === nextProps.item.icon &&
+      prevProps.previewUri === nextProps.previewUri &&
+      prevProps.index === nextProps.index &&
+      prevProps.categoryCardSize === nextProps.categoryCardSize &&
+      prevProps.categoryCardGap === nextProps.categoryCardGap &&
+      prevProps.categoryColumns === nextProps.categoryColumns
+    );
+  });
+
+  const renderCategoryCard = useCallback(({ item, index }: { item: GreetingCategory; index: number }) => {
+    const previewUri = categoryPreviewImages[item.id] || null;
+    
+    return (
+      <CategoryCard
+        item={item}
+        index={index}
+        categoryCardSize={categoryCardSize}
+        categoryCardGap={categoryCardGap}
+        categoryColumns={categoryColumns}
+        previewUri={previewUri}
+        onPress={handleCategoryPress}
+      />
+    );
+  }, [categoryCardSize, categoryCardGap, categoryColumns, categoryPreviewImages, handleCategoryPress]);
 
   const keyExtractor = useCallback((item: GreetingCategory) => item.id, []);
 
@@ -458,16 +496,7 @@ const GreetingTemplatesScreen: React.FC = () => {
     [categoryCardGap, categoryCardSize, categoryColumns],
   );
 
-  const flatListPerfConfig = useMemo(
-    () => ({
-      initialNumToRender: Math.max(categoryColumns * 2, 8),
-      maxToRenderPerBatch: Math.max(categoryColumns * 2, 8),
-      windowSize: 5,
-      updateCellsBatchingPeriod: 80,
-      removeClippedSubviews: true,
-    }),
-    [categoryColumns],
-  );
+  // Removed flatListPerfConfig - using inline props for better control
 
   const listEmptyComponent = useMemo(() => (
     <View style={styles.emptyContainer}>
@@ -629,7 +658,12 @@ const GreetingTemplatesScreen: React.FC = () => {
             />
           }
           getItemLayout={getItemLayout}
-          {...flatListPerfConfig}
+          // Enhanced performance optimizations
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={Math.max(categoryColumns * 2, 8)}
+          windowSize={5}
+          initialNumToRender={Math.max(categoryColumns * 2, 8)}
+          updateCellsBatchingPeriod={80}
         />
       </LinearGradient>
     </SafeAreaView>

@@ -22,6 +22,7 @@ import { useTheme } from '../context/ThemeContext';
 import ImagePickerModal from '../components/ImagePickerModal';
 import OptimizedImage from '../components/OptimizedImage';
 import ComingSoonModal from '../components/ComingSoonModal';
+import logger from '../utils/logger';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -101,7 +102,7 @@ const TemplateGalleryScreen: React.FC = () => {
         setUploadedPhotos(photos);
       }
     } catch (error) {
-      console.error('Error loading uploaded photos:', error);
+      logger.error('Error loading uploaded photos:', error);
     }
   }, []);
 
@@ -110,7 +111,7 @@ const TemplateGalleryScreen: React.FC = () => {
     try {
       await AsyncStorage.setItem(UPLOADED_PHOTOS_KEY, JSON.stringify(photos));
     } catch (error) {
-      console.error('Error saving uploaded photos:', error);
+      logger.error('Error saving uploaded photos:', error);
     }
   };
 
@@ -121,7 +122,7 @@ const TemplateGalleryScreen: React.FC = () => {
 
   // Handle image selection from picker
   const handleImageSelected = async (imageUri: string) => {
-    console.log('Image selected:', imageUri);
+    logger.log('Image selected:', imageUri);
     
     // Save to uploaded photos
     const newPhoto: UploadedPhoto = {
@@ -191,7 +192,7 @@ const TemplateGalleryScreen: React.FC = () => {
   const cardWidth = (currentScreenWidth - horizontalPadding - totalGapWidth) / numColumns;
   const cardHeight = cardWidth * 1.2;
 
-  // Render uploaded photo item
+  // Render uploaded photo item - memoized with useCallback
   const renderPhotoItem = useCallback(({ item }: { item: UploadedPhoto }) => (
     <TouchableOpacity
       style={[styles.photoCard, { 
@@ -224,7 +225,7 @@ const TemplateGalleryScreen: React.FC = () => {
         <Icon name="delete" size={12} color="#ffffff" />
       </TouchableOpacity>
     </TouchableOpacity>
-  ), [cardWidth, cardHeight, theme, handlePhotoPress, handleDeletePhoto, dynamicModerateScale]);
+  ), [cardWidth, cardHeight, theme.colors.primary, handlePhotoPress, handleDeletePhoto]);
 
   return (
     <SafeAreaView 

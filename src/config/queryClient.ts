@@ -5,22 +5,22 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // React Query's built-in cache will work with AsyncStorage through the hooks
 // We can add persistence later if needed
 
-// Create QueryClient with default options
+// Create QueryClient with optimized default options
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Default cache time: 5 minutes (how long unused data stays in cache)
-      gcTime: 5 * 60 * 1000, // Previously called cacheTime
-      // Default stale time: 0 (data is immediately stale, will refetch)
-      staleTime: 0,
+      // Default stale time: 5 minutes (data is fresh for 5 min, won't refetch during this time)
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      // Default cache time: 30 minutes (how long unused data stays in cache)
+      gcTime: 30 * 60 * 1000, // 30 minutes (previously called cacheTime)
       // Retry failed requests
       retry: 2,
       // Refetch on window focus (disabled for React Native)
       refetchOnWindowFocus: false,
       // Refetch on reconnect
       refetchOnReconnect: true,
-      // Refetch on mount
-      refetchOnMount: true,
+      // Only refetch on mount if data is stale (not always)
+      refetchOnMount: false,
       // Network mode
       networkMode: 'online',
     },

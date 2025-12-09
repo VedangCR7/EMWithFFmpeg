@@ -5,6 +5,7 @@ import homeApi, {
   ProfessionalTemplatesResponse, 
   VideoContentResponse 
 } from '../services/homeApi';
+import { API_CACHE_CONFIG } from '../config/apiCacheConfig';
 
 // Query keys factory for home API
 export const homeApiKeys = {
@@ -30,9 +31,8 @@ export const useFeaturedContent = (
   return useQuery({
     queryKey: homeApiKeys.featured(params),
     queryFn: () => homeApi.getFeaturedContent(params),
-    // TTL will be set based on user configuration
-    // staleTime: 5 * 60 * 1000, // 5 minutes - will be configured
-    // gcTime: 5 * 60 * 1000, // 5 minutes - will be configured
+    staleTime: API_CACHE_CONFIG.home.featured.staleTime,
+    gcTime: API_CACHE_CONFIG.home.featured.gcTime,
     ...options,
   });
 };
@@ -55,7 +55,8 @@ export const useUpcomingEvents = (
   return useQuery({
     queryKey: homeApiKeys.events(params),
     queryFn: () => homeApi.getUpcomingEvents(params),
-    // TTL will be set based on user configuration
+    staleTime: API_CACHE_CONFIG.home.events.staleTime,
+    gcTime: API_CACHE_CONFIG.home.events.gcTime,
     ...options,
   });
 };
@@ -79,7 +80,8 @@ export const useProfessionalTemplates = (
   return useQuery({
     queryKey: homeApiKeys.templates(params),
     queryFn: () => homeApi.getProfessionalTemplates(params),
-    // TTL will be set based on user configuration
+    staleTime: API_CACHE_CONFIG.home.templates.staleTime,
+    gcTime: API_CACHE_CONFIG.home.templates.gcTime,
     ...options,
   });
 };
@@ -103,7 +105,8 @@ export const useVideoContent = (
   return useQuery({
     queryKey: homeApiKeys.videos(params),
     queryFn: () => homeApi.getVideoContent(params),
-    // TTL will be set based on user configuration
+    staleTime: API_CACHE_CONFIG.home.videos.staleTime,
+    gcTime: API_CACHE_CONFIG.home.videos.gcTime,
     ...options,
   });
 };

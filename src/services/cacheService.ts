@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import logger from '../utils/logger';
 
 /**
  * Cache Entry Interface
@@ -29,9 +30,6 @@ class CacheService {
     // Check memory cache first (fastest)
     const memoryEntry = this.memoryCache.get(key);
     if (memoryEntry && Date.now() < memoryEntry.expiresAt) {
-      if (__DEV__) {
-        console.log(`💾 [CACHE HIT] Memory cache: ${key}`);
-      }
       return memoryEntry.data as T;
     }
 
@@ -50,25 +48,16 @@ class CacheService {
         if (now < entry.expiresAt) {
           // Valid cache, restore to memory for faster access
           this.memoryCache.set(key, entry);
-          if (__DEV__) {
-            console.log(`💾 [CACHE HIT] AsyncStorage cache: ${key}`);
-          }
           return entry.data;
         } else {
           // Expired, remove it
           await AsyncStorage.removeItem(`${this.STORAGE_PREFIX}${key}`);
-          if (__DEV__) {
-            console.log(`🗑️ [CACHE EXPIRED] Removed: ${key}`);
-          }
         }
       }
     } catch (error) {
-      console.error(`[CACHE] Error reading from AsyncStorage for key ${key}:`, error);
+      logger.error(`[CACHE] Error reading from AsyncStorage for key ${key}:`, error);
     }
 
-    if (__DEV__) {
-      console.log(`❌ [CACHE MISS] ${key}`);
-    }
     return null;
   }
 
@@ -90,9 +79,8 @@ class CacheService {
     if (this.memoryCache.size > this.MAX_CACHE_SIZE) {
       // Remove oldest entry (first in map)
       const firstKey = this.memoryCache.keys().next().value;
-      this.memoryCache.delete(firstKey);
-      if (__DEV__) {
-        console.log(`🗑️ [CACHE] Evicted oldest entry: ${firstKey}`);
+      if (firstKey) {
+        this.memoryCache.delete(firstKey);
       }
     }
 
@@ -102,11 +90,8 @@ class CacheService {
         `${this.STORAGE_PREFIX}${key}`,
         JSON.stringify(entry)
       );
-      if (__DEV__) {
-        console.log(`💾 [CACHE SET] ${key} (TTL: ${Math.round((ttl || this.DEFAULT_TTL) / 1000)}s)`);
-      }
     } catch (error) {
-      console.error(`[CACHE] Error writing to AsyncStorage for key ${key}:`, error);
+      logger.error(`[CACHE] Error writing to AsyncStorage for key ${key}:`, error);
       // If AsyncStorage fails, we still have memory cache
     }
   }
@@ -130,18 +115,12 @@ class CacheService {
       if (entry && Date.now() >= entry.expiresAt && allowStale) {
         // Cache is stale but we allow stale data
         // Fetch fresh data in background (don't await)
-        if (__DEV__) {
-          console.log(`🔄 [CACHE] Stale data returned, refreshing in background: ${key}`);
-        }
         fetchFn()
           .then(freshData => {
             this.set(key, freshData, ttl);
-            if (__DEV__) {
-              console.log(`✅ [CACHE] Background refresh completed: ${key}`);
-            }
           })
           .catch(err => {
-            console.error(`[CACHE] Background refresh failed for ${key}:`, err);
+            logger.error(`[CACHE] Background refresh failed for ${key}:`, err);
             // Keep stale data if refresh fails
           });
       }
@@ -149,9 +128,6 @@ class CacheService {
     }
 
     // No cache, fetch fresh data
-    if (__DEV__) {
-      console.log(`📡 [CACHE] Fetching fresh data: ${key}`);
-    }
     try {
       const freshData = await fetchFn();
       await this.set(key, freshData, ttl);
@@ -159,7 +135,7 @@ class CacheService {
     } catch (error) {
       // If fetch fails and we have stale cache, return it
       if (cached && allowStale) {
-        console.warn(`[CACHE] Fetch failed, returning stale cache: ${key}`);
+        logger.warn(`[CACHE] Fetch failed, returning stale cache: ${key}`);
         return cached;
       }
       throw error;
@@ -181,11 +157,8 @@ class CacheService {
     this.memoryCache.delete(key);
     try {
       await AsyncStorage.removeItem(`${this.STORAGE_PREFIX}${key}`);
-      if (__DEV__) {
-        console.log(`🗑️ [CACHE] Cleared: ${key}`);
-      }
     } catch (error) {
-      console.error(`[CACHE] Error clearing key ${key}:`, error);
+      logger.error(`[CACHE] Error clearing key ${key}:`, error);
     }
   }
 
@@ -211,11 +184,8 @@ class CacheService {
         k.includes(pattern)
       );
       await AsyncStorage.multiRemove(cacheKeys);
-      if (__DEV__) {
-        console.log(`🗑️ [CACHE] Cleared pattern: ${pattern} (${keysToRemove.length} entries)`);
-      }
     } catch (error) {
-      console.error(`[CACHE] Error clearing pattern ${pattern}:`, error);
+      logger.error(`[CACHE] Error clearing pattern ${pattern}:`, error);
     }
   }
 
@@ -228,11 +198,8 @@ class CacheService {
       const keys = await AsyncStorage.getAllKeys();
       const cacheKeys = keys.filter(k => k.startsWith(this.STORAGE_PREFIX));
       await AsyncStorage.multiRemove(cacheKeys);
-      if (__DEV__) {
-        console.log(`🗑️ [CACHE] Cleared all cache (${cacheKeys.length} entries)`);
-      }
     } catch (error) {
-      console.error('[CACHE] Error clearing all cache:', error);
+      logger.error('[CACHE] Error clearing all cache:', error);
     }
   }
 
@@ -277,12 +244,8 @@ class CacheService {
         await AsyncStorage.multiRemove(expiredKeys);
         expiredCount += expiredKeys.length;
       }
-
-      if (__DEV__ && expiredCount > 0) {
-        console.log(`🗑️ [CACHE] Cleared ${expiredCount} expired entries`);
-      }
     } catch (error) {
-      console.error('[CACHE] Error clearing expired cache:', error);
+      logger.error('[CACHE] Error clearing expired cache:', error);
     }
   }
 

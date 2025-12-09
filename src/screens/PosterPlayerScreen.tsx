@@ -1777,7 +1777,7 @@ const PosterPlayerScreen: React.FC = () => {
                showsVerticalScrollIndicator={true}
                contentContainerStyle={styles.relatedList}
                style={styles.relatedFlatList}
-               // Performance optimizations for large lists
+               // Enhanced performance optimizations for large lists
                removeClippedSubviews={true}
                maxToRenderPerBatch={isTabletDevice ? 8 : 6}
                windowSize={5}

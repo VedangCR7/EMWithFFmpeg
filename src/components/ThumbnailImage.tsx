@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { View, ActivityIndicator, StyleSheet, ViewStyle, ImageStyle, Image, Text, StyleProp, Animated } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import logger from '../utils/logger';
 
 const defaultFallbackSource = require('../assets/MainLogo/MB.png');
 
@@ -69,9 +70,11 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({
     if (sanitizedUri.includes('res.cloudinary.com') && sanitizedUri.includes('/upload/')) {
       try {
         const [prefix, remainder] = sanitizedUri.split('/upload/');
+        
         if (remainder && !remainder.includes('w_')) {
           const transform = 'f_auto,q_auto:best,c_limit,w_800';
-          return `${prefix}/upload/${transform}/${remainder}`;
+          const result = `${prefix}/upload/${transform}/${remainder}`;
+          return result;
         }
       } catch (error) {
         // Fallback to original
@@ -80,9 +83,11 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({
     
     // For other URLs, add high quality size parameters if possible
     if (sanitizedUri.includes('?')) {
-      return `${sanitizedUri}&w=800&q=90`;
+      const result = `${sanitizedUri}&w=800&q=90`;
+      return result;
     } else if (!sanitizedUri.includes('width=') && !sanitizedUri.includes('w=')) {
-      return `${sanitizedUri}?w=800&q=90`;
+      const result = `${sanitizedUri}?w=800&q=90`;
+      return result;
     }
     
     return sanitizedUri;
@@ -180,7 +185,7 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({
         // Cache miss - use optimized URI
         setCachedUri(targetUri);
       } catch (error) {
-        console.warn('Error checking thumbnail cache:', error);
+        logger.warn('Error checking thumbnail cache:', error);
         setCachedUri(targetUri);
       }
     };
@@ -203,7 +208,7 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({
       };
       
       AsyncStorage.setItem(storageKey, JSON.stringify(cacheEntry))
-        .catch(err => console.warn('Error saving thumbnail cache:', err));
+        .catch(err => logger.warn('Error saving thumbnail cache:', err));
     }
   };
 
@@ -239,8 +244,8 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({
     setLoading(false);
     setError(true);
     
-    if (__DEV__ && !nativeError.toLowerCase().includes('network') && !nativeError.toLowerCase().includes('timeout')) {
-      console.warn('⚠️ [THUMBNAIL IMAGE ERROR]', {
+    if (!nativeError.toLowerCase().includes('network') && !nativeError.toLowerCase().includes('timeout')) {
+      logger.warn('⚠️ [THUMBNAIL IMAGE ERROR]', {
         uri: sanitizedUri,
         optimizedUri: optimizedThumbnailUri,
         retriedWithOriginal: uriVariant === 'original',

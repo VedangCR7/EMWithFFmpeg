@@ -1,5 +1,6 @@
 import api from './api';
 import cacheService from './cacheService';
+import logger from '../utils/logger';
 
 // ============================================================================
 // CALENDAR API SERVICE
@@ -62,26 +63,19 @@ class CalendarApiService {
     // If force refresh, clear cache first and wait a bit to ensure it's cleared
     if (forceRefresh) {
       await cacheService.clear(cacheKey);
-      console.log(`🔄 [CALENDAR API] Force refreshing posters for date: ${date} (cache cleared)`);
+      logger.log(`🔄 [CALENDAR API] Force refreshing posters for date: ${date} (cache cleared)`);
     }
 
     // If force refresh, bypass cache entirely and fetch directly
     if (forceRefresh) {
       try {
         // Fetch directly without using cache
-        console.log(`📡 [CALENDAR API] Fetching fresh data (bypassing cache) for date: ${date}`);
+        logger.log(`📡 [CALENDAR API] Fetching fresh data (bypassing cache) for date: ${date}`);
         const response = await api.get(`/api/mobile/calendar/posters/${date}`);
-        
-        console.log('═══════════════════════════════════════════════════════');
-        console.log(`📦 [CALENDAR API] COMPLETE RESPONSE FOR DATE: ${date}`);
-        console.log('═══════════════════════════════════════════════════════');
-        console.log('📋 Response Status:', response.status);
-        console.log('📋 Full Response Data:', JSON.stringify(response.data, null, 2));
-        console.log('═══════════════════════════════════════════════════════');
 
         if (response.data.success) {
           const posters = response.data.data?.posters || response.data.posters || [];
-          console.log(`✅ [CALENDAR API] ${posters.length} poster(s) fetched for ${date}`);
+          logger.log(`✅ [CALENDAR API] ${posters.length} poster(s) fetched for ${date}`);
 
           // Convert backend response to frontend format and fix URLs
           const baseUrl = 'https://eventmarketersbackend.onrender.com';
@@ -133,12 +127,12 @@ class CalendarApiService {
             message: 'Posters fetched successfully',
           };
         } else {
-          console.log('⚠️ [CALENDAR API] Response Success = false (force refresh)');
-          console.log('⚠️ Error from API:', response.data.error || response.data.message);
+          logger.warn('⚠️ [CALENDAR API] Response Success = false (force refresh)');
+          logger.warn('⚠️ Error from API:', response.data.error || response.data.message);
           throw new Error(response.data.error || response.data.message || 'Failed to fetch posters');
         }
       } catch (forceRefreshError) {
-        console.error('❌ [CALENDAR API] Error during force refresh:', forceRefreshError);
+        logger.error('❌ [CALENDAR API] Error during force refresh:', forceRefreshError);
         throw forceRefreshError;
       }
     }
@@ -148,21 +142,13 @@ class CalendarApiService {
       const cachedData = await cacheService.getOrFetch(
         cacheKey,
         async () => {
-          console.log(`📡 [CALENDAR API] Fetching posters for date: ${date}`);
-          console.log(`📡 [CALENDAR API] Endpoint: /api/mobile/calendar/posters/${date}`);
+          logger.log(`📡 [CALENDAR API] Fetching posters for date: ${date}`);
 
           const response = await api.get(`/api/mobile/calendar/posters/${date}`);
 
-          console.log('═══════════════════════════════════════════════════════');
-          console.log(`📦 [CALENDAR API] COMPLETE RESPONSE FOR DATE: ${date}`);
-          console.log('═══════════════════════════════════════════════════════');
-          console.log('📋 Response Status:', response.status);
-          console.log('📋 Full Response Data:', JSON.stringify(response.data, null, 2));
-          console.log('═══════════════════════════════════════════════════════');
-
           if (response.data.success) {
             const posters = response.data.data?.posters || response.data.posters || [];
-            console.log(`✅ [CALENDAR API] ${posters.length} poster(s) fetched for ${date}`);
+            logger.log(`✅ [CALENDAR API] ${posters.length} poster(s) fetched for ${date}`);
 
             // Convert backend response to frontend format and fix URLs
             const baseUrl = 'https://eventmarketersbackend.onrender.com';
@@ -193,7 +179,7 @@ class CalendarApiService {
               } as CalendarPoster;
             });
 
-            console.log(`✅ [CALENDAR API] Cached ${postersWithAbsoluteUrls.length} poster(s) for date: ${date}`);
+            logger.log(`✅ [CALENDAR API] Cached ${postersWithAbsoluteUrls.length} poster(s) for date: ${date}`);
 
             return {
               success: true,
@@ -205,8 +191,8 @@ class CalendarApiService {
               message: 'Posters fetched successfully',
             };
           } else {
-            console.log('⚠️ [CALENDAR API] Response Success = false');
-            console.log('⚠️ Error from API:', response.data.error || response.data.message);
+            logger.warn('⚠️ [CALENDAR API] Response Success = false');
+            logger.warn('⚠️ Error from API:', response.data.error || response.data.message);
             throw new Error(response.data.error || response.data.message || 'Failed to fetch posters');
           }
         },
@@ -216,10 +202,10 @@ class CalendarApiService {
 
       return cachedData;
     } catch (error: any) {
-      console.error('❌ [CALENDAR API] Error fetching posters:', error.message);
+      logger.error('❌ [CALENDAR API] Error fetching posters:', error.message);
       if (error.response) {
-        console.error('   ↳ Status:', error.response.status);
-        console.error('   ↳ Message:', error.response.data?.message);
+        logger.error('   ↳ Status:', error.response.status);
+        logger.error('   ↳ Message:', error.response.data?.message);
       }
 
       // Return empty data when API fails (graceful degradation)
@@ -251,14 +237,13 @@ class CalendarApiService {
       const cachedData = await cacheService.getOrFetch(
         cacheKey,
         async () => {
-          console.log(`📡 [CALENDAR API] Fetching posters for month: ${year}-${month}`);
-          console.log(`📡 [CALENDAR API] Endpoint: /api/mobile/calendar/posters/month/${year}/${month}`);
+          logger.log(`📡 [CALENDAR API] Fetching posters for month: ${year}-${month}`);
 
           const response = await api.get(`/api/mobile/calendar/posters/month/${year}/${month}`);
 
           if (response.data.success) {
             const posters = response.data.data?.posters || response.data.posters || [];
-            console.log(`✅ [CALENDAR API] ${posters.length} poster(s) fetched for month ${year}-${month}`);
+            logger.log(`✅ [CALENDAR API] ${posters.length} poster(s) fetched for month ${year}-${month}`);
 
             // Convert backend response to frontend format
             const baseUrl = 'https://eventmarketersbackend.onrender.com';
@@ -318,7 +303,7 @@ class CalendarApiService {
 
       return cachedData;
     } catch (error: any) {
-      console.error('❌ [CALENDAR API] Error fetching month posters:', error.message);
+      logger.error('❌ [CALENDAR API] Error fetching month posters:', error.message);
       return {
         success: false,
         data: {
@@ -338,11 +323,11 @@ class CalendarApiService {
   clearCache(date?: string): void {
     if (date) {
       cacheService.clear(`calendar_posters_date_${date}`);
-      console.log(`🗑️ [CALENDAR API] Cleared cache for date: ${date}`);
+      logger.log(`🗑️ [CALENDAR API] Cleared cache for date: ${date}`);
     } else {
       // Clear all calendar poster caches
       cacheService.clearPattern('calendar_posters_');
-      console.log('🗑️ [CALENDAR API] Cleared all cache');
+      logger.log('🗑️ [CALENDAR API] Cleared all cache');
     }
   }
 }

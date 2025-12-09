@@ -27,6 +27,7 @@ import downloadTrackingService, { DownloadedContent } from '../services/download
 import authService from '../services/auth';
 import { MainStackParamList } from '../navigation/AppNavigator';
 import { Template } from '../services/dashboard';
+import logger from '../utils/logger';
 
 type MyPostersScreenNavigationProp = StackNavigationProp<MainStackParamList, 'MyPosters'>;
 
@@ -207,7 +208,7 @@ const MyPostersScreen: React.FC = () => {
                 Alert.alert('Error', 'Failed to delete poster');
               }
             } catch (error) {
-              console.error('Error deleting poster:', error);
+              logger.error('Error deleting poster:', error);
               Alert.alert('Error', 'Failed to delete poster');
             }
           },
@@ -240,10 +241,10 @@ const MyPostersScreen: React.FC = () => {
         isDownloaded: true,
       }));
 
-    console.log('📱 [MY POSTERS] Navigating to PosterPlayer');
-    console.log('Selected Poster:', selectedTemplate);
-    console.log('Using imageUri:', poster.imageUri);
-    console.log('Related Posters Count:', relatedTemplates.length);
+    logger.log('📱 [MY POSTERS] Navigating to PosterPlayer');
+    logger.log('Selected Poster:', selectedTemplate);
+    logger.log('Using imageUri:', poster.imageUri);
+    logger.log('Related Posters Count:', relatedTemplates.length);
 
     // Navigate to PosterPlayerScreen
     navigation.navigate('PosterPlayer', {
@@ -287,7 +288,7 @@ const MyPostersScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
     );
-  }, [theme, cardWidth, cardHeight, gap, visibleCards, handleViewPoster, posters]);
+  }, [theme, cardWidth, cardHeight, gap, visibleCards, handleViewPoster]);
 
   const renderCategoryFilter = () => (
     <View style={styles.categoryFilter}>
@@ -471,10 +472,12 @@ const MyPostersScreen: React.FC = () => {
               />
             }
             ListEmptyComponent={renderEmptyState}
+            // Enhanced performance optimizations
             removeClippedSubviews={true}
             maxToRenderPerBatch={isTablet ? 12 : 8}
             windowSize={isTablet ? 10 : 8}
             initialNumToRender={isTablet ? 12 : 8}
+            updateCellsBatchingPeriod={50}
           />
         )}
       </LinearGradient>

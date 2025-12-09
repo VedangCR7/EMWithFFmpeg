@@ -14,76 +14,76 @@ export const API_CACHE_CONFIG = {
   // Home API
   home: {
     featured: {
-      staleTime: 0, // Will be configured - data is immediately stale
-      gcTime: 0, // Will be configured - how long to keep in cache
+      staleTime: minutesToMs(10), // 10 minutes - featured content changes frequently
+      gcTime: minutesToMs(30), // 30 minutes
     },
     events: {
-      staleTime: 0,
-      gcTime: 0,
+      staleTime: minutesToMs(15), // 15 minutes - events update periodically
+      gcTime: hoursToMs(2), // 2 hours
     },
     templates: {
-      staleTime: 0,
-      gcTime: 0,
+      staleTime: minutesToMs(30), // 30 minutes - templates are relatively static
+      gcTime: hoursToMs(4), // 4 hours
     },
     videos: {
-      staleTime: 0,
-      gcTime: 0,
+      staleTime: minutesToMs(30), // 30 minutes - videos are relatively static
+      gcTime: hoursToMs(4), // 4 hours
     },
   },
   
   // Greeting Templates
   greetingTemplates: {
     categories: {
-      staleTime: 0,
-      gcTime: 0,
+      staleTime: hoursToMs(24), // 24 hours - categories rarely change
+      gcTime: hoursToMs(72), // 72 hours
     },
     templates: {
-      staleTime: 0,
-      gcTime: 0,
+      staleTime: minutesToMs(30), // 30 minutes - templates update occasionally
+      gcTime: hoursToMs(4), // 4 hours
     },
     search: {
-      staleTime: 0,
-      gcTime: 0,
+      staleTime: minutesToMs(5), // 5 minutes - search results should be fresh
+      gcTime: minutesToMs(30), // 30 minutes
     },
     byCategory: {
-      staleTime: 0,
-      gcTime: 0,
+      staleTime: minutesToMs(30), // 30 minutes
+      gcTime: hoursToMs(4), // 4 hours
     },
   },
   
   // Business Categories
   businessCategories: {
     list: {
-      staleTime: hoursToMs(30 * 24), // 30 days
+      staleTime: hoursToMs(30 * 24), // 30 days - categories rarely change
       gcTime: hoursToMs(60 * 24), // 60 days
     },
     byId: {
-      staleTime: 0,
-      gcTime: 0,
+      staleTime: hoursToMs(24), // 24 hours
+      gcTime: hoursToMs(72), // 72 hours
     },
     search: {
-      staleTime: 0,
-      gcTime: 0,
+      staleTime: minutesToMs(10), // 10 minutes - search should be fresh
+      gcTime: hoursToMs(2), // 2 hours
     },
   },
   
   // Business Category Posters
   businessCategoryPosters: {
     byCategory: {
-      staleTime: hoursToMs(30 * 24), // 30 days
-      gcTime: hoursToMs(60 * 24), // 60 days
+      staleTime: hoursToMs(24), // 24 hours - posters update daily
+      gcTime: hoursToMs(72), // 72 hours
     },
   },
   
   // Dashboard
   dashboard: {
     templates: {
-      staleTime: 0,
-      gcTime: 0,
+      staleTime: minutesToMs(15), // 15 minutes - dashboard should be relatively fresh
+      gcTime: hoursToMs(2), // 2 hours
     },
     search: {
-      staleTime: 0,
-      gcTime: 0,
+      staleTime: minutesToMs(5), // 5 minutes - search should be fresh
+      gcTime: minutesToMs(30), // 30 minutes
     },
   },
 };

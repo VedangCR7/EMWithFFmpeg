@@ -41,6 +41,7 @@ import responsiveUtils, {
   isTablet,
   isLandscape 
 } from '../utils/responsiveUtils';
+import logger from '../utils/logger';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -855,9 +856,15 @@ const BusinessProfilesScreen: React.FC = () => {
     setEditingProfile(null);
   }, []);
 
-  const renderBusinessCard = useCallback(({ item, index }: { item: any; index: number }) => {
-    // Check if this is the user's main profile (from registration)
-    // Use the profile ID to determine, not the index (so it works correctly during search)
+  // Memoized BusinessCard component for better performance
+  const BusinessCard = React.memo<{
+    item: any;
+    mainProfileId: string | null;
+    imageRefreshKey: number;
+    theme: any;
+    onEdit: (item: any) => void;
+    onDelete: (id: string) => void;
+  }>(({ item, mainProfileId, imageRefreshKey, theme, onEdit, onDelete }) => {
     const isUserOwnProfile = mainProfileId !== null && item.id === mainProfileId;
     
     return (
@@ -876,10 +883,10 @@ const BusinessProfilesScreen: React.FC = () => {
                   resizeMode="cover"
                   key={`${item.id}-logo-${imageRefreshKey}`} // Force re-render with refresh key
                   onError={(error) => {
-                    console.log(`❌ Failed to load logo for ${item.name}:`, error.nativeEvent);
+                    logger.log(`❌ Failed to load logo for ${item.name}:`, error.nativeEvent);
                   }}
                   onLoad={() => {
-                    console.log(`✅ Logo loaded for ${item.name}`);
+                    logger.log(`✅ Logo loaded for ${item.name}`);
                   }}
                 />
               ) : (
@@ -909,13 +916,13 @@ const BusinessProfilesScreen: React.FC = () => {
             <View style={styles.cardActions}>
               <TouchableOpacity
                 style={[styles.actionButton, { backgroundColor: `${theme.colors.primary}20` }]}
-                onPress={() => handleEditProfile(item)}
+                onPress={() => onEdit(item)}
               >
                 <Icon name="edit" size={16} color={theme.colors.primary} />
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.actionButton, { backgroundColor: `${theme.colors.error}20` }]}
-                onPress={() => handleDeleteProfile(item.id)}
+                onPress={() => onDelete(item.id)}
               >
                 <Icon name="delete" size={16} color={theme.colors.error} />
               </TouchableOpacity>
@@ -923,75 +930,107 @@ const BusinessProfilesScreen: React.FC = () => {
           )}
         </View>
 
-      {item.description && (
-        <Text style={[styles.description, { color: theme.colors.textSecondary }]}>
-          {item.description}
-        </Text>
-      )}
+        {item.description && (
+          <Text style={[styles.description, { color: theme.colors.textSecondary }]}>
+            {item.description}
+          </Text>
+        )}
 
-      <View style={styles.contactInfo}>
-        {item.phone && (
-          <View style={styles.contactItem}>
-            <Icon name="phone" size={14} color={theme.colors.textSecondary} />
-            <Text style={[styles.contactText, { color: theme.colors.textSecondary }]}>
-              {item.phone}
-            </Text>
-          </View>
-        )}
-        {item.alternatePhone && (
-          <View style={styles.contactItem}>
-            <Icon name="phone-in-talk" size={14} color={theme.colors.textSecondary} />
-            <Text style={[styles.contactText, { color: theme.colors.textSecondary }]}>
-              {item.alternatePhone} (Alt)
-            </Text>
-          </View>
-        )}
-        {item.email && (
-          <View style={styles.contactItem}>
-            <Icon name="email" size={14} color={theme.colors.textSecondary} />
-            <Text style={[styles.contactText, { color: theme.colors.textSecondary }]}>
-              {item.email}
-            </Text>
-          </View>
-        )}
-        {item.address && (
-          <View style={styles.contactItem}>
-            <Icon name="location-on" size={14} color={theme.colors.textSecondary} />
-            <Text style={[styles.contactText, { color: theme.colors.textSecondary }]}>
-              {item.address}
-            </Text>
-          </View>
-        )}
-        {item.website && (
-          <View style={styles.contactItem}>
-            <Icon name="language" size={14} color={theme.colors.textSecondary} />
-            <Text style={[styles.contactText, { color: theme.colors.textSecondary }]}>
-              {item.website}
-            </Text>
+        <View style={styles.contactInfo}>
+          {item.phone && (
+            <View style={styles.contactItem}>
+              <Icon name="phone" size={14} color={theme.colors.textSecondary} />
+              <Text style={[styles.contactText, { color: theme.colors.textSecondary }]}>
+                {item.phone}
+              </Text>
+            </View>
+          )}
+          {item.alternatePhone && (
+            <View style={styles.contactItem}>
+              <Icon name="phone-in-talk" size={14} color={theme.colors.textSecondary} />
+              <Text style={[styles.contactText, { color: theme.colors.textSecondary }]}>
+                {item.alternatePhone} (Alt)
+              </Text>
+            </View>
+          )}
+          {item.email && (
+            <View style={styles.contactItem}>
+              <Icon name="email" size={14} color={theme.colors.textSecondary} />
+              <Text style={[styles.contactText, { color: theme.colors.textSecondary }]}>
+                {item.email}
+              </Text>
+            </View>
+          )}
+          {item.address && (
+            <View style={styles.contactItem}>
+              <Icon name="location-on" size={14} color={theme.colors.textSecondary} />
+              <Text style={[styles.contactText, { color: theme.colors.textSecondary }]}>
+                {item.address}
+              </Text>
+            </View>
+          )}
+          {item.website && (
+            <View style={styles.contactItem}>
+              <Icon name="language" size={14} color={theme.colors.textSecondary} />
+              <Text style={[styles.contactText, { color: theme.colors.textSecondary }]}>
+                {item.website}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {item.services && item.services.length > 0 && (
+          <View style={styles.servicesContainer}>
+            <Text style={[styles.servicesTitle, { color: theme.colors.text }]}>Services:</Text>
+            <View style={styles.servicesList}>
+              {item.services.slice(0, 3).map((service: string, index: number) => (
+                <View key={`${item.id}-service-${index}-${service}`} style={[styles.serviceTag, { backgroundColor: `${theme.colors.primary}20` }]}>
+                  <Text style={[styles.serviceText, { color: theme.colors.primary }]}>{service}</Text>
+                </View>
+              ))}
+              {item.services.length > 3 && (
+                <View key={`${item.id}-more-services`} style={[styles.serviceTag, { backgroundColor: `${theme.colors.textSecondary}20` }]}>
+                  <Text style={[styles.serviceText, { color: theme.colors.textSecondary }]}>
+                    +{item.services.length - 3} more
+                  </Text>
+                </View>
+              )}
+            </View>
           </View>
         )}
       </View>
+    );
+  }, (prevProps, nextProps) => {
+    // Only re-render if item data, mainProfileId, imageRefreshKey, or theme changes
+    return (
+      prevProps.item.id === nextProps.item.id &&
+      prevProps.item.name === nextProps.item.name &&
+      prevProps.item.category === nextProps.item.category &&
+      prevProps.item.description === nextProps.item.description &&
+      prevProps.item.companyLogo === nextProps.item.companyLogo &&
+      prevProps.item.logo === nextProps.item.logo &&
+      prevProps.item.phone === nextProps.item.phone &&
+      prevProps.item.email === nextProps.item.email &&
+      prevProps.item.address === nextProps.item.address &&
+      prevProps.item.website === nextProps.item.website &&
+      JSON.stringify(prevProps.item.services) === JSON.stringify(nextProps.item.services) &&
+      prevProps.mainProfileId === nextProps.mainProfileId &&
+      prevProps.imageRefreshKey === nextProps.imageRefreshKey &&
+      prevProps.theme.colors.primary === nextProps.theme.colors.primary &&
+      prevProps.theme.colors.text === nextProps.theme.colors.text
+    );
+  });
 
-      {item.services && item.services.length > 0 && (
-        <View style={styles.servicesContainer}>
-          <Text style={[styles.servicesTitle, { color: theme.colors.text }]}>Services:</Text>
-          <View style={styles.servicesList}>
-            {item.services.slice(0, 3).map((service: string, index: number) => (
-              <View key={`${item.id}-service-${index}-${service}`} style={[styles.serviceTag, { backgroundColor: `${theme.colors.primary}20` }]}>
-                <Text style={[styles.serviceText, { color: theme.colors.primary }]}>{service}</Text>
-              </View>
-            ))}
-            {item.services.length > 3 && (
-              <View key={`${item.id}-more-services`} style={[styles.serviceTag, { backgroundColor: `${theme.colors.textSecondary}20` }]}>
-                <Text style={[styles.serviceText, { color: theme.colors.textSecondary }]}>
-                  +{item.services.length - 3} more
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
-      )}
-    </View>
+  const renderBusinessCard = useCallback(({ item, index }: { item: any; index: number }) => {
+    return (
+      <BusinessCard
+        item={item}
+        mainProfileId={mainProfileId}
+        imageRefreshKey={imageRefreshKey}
+        theme={theme}
+        onEdit={handleEditProfile}
+        onDelete={handleDeleteProfile}
+      />
     );
   }, [mainProfileId, imageRefreshKey, theme, handleEditProfile, handleDeleteProfile]);
 
@@ -1059,9 +1098,12 @@ const BusinessProfilesScreen: React.FC = () => {
           showsVerticalScrollIndicator={false}
           onRefresh={onRefresh}
           refreshing={refreshing}
+          // Enhanced performance optimizations
           removeClippedSubviews={true}
           maxToRenderPerBatch={5}
           windowSize={10}
+          initialNumToRender={5}
+          updateCellsBatchingPeriod={50}
           ListEmptyComponent={
             !loading ? (
               <View style={styles.emptyStateContainer}>
