@@ -663,22 +663,13 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
     <View style={styles.container}>
       {/* Section Header */}
       <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text, fontWeight: 'bold' }]}>
-          Festivals
-        </Text>
         <TouchableOpacity
-          style={styles.viewMoreButton}
           onPress={handleViewMore}
-          activeOpacity={0.85}
+          activeOpacity={0.7}
         >
-          <LinearGradient
-            colors={[theme.colors.secondary, theme.colors.primary]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.viewMoreButtonGradient}
-          >
-            <Text style={styles.viewMoreButtonText}>View More</Text>
-          </LinearGradient>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text, fontWeight: 'bold' }]}>
+            Festive alerts
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -819,7 +810,7 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
               <View style={styles.modalHeader}>
                 <View style={styles.modalTitleContainer}>
                   <Text style={styles.modalTitle}>
-                    All Festival Posters
+                    All Festive Alert Posters
                   </Text>
                 </View>
                 <TouchableOpacity
@@ -892,10 +883,10 @@ const styles = StyleSheet.create({
   },
   dayCell: {
     width: isTablet ? 60 : 50,
-    height: isTablet ? 75 : 65,
+    height: isTablet ? 60 : 50,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: moderateScale(8),
+    borderRadius: isTablet ? 30 : 25,
     paddingVertical: moderateScale(6),
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.1)',
@@ -934,8 +925,8 @@ const styles = StyleSheet.create({
   },
   gradientBorderWrapper: {
     width: isTablet ? 60 : 50,
-    height: isTablet ? 75 : 65,
-    borderRadius: moderateScale(10),
+    height: isTablet ? 60 : 50,
+    borderRadius: isTablet ? 30 : 25,
     position: 'relative',
     justifyContent: 'center',
     alignItems: 'center',
@@ -943,19 +934,19 @@ const styles = StyleSheet.create({
   },
   gradientBorderInner: {
     position: 'absolute',
-    borderRadius: moderateScale(8),
+    borderRadius: isTablet ? 30 : 25,
     overflow: 'hidden',
   },
   runningBorderOverlay: {
     position: 'absolute',
     width: isTablet ? 60 : 50,
-    height: isTablet ? 75 : 65,
-    borderRadius: moderateScale(12),
+    height: isTablet ? 60 : 50,
+    borderRadius: isTablet ? 30 : 25,
     overflow: 'hidden',
   },
   gradientBorderFill: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: moderateScale(12),
+    borderRadius: isTablet ? 30 : 25,
   },
   postersSection: {
     marginTop: moderateScale(10),

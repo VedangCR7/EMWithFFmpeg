@@ -1744,15 +1744,21 @@ const HomeScreen: React.FC = React.memo(() => {
       setIsSearching(true);
       setDisableBackgroundUpdates(true);
       
-      // Combine professional templates, greeting templates, and calendar posters for unified search
-      const allTemplates = [...professionalTemplates, ...allGreetingTemplates, ...calendarPosters];
-      
-      if (__DEV__) {
-      }
-      
       // Use local search immediately for better performance
       // Search in name, category, description, and tags
       const searchLower = searchQuery.toLowerCase();
+      
+      // Check if search query matches any General Category name
+      const matchingCategories = filteredGreetingCategoriesList.filter(category => 
+        category.name.toLowerCase().includes(searchLower) || 
+        searchLower.includes(category.name.toLowerCase())
+      );
+      const matchingCategoryNames = matchingCategories.map(category => category.name.toLowerCase());
+      
+      // Combine professional templates, greeting templates, and calendar posters for unified search
+      const allTemplates = [...professionalTemplates, ...allGreetingTemplates, ...calendarPosters];
+      
+      // First, show immediate local results
       const filtered = allTemplates.filter(template => {
         // Search in name
         if (template.name?.toLowerCase().includes(searchLower)) return true;
@@ -1765,9 +1771,13 @@ const HomeScreen: React.FC = React.memo(() => {
         
         // Search in tags array (including calendar posters tags)
         if (template.tags && Array.isArray(template.tags)) {
-          const tagMatch = template.tags.some((tag: string) => 
-            tag?.toLowerCase().includes(searchLower)
-          );
+          const tagMatch = template.tags.some((tag: string) => {
+            const tagLower = tag?.toLowerCase();
+            if (tagLower?.includes(searchLower)) return true;
+            // Check if tag matches any matching category name
+            if (matchingCategoryNames.some(catName => tagLower?.includes(catName))) return true;
+            return false;
+          });
           if (tagMatch) return true;
         }
         
@@ -1776,15 +1786,73 @@ const HomeScreen: React.FC = React.memo(() => {
           return true;
         }
         
+        // Check if template category matches any General Category name
+        if (template.category && matchingCategoryNames.some(catName => 
+          template.category?.toLowerCase().includes(catName)
+        )) {
+          return true;
+        }
+        
         return false;
       });
       
-      if (__DEV__) {
-        if (filtered.length > 0) {
-        }
-      }
+      // Remove duplicates based on id
+      const uniqueFiltered = Array.from(
+        new Map(filtered.map(template => [template.id, template])).values()
+      );
       
-      setTemplates(filtered);
+      // Set initial results immediately
+      setTemplates(uniqueFiltered);
+      
+      // Then fetch General Category templates if search matches a category and update results
+      if (matchingCategories.length > 0) {
+        (async () => {
+          try {
+            const generalCategoryResultsPromises = matchingCategories.map(async (category) => {
+              try {
+                const categoryTemplates = await greetingTemplatesService.searchTemplates(category.name);
+                return categoryTemplates;
+              } catch (error) {
+                if (__DEV__) {
+                  devWarn(`Failed to search category ${category.name}:`, error);
+                }
+                return [];
+              }
+            });
+            
+            const generalCategoryResultsArrays = await Promise.all(generalCategoryResultsPromises);
+            const generalCategoryResults = generalCategoryResultsArrays.flat();
+            
+            // Convert general category results to Template format
+            const convertedGeneralCategoryResults = generalCategoryResults.map(greetingTemplate => ({
+              id: greetingTemplate.id,
+              name: greetingTemplate.name || '',
+              thumbnail: greetingTemplate.thumbnail || '',
+              category: greetingTemplate.category || 'Greeting',
+              downloads: greetingTemplate.downloads || 0,
+              isDownloaded: greetingTemplate.isDownloaded || false,
+              description: greetingTemplate.content?.text || '',
+              tags: (greetingTemplate as any).tags || [],
+              isGreeting: true,
+              originalTemplate: greetingTemplate,
+            }));
+            
+            // Combine with existing results and remove duplicates
+            const allResults = [...uniqueFiltered, ...convertedGeneralCategoryResults];
+            const finalUniqueResults = Array.from(
+              new Map(allResults.map(template => [template.id, template])).values()
+            );
+            
+            if (currentRequestId === requestId) {
+              setTemplates(finalUniqueResults);
+            }
+          } catch (error) {
+            if (__DEV__) {
+              devWarn('Failed to fetch General Category templates:', error);
+            }
+          }
+        })();
+      }
       
       // Try API search in background for professional templates
       setTimeout(async () => {
@@ -1795,6 +1863,29 @@ const HomeScreen: React.FC = React.memo(() => {
           
           // Search greeting templates via API
           const greetingResults = await greetingTemplatesService.searchTemplates(searchQuery);
+          
+          // Check if search query matches any General Category name
+          const searchLower = searchQuery.toLowerCase();
+          const matchingCategories = filteredGreetingCategoriesList.filter(category => 
+            category.name.toLowerCase().includes(searchLower) || 
+            searchLower.includes(category.name.toLowerCase())
+          );
+          
+          // Search for templates in matching General Categories
+          const generalCategoryResultsPromises = matchingCategories.map(async (category) => {
+            try {
+              const categoryTemplates = await greetingTemplatesService.searchTemplates(category.name);
+              return categoryTemplates;
+            } catch (error) {
+              if (__DEV__) {
+                devWarn(`Failed to search category ${category.name}:`, error);
+              }
+              return [];
+            }
+          });
+          
+          const generalCategoryResultsArrays = await Promise.all(generalCategoryResultsPromises);
+          const generalCategoryResults = generalCategoryResultsArrays.flat();
           
           // Convert greeting results to Template format
           const convertedGreetingResults = greetingResults.map(greetingTemplate => ({
@@ -1810,11 +1901,28 @@ const HomeScreen: React.FC = React.memo(() => {
             originalTemplate: greetingTemplate,
           }));
           
-          // Combine results
-          const combinedResults = [...professionalResults, ...convertedGreetingResults];
+          // Convert general category results to Template format
+          const convertedGeneralCategoryResults = generalCategoryResults.map(greetingTemplate => ({
+            id: greetingTemplate.id,
+            name: greetingTemplate.name || '',
+            thumbnail: greetingTemplate.thumbnail || '',
+            category: greetingTemplate.category || 'Greeting',
+            downloads: greetingTemplate.downloads || 0,
+            isDownloaded: greetingTemplate.isDownloaded || false,
+            description: greetingTemplate.content?.text || '',
+            tags: (greetingTemplate as any).tags || [],
+            isGreeting: true,
+            originalTemplate: greetingTemplate,
+          }));
+          
+          // Combine results and remove duplicates based on id
+          const allResults = [...professionalResults, ...convertedGreetingResults, ...convertedGeneralCategoryResults];
+          const uniqueResults = Array.from(
+            new Map(allResults.map(template => [template.id, template])).values()
+          );
           
           if (currentRequestId === requestId) {
-            setTemplates(combinedResults);
+            setTemplates(uniqueResults);
           }
         } catch (error) {
           if (__DEV__) {
@@ -1828,7 +1936,7 @@ const HomeScreen: React.FC = React.memo(() => {
 
     // Cleanup timeout on unmount or when searchQuery changes
     return () => clearTimeout(timeoutId);
-  }, [searchQuery, professionalTemplates, allGreetingTemplates, calendarPosters, currentRequestId]);
+  }, [searchQuery, professionalTemplates, allGreetingTemplates, calendarPosters, currentRequestId, filteredGreetingCategoriesList]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -1934,10 +2042,24 @@ const HomeScreen: React.FC = React.memo(() => {
     setIsSearching(true);
     setDisableBackgroundUpdates(true); // Disable background updates when searching
     // Use local search immediately for better performance with API data
-    const filtered = professionalTemplates.filter(template => 
-      template.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      template.category?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const searchLower = searchQuery.toLowerCase();
+    
+    // Check if search query matches any General Category name
+    const matchingCategoryNames = filteredGreetingCategoriesList
+      .filter(category => 
+        category.name.toLowerCase().includes(searchLower) || 
+        searchLower.includes(category.name.toLowerCase())
+      )
+      .map(category => category.name.toLowerCase());
+    
+    const filtered = professionalTemplates.filter(template => {
+      const nameMatch = template.name?.toLowerCase().includes(searchLower);
+      const categoryMatch = template.category?.toLowerCase().includes(searchLower);
+      const generalCategoryMatch = template.category && matchingCategoryNames.some(catName => 
+        template.category?.toLowerCase().includes(catName)
+      );
+      return nameMatch || categoryMatch || generalCategoryMatch;
+    });
     setTemplates(filtered);
     
     // Try API search in background
@@ -1947,15 +2069,52 @@ const HomeScreen: React.FC = React.memo(() => {
       
       try {
         const results = await dashboardService.searchTemplates(searchQuery);
+        
+        // Search for templates in matching General Categories
+        const generalCategoryResultsPromises = matchingCategoryNames.map(async (categoryName) => {
+          try {
+            const categoryTemplates = await greetingTemplatesService.searchTemplates(categoryName);
+            return categoryTemplates;
+          } catch (error) {
+            if (__DEV__) {
+              devWarn(`Failed to search category ${categoryName}:`, error);
+            }
+            return [];
+          }
+        });
+        
+        const generalCategoryResultsArrays = await Promise.all(generalCategoryResultsPromises);
+        const generalCategoryResults = generalCategoryResultsArrays.flat();
+        
+        // Convert general category results to Template format
+        const convertedGeneralCategoryResults = generalCategoryResults.map(greetingTemplate => ({
+          id: greetingTemplate.id,
+          name: greetingTemplate.name || '',
+          thumbnail: greetingTemplate.thumbnail || '',
+          category: greetingTemplate.category || 'Greeting',
+          downloads: greetingTemplate.downloads || 0,
+          isDownloaded: greetingTemplate.isDownloaded || false,
+          description: greetingTemplate.content?.text || '',
+          tags: (greetingTemplate as any).tags || [],
+          isGreeting: true,
+          originalTemplate: greetingTemplate,
+        }));
+        
+        // Combine results and remove duplicates
+        const allResults = [...results, ...convertedGeneralCategoryResults];
+        const uniqueResults = Array.from(
+          new Map(allResults.map(template => [template.id, template])).values()
+        );
+        
         // Only update if this is still the current request and we're still searching
         if (currentRequestId === requestId && isSearching) {
-          setTemplates(results);
+          setTemplates(uniqueResults);
         }
       } catch (error) {
         devError('Search error:', error);
       }
     }, 100);
-  }, [searchQuery, activeTab, professionalTemplates, currentRequestId, isSearching]);
+  }, [searchQuery, activeTab, professionalTemplates, currentRequestId, isSearching, filteredGreetingCategoriesList]);
 
   // Memoized lookup maps for O(1) access instead of O(n) find operations
 const videoContentMap = useMemo(() => {
@@ -3411,39 +3570,132 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
           )}
 
           {/* Search Results - Shown only when searching */}
-          {isSearching && searchQuery.trim() !== '' && (
-            <View style={styles.templatesSection}>
-              <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
-                  Search Results
-                </Text>
-              </View>
-              {templates.length > 0 ? (
-                <FlatList
-                  key={`search-results-${templates.length}`}
-                  data={templates}
-                  renderItem={renderTemplate}
-                  keyExtractor={keyExtractor}
-                  horizontal={true}
-                  showsHorizontalScrollIndicator={false}
-                  nestedScrollEnabled={true}
-                  removeClippedSubviews={true}
-                  maxToRenderPerBatch={3}
-                  windowSize={2}
-                  initialNumToRender={3}
-                  updateCellsBatchingPeriod={150}
-                  getItemLayout={getItemLayout}
-                  contentContainerStyle={styles.horizontalList}
-                />
-              ) : (
-                <View style={{ padding: 20, alignItems: 'center' }}>
-                  <Text style={{ color: theme.colors.textSecondary, fontSize: 14 }}>
-                    No results found for "{searchQuery}"
-                  </Text>
+          {isSearching && searchQuery.trim() !== '' && (() => {
+            const searchLower = searchQuery.toLowerCase();
+            const matchingCategories = filteredGreetingCategoriesList.filter(category => 
+              category.name.toLowerCase().includes(searchLower) || 
+              searchLower.includes(category.name.toLowerCase())
+            );
+            
+            return (
+              <>
+                {/* Show matching General Categories */}
+                {matchingCategories.length > 0 && (
+                  <View style={styles.templatesSection}>
+                    <View style={styles.sectionHeader}>
+                      <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
+                        Categories
+                      </Text>
+                    </View>
+                    <FlatList
+                      data={matchingCategories}
+                      renderItem={({ item: category }) => {
+                        const categoryImage = memoizedGreetingCategoryImages[category.id] || category.imageUrl || null;
+                        return (
+                          <TouchableOpacity
+                            activeOpacity={0.85}
+                            style={[styles.businessCategoryCard, { width: cardWidth, marginRight: moderateScale(3) }]}
+                            onPress={() => handleGreetingCategoryPress(category)}
+                          >
+                            <View style={[
+                              styles.businessCategoryCardContent, 
+                              { 
+                                backgroundColor: theme.colors.cardBackground,
+                                height: cardWidth,
+                              }
+                            ]}>
+                              <View style={styles.businessCategoryImageSection}>
+                                {categoryImage ? (
+                                  <OptimizedImage 
+                                    uri={categoryImage} 
+                                    style={styles.businessCategoryImage}
+                                    resizeMode="cover"
+                                    mode="thumbnail"
+                                    cacheKey={`greeting_category_${category.id}`}
+                                  />
+                                ) : (
+                                  <View
+                                    style={[
+                                      styles.businessCategoryImage,
+                                      { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.05)' },
+                                    ]}
+                                  >
+                                    {category.icon ? (
+                                      <Text style={styles.businessCategoryIcon}>
+                                        {category.icon}
+                                      </Text>
+                                    ) : null}
+                                  </View>
+                                )}
+                                <LinearGradient
+                                  colors={['transparent', 'rgba(0,0,0,0.75)']}
+                                  style={StyleSheet.absoluteFillObject}
+                                  pointerEvents="none"
+                                />
+                                <View
+                                  style={[
+                                    StyleSheet.absoluteFillObject,
+                                    { justifyContent: 'flex-end', padding: 6 },
+                                  ]}
+                                  pointerEvents="none"
+                                >
+                                  <Text 
+                                    style={[styles.businessCategoryName, { color: '#ffffff', textAlign: 'left' }]}
+                                    numberOfLines={1}
+                                    ellipsizeMode="tail"
+                                  >
+                                    {category.name}
+                                  </Text>
+                                </View>
+                              </View>
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      }}
+                      keyExtractor={(item) => `category-${item.id}`}
+                      horizontal={true}
+                      showsHorizontalScrollIndicator={false}
+                      nestedScrollEnabled={true}
+                      contentContainerStyle={styles.horizontalList}
+                    />
+                  </View>
+                )}
+                
+                {/* Show matching Templates */}
+                <View style={styles.templatesSection}>
+                  <View style={styles.sectionHeader}>
+                    <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
+                      {matchingCategories.length > 0 ? 'Templates' : 'Search Results'}
+                    </Text>
+                  </View>
+                  {templates.length > 0 ? (
+                    <FlatList
+                      key={`search-results-${templates.length}`}
+                      data={templates}
+                      renderItem={renderTemplate}
+                      keyExtractor={keyExtractor}
+                      horizontal={true}
+                      showsHorizontalScrollIndicator={false}
+                      nestedScrollEnabled={true}
+                      removeClippedSubviews={true}
+                      maxToRenderPerBatch={3}
+                      windowSize={2}
+                      initialNumToRender={3}
+                      updateCellsBatchingPeriod={150}
+                      getItemLayout={getItemLayout}
+                      contentContainerStyle={styles.horizontalList}
+                    />
+                  ) : matchingCategories.length === 0 ? (
+                    <View style={{ padding: 20, alignItems: 'center' }}>
+                      <Text style={{ color: theme.colors.textSecondary, fontSize: 14 }}>
+                        No results found for "{searchQuery}"
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
-              )}
-            </View>
-          )}
+              </>
+            );
+          })()}
 
           {/* Video Section - Hidden when searching */}
           {!isSearching && searchQuery.trim() === '' && videoContent.length > 0 && (

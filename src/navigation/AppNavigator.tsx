@@ -963,7 +963,7 @@ const CustomTabBar = (props: any) => {
               }}
             >
               <Image 
-                source={require('../assets/floatingLogo/1.png')}
+                source={require('../assets/floatingLogo/7.png')}
                 style={{
                   width: '120%',
                   height: '120%',
