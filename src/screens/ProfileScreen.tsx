@@ -1590,11 +1590,11 @@ const ProfileScreen: React.FC = () => {
 
   return (
     <SafeAreaView 
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
+      style={[styles.container, { backgroundColor: theme.colors.gradient[0] || '#e8e8e8' }]}
       edges={['top', 'left', 'right']}
     >
       <StatusBar 
-        barStyle="dark-content"
+        barStyle={isDarkMode ? "light-content" : "dark-content"}
         backgroundColor="transparent" 
         translucent={true}
       />

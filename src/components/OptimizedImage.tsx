@@ -91,7 +91,7 @@ const getTargetWidth = (style?: StyleProp<ViewStyle | ImageStyle>): number => {
   return CLOUDINARY_DEFAULT_WIDTH;
 };
 
-const applyCloudinaryTransform = (input: string, targetWidth: number): string => {
+const applyCloudinaryTransform = (input: string, targetWidth: number, highQuality: boolean = false): string => {
   if (!input || !input.includes('res.cloudinary.com') || !input.includes(CLOUDINARY_UPLOAD_SEGMENT)) {
     return input;
   }
@@ -102,6 +102,27 @@ const applyCloudinaryTransform = (input: string, targetWidth: number): string =>
       return input;
     }
 
+    // For high quality, always apply our transform (override existing)
+    if (highQuality) {
+      // Find the version and image path
+      const parts = remainder.split('/');
+      let versionIndex = -1;
+      for (let i = 0; i < parts.length; i++) {
+        if (/^v\d+/.test(parts[i])) {
+          versionIndex = i;
+          break;
+        }
+      }
+      
+      if (versionIndex >= 0) {
+        // Reconstruct with high quality transform
+        const version = parts[versionIndex];
+        const imagePath = parts.slice(versionIndex + 1).join('/');
+        const transform = `f_auto,q_auto:best,c_limit,w_${targetWidth}`;
+        return `${prefix}${CLOUDINARY_UPLOAD_SEGMENT}${transform}/${version}/${imagePath}`;
+      }
+    }
+
     const [firstSegment, ...restSegments] = remainder.split('/');
 
     // If the first segment is not a version string, we assume a transform already exists
@@ -110,7 +131,9 @@ const applyCloudinaryTransform = (input: string, targetWidth: number): string =>
     }
 
     const restPath = [firstSegment, ...restSegments].join('/');
-    const transform = `${CLOUDINARY_BASE_TRANSFORM},w_${targetWidth}`;
+    // Use high quality for carousel images
+    const qualityTransform = highQuality ? 'f_auto,q_auto:best,c_limit' : CLOUDINARY_BASE_TRANSFORM;
+    const transform = `${qualityTransform},w_${targetWidth}`;
     return `${prefix}${CLOUDINARY_UPLOAD_SEGMENT}${transform}/${restPath}`;
   } catch (error) {
     return input;
@@ -192,11 +215,21 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const shimmerAnim = useRef(new Animated.Value(0)).current;
-  const targetWidth = useMemo(() => getTargetWidth(style), [style]);
+  const baseTargetWidth = useMemo(() => getTargetWidth(style), [style]);
+  // For high quality mode, request 2x resolution for retina displays
+  const targetWidth = useMemo(() => {
+    if (actualMode === 'full') {
+      // Request 2x width for high quality on retina displays
+      return Math.min(2400, Math.max(baseTargetWidth, baseTargetWidth * 2));
+    }
+    return baseTargetWidth;
+  }, [baseTargetWidth, actualMode]);
   const displayUri = useMemo(() => (sanitizedUri ? ensureImageUri(sanitizedUri) : ''), [sanitizedUri]);
+  // Use high quality when mode is 'full'
+  const useHighQuality = actualMode === 'full';
   const optimizedUri = useMemo(
-    () => (displayUri ? applyCloudinaryTransform(displayUri, targetWidth) : ''),
-    [displayUri, targetWidth],
+    () => (displayUri ? applyCloudinaryTransform(displayUri, targetWidth, useHighQuality) : ''),
+    [displayUri, targetWidth, useHighQuality],
   );
 
   // Shimmer animation effect

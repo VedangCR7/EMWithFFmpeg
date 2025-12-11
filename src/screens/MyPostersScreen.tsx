@@ -387,7 +387,7 @@ const MyPostersScreen: React.FC = () => {
 
   return (
     <SafeAreaView 
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
+      style={[styles.container, { backgroundColor: theme.colors.gradient[0] || '#e8e8e8' }]}
       edges={['top', 'left', 'right']}
     >
       <StatusBar 

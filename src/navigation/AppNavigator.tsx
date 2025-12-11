@@ -275,6 +275,7 @@ const CustomTabBar = (props: any) => {
   const [isLoadingPosters, setIsLoadingPosters] = React.useState(false);
   
   const isPosterPlayerFocused = props.state.routes[props.state.index]?.name === 'PosterPlayer';
+  const isHomeFocused = props.state.routes[props.state.index]?.name === 'Home';
   
   // Dynamic dimensions for screen rotation/resize support
   const [dimensions, setDimensions] = React.useState(() => {
@@ -392,7 +393,26 @@ const CustomTabBar = (props: any) => {
   const bgColorAnim = React.useRef(new Animated.Value(0)).current;
   const entranceAnim = React.useRef(new Animated.Value(0)).current;
 
-  React.useEffect(() => {
+  // Store animation references to restart them when Home is focused
+  const animationRefs = React.useRef<{
+    pulseAnimation?: Animated.CompositeAnimation;
+    borderAnimation?: Animated.CompositeAnimation;
+    shadowAnimation?: Animated.CompositeAnimation;
+    floatAnimation?: Animated.CompositeAnimation;
+    rippleAnimation1?: Animated.CompositeAnimation;
+    rippleAnimation2?: Animated.CompositeAnimation;
+    logoRotationAnimation?: Animated.CompositeAnimation;
+    sparkleAnimation?: Animated.CompositeAnimation;
+    bgColorAnimation?: Animated.CompositeAnimation;
+    entranceAnimation?: Animated.CompositeAnimation;
+  }>({});
+
+  const startAnimations = React.useCallback(() => {
+    // Stop existing animations first
+    Object.values(animationRefs.current).forEach(anim => {
+      if (anim) anim.stop();
+    });
+
     // Pulse animation
     const pulseAnimation = Animated.loop(
       Animated.sequence([
@@ -555,6 +575,21 @@ const CustomTabBar = (props: any) => {
       }),
     ]);
 
+    // Store animation references
+    animationRefs.current = {
+      pulseAnimation,
+      borderAnimation,
+      shadowAnimation,
+      floatAnimation,
+      rippleAnimation1,
+      rippleAnimation2,
+      logoRotationAnimation,
+      sparkleAnimation,
+      bgColorAnimation,
+      entranceAnimation,
+    };
+
+    // Start all animations
     pulseAnimation.start();
     borderAnimation.start();
     shadowAnimation.start();
@@ -565,19 +600,26 @@ const CustomTabBar = (props: any) => {
     sparkleAnimation.start();
     bgColorAnimation.start();
     entranceAnimation.start();
+  }, [pulseAnim, borderAnim, shadowAnim, floatAnim, rippleAnim1, rippleAnim2, logoRotateAnim, sparkleAnim, bgColorAnim, entranceAnim]);
+
+  // Start animations on mount
+  React.useEffect(() => {
+    startAnimations();
 
     return () => {
-      pulseAnimation.stop();
-      borderAnimation.stop();
-      shadowAnimation.stop();
-      floatAnimation.stop();
-      rippleAnimation1.stop();
-      rippleAnimation2.stop();
-      logoRotationAnimation.stop();
-      sparkleAnimation.stop();
-      bgColorAnimation.stop();
+      // Stop all animations on unmount
+      Object.values(animationRefs.current).forEach(anim => {
+        if (anim) anim.stop();
+      });
     };
-  }, [pulseAnim, borderAnim, shadowAnim, floatAnim, rippleAnim1, rippleAnim2, logoRotateAnim, sparkleAnim, bgColorAnim, entranceAnim]);
+  }, [startAnimations]);
+
+  // Restart animations when Home screen is focused
+  React.useEffect(() => {
+    if (isHomeFocused) {
+      startAnimations();
+    }
+  }, [isHomeFocused, startAnimations]);
 
   const pulseScale = pulseAnim;
   const animatedBorderWidth = borderAnim.interpolate({
@@ -856,20 +898,21 @@ const CustomTabBar = (props: any) => {
       </View>
     </Modal>
 
-    {/* Floating Action Button - Today's Pick */}
-    <Animated.View
-      style={{
-        position: 'absolute',
-        bottom: fabBottomOffset,
-        right: currentModerateScale(16),
-        transform: [
-          { scale: pulseScale },
-          { translateY: floatTranslateY },
-          { scale: entranceScale },
-        ],
-        zIndex: 1001,
-      }}
-    >
+    {/* Floating Action Button - Today's Pick - Only show on Home screen */}
+    {isHomeFocused && (
+      <Animated.View
+        style={{
+          position: 'absolute',
+          bottom: fabBottomOffset,
+          right: currentModerateScale(16),
+          transform: [
+            { scale: pulseScale },
+            { translateY: floatTranslateY },
+            { scale: entranceScale },
+          ],
+          zIndex: 1001,
+        }}
+      >
       {/* Ripple Effect 1 */}
       <Animated.View
         style={{
@@ -981,6 +1024,7 @@ const CustomTabBar = (props: any) => {
         </Animated.View>
       </Animated.View>
     </Animated.View>
+    )}
     </View>
   );
 };

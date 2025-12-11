@@ -78,7 +78,7 @@ const createPlaceholderPoster = (category: GreetingCategory): Template => ({
 const SMALL_SCREEN_WIDTH_THRESHOLD = 450;
 
 const GreetingTemplatesScreen: React.FC = () => {
-  const { theme } = useTheme();
+  const { isDarkMode, theme } = useTheme();
   const navigation = useNavigation<StackNavigationProp<MainStackParamList>>();
   const insets = useSafeAreaInsets();
 
@@ -529,11 +529,11 @@ const GreetingTemplatesScreen: React.FC = () => {
 
   return (
     <SafeAreaView 
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
+      style={[styles.container, { backgroundColor: theme.colors.gradient[0] || '#e8e8e8' }]}
       edges={safeAreaEdges}
     >
       <StatusBar 
-        barStyle="dark-content"
+        barStyle={isDarkMode ? "light-content" : "dark-content"}
         backgroundColor="transparent" 
         translucent={true}
       />
@@ -723,7 +723,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   categoriesList: {
-    paddingHorizontal: moderateScale(8),
+    paddingHorizontal: moderateScale(16),
     paddingTop: moderateScale(6),
   },
   categoryCard: {

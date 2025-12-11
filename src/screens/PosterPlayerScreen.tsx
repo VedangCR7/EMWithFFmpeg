@@ -368,7 +368,6 @@ const PosterPlayerScreen: React.FC = () => {
     let url = poster.thumbnail;
     
     if (!url) {
-      console.warn('⚠️ No thumbnail URL found for poster:', poster.id);
       return '';
     }
     
@@ -494,23 +493,6 @@ const PosterPlayerScreen: React.FC = () => {
     // Ensure all templates have languages merged before filtering
     const templatesWithLanguages = allTemplates.map(t => mergeTemplateLanguages(t));
     
-    // Debug logging for all category types
-    if (calendarDate || greetingCategory || businessCategory) {
-      const categoryType = calendarDate ? 'calendar' : greetingCategory ? 'greeting' : 'business';
-      console.log(`🔍 [LANGUAGE FILTER] Filtering ${categoryType} posters:`, {
-        selectedLanguage,
-        totalTemplates: templatesWithLanguages.length,
-        sampleTemplates: templatesWithLanguages.slice(0, 3).map(t => ({
-          id: t.id,
-          name: t.name,
-          tags: t.tags,
-          languages: t.languages,
-          willMatchEnglish: templateContainsLanguage(t, 'english'),
-          willMatchHindi: templateContainsLanguage(t, 'hindi'),
-        }))
-      });
-    }
-    
     // If "All" is selected, skip language filtering
     let languageFiltered: Template[];
     if (selectedLanguage === 'all') {
@@ -519,43 +501,13 @@ const PosterPlayerScreen: React.FC = () => {
       // Filter by language - if no matches, return empty array
       languageFiltered = templatesWithLanguages.filter(template => {
         const matches = templateContainsLanguage(template, selectedLanguage);
-        if ((calendarDate || greetingCategory || businessCategory) && !matches) {
-          // Debug logging for filtered out posters
-          const categoryType = calendarDate ? 'calendar' : greetingCategory ? 'greeting' : 'business';
-          console.log(`🔍 [LANGUAGE FILTER] ${categoryType} poster "${template.name}" (${template.id}) filtered out:`, {
-            tags: template.tags,
-            languages: template.languages,
-            selectedLanguage,
-            matches,
-            matchDetails: {
-              hasLanguagesArray: Array.isArray(template.languages) && template.languages.length > 0,
-              languagesArray: template.languages,
-              tagsLength: template.tags.length,
-              extractedLanguages: extractLanguagesFromTags(template.tags),
-            }
-          });
-        }
         return matches;
       });
       
       // If no language matches, show nothing
       if (languageFiltered.length === 0) {
-        const categoryType = calendarDate ? 'calendar' : greetingCategory ? 'greeting' : businessCategory ? 'business' : 'unknown';
-        console.log(`⚠️ [LANGUAGE FILTER] No ${categoryType} posters match language:`, selectedLanguage, {
-          totalTemplates: templatesWithLanguages.length,
-          allTemplatesDetails: templatesWithLanguages.map(t => ({
-            id: t.id,
-            name: t.name,
-            tags: t.tags,
-            languages: t.languages,
-            extractedLanguages: extractLanguagesFromTags(t.tags),
-          }))
-        });
         return [];
       }
-      
-      const categoryType = calendarDate ? 'calendar' : greetingCategory ? 'greeting' : businessCategory ? 'business' : 'unknown';
-      console.log(`✅ [LANGUAGE FILTER] ${languageFiltered.length} ${categoryType} posters match language "${selectedLanguage}"`);
     }
     
     // Then apply service filter if applicable
@@ -717,14 +669,26 @@ const PosterPlayerScreen: React.FC = () => {
 
     const fetchGreetingCategoryTemplates = async () => {
       try {
-        console.log('📡 [POSTER PLAYER] Fetching greeting category templates for:', greetingCategory);
+        // Normalize category name for search (like HomeScreen does)
+        // Convert "Money & Finance" to "money and finance" to match how templates are tagged
+        const normalizedCategory = greetingCategory.toLowerCase()
+          .replace(/[&]/g, 'and')
+          .replace(/[^a-z0-9\s]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
         
         // Use getTemplates with category filter and limit of 200 to get templates
-        // Also use searchTemplates to ensure we get templates with matching tags
-        const [categoryTemplates, searchTemplates] = await Promise.all([
+        // Also use searchTemplates with both original and normalized category names
+        // This ensures we get all templates that match the category (like HomeScreen does)
+        // Both calls use limit: 200 to get all available images for the category
+        const [categoryTemplates, searchTemplatesOriginal, searchTemplatesNormalized] = await Promise.all([
           greetingTemplatesService.getTemplates({ category: greetingCategory, limit: 200 }),
-          greetingTemplatesService.searchTemplates(greetingCategory)
+          greetingTemplatesService.searchTemplates(greetingCategory, undefined, 200),
+          greetingTemplatesService.searchTemplates(normalizedCategory, undefined, 200)
         ]);
+        
+        // Combine all search results
+        const searchTemplates = [...searchTemplatesOriginal, ...searchTemplatesNormalized];
         
         // Combine both results and remove duplicates
         const combinedTemplates = [...categoryTemplates, ...searchTemplates];
@@ -737,15 +701,32 @@ const PosterPlayerScreen: React.FC = () => {
         const allTemplates = Array.from(uniqueTemplatesMap.values());
         
         // Filter templates to only include those that have the category name in their tags or category
+        // Use both original and normalized category names for matching (to match HomeScreen behavior)
         const filteredTemplates = allTemplates.filter(template => {
           const templateAny = template as any;
           const templateTags = Array.isArray(templateAny.tags) ? templateAny.tags : [];
-          // Check if any tag contains the category name (case-insensitive)
-          const hasMatchingTag = templateTags.some((tag: string) => 
-            typeof tag === 'string' && tag.toLowerCase().includes(greetingCategory.toLowerCase())
+          const normalizedTags = templateTags.map((tag: string) => 
+            typeof tag === 'string' ? tag.toLowerCase().replace(/[&]/g, 'and').replace(/[^a-z0-9\s]/g, ' ').trim() : ''
           );
-          // Also check if category matches
-          const categoryMatch = template.category?.toLowerCase().includes(greetingCategory.toLowerCase());
+          
+          // Check if any tag contains the original or normalized category name (case-insensitive)
+          const hasMatchingTag = templateTags.some((tag: string) => {
+            if (typeof tag !== 'string') return false;
+            const normalizedTag = tag.toLowerCase().replace(/[&]/g, 'and').replace(/[^a-z0-9\s]/g, ' ').trim();
+            return tag.toLowerCase().includes(greetingCategory.toLowerCase()) ||
+                   tag.toLowerCase().includes(normalizedCategory) ||
+                   normalizedTag.includes(normalizedCategory) ||
+                   normalizedCategory.includes(normalizedTag);
+          });
+          
+          // Also check if category matches (original or normalized)
+          const normalizedTemplateCategory = template.category 
+            ? template.category.toLowerCase().replace(/[&]/g, 'and').replace(/[^a-z0-9\s]/g, ' ').trim()
+            : '';
+          const categoryMatch = template.category?.toLowerCase().includes(greetingCategory.toLowerCase()) ||
+                                normalizedTemplateCategory.includes(normalizedCategory) ||
+                                normalizedCategory.includes(normalizedTemplateCategory);
+          
           return hasMatchingTag || categoryMatch;
         });
         
@@ -754,8 +735,6 @@ const PosterPlayerScreen: React.FC = () => {
         const templatesToUse = filteredTemplates.length > 0 
           ? filteredTemplates.slice(0, 200)
           : allTemplates.slice(0, 200);
-        
-        console.log(`✅ [POSTER PLAYER] Loaded ${templatesToUse.length} templates for greeting category: ${greetingCategory}`);
         
         if (templatesToUse.length > 0) {
           // Convert GreetingTemplate to Template format
@@ -778,31 +757,12 @@ const PosterPlayerScreen: React.FC = () => {
               tags: normalizedTags,
             };
 
-            if (__DEV__ && normalizedTags.length > 0) {
-              console.log(`📋 [GREETING CONVERSION] Template ${convertedTemplate.id} tags:`, normalizedTags);
-            }
-
             return convertedTemplate;
           });
 
           // Set first template as current poster and others as related
           // Ensure all templates have languages extracted from tags
           const ensuredTemplates = convertedTemplates.map(t => mergeTemplateLanguages(t));
-
-          // Log language extraction for debugging
-          if (__DEV__) {
-            console.log('📋 [GREETING TEMPLATES] Language extraction results:');
-            ensuredTemplates.slice(0, 5).forEach((template, index) => {
-              const languagesFromTags = extractLanguagesFromTags(template.tags);
-              console.log(`  Template ${index + 1} (${template.name}):`, {
-                tags: template.tags,
-                languages: template.languages,
-                languagesFromTags: languagesFromTags,
-                willMatchEnglish: templateContainsLanguage(template, 'english'),
-                willMatchHindi: templateContainsLanguage(template, 'hindi'),
-              });
-            });
-          }
 
           // Ensure the initially selected poster is present
           const initialPosterWithLanguages = mergeTemplateLanguages(initialPoster);
@@ -834,24 +794,15 @@ const PosterPlayerScreen: React.FC = () => {
               });
               
               if (detectedLanguage) {
-                console.log(`🔄 [GREETING TEMPLATES] Auto-detecting language: ${detectedLanguage} from tags:`, finalPoster.tags);
                 setSelectedLanguage(detectedLanguage);
               } else {
                 // If no matching language found, default to English for templates without language tags
-                console.log(`ℹ️ [GREETING TEMPLATES] No language detected from tags, defaulting to English. Tags:`, finalPoster.tags);
                 setSelectedLanguage('english');
               }
             } else {
               // No language keywords found in tags, default to English
-              console.log(`ℹ️ [GREETING TEMPLATES] No language keywords found in tags, defaulting to English. Tags:`, finalPoster.tags);
               setSelectedLanguage('english');
             }
-          }
-          
-          console.log('✅ [POSTER PLAYER] Loaded', ensuredTemplates.length, 'greeting category templates');
-          if (__DEV__ && ensuredTemplates[0]?.tags) {
-            console.log('📋 [POSTER PLAYER] First greeting template tags:', ensuredTemplates[0].tags);
-            console.log('📋 [POSTER PLAYER] All templates tags:', ensuredTemplates.map(t => ({ id: t.id, tags: t.tags })));
           }
         }
       } catch (error) {
@@ -1093,14 +1044,6 @@ const PosterPlayerScreen: React.FC = () => {
       return; // No tags to detect language from
     }
 
-    console.log('🔍 [LANGUAGE DETECTION] Detecting language for poster:', {
-      posterId: currentPoster.id,
-      tags: posterTags,
-      businessCategory,
-      greetingCategory,
-      calendarDate
-    });
-
     // Extract languages from tags using the helper function
     const languagesFromTags = extractLanguagesFromTags(posterTags);
     
@@ -1125,17 +1068,8 @@ const PosterPlayerScreen: React.FC = () => {
     // Only auto-detect if currently on "All" to avoid overriding user's manual selection
     if (detectedLanguage) {
       if (detectedLanguage !== selectedLanguage && selectedLanguage === 'all') {
-        console.log(`🔄 [LANGUAGE DETECTION] Switching language from ${selectedLanguage} to ${detectedLanguage}`, {
-          detectedLanguages: allDetectedLanguages,
-          tags: posterTags
-        });
         setSelectedLanguage(detectedLanguage);
-      } else {
-        console.log(`✅ [LANGUAGE DETECTION] Language already set to ${detectedLanguage}`);
       }
-    } else {
-      console.log('⚠️ [LANGUAGE DETECTION] No language detected from tags:', posterTags);
-      // Keep current selection, don't auto-switch
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPoster?.id, businessCategory, greetingCategory, calendarDate]); // Run when current poster changes for category or calendar
@@ -1173,25 +1107,7 @@ const PosterPlayerScreen: React.FC = () => {
       );
 
       if (firstMatchingTemplate) {
-        if (__DEV__ && (greetingCategory || businessCategory || calendarDate)) {
-          console.log(`🔄 [LANGUAGE FILTER] Switching to matching template:`, {
-            templateId: firstMatchingTemplate.id,
-            templateName: firstMatchingTemplate.name,
-            selectedLanguage,
-            tags: firstMatchingTemplate.tags,
-            languages: firstMatchingTemplate.languages,
-          });
-        }
         return firstMatchingTemplate;
-      }
-
-      // If no match found, keep current poster or use first one
-      // But log a warning if we're filtering by language
-      if (selectedLanguage !== 'all' && (greetingCategory || businessCategory || calendarDate)) {
-        console.warn(`⚠️ [LANGUAGE FILTER] No templates match language "${selectedLanguage}"`, {
-          totalTemplates: templatesWithLanguages.length,
-          sampleTags: templatesWithLanguages.slice(0, 3).map(t => ({ id: t.id, tags: t.tags })),
-        });
       }
 
       return resolvedPrevious || templatesWithLanguages[0];

@@ -303,6 +303,47 @@ const moderateScale = (size: number, factor = 0.5) => {
   return size + (scale(size) - size) * factor;
 };
 
+// Helper function to enhance thumbnail URL for high quality
+const getHighQualityThumbnailUrl = (thumbnailUrl: string): string => {
+  if (!thumbnailUrl) return thumbnailUrl;
+  
+  // For Cloudinary URLs, enhance to high quality
+  if (thumbnailUrl.includes('res.cloudinary.com') && thumbnailUrl.includes('/upload/')) {
+    try {
+      const [prefix, remainder] = thumbnailUrl.split('/upload/');
+      if (!remainder) {
+        return thumbnailUrl;
+      }
+      
+      const parts = remainder.split('/');
+      
+      // Find the version number (starts with 'v' followed by digits)
+      let versionIndex = -1;
+      for (let i = 0; i < parts.length; i++) {
+        if (/^v\d+/.test(parts[i])) {
+          versionIndex = i;
+          break;
+        }
+      }
+      
+      if (versionIndex >= 0) {
+        // Extract everything from version onwards
+        const versionAndPath = parts.slice(versionIndex).join('/');
+        
+        // Use high quality transform for thumbnails (w_800 for good quality but reasonable size)
+        const highQualityTransform = 'f_auto,q_auto:best,c_limit,w_800';
+        const highQualityUrl = `${prefix}/upload/${highQualityTransform}/${versionAndPath}`;
+        
+        return highQualityUrl;
+      }
+    } catch (error) {
+      // Fall through to return original URL
+    }
+  }
+  
+  return thumbnailUrl;
+};
+
 interface HorizontalFestivalCalendarProps {
   refreshKey?: number;
 }
@@ -317,6 +358,9 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
   const [isLoadingAllPosters, setIsLoadingAllPosters] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const borderAnimation = useRef(new Animated.Value(0)).current;
+  const festiveAlertScale = useRef(new Animated.Value(1)).current;
+  const festiveAlertOpacity = useRef(new Animated.Value(1)).current;
+  const festiveAlertTranslateY = useRef(new Animated.Value(0)).current;
 
   const gradientColors = [theme.colors.secondary, theme.colors.primary];
   const borderThickness = 2.5;
@@ -340,6 +384,70 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
     loop.start();
     return () => loop.stop();
   }, [borderAnimation]);
+
+  // Enhanced attractive animation for "Festive alerts" text
+  // Combines scale bounce, opacity pulse, and vertical bounce (all use native driver for performance)
+  useEffect(() => {
+    // Create a combined parallel animation for smoother effect
+    const combinedAnimation = Animated.loop(
+      Animated.parallel([
+        // Scale bounce animation
+        Animated.sequence([
+          Animated.spring(festiveAlertScale, {
+            toValue: 1.2,
+            tension: 40,
+            friction: 3,
+            useNativeDriver: true,
+          }),
+          Animated.spring(festiveAlertScale, {
+            toValue: 1,
+            tension: 40,
+            friction: 3,
+            useNativeDriver: true,
+          }),
+          Animated.delay(400),
+        ]),
+        // Opacity pulse animation
+        Animated.sequence([
+          Animated.timing(festiveAlertOpacity, {
+            toValue: 0.6,
+            duration: 600,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(festiveAlertOpacity, {
+            toValue: 1,
+            duration: 600,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.delay(300),
+        ]),
+        // Vertical bounce animation
+        Animated.sequence([
+          Animated.spring(festiveAlertTranslateY, {
+            toValue: -4,
+            tension: 120,
+            friction: 3,
+            useNativeDriver: true,
+          }),
+          Animated.spring(festiveAlertTranslateY, {
+            toValue: 0,
+            tension: 120,
+            friction: 3,
+            useNativeDriver: true,
+          }),
+          Animated.delay(200),
+        ]),
+      ])
+    );
+
+    combinedAnimation.start();
+
+    return () => {
+      combinedAnimation.stop();
+    };
+  }, [festiveAlertScale, festiveAlertOpacity, festiveAlertTranslateY]);
 
   // Use state for current date so it updates automatically
   const [currentDateState, setCurrentDateState] = useState(() => new Date());
@@ -390,12 +498,6 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
     const dateString = formatDateKey(date);
     let resolvedPosters: Template[] = [];
     
-    // First, try to get from mock data (fallback)
-    const mockPosters = datePosters[dateString] || [];
-    if (mockPosters.length > 0) {
-      resolvedPosters = mockPosters;
-    }
-    
     // Fetch posters from API (force refresh if refreshKey > 0)
     try {
       const forceRefresh = refreshKey > 0;
@@ -412,10 +514,19 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
           tags: poster.tags || [],
         }));
         resolvedPosters = templates;
+      } else if (response.success && response.data.posters.length === 0) {
+        // API returned successfully but no posters - use empty array (don't show mock data)
+        resolvedPosters = [];
       }
     } catch (error) {
       console.error('❌ [CALENDAR] Error fetching calendar posters:', error);
-      // Keep mock data if API fails
+      // Only use mock data if API actually fails (not if it returns empty)
+      // For production, we should not show mock data when API fails
+      // const mockPosters = datePosters[dateString] || [];
+      // if (mockPosters.length > 0) {
+      //   resolvedPosters = mockPosters;
+      // }
+      resolvedPosters = [];
     }
     
     setSelectedDate(dateString);
@@ -441,7 +552,7 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
   useEffect(() => {
     const scrollToToday = () => {
       if (scrollViewRef.current) {
-        const itemWidth = isTablet ? 70 : 60;
+        const itemWidth = isTablet ? 76 : 65;
         // Today is always the first item (index 0)
         const scrollPosition = 0 * itemWidth - SCREEN_WIDTH / 2 + itemWidth / 2;
         scrollViewRef.current.scrollTo({
@@ -578,29 +689,11 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
               date: date,
             }));
             allPosters.push(...templates);
-          } else {
-            // Check mock data as fallback
-            const mockPosters = datePosters[dateString] || [];
-            if (mockPosters.length > 0) {
-              const templates: PosterWithDate[] = mockPosters.map((poster) => ({
-                ...poster,
-                dateString: dateString,
-                date: date,
-              }));
-              allPosters.push(...templates);
-            }
           }
+          // If API returns successfully but no posters, don't add anything (don't show mock data)
         } catch (error) {
-          // Silently fail for individual dates
-          const mockPosters = datePosters[dateString] || [];
-          if (mockPosters.length > 0) {
-            const templates: PosterWithDate[] = mockPosters.map((poster) => ({
-              ...poster,
-              dateString: dateString,
-              date: date,
-            }));
-            allPosters.push(...templates);
-          }
+          // Silently fail for individual dates - don't show mock data on API errors
+          // For production, we should not show mock data when API fails
         }
       });
       
@@ -627,6 +720,7 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
     const padding = moderateScale(24); // 12 padding on each side
     const gap = moderateScale(8); // Gap between cards
     const cardWidth = (actualModalWidth - padding - gap) / 2;
+    const highQualityThumbnail = getHighQualityThumbnailUrl(item.thumbnail);
     
     return (
       <TouchableOpacity
@@ -644,9 +738,10 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
         activeOpacity={0.8}
       >
         <OptimizedImage 
-          uri={item.thumbnail} 
+          uri={highQualityThumbnail} 
           style={styles.modalPosterImage} 
-          resizeMode="cover" 
+          resizeMode="cover"
+          mode="thumbnail"
         />
         <View style={styles.modalPosterDateContainer}>
           <Text style={[styles.modalPosterDateText, { color: theme.colors.text }]}>
@@ -667,9 +762,44 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
           onPress={handleViewMore}
           activeOpacity={0.7}
         >
-          <Text style={[styles.sectionTitle, { color: theme.colors.text, fontWeight: 'bold' }]}>
-            Festive alerts
-          </Text>
+          <Animated.View
+            style={{
+              transform: [
+                { scale: festiveAlertScale },
+                { translateY: festiveAlertTranslateY }
+              ],
+              opacity: festiveAlertOpacity,
+            }}
+          >
+            <LinearGradient
+              colors={[theme.colors.primary, theme.colors.secondary]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{
+                paddingHorizontal: moderateScale(12),
+                paddingVertical: moderateScale(6),
+                borderRadius: moderateScale(20),
+                shadowColor: theme.colors.primary,
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.3,
+                shadowRadius: 4,
+                elevation: 4,
+              }}
+            >
+              <Text 
+                style={[
+                  styles.sectionTitle, 
+                  { 
+                    fontWeight: 'bold',
+                    color: '#FFFFFF',
+                    textAlign: 'center',
+                  }
+                ]}
+              >
+                Festive alerts
+              </Text>
+            </LinearGradient>
+          </Animated.View>
         </TouchableOpacity>
       </View>
 
@@ -882,11 +1012,11 @@ const styles = StyleSheet.create({
     marginRight: moderateScale(4),
   },
   dayCell: {
-    width: isTablet ? 60 : 50,
-    height: isTablet ? 60 : 50,
+    width: isTablet ? 66 : 55,
+    height: isTablet ? 66 : 55,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: isTablet ? 30 : 25,
+    borderRadius: isTablet ? 33 : 28,
     paddingVertical: moderateScale(6),
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.1)',
@@ -924,9 +1054,9 @@ const styles = StyleSheet.create({
     borderRadius: moderateScale(3),
   },
   gradientBorderWrapper: {
-    width: isTablet ? 60 : 50,
-    height: isTablet ? 60 : 50,
-    borderRadius: isTablet ? 30 : 25,
+    width: isTablet ? 66 : 55,
+    height: isTablet ? 66 : 55,
+    borderRadius: isTablet ? 33 : 28,
     position: 'relative',
     justifyContent: 'center',
     alignItems: 'center',
@@ -934,19 +1064,19 @@ const styles = StyleSheet.create({
   },
   gradientBorderInner: {
     position: 'absolute',
-    borderRadius: isTablet ? 30 : 25,
+    borderRadius: isTablet ? 33 : 28,
     overflow: 'hidden',
   },
   runningBorderOverlay: {
     position: 'absolute',
-    width: isTablet ? 60 : 50,
-    height: isTablet ? 60 : 50,
-    borderRadius: isTablet ? 30 : 25,
+    width: isTablet ? 66 : 55,
+    height: isTablet ? 66 : 55,
+    borderRadius: isTablet ? 33 : 28,
     overflow: 'hidden',
   },
   gradientBorderFill: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: isTablet ? 30 : 25,
+    borderRadius: isTablet ? 33 : 28,
   },
   postersSection: {
     marginTop: moderateScale(10),

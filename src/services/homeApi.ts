@@ -404,7 +404,26 @@ class HomeApiService {
           };
         }
         
-        const convertedData = this.convertFeaturedContentUrls(featuredData);
+        // Backend already returns FeaturedContent format, just convert URLs to absolute
+        // Don't remap the data structure as it's already correct
+        const convertedData = featuredData.map(item => {
+          // Convert URLs to absolute if needed (backend should already return absolute URLs from Cloudinary)
+          const convertedImageUrl = this.convertToAbsoluteUrl(item.imageUrl);
+          const convertedVideoUrl = item.videoUrl ? this.convertToAbsoluteUrl(item.videoUrl) : item.videoUrl;
+          
+          return {
+            ...item, // Preserve all original data from backend
+            imageUrl: convertedImageUrl || item.imageUrl || '', // Keep original if conversion fails
+            videoUrl: convertedVideoUrl || item.videoUrl,
+          };
+        }).filter(item => {
+          // Filter out items without valid imageUrl
+          const hasValidImage = item.imageUrl && item.imageUrl.trim() !== '';
+          if (!hasValidImage) {
+            console.warn('⚠️ [HOME API] Filtering out featured item without valid imageUrl:', item.id);
+          }
+          return hasValidImage;
+        });
         
         console.log('✅ [FEATURED CONTENT API] Response Details:');
         console.log('   - Success:', response.data.success);

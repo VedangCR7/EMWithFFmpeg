@@ -306,19 +306,30 @@ const MyBusinessScreen: React.FC = () => {
 
   const keyExtractor = useCallback((item: BusinessCategoryPoster) => item.id, []);
 
+  // Pastel gradient colors for smooth, airy background (lightened)
+  const pastelGradientColors = [
+    '#D4DAF5', // soft lavender blue (top, lighter)
+    '#B8C0E8', // muted purple-blue
+    '#C8A8E8', // gentle violet (center)
+    '#9DD9D0', // teal-green tint (blended lightly)
+    '#F5D99E', // warm soft yellow highlight (bottom, minimal intensity)
+  ];
+  const pastelGradientLocations = [0, 0.25, 0.5, 0.75, 1];
+
   return (
     <SafeAreaView 
-      style={[styles.container, { backgroundColor: theme.colors.gradient[0] || theme.colors.background }]}
+      style={[styles.container, { backgroundColor: '#D4DAF5' }]}
       edges={['top', 'left', 'right']}
     >
       <StatusBar 
-        barStyle={isDarkMode ? "light-content" : "dark-content"}
+        barStyle="dark-content"
         backgroundColor="transparent" 
         translucent={true}
       />
       
       <LinearGradient
-        colors={theme.colors.gradient}
+        colors={pastelGradientColors}
+        locations={pastelGradientLocations}
         style={styles.gradientBackground}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}

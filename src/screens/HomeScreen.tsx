@@ -32,8 +32,6 @@ import { MainStackParamList } from '../navigation/AppNavigator';
 import dashboardService, { Banner, Template } from '../services/dashboard';
 import homeApi, { 
   FeaturedContent, 
-  UpcomingEvent, 
-  ProfessionalTemplate, 
   VideoContent 
 } from '../services/homeApi';
 import greetingTemplatesService from '../services/greetingTemplates';
@@ -563,7 +561,7 @@ const HomeScreen: React.FC = React.memo(() => {
   const navigation = useNavigation<StackNavigationProp<MainStackParamList>>();
   
   // Get current user info
-  const userProfileSectionRef = useRef<TouchableOpacity>(null);
+  const userProfileSectionRef = useRef<React.ElementRef<typeof TouchableOpacity>>(null);
   const [userProfile, setUserProfile] = useState(() => authService.getCurrentUser());
   const [userBusinessProfiles, setUserBusinessProfiles] = useState<BusinessProfile[]>([]);
   const [businessProfilesLoadingState, setBusinessProfilesLoadingState] = useState(false);
@@ -896,59 +894,78 @@ const HomeScreen: React.FC = React.memo(() => {
   const [isSearching, setIsSearching] = useState(false);
   const [currentRequestId, setCurrentRequestId] = useState(0);
   const [disableBackgroundUpdates, setDisableBackgroundUpdates] = useState(false);
-  const [isUpcomingEventsModalVisible, setIsUpcomingEventsModalVisible] = useState(false);
   const [isBusinessCategoriesModalVisible, setIsBusinessCategoriesModalVisible] = useState(false);
   const [isVideosModalVisible, setIsVideosModalVisible] = useState(false);
   const [showVideoComingSoonModal, setShowVideoComingSoonModal] = useState(false);
   const [isCustomerSupportModalVisible, setIsCustomerSupportModalVisible] = useState(false);
   
   // Greeting section modal states
-  const [isMotivationModalVisible, setIsMotivationModalVisible] = useState(false);
-  const [isGoodMorningModalVisible, setIsGoodMorningModalVisible] = useState(false);
   const [isBusinessEthicsModalVisible, setIsBusinessEthicsModalVisible] = useState(false);
-  const [isDevotionalModalVisible, setIsDevotionalModalVisible] = useState(false);
-  const [isLeaderQuotesModalVisible, setIsLeaderQuotesModalVisible] = useState(false);
-  const [isAtmanirbharBharatModalVisible, setIsAtmanirbharBharatModalVisible] = useState(false);
-  const [isGoodThoughtsModalVisible, setIsGoodThoughtsModalVisible] = useState(false);
-  const [isTrendingModalVisible, setIsTrendingModalVisible] = useState(false);
-  const [isBhagvatGitaModalVisible, setIsBhagvatGitaModalVisible] = useState(false);
-  const [isBooksModalVisible, setIsBooksModalVisible] = useState(false);
-  const [isCelebratesMomentsModalVisible, setIsCelebratesMomentsModalVisible] = useState(false);
+  const [isSuccessMindsetModalVisible, setIsSuccessMindsetModalVisible] = useState(false);
+  const [isSocialMediaGrowthModalVisible, setIsSocialMediaGrowthModalVisible] = useState(false);
+  const [isMoneyAndFinanceModalVisible, setIsMoneyAndFinanceModalVisible] = useState(false);
+  const [isBusinessLegendQuoteModalVisible, setIsBusinessLegendQuoteModalVisible] = useState(false);
+  const [isBusinessMarketingTipsModalVisible, setIsBusinessMarketingTipsModalVisible] = useState(false);
+  const [isBusinessQuotesModalVisible, setIsBusinessQuotesModalVisible] = useState(false);
   const [isFeaturedContentModalVisible, setIsFeaturedContentModalVisible] = useState(false);
   const [isGeneralCategoriesModalVisible, setIsGeneralCategoriesModalVisible] = useState(false);
 
   // New API data states
   const [featuredContent, setFeaturedContent] = useState<FeaturedContent[]>([]);
-  const [upcomingEvents, setUpcomingEvents] = useState<UpcomingEvent[]>([]);
-  const [professionalTemplates, setProfessionalTemplates] = useState<ProfessionalTemplate[]>([]);
+
+  // Helper function to filter out Diwali-related content from featured content
+  const filterDiwaliContent = useCallback((content: FeaturedContent[]): FeaturedContent[] => {
+    if (!Array.isArray(content)) {
+      if (__DEV__) console.warn('[FEATURED CONTENT] filterDiwaliContent received non-array:', content);
+      return [];
+    }
+    
+    const filtered = content.filter(item => {
+      const title = (item.title || '').toLowerCase();
+      const description = (item.description || '').toLowerCase();
+      const imageUrl = (item.imageUrl || '').toLowerCase();
+      
+      // Filter out items that contain "diwali" in title, description, or image URL
+      const isDiwali = title.includes('diwali') || 
+                       description.includes('diwali') || 
+                       imageUrl.includes('diwali');
+      
+      if (isDiwali && __DEV__) {
+        console.log('[FEATURED CONTENT] Filtering out Diwali item:', item.id, item.title);
+      }
+      
+      return !isDiwali;
+    });
+    
+    if (__DEV__) {
+      console.log(`[FEATURED CONTENT] Diwali filter: ${content.length} items -> ${filtered.length} items`);
+      if (filtered.length === 0 && content.length > 0) {
+        console.warn('[FEATURED CONTENT] All items were filtered out as Diwali content!');
+      }
+    }
+    
+    return filtered;
+  }, []);
   const [videoContent, setVideoContent] = useState<VideoContent[]>([]);
   const [calendarPosters, setCalendarPosters] = useState<Template[]>([]);
   const [apiLoading, setApiLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
 
   // Greeting sections data states
-  const [motivationTemplates, setMotivationTemplates] = useState<any[]>([]);
-  const [motivationTemplatesRaw, setMotivationTemplatesRaw] = useState<any[]>([]);
-  const [goodMorningTemplates, setGoodMorningTemplates] = useState<any[]>([]);
-  const [goodMorningTemplatesRaw, setGoodMorningTemplatesRaw] = useState<any[]>([]);
   const [businessEthicsTemplates, setBusinessEthicsTemplates] = useState<any[]>([]);
   const [businessEthicsTemplatesRaw, setBusinessEthicsTemplatesRaw] = useState<any[]>([]);
-  const [devotionalTemplates, setDevotionalTemplates] = useState<any[]>([]);
-  const [devotionalTemplatesRaw, setDevotionalTemplatesRaw] = useState<any[]>([]);
-  const [leaderQuotesTemplates, setLeaderQuotesTemplates] = useState<any[]>([]);
-  const [leaderQuotesTemplatesRaw, setLeaderQuotesTemplatesRaw] = useState<any[]>([]);
-  const [atmanirbharBharatTemplates, setAtmanirbharBharatTemplates] = useState<any[]>([]);
-  const [atmanirbharBharatTemplatesRaw, setAtmanirbharBharatTemplatesRaw] = useState<any[]>([]);
-  const [goodThoughtsTemplates, setGoodThoughtsTemplates] = useState<any[]>([]);
-  const [goodThoughtsTemplatesRaw, setGoodThoughtsTemplatesRaw] = useState<any[]>([]);
-  const [trendingTemplates, setTrendingTemplates] = useState<any[]>([]);
-  const [trendingTemplatesRaw, setTrendingTemplatesRaw] = useState<any[]>([]);
-  const [bhagvatGitaTemplates, setBhagvatGitaTemplates] = useState<any[]>([]);
-  const [bhagvatGitaTemplatesRaw, setBhagvatGitaTemplatesRaw] = useState<any[]>([]);
-  const [booksTemplates, setBooksTemplates] = useState<any[]>([]);
-  const [booksTemplatesRaw, setBooksTemplatesRaw] = useState<any[]>([]);
-  const [celebratesMomentsTemplates, setCelebratesMomentsTemplates] = useState<any[]>([]);
-  const [celebratesMomentsTemplatesRaw, setCelebratesMomentsTemplatesRaw] = useState<any[]>([]);
+  const [successMindsetTemplates, setSuccessMindsetTemplates] = useState<any[]>([]);
+  const [successMindsetTemplatesRaw, setSuccessMindsetTemplatesRaw] = useState<any[]>([]);
+  const [socialMediaGrowthTemplates, setSocialMediaGrowthTemplates] = useState<any[]>([]);
+  const [socialMediaGrowthTemplatesRaw, setSocialMediaGrowthTemplatesRaw] = useState<any[]>([]);
+  const [moneyAndFinanceTemplates, setMoneyAndFinanceTemplates] = useState<any[]>([]);
+  const [moneyAndFinanceTemplatesRaw, setMoneyAndFinanceTemplatesRaw] = useState<any[]>([]);
+  const [businessLegendQuoteTemplates, setBusinessLegendQuoteTemplates] = useState<any[]>([]);
+  const [businessLegendQuoteTemplatesRaw, setBusinessLegendQuoteTemplatesRaw] = useState<any[]>([]);
+  const [businessMarketingTipsTemplates, setBusinessMarketingTipsTemplates] = useState<any[]>([]);
+  const [businessMarketingTipsTemplatesRaw, setBusinessMarketingTipsTemplatesRaw] = useState<any[]>([]);
+  const [businessQuotesTemplates, setBusinessQuotesTemplates] = useState<any[]>([]);
+  const [businessQuotesTemplatesRaw, setBusinessQuotesTemplatesRaw] = useState<any[]>([]);
   
   // Load data from APIs with caching for instant loads and request deduplication
   const loadApiData = useCallback(async (isRefresh: boolean = false) => {
@@ -961,22 +978,25 @@ const HomeScreen: React.FC = React.memo(() => {
         }
         
         // Track success count for error handling
-        let totalMainRequests = 4;
+        let totalMainRequests = 3;
         const networkErrors: string[] = [];
         
-        // Load all 4 APIs in parallel with progressive state updates
-        // Update UI as each API completes instead of waiting for all
-        // Reduced initial limits for faster loading - can load more on demand
-        const apiPromises = [
+        // Load 3 items from each section immediately, then load the rest in background
+        // This provides instant visual feedback while remaining content loads
+        
+        // Step 1: Load first 3 items from each main section in parallel (immediate)
+        const immediateApiPromises = [
           requestDeduplication.deduplicate(
-            RequestDeduplication.generateKey('featuredContent', { limit: 10 }),
-            () => homeApi.getFeaturedContent({ limit: 10 })
+            RequestDeduplication.generateKey('featuredContent', { limit: 3 }),
+            () => homeApi.getFeaturedContent({ limit: 3 })
           ).then(response => {
-            // Update featured content immediately when ready
+            // Update featured content immediately with first 3 items
             if (response.success) {
               React.startTransition(() => {
-                setFeaturedContent(response.data);
-                const convertedBanners: Banner[] = response.data.map(item => ({
+                // Filter out Diwali content before setting
+                const filteredData = filterDiwaliContent(response.data);
+                setFeaturedContent(filteredData);
+                const convertedBanners: Banner[] = filteredData.map(item => ({
                   id: item.id,
                   title: item.title,
                   imageUrl: item.imageUrl,
@@ -1003,69 +1023,10 @@ const HomeScreen: React.FC = React.memo(() => {
           }),
           
           requestDeduplication.deduplicate(
-            RequestDeduplication.generateKey('upcomingEvents', { limit: 50 }),
-            () => homeApi.getUpcomingEvents({ limit: 50 })
+            RequestDeduplication.generateKey('videoContent', { limit: 3 }),
+            () => homeApi.getVideoContent({ limit: 3 })
           ).then(response => {
-            // Update events immediately when ready
-            if (response.success) {
-              React.startTransition(() => {
-                setUpcomingEvents(response.data);
-              });
-            } else {
-              React.startTransition(() => {
-                setUpcomingEvents([]);
-              });
-            }
-            return { type: 'events', response, success: response.success };
-          }).catch(err => {
-            if (err?.message === 'NETWORK_ERROR' || err?.message === 'TIMEOUT') {
-              networkErrors.push('events');
-            }
-            React.startTransition(() => {
-              setUpcomingEvents([]);
-            });
-            return { type: 'events', response: null, success: false };
-          }),
-          
-          requestDeduplication.deduplicate(
-            RequestDeduplication.generateKey('professionalTemplates', { limit: 50 }),
-            () => homeApi.getProfessionalTemplates({ limit: 50 })
-          ).then(response => {
-            // Update templates immediately when ready
-            if (response.success) {
-              React.startTransition(() => {
-                setProfessionalTemplates(response.data);
-                if (!disableBackgroundUpdates) {
-                  setTemplates(response.data);
-                }
-              });
-            } else {
-              React.startTransition(() => {
-                setProfessionalTemplates([]);
-                if (!disableBackgroundUpdates) {
-                  setTemplates([]);
-                }
-              });
-            }
-            return { type: 'templates', response, success: response.success };
-          }).catch(err => {
-            if (err?.message === 'NETWORK_ERROR' || err?.message === 'TIMEOUT') {
-              networkErrors.push('templates');
-            }
-            React.startTransition(() => {
-              setProfessionalTemplates([]);
-              if (!disableBackgroundUpdates) {
-                setTemplates([]);
-              }
-            });
-            return { type: 'templates', response: null, success: false };
-          }),
-          
-          requestDeduplication.deduplicate(
-            RequestDeduplication.generateKey('videoContent', { limit: 20 }),
-            () => homeApi.getVideoContent({ limit: 20 })
-          ).then(response => {
-            // Update videos immediately when ready
+            // Update videos immediately with first 3 items
             if (response.success) {
               React.startTransition(() => {
                 setVideoContent(response.data);
@@ -1087,8 +1048,48 @@ const HomeScreen: React.FC = React.memo(() => {
           }),
         ];
 
-        // Wait for all APIs but UI updates progressively as each completes
-        const results = await Promise.allSettled(apiPromises);
+        // Wait for first 3 items from each section (immediate load)
+        const results = await Promise.allSettled(immediateApiPromises);
+        
+        // Step 2: Load remaining items in background (non-blocking)
+        setTimeout(async () => {
+          try {
+            // Load full featured content (10 items)
+            const fullFeaturedResponse = await requestDeduplication.deduplicate(
+              RequestDeduplication.generateKey('featuredContent', { limit: 10 }),
+              () => homeApi.getFeaturedContent({ limit: 10 })
+            );
+            if (fullFeaturedResponse.success && fullFeaturedResponse.data.length > 3) {
+              React.startTransition(() => {
+                // Filter out Diwali content before setting
+                const filteredData = filterDiwaliContent(fullFeaturedResponse.data);
+                setFeaturedContent(filteredData);
+                const convertedBanners: Banner[] = filteredData.map(item => ({
+                  id: item.id,
+                  title: item.title,
+                  imageUrl: item.imageUrl,
+                  link: item.link,
+                }));
+                setBanners(convertedBanners);
+              });
+            }
+            
+            // Load full video content (20 items)
+            const fullVideosResponse = await requestDeduplication.deduplicate(
+              RequestDeduplication.generateKey('videoContent', { limit: 20 }),
+              () => homeApi.getVideoContent({ limit: 20 })
+            );
+            if (fullVideosResponse.success && fullVideosResponse.data.length > 3) {
+              React.startTransition(() => {
+                setVideoContent(fullVideosResponse.data);
+              });
+            }
+          } catch (error) {
+            if (__DEV__) {
+              devError('Error loading remaining content in background:', error);
+            }
+          }
+        }, 0); // Execute in next event loop tick
         
         // Count successful responses from results
         const successCount = results.filter(result => 
@@ -1117,96 +1118,138 @@ const HomeScreen: React.FC = React.memo(() => {
         }
       }
 
-      // Load greeting sections lazily in background (don't block main content)
-      // This allows the UI to show main content immediately while greeting sections load
+      // Load greeting sections: 3 items immediately, then rest in background
+      // Step 1: Load first 3 items from each greeting section immediately (in parallel)
       InteractionManager.runAfterInteractions(() => {
         Promise.allSettled([
-          greetingTemplatesService.searchTemplates('motivational').catch(() => []),
-          greetingTemplatesService.searchTemplates('good morning').catch(() => []),
-          greetingTemplatesService.searchTemplates('business ethics').catch(() => []),
-          greetingTemplatesService.searchTemplates('devotional').catch(() => []),
-          greetingTemplatesService.searchTemplates('leader quotes').catch(() => []),
-          greetingTemplatesService.searchTemplates('atmanirbhar bharat').catch(() => []),
-          greetingTemplatesService.searchTemplates('good thoughts').catch(() => []),
-          greetingTemplatesService.searchTemplates('trending').catch(() => []),
-          greetingTemplatesService.searchTemplates('bhagvat gita').catch(() => []),
-          greetingTemplatesService.searchTemplates('books').catch(() => []),
-          greetingTemplatesService.searchTemplates('celebrates the moments').catch(() => [])
+          greetingTemplatesService.searchTemplates('business ethics').catch(() => []).then(results => results.slice(0, 3)),
+          greetingTemplatesService.searchTemplates('success mindset').catch(() => []).then(results => results.slice(0, 3)),
+          greetingTemplatesService.searchTemplates('social media growth').catch(() => []).then(results => results.slice(0, 3)),
+          greetingTemplatesService.searchTemplates('money and finance').catch(() => []).then(results => results.slice(0, 3)),
+          greetingTemplatesService.searchTemplates('business legend quote').catch(() => []).then(results => results.slice(0, 3)),
+          greetingTemplatesService.searchTemplates('business marketing tips').catch(() => []).then(results => results.slice(0, 3)),
+          greetingTemplatesService.searchTemplates('business quotes').catch(() => []).then(results => results.slice(0, 3))
         ]).then(([
-          motivationResponse,
-          goodMorningResponse,
           businessEthicsResponse,
-          devotionalResponse,
-          leaderQuotesResponse,
-          atmanirbharResponse,
-          goodThoughtsResponse,
-          trendingResponse,
-          bhagvatGitaResponse,
-          booksResponse,
-          celebratesResponse
+          successMindsetResponse,
+          socialMediaGrowthResponse,
+          moneyAndFinanceResponse,
+          businessLegendQuoteResponse,
+          businessMarketingTipsResponse,
+          businessQuotesResponse
         ]) => {
-          // Handle greeting sections responses - Batch state updates for better performance
+          // Handle greeting sections responses - Set first 3 items immediately
           const greetingUpdates = {
-            motivation: motivationResponse.status === 'fulfilled' && motivationResponse.value.length > 0
-              ? { display: motivationResponse.value.slice(0, 10), raw: motivationResponse.value }
-              : { display: [], raw: [] },
-            goodMorning: goodMorningResponse.status === 'fulfilled' && goodMorningResponse.value.length > 0
-              ? { display: goodMorningResponse.value.slice(0, 10), raw: goodMorningResponse.value }
-              : { display: [], raw: [] },
             businessEthics: businessEthicsResponse.status === 'fulfilled' && businessEthicsResponse.value.length > 0
-              ? { display: businessEthicsResponse.value.slice(0, 10), raw: businessEthicsResponse.value }
+              ? { display: businessEthicsResponse.value.slice(0, 3), raw: businessEthicsResponse.value }
               : { display: [], raw: [] },
-            devotional: devotionalResponse.status === 'fulfilled' && devotionalResponse.value.length > 0
-              ? { display: devotionalResponse.value.slice(0, 10), raw: devotionalResponse.value }
+            successMindset: successMindsetResponse.status === 'fulfilled' && successMindsetResponse.value.length > 0
+              ? { display: successMindsetResponse.value.slice(0, 3), raw: successMindsetResponse.value }
               : { display: [], raw: [] },
-            leaderQuotes: leaderQuotesResponse.status === 'fulfilled' && leaderQuotesResponse.value.length > 0
-              ? { display: leaderQuotesResponse.value.slice(0, 10), raw: leaderQuotesResponse.value }
+            socialMediaGrowth: socialMediaGrowthResponse.status === 'fulfilled' && socialMediaGrowthResponse.value.length > 0
+              ? { display: socialMediaGrowthResponse.value.slice(0, 3), raw: socialMediaGrowthResponse.value }
               : { display: [], raw: [] },
-            atmanirbharBharat: atmanirbharResponse.status === 'fulfilled' && atmanirbharResponse.value.length > 0
-              ? { display: atmanirbharResponse.value.slice(0, 10), raw: atmanirbharResponse.value }
+            moneyAndFinance: moneyAndFinanceResponse.status === 'fulfilled' && moneyAndFinanceResponse.value.length > 0
+              ? { display: moneyAndFinanceResponse.value.slice(0, 3), raw: moneyAndFinanceResponse.value }
               : { display: [], raw: [] },
-            goodThoughts: goodThoughtsResponse.status === 'fulfilled' && goodThoughtsResponse.value.length > 0
-              ? { display: goodThoughtsResponse.value.slice(0, 10), raw: goodThoughtsResponse.value }
+            businessLegendQuote: businessLegendQuoteResponse.status === 'fulfilled' && businessLegendQuoteResponse.value.length > 0
+              ? { display: businessLegendQuoteResponse.value.slice(0, 3), raw: businessLegendQuoteResponse.value }
               : { display: [], raw: [] },
-            trending: trendingResponse.status === 'fulfilled' && trendingResponse.value.length > 0
-              ? { display: trendingResponse.value.slice(0, 10), raw: trendingResponse.value }
+            businessMarketingTips: businessMarketingTipsResponse.status === 'fulfilled' && businessMarketingTipsResponse.value.length > 0
+              ? { display: businessMarketingTipsResponse.value.slice(0, 3), raw: businessMarketingTipsResponse.value }
               : { display: [], raw: [] },
-            bhagvatGita: bhagvatGitaResponse.status === 'fulfilled' && bhagvatGitaResponse.value.length > 0
-              ? { display: bhagvatGitaResponse.value.slice(0, 10), raw: bhagvatGitaResponse.value }
-              : { display: [], raw: [] },
-            books: booksResponse.status === 'fulfilled' && booksResponse.value.length > 0
-              ? { display: booksResponse.value.slice(0, 10), raw: booksResponse.value }
-              : { display: [], raw: [] },
-            celebratesMoments: celebratesResponse.status === 'fulfilled' && celebratesResponse.value.length > 0
-              ? { display: celebratesResponse.value.slice(0, 10), raw: celebratesResponse.value }
+            businessQuotes: businessQuotesResponse.status === 'fulfilled' && businessQuotesResponse.value.length > 0
+              ? { display: businessQuotesResponse.value.slice(0, 3), raw: businessQuotesResponse.value }
               : { display: [], raw: [] },
           };
 
           // Batch all state updates together using React.startTransition for non-urgent updates
           React.startTransition(() => {
-            setMotivationTemplates(greetingUpdates.motivation.display);
-            setMotivationTemplatesRaw(greetingUpdates.motivation.raw);
-            setGoodMorningTemplates(greetingUpdates.goodMorning.display);
-            setGoodMorningTemplatesRaw(greetingUpdates.goodMorning.raw);
             setBusinessEthicsTemplates(greetingUpdates.businessEthics.display);
             setBusinessEthicsTemplatesRaw(greetingUpdates.businessEthics.raw);
-            setDevotionalTemplates(greetingUpdates.devotional.display);
-            setDevotionalTemplatesRaw(greetingUpdates.devotional.raw);
-            setLeaderQuotesTemplates(greetingUpdates.leaderQuotes.display);
-            setLeaderQuotesTemplatesRaw(greetingUpdates.leaderQuotes.raw);
-            setAtmanirbharBharatTemplates(greetingUpdates.atmanirbharBharat.display);
-            setAtmanirbharBharatTemplatesRaw(greetingUpdates.atmanirbharBharat.raw);
-            setGoodThoughtsTemplates(greetingUpdates.goodThoughts.display);
-            setGoodThoughtsTemplatesRaw(greetingUpdates.goodThoughts.raw);
-            setTrendingTemplates(greetingUpdates.trending.display);
-            setTrendingTemplatesRaw(greetingUpdates.trending.raw);
-            setBhagvatGitaTemplates(greetingUpdates.bhagvatGita.display);
-            setBhagvatGitaTemplatesRaw(greetingUpdates.bhagvatGita.raw);
-            setBooksTemplates(greetingUpdates.books.display);
-            setBooksTemplatesRaw(greetingUpdates.books.raw);
-            setCelebratesMomentsTemplates(greetingUpdates.celebratesMoments.display);
-            setCelebratesMomentsTemplatesRaw(greetingUpdates.celebratesMoments.raw);
+            setSuccessMindsetTemplates(greetingUpdates.successMindset.display);
+            setSuccessMindsetTemplatesRaw(greetingUpdates.successMindset.raw);
+            setSocialMediaGrowthTemplates(greetingUpdates.socialMediaGrowth.display);
+            setSocialMediaGrowthTemplatesRaw(greetingUpdates.socialMediaGrowth.raw);
+            setMoneyAndFinanceTemplates(greetingUpdates.moneyAndFinance.display);
+            setMoneyAndFinanceTemplatesRaw(greetingUpdates.moneyAndFinance.raw);
+            setBusinessLegendQuoteTemplates(greetingUpdates.businessLegendQuote.display);
+            setBusinessLegendQuoteTemplatesRaw(greetingUpdates.businessLegendQuote.raw);
+            setBusinessMarketingTipsTemplates(greetingUpdates.businessMarketingTips.display);
+            setBusinessMarketingTipsTemplatesRaw(greetingUpdates.businessMarketingTips.raw);
+            setBusinessQuotesTemplates(greetingUpdates.businessQuotes.display);
+            setBusinessQuotesTemplatesRaw(greetingUpdates.businessQuotes.raw);
           });
+          
+          // Step 2: Load remaining items in background (non-blocking)
+          setTimeout(async () => {
+            try {
+              const fullGreetingPromises = await Promise.allSettled([
+                greetingTemplatesService.searchTemplates('business ethics').catch(() => []),
+                greetingTemplatesService.searchTemplates('success mindset').catch(() => []),
+                greetingTemplatesService.searchTemplates('social media growth').catch(() => []),
+                greetingTemplatesService.searchTemplates('money and finance').catch(() => []),
+                greetingTemplatesService.searchTemplates('business legend quote').catch(() => []),
+                greetingTemplatesService.searchTemplates('business marketing tips').catch(() => []),
+                greetingTemplatesService.searchTemplates('business quotes').catch(() => [])
+              ]);
+              
+              const [
+                fullBusinessEthicsResponse,
+                fullSuccessMindsetResponse,
+                fullSocialMediaGrowthResponse,
+                fullMoneyAndFinanceResponse,
+                fullBusinessLegendQuoteResponse,
+                fullBusinessMarketingTipsResponse,
+                fullBusinessQuotesResponse
+              ] = fullGreetingPromises;
+              
+              const fullGreetingUpdates = {
+                businessEthics: fullBusinessEthicsResponse.status === 'fulfilled' && fullBusinessEthicsResponse.value.length > 0
+                  ? { display: fullBusinessEthicsResponse.value.slice(0, 10), raw: fullBusinessEthicsResponse.value }
+                  : { display: [], raw: [] },
+                successMindset: fullSuccessMindsetResponse.status === 'fulfilled' && fullSuccessMindsetResponse.value.length > 0
+                  ? { display: fullSuccessMindsetResponse.value.slice(0, 10), raw: fullSuccessMindsetResponse.value }
+                  : { display: [], raw: [] },
+                socialMediaGrowth: fullSocialMediaGrowthResponse.status === 'fulfilled' && fullSocialMediaGrowthResponse.value.length > 0
+                  ? { display: fullSocialMediaGrowthResponse.value.slice(0, 10), raw: fullSocialMediaGrowthResponse.value }
+                  : { display: [], raw: [] },
+                moneyAndFinance: fullMoneyAndFinanceResponse.status === 'fulfilled' && fullMoneyAndFinanceResponse.value.length > 0
+                  ? { display: fullMoneyAndFinanceResponse.value.slice(0, 10), raw: fullMoneyAndFinanceResponse.value }
+                  : { display: [], raw: [] },
+                businessLegendQuote: fullBusinessLegendQuoteResponse.status === 'fulfilled' && fullBusinessLegendQuoteResponse.value.length > 0
+                  ? { display: fullBusinessLegendQuoteResponse.value.slice(0, 10), raw: fullBusinessLegendQuoteResponse.value }
+                  : { display: [], raw: [] },
+                businessMarketingTips: fullBusinessMarketingTipsResponse.status === 'fulfilled' && fullBusinessMarketingTipsResponse.value.length > 0
+                  ? { display: fullBusinessMarketingTipsResponse.value.slice(0, 10), raw: fullBusinessMarketingTipsResponse.value }
+                  : { display: [], raw: [] },
+                businessQuotes: fullBusinessQuotesResponse.status === 'fulfilled' && fullBusinessQuotesResponse.value.length > 0
+                  ? { display: fullBusinessQuotesResponse.value.slice(0, 10), raw: fullBusinessQuotesResponse.value }
+                  : { display: [], raw: [] },
+              };
+              
+              React.startTransition(() => {
+                setBusinessEthicsTemplates(fullGreetingUpdates.businessEthics.display);
+                setBusinessEthicsTemplatesRaw(fullGreetingUpdates.businessEthics.raw);
+                setSuccessMindsetTemplates(fullGreetingUpdates.successMindset.display);
+                setSuccessMindsetTemplatesRaw(fullGreetingUpdates.successMindset.raw);
+                setSocialMediaGrowthTemplates(fullGreetingUpdates.socialMediaGrowth.display);
+                setSocialMediaGrowthTemplatesRaw(fullGreetingUpdates.socialMediaGrowth.raw);
+                setMoneyAndFinanceTemplates(fullGreetingUpdates.moneyAndFinance.display);
+                setMoneyAndFinanceTemplatesRaw(fullGreetingUpdates.moneyAndFinance.raw);
+                setBusinessLegendQuoteTemplates(fullGreetingUpdates.businessLegendQuote.display);
+                setBusinessLegendQuoteTemplatesRaw(fullGreetingUpdates.businessLegendQuote.raw);
+                setBusinessMarketingTipsTemplates(fullGreetingUpdates.businessMarketingTips.display);
+                setBusinessMarketingTipsTemplatesRaw(fullGreetingUpdates.businessMarketingTips.raw);
+                setBusinessQuotesTemplates(fullGreetingUpdates.businessQuotes.display);
+                setBusinessQuotesTemplatesRaw(fullGreetingUpdates.businessQuotes.raw);
+              });
+            } catch (error) {
+              if (__DEV__) {
+                devError('Error loading full greeting sections in background:', error);
+              }
+            }
+          }, 0); // Execute in next event loop tick
         }).catch((error) => {
           if (__DEV__) {
             devError('Error loading greeting sections:', error);
@@ -1228,61 +1271,101 @@ const HomeScreen: React.FC = React.memo(() => {
     });
   }, []);
 
+  // Helper function to convert CalendarPoster to Template format
+  const convertCalendarPosterToTemplate = useCallback((poster: CalendarPoster): Template => {
+    const template: any = {
+      id: poster.id,
+      name: poster.name || poster.title || 'Calendar Poster',
+      thumbnail: poster.thumbnail || poster.imageUrl || '',
+      category: poster.category || 'Festival',
+      downloads: poster.downloads || 0,
+      isDownloaded: poster.isDownloaded || false,
+      tags: poster.tags || [],
+    };
+    // Add extra properties for calendar posters if needed
+    if (poster.description) template.description = poster.description;
+    if (poster.date) template.date = poster.date;
+    if (poster.festivalName) template.festivalName = poster.festivalName;
+    return template as Template;
+  }, []);
+
   // Load calendar posters for upcoming dates
+  // Today's poster loads immediately, rest load in background
   const loadCalendarPosters = useCallback(async () => {
     try {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
-      // Fetch posters for next 15 days (same as calendar component)
-      const datePromises: Promise<Template[]>[] = [];
-      for (let i = 0; i <= 15; i++) {
-        const date = new Date(today);
-        date.setDate(today.getDate() + i);
+      // Format date string helper
+      const formatDateString = (date: Date): string => {
         const year = date.getFullYear();
         const month = date.getMonth() + 1;
         const day = date.getDate();
-        const dateString = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        
-        datePromises.push(
-          calendarApi.getPostersByDate(dateString)
-            .then(response => {
-              if (response.success && response.data.posters.length > 0) {
-                // Convert CalendarPoster to Template format
-                return response.data.posters.map((poster: CalendarPoster) => ({
-                  id: poster.id,
-                  name: poster.name || poster.title || 'Calendar Poster',
-                  thumbnail: poster.thumbnail || poster.imageUrl || '',
-                  category: poster.category || 'Festival',
-                  downloads: poster.downloads || 0,
-                  isDownloaded: poster.isDownloaded || false,
-                  tags: poster.tags || [],
-                  description: poster.description || '',
-                  date: poster.date,
-                  festivalName: poster.festivalName,
-                }));
-              }
-              return [];
-            })
-            .catch(() => [])
-        );
+        return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      };
+      
+      // Load today's poster immediately
+      const todayString = formatDateString(today);
+      try {
+        const todayResponse = await calendarApi.getPostersByDate(todayString);
+        if (todayResponse.success && todayResponse.data.posters.length > 0) {
+          const todayPosters = todayResponse.data.posters.map(convertCalendarPosterToTemplate);
+          // Set today's posters immediately
+          setCalendarPosters(todayPosters);
+        }
+      } catch (error) {
+        if (__DEV__) {
+          devError('Error loading today\'s calendar posters:', error);
+        }
       }
       
-      const results = await Promise.all(datePromises);
-      const allCalendarPosters = results.flat();
+      // Load rest of the dates (next 15 days) in the background
+      // Use setTimeout to ensure it doesn't block the UI
+      setTimeout(async () => {
+        try {
+          const datePromises: Promise<Template[]>[] = [];
+          // Start from tomorrow (i = 1) since today is already loaded
+          for (let i = 1; i <= 15; i++) {
+            const date = new Date(today);
+            date.setDate(today.getDate() + i);
+            const dateString = formatDateString(date);
+            
+            datePromises.push(
+              calendarApi.getPostersByDate(dateString)
+                .then(response => {
+                  if (response.success && response.data.posters.length > 0) {
+                    return response.data.posters.map(convertCalendarPosterToTemplate);
+                  }
+                  return [];
+                })
+                .catch(() => [])
+            );
+          }
+          
+          const results = await Promise.all(datePromises);
+          const futurePosters = results.flat();
+          
+          // Merge with today's posters (remove duplicates)
+          setCalendarPosters(prevPosters => {
+            const allPosters = [...prevPosters, ...futurePosters];
+            const uniquePosters = Array.from(
+              new Map(allPosters.map(poster => [poster.id, poster])).values()
+            );
+            return uniquePosters;
+          });
+        } catch (error) {
+          if (__DEV__) {
+            devError('Error loading future calendar posters:', error);
+          }
+        }
+      }, 0); // Execute in next event loop tick
       
-      // Remove duplicates based on id
-      const uniquePosters = Array.from(
-        new Map(allCalendarPosters.map(poster => [poster.id, poster])).values()
-      );
-      
-      setCalendarPosters(uniquePosters);
     } catch (error) {
       if (__DEV__) {
         devError('Error loading calendar posters:', error);
       }
     }
-  }, []);
+  }, [convertCalendarPosterToTemplate]);
 
   // Load API data once on component mount only (with ref guard to prevent duplicates)
   useEffect(() => {
@@ -1300,8 +1383,9 @@ const HomeScreen: React.FC = React.memo(() => {
         // Load data from APIs only - no mock data
         if (isMounted) {
           await loadApiData();
-          // Load calendar posters in parallel
-          await loadCalendarPosters();
+          // Load calendar posters (today's poster loads immediately, rest in background)
+          // Don't await - let it run in background
+          loadCalendarPosters();
         }
       } catch (error) {
         if (__DEV__) {
@@ -1645,17 +1729,13 @@ const HomeScreen: React.FC = React.memo(() => {
   const allGreetingTemplates = useMemo(() => {
     // Calculate current lengths signature for quick comparison
     const currentLengthsSignature = [
-      motivationTemplatesRaw.length,
-      goodMorningTemplatesRaw.length,
       businessEthicsTemplatesRaw.length,
-      devotionalTemplatesRaw.length,
-      leaderQuotesTemplatesRaw.length,
-      atmanirbharBharatTemplatesRaw.length,
-      goodThoughtsTemplatesRaw.length,
-      trendingTemplatesRaw.length,
-      bhagvatGitaTemplatesRaw.length,
-      booksTemplatesRaw.length,
-      celebratesMomentsTemplatesRaw.length,
+      successMindsetTemplatesRaw.length,
+      socialMediaGrowthTemplatesRaw.length,
+      moneyAndFinanceTemplatesRaw.length,
+      businessLegendQuoteTemplatesRaw.length,
+      businessMarketingTipsTemplatesRaw.length,
+      businessQuotesTemplatesRaw.length,
     ].join(',');
     
     // If lengths haven't changed, return cached result (optimization)
@@ -1667,17 +1747,13 @@ const HomeScreen: React.FC = React.memo(() => {
     const all: any[] = [];
     
     // Collect from all greeting sections (use Raw arrays for complete data)
-    if (motivationTemplatesRaw.length > 0) all.push(...motivationTemplatesRaw);
-    if (goodMorningTemplatesRaw.length > 0) all.push(...goodMorningTemplatesRaw);
     if (businessEthicsTemplatesRaw.length > 0) all.push(...businessEthicsTemplatesRaw);
-    if (devotionalTemplatesRaw.length > 0) all.push(...devotionalTemplatesRaw);
-    if (leaderQuotesTemplatesRaw.length > 0) all.push(...leaderQuotesTemplatesRaw);
-    if (atmanirbharBharatTemplatesRaw.length > 0) all.push(...atmanirbharBharatTemplatesRaw);
-    if (goodThoughtsTemplatesRaw.length > 0) all.push(...goodThoughtsTemplatesRaw);
-    if (trendingTemplatesRaw.length > 0) all.push(...trendingTemplatesRaw);
-    if (bhagvatGitaTemplatesRaw.length > 0) all.push(...bhagvatGitaTemplatesRaw);
-    if (booksTemplatesRaw.length > 0) all.push(...booksTemplatesRaw);
-    if (celebratesMomentsTemplatesRaw.length > 0) all.push(...celebratesMomentsTemplatesRaw);
+    if (successMindsetTemplatesRaw.length > 0) all.push(...successMindsetTemplatesRaw);
+    if (socialMediaGrowthTemplatesRaw.length > 0) all.push(...socialMediaGrowthTemplatesRaw);
+    if (moneyAndFinanceTemplatesRaw.length > 0) all.push(...moneyAndFinanceTemplatesRaw);
+    if (businessLegendQuoteTemplatesRaw.length > 0) all.push(...businessLegendQuoteTemplatesRaw);
+    if (businessMarketingTipsTemplatesRaw.length > 0) all.push(...businessMarketingTipsTemplatesRaw);
+    if (businessQuotesTemplatesRaw.length > 0) all.push(...businessQuotesTemplatesRaw);
     
     // Convert greeting templates to Template format for unified search
     const converted = all.map(greetingTemplate => ({
@@ -1699,30 +1775,22 @@ const HomeScreen: React.FC = React.memo(() => {
       lengthsSignature: currentLengthsSignature,
     };
     
-    // Debug: Log Good Morning templates structure (dev only)
-    if (__DEV__ && goodMorningTemplatesRaw.length > 0) {
-    }
-    
     return converted;
   }, [
-    motivationTemplatesRaw,
-    goodMorningTemplatesRaw,
     businessEthicsTemplatesRaw,
-    devotionalTemplatesRaw,
-    leaderQuotesTemplatesRaw,
-    atmanirbharBharatTemplatesRaw,
-    goodThoughtsTemplatesRaw,
-    trendingTemplatesRaw,
-    bhagvatGitaTemplatesRaw,
-    booksTemplatesRaw,
-    celebratesMomentsTemplatesRaw,
+    successMindsetTemplatesRaw,
+    socialMediaGrowthTemplatesRaw,
+    moneyAndFinanceTemplatesRaw,
+    businessLegendQuoteTemplatesRaw,
+    businessMarketingTipsTemplatesRaw,
+    businessQuotesTemplatesRaw,
   ]);
 
   // Debounced search handler - triggers search after user stops typing
   useEffect(() => {
     // If search query is empty, reset immediately (no debounce delay)
     if (searchQuery.trim() === '') {
-      setTemplates(professionalTemplates);
+      setTemplates([]);
       setIsSearching(false);
       setDisableBackgroundUpdates(false);
       return;
@@ -1732,7 +1800,7 @@ const HomeScreen: React.FC = React.memo(() => {
     const timeoutId = setTimeout(() => {
       // Double-check query is still not empty (user might have cleared it during debounce)
       if (searchQuery.trim() === '') {
-        setTemplates(professionalTemplates);
+        setTemplates([]);
         setIsSearching(false);
         setDisableBackgroundUpdates(false);
         return;
@@ -1755,8 +1823,8 @@ const HomeScreen: React.FC = React.memo(() => {
       );
       const matchingCategoryNames = matchingCategories.map(category => category.name.toLowerCase());
       
-      // Combine professional templates, greeting templates, and calendar posters for unified search
-      const allTemplates = [...professionalTemplates, ...allGreetingTemplates, ...calendarPosters];
+      // Combine greeting templates and calendar posters for unified search
+      const allTemplates = [...allGreetingTemplates, ...calendarPosters];
       
       // First, show immediate local results
       const filtered = allTemplates.filter(template => {
@@ -1854,13 +1922,10 @@ const HomeScreen: React.FC = React.memo(() => {
         })();
       }
       
-      // Try API search in background for professional templates
+      // Try API search in background
       setTimeout(async () => {
         if (currentRequestId !== requestId) return;
         try {
-          // Search professional templates via API
-          const professionalResults = await dashboardService.searchTemplates(searchQuery);
-          
           // Search greeting templates via API
           const greetingResults = await greetingTemplatesService.searchTemplates(searchQuery);
           
@@ -1916,7 +1981,7 @@ const HomeScreen: React.FC = React.memo(() => {
           }));
           
           // Combine results and remove duplicates based on id
-          const allResults = [...professionalResults, ...convertedGreetingResults, ...convertedGeneralCategoryResults];
+          const allResults = [...convertedGreetingResults, ...convertedGeneralCategoryResults];
           const uniqueResults = Array.from(
             new Map(allResults.map(template => [template.id, template])).values()
           );
@@ -1936,7 +2001,7 @@ const HomeScreen: React.FC = React.memo(() => {
 
     // Cleanup timeout on unmount or when searchQuery changes
     return () => clearTimeout(timeoutId);
-  }, [searchQuery, professionalTemplates, allGreetingTemplates, calendarPosters, currentRequestId, filteredGreetingCategoriesList]);
+  }, [searchQuery, allGreetingTemplates, calendarPosters, currentRequestId, filteredGreetingCategoriesList]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -1967,22 +2032,8 @@ const HomeScreen: React.FC = React.memo(() => {
   const handleTabChange = useCallback(async (tab: string) => {
     setActiveTab(tab);
     setIsSearching(false); // Reset search state
-    
-    // Use API data for different tabs
-    try {
-      // Filter business events based on tab
-      const filteredTemplates = professionalTemplates.filter(template => {
-        if (tab === 'daily') return template.category?.toLowerCase().includes('daily');
-        if (tab === 'festival') return template.category?.toLowerCase().includes('festival');
-        if (tab === 'special') return template.category?.toLowerCase().includes('special');
-        return true; // 'all' tab shows all templates
-      });
-      setTemplates(filteredTemplates);
-    } catch (error) {
-      if (__DEV__) {
-      }
-    }
-  }, [professionalTemplates]);
+    // Tab functionality removed - no professional templates
+  }, []);
 
   // Like functionality has been removed - templates no longer have like status
   const applyUserLikeStatus = useCallback(async (templates: Template[]) => {
@@ -2017,25 +2068,7 @@ const HomeScreen: React.FC = React.memo(() => {
     if (!searchQuery.trim()) {
       setIsSearching(false);
       setDisableBackgroundUpdates(false); // Re-enable background updates when clearing search
-      setTemplates(professionalTemplates);
-      
-      // Try API call in background
-      setTimeout(async () => {
-        // Check if this is still the current request
-        if (currentRequestId !== requestId) return;
-        
-        try {
-          const templatesData = await dashboardService.getTemplatesByTab(activeTab);
-          // Only update if this is still the current request
-          if (currentRequestId === requestId) {
-            setTemplates(templatesData);
-          }
-        } catch (error) {
-          if (__DEV__) {
-            devError('Search reset error:', error);
-          }
-        }
-      }, 100);
+      setTemplates([]);
       return;
     }
     
@@ -2052,15 +2085,8 @@ const HomeScreen: React.FC = React.memo(() => {
       )
       .map(category => category.name.toLowerCase());
     
-    const filtered = professionalTemplates.filter(template => {
-      const nameMatch = template.name?.toLowerCase().includes(searchLower);
-      const categoryMatch = template.category?.toLowerCase().includes(searchLower);
-      const generalCategoryMatch = template.category && matchingCategoryNames.some(catName => 
-        template.category?.toLowerCase().includes(catName)
-      );
-      return nameMatch || categoryMatch || generalCategoryMatch;
-    });
-    setTemplates(filtered);
+    // Local search removed - only API search for greeting templates
+    setTemplates([]);
     
     // Try API search in background
     setTimeout(async () => {
@@ -2101,7 +2127,7 @@ const HomeScreen: React.FC = React.memo(() => {
         }));
         
         // Combine results and remove duplicates
-        const allResults = [...results, ...convertedGeneralCategoryResults];
+        const allResults = [...convertedGeneralCategoryResults];
         const uniqueResults = Array.from(
           new Map(allResults.map(template => [template.id, template])).values()
         );
@@ -2114,7 +2140,7 @@ const HomeScreen: React.FC = React.memo(() => {
         devError('Search error:', error);
       }
     }, 100);
-  }, [searchQuery, activeTab, professionalTemplates, currentRequestId, isSearching, filteredGreetingCategoriesList]);
+  }, [searchQuery, activeTab, currentRequestId, isSearching, filteredGreetingCategoriesList]);
 
   // Memoized lookup maps for O(1) access instead of O(n) find operations
 const videoContentMap = useMemo(() => {
@@ -2123,11 +2149,6 @@ const videoContentMap = useMemo(() => {
   return map;
 }, [videoContent]);
 
-const professionalTemplatesMap = useMemo(() => {
-  const map = new Map();
-  professionalTemplates.forEach(template => map.set(template.id, template));
-  return map;
-}, [professionalTemplates]);
 
 // Memoize business category previews to prevent unnecessary re-renders
 const memoizedBusinessCategoryPreviews = useMemo(() => {
@@ -2162,15 +2183,12 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
     return;
   }
 
-  // Use O(1) lookup instead of O(n) find
-  const matchedPoster = professionalTemplatesMap.get(template.id) || template;
-  const related = professionalTemplates.filter(poster => poster.id !== template.id);
-
+  // Navigate to PosterPlayer with template
   navigation.navigate('PosterPlayer', {
-    selectedPoster: matchedPoster as Template,
-    relatedPosters: related,
+    selectedPoster: template as Template,
+    relatedPosters: [],
   });
-}, [videoContentMap, professionalTemplatesMap, videoContent, professionalTemplates, allGreetingTemplates, navigation, searchQuery]);
+}, [videoContentMap, videoContent, allGreetingTemplates, navigation, searchQuery]);
 
   const closeModal = useCallback(() => {
     setIsModalVisible(false);
@@ -2200,7 +2218,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
       return;
     }
     if (userProfileSectionRef.current) {
-      userProfileSectionRef.current.measureInWindow((x, y, width, height) => {
+      userProfileSectionRef.current.measureInWindow((x: number, y: number, width: number, height: number) => {
         setBusinessProfileDropdownPosition({
           top: y + height + moderateScale(4),
           left: x,
@@ -2274,18 +2292,10 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
         setSearchQuery('');
         setIsSearching(false);
         setDisableBackgroundUpdates(false);
-        setTemplates(professionalTemplates);
+        setTemplates([]);
         return false;
       }
     });
-  }, [professionalTemplates]);
-
-  const handleViewAllUpcomingEvents = useCallback(() => {
-    setIsUpcomingEventsModalVisible(true);
-  }, []);
-
-  const closeUpcomingEventsModal = useCallback(() => {
-    setIsUpcomingEventsModalVisible(false);
   }, []);
 
 
@@ -2298,22 +2308,6 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
   }, []);
 
   // Greeting section modal handlers
-  const handleViewAllMotivation = useCallback(() => {
-    setIsMotivationModalVisible(true);
-  }, []);
-
-  const closeMotivationModal = useCallback(() => {
-    setIsMotivationModalVisible(false);
-  }, []);
-
-  const handleViewAllGoodMorning = useCallback(() => {
-    setIsGoodMorningModalVisible(true);
-  }, []);
-
-  const closeGoodMorningModal = useCallback(() => {
-    setIsGoodMorningModalVisible(false);
-  }, []);
-
   const handleViewAllBusinessEthics = useCallback(() => {
     setIsBusinessEthicsModalVisible(true);
   }, []);
@@ -2322,68 +2316,52 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
     setIsBusinessEthicsModalVisible(false);
   }, []);
 
-  const handleViewAllDevotional = useCallback(() => {
-    setIsDevotionalModalVisible(true);
+  const handleViewAllSuccessMindset = useCallback(() => {
+    setIsSuccessMindsetModalVisible(true);
   }, []);
 
-  const closeDevotionalModal = useCallback(() => {
-    setIsDevotionalModalVisible(false);
+  const closeSuccessMindsetModal = useCallback(() => {
+    setIsSuccessMindsetModalVisible(false);
   }, []);
 
-  const handleViewAllLeaderQuotes = useCallback(() => {
-    setIsLeaderQuotesModalVisible(true);
+  const handleViewAllSocialMediaGrowth = useCallback(() => {
+    setIsSocialMediaGrowthModalVisible(true);
   }, []);
 
-  const closeLeaderQuotesModal = useCallback(() => {
-    setIsLeaderQuotesModalVisible(false);
+  const closeSocialMediaGrowthModal = useCallback(() => {
+    setIsSocialMediaGrowthModalVisible(false);
   }, []);
 
-  const handleViewAllAtmanirbharBharat = useCallback(() => {
-    setIsAtmanirbharBharatModalVisible(true);
+  const handleViewAllMoneyAndFinance = useCallback(() => {
+    setIsMoneyAndFinanceModalVisible(true);
   }, []);
 
-  const closeAtmanirbharBharatModal = useCallback(() => {
-    setIsAtmanirbharBharatModalVisible(false);
+  const closeMoneyAndFinanceModal = useCallback(() => {
+    setIsMoneyAndFinanceModalVisible(false);
   }, []);
 
-  const handleViewAllGoodThoughts = useCallback(() => {
-    setIsGoodThoughtsModalVisible(true);
+  const handleViewAllBusinessLegendQuote = useCallback(() => {
+    setIsBusinessLegendQuoteModalVisible(true);
   }, []);
 
-  const closeGoodThoughtsModal = useCallback(() => {
-    setIsGoodThoughtsModalVisible(false);
+  const closeBusinessLegendQuoteModal = useCallback(() => {
+    setIsBusinessLegendQuoteModalVisible(false);
   }, []);
 
-  const handleViewAllTrending = useCallback(() => {
-    setIsTrendingModalVisible(true);
+  const handleViewAllBusinessMarketingTips = useCallback(() => {
+    setIsBusinessMarketingTipsModalVisible(true);
   }, []);
 
-  const closeTrendingModal = useCallback(() => {
-    setIsTrendingModalVisible(false);
+  const closeBusinessMarketingTipsModal = useCallback(() => {
+    setIsBusinessMarketingTipsModalVisible(false);
   }, []);
 
-  const handleViewAllBhagvatGita = useCallback(() => {
-    setIsBhagvatGitaModalVisible(true);
+  const handleViewAllBusinessQuotes = useCallback(() => {
+    setIsBusinessQuotesModalVisible(true);
   }, []);
 
-  const closeBhagvatGitaModal = useCallback(() => {
-    setIsBhagvatGitaModalVisible(false);
-  }, []);
-
-  const handleViewAllBooks = useCallback(() => {
-    setIsBooksModalVisible(true);
-  }, []);
-
-  const closeBooksModal = useCallback(() => {
-    setIsBooksModalVisible(false);
-  }, []);
-
-  const handleViewAllCelebratesMoments = useCallback(() => {
-    setIsCelebratesMomentsModalVisible(true);
-  }, []);
-
-  const closeCelebratesMomentsModal = useCallback(() => {
-    setIsCelebratesMomentsModalVisible(false);
+  const closeBusinessQuotesModal = useCallback(() => {
+    setIsBusinessQuotesModalVisible(false);
   }, []);
 
   const handleViewAllFeaturedContent = useCallback(() => {
@@ -2505,6 +2483,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
             uri={item.imageUrl} 
             style={styles.bannerImage}
             resizeMode="cover"
+            mode="full"
           />
            <LinearGradient
              colors={['transparent', 'rgba(0,0,0,0.7)']}
@@ -2554,7 +2533,13 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
     );
   }, [theme, cardWidth, playIconSize, handleVideoCardPress]);
 
-  const featuredCarouselItemWidth = useMemo(() => screenWidth - moderateScale(40), [screenWidth]);
+  const featuredCarouselItemWidth = useMemo(() => {
+    // Account for list padding (12px on each side = 24px total) and card margins
+    const listPadding = moderateScale(12) * 2; // paddingHorizontal on both sides
+    const cardMargin = moderateScale(10); // marginRight on card
+    return screenWidth - listPadding - cardMargin;
+  }, [screenWidth]);
+  const featuredCarouselItemHeight = useMemo(() => featuredCarouselItemWidth / 3, [featuredCarouselItemWidth]); // 3:1 aspect ratio
   const featuredCarouselSnapInterval = useMemo(() => featuredCarouselItemWidth + moderateScale(10), [featuredCarouselItemWidth]);
 
   // Memoized key extractors
@@ -2562,159 +2547,113 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
 
   // Memoized renderItem functions for each category to prevent re-creation
   // These are stable functions that won't change on every render
-  const renderMotivationCard = useMemo(() => {
-    const categoryTemplates = motivationTemplatesRaw.length > 0 ? motivationTemplatesRaw : motivationTemplates;
-    return ({ item }: { item: any }) => (
-      <GreetingCard
-        item={item}
-        cardWidth={cardWidth}
-        theme={theme}
-        categoryTemplates={categoryTemplates}
-        searchQuery="motivational"
-        navigation={navigation}
-      />
-    );
-  }, [navigation, theme, cardWidth, motivationTemplatesRaw, motivationTemplates]);
+  // Using useCallback instead of useMemo for better performance
 
-  const renderGoodMorningCard = useMemo(() => {
-    const categoryTemplates = goodMorningTemplatesRaw.length > 0 ? goodMorningTemplatesRaw : goodMorningTemplates;
-    return ({ item }: { item: any }) => (
-      <GreetingCard
-        item={item}
-        cardWidth={cardWidth}
-        theme={theme}
-        categoryTemplates={categoryTemplates}
-        searchQuery="good morning"
-        navigation={navigation}
-      />
-    );
-  }, [navigation, theme, cardWidth, goodMorningTemplatesRaw, goodMorningTemplates]);
+  const businessEthicsCategoryTemplates = useMemo(() => 
+    businessEthicsTemplatesRaw.length > 0 ? businessEthicsTemplatesRaw : businessEthicsTemplates,
+    [businessEthicsTemplatesRaw, businessEthicsTemplates]
+  );
+  const renderBusinessEthicsCard = useCallback(({ item }: { item: any }) => (
+    <GreetingCard
+      item={item}
+      cardWidth={cardWidth}
+      theme={theme}
+      categoryTemplates={businessEthicsCategoryTemplates}
+      searchQuery="business ethics"
+      navigation={navigation}
+    />
+  ), [navigation, theme, cardWidth, businessEthicsCategoryTemplates]);
 
-  const renderBusinessEthicsCard = useMemo(() => {
-    const categoryTemplates = businessEthicsTemplatesRaw.length > 0 ? businessEthicsTemplatesRaw : businessEthicsTemplates;
-    return ({ item }: { item: any }) => (
-      <GreetingCard
-        item={item}
-        cardWidth={cardWidth}
-        theme={theme}
-        categoryTemplates={categoryTemplates}
-        searchQuery="business ethics"
-        navigation={navigation}
-      />
-    );
-  }, [navigation, theme, cardWidth, businessEthicsTemplatesRaw, businessEthicsTemplates]);
+  const successMindsetCategoryTemplates = useMemo(() => 
+    successMindsetTemplatesRaw.length > 0 ? successMindsetTemplatesRaw : successMindsetTemplates,
+    [successMindsetTemplatesRaw, successMindsetTemplates]
+  );
+  const renderSuccessMindsetCard = useCallback(({ item }: { item: any }) => (
+    <GreetingCard
+      item={item}
+      cardWidth={cardWidth}
+      theme={theme}
+      categoryTemplates={successMindsetCategoryTemplates}
+      searchQuery="success mindset"
+      navigation={navigation}
+    />
+  ), [navigation, theme, cardWidth, successMindsetCategoryTemplates]);
 
-  const renderDevotionalCard = useMemo(() => {
-    const categoryTemplates = devotionalTemplatesRaw.length > 0 ? devotionalTemplatesRaw : devotionalTemplates;
-    return ({ item }: { item: any }) => (
-      <GreetingCard
-        item={item}
-        cardWidth={cardWidth}
-        theme={theme}
-        categoryTemplates={categoryTemplates}
-        searchQuery="devotional"
-        navigation={navigation}
-      />
-    );
-  }, [navigation, theme, cardWidth, devotionalTemplatesRaw, devotionalTemplates]);
+  const socialMediaGrowthCategoryTemplates = useMemo(() => 
+    socialMediaGrowthTemplatesRaw.length > 0 ? socialMediaGrowthTemplatesRaw : socialMediaGrowthTemplates,
+    [socialMediaGrowthTemplatesRaw, socialMediaGrowthTemplates]
+  );
+  const renderSocialMediaGrowthCard = useCallback(({ item }: { item: any }) => (
+    <GreetingCard
+      item={item}
+      cardWidth={cardWidth}
+      theme={theme}
+      categoryTemplates={socialMediaGrowthCategoryTemplates}
+      searchQuery="social media growth"
+      navigation={navigation}
+    />
+  ), [navigation, theme, cardWidth, socialMediaGrowthCategoryTemplates]);
 
-  const renderLeaderQuotesCard = useMemo(() => {
-    const categoryTemplates = leaderQuotesTemplatesRaw.length > 0 ? leaderQuotesTemplatesRaw : leaderQuotesTemplates;
-    return ({ item }: { item: any }) => (
-      <GreetingCard
-        item={item}
-        cardWidth={cardWidth}
-        theme={theme}
-        categoryTemplates={categoryTemplates}
-        searchQuery="leader quotes"
-        navigation={navigation}
-      />
-    );
-  }, [navigation, theme, cardWidth, leaderQuotesTemplatesRaw, leaderQuotesTemplates]);
+  const moneyAndFinanceCategoryTemplates = useMemo(() => 
+    moneyAndFinanceTemplatesRaw.length > 0 ? moneyAndFinanceTemplatesRaw : moneyAndFinanceTemplates,
+    [moneyAndFinanceTemplatesRaw, moneyAndFinanceTemplates]
+  );
+  const renderMoneyAndFinanceCard = useCallback(({ item }: { item: any }) => (
+    <GreetingCard
+      item={item}
+      cardWidth={cardWidth}
+      theme={theme}
+      categoryTemplates={moneyAndFinanceCategoryTemplates}
+      searchQuery="money and finance"
+      navigation={navigation}
+    />
+  ), [navigation, theme, cardWidth, moneyAndFinanceCategoryTemplates]);
 
-  const renderAtmanirbharBharatCard = useMemo(() => {
-    const categoryTemplates = atmanirbharBharatTemplatesRaw.length > 0 ? atmanirbharBharatTemplatesRaw : atmanirbharBharatTemplates;
-    return ({ item }: { item: any }) => (
-      <GreetingCard
-        item={item}
-        cardWidth={cardWidth}
-        theme={theme}
-        categoryTemplates={categoryTemplates}
-        searchQuery="atmanirbhar bharat"
-        navigation={navigation}
-      />
-    );
-  }, [navigation, theme, cardWidth, atmanirbharBharatTemplatesRaw, atmanirbharBharatTemplates]);
+  const businessLegendQuoteCategoryTemplates = useMemo(() => 
+    businessLegendQuoteTemplatesRaw.length > 0 ? businessLegendQuoteTemplatesRaw : businessLegendQuoteTemplates,
+    [businessLegendQuoteTemplatesRaw, businessLegendQuoteTemplates]
+  );
+  const renderBusinessLegendQuoteCard = useCallback(({ item }: { item: any }) => (
+    <GreetingCard
+      item={item}
+      cardWidth={cardWidth}
+      theme={theme}
+      categoryTemplates={businessLegendQuoteCategoryTemplates}
+      searchQuery="business legend quote"
+      navigation={navigation}
+    />
+  ), [navigation, theme, cardWidth, businessLegendQuoteCategoryTemplates]);
 
-  const renderGoodThoughtsCard = useMemo(() => {
-    const categoryTemplates = goodThoughtsTemplatesRaw.length > 0 ? goodThoughtsTemplatesRaw : goodThoughtsTemplates;
-    return ({ item }: { item: any }) => (
-      <GreetingCard
-        item={item}
-        cardWidth={cardWidth}
-        theme={theme}
-        categoryTemplates={categoryTemplates}
-        searchQuery="good thoughts"
-        navigation={navigation}
-      />
-    );
-  }, [navigation, theme, cardWidth, goodThoughtsTemplatesRaw, goodThoughtsTemplates]);
+  const businessMarketingTipsCategoryTemplates = useMemo(() => 
+    businessMarketingTipsTemplatesRaw.length > 0 ? businessMarketingTipsTemplatesRaw : businessMarketingTipsTemplates,
+    [businessMarketingTipsTemplatesRaw, businessMarketingTipsTemplates]
+  );
+  const renderBusinessMarketingTipsCard = useCallback(({ item }: { item: any }) => (
+    <GreetingCard
+      item={item}
+      cardWidth={cardWidth}
+      theme={theme}
+      categoryTemplates={businessMarketingTipsCategoryTemplates}
+      searchQuery="business marketing tips"
+      navigation={navigation}
+    />
+  ), [navigation, theme, cardWidth, businessMarketingTipsCategoryTemplates]);
 
-  const renderTrendingCard = useMemo(() => {
-    const categoryTemplates = trendingTemplatesRaw.length > 0 ? trendingTemplatesRaw : trendingTemplates;
-    return ({ item }: { item: any }) => (
-      <GreetingCard
-        item={item}
-        cardWidth={cardWidth}
-        theme={theme}
-        categoryTemplates={categoryTemplates}
-        searchQuery="trending"
-        navigation={navigation}
-      />
-    );
-  }, [navigation, theme, cardWidth, trendingTemplatesRaw, trendingTemplates]);
+  const businessQuotesCategoryTemplates = useMemo(() => 
+    businessQuotesTemplatesRaw.length > 0 ? businessQuotesTemplatesRaw : businessQuotesTemplates,
+    [businessQuotesTemplatesRaw, businessQuotesTemplates]
+  );
+  const renderBusinessQuotesCard = useCallback(({ item }: { item: any }) => (
+    <GreetingCard
+      item={item}
+      cardWidth={cardWidth}
+      theme={theme}
+      categoryTemplates={businessQuotesCategoryTemplates}
+      searchQuery="business quotes"
+      navigation={navigation}
+    />
+  ), [navigation, theme, cardWidth, businessQuotesCategoryTemplates]);
 
-  const renderBhagvatGitaCard = useMemo(() => {
-    const categoryTemplates = bhagvatGitaTemplatesRaw.length > 0 ? bhagvatGitaTemplatesRaw : bhagvatGitaTemplates;
-    return ({ item }: { item: any }) => (
-      <GreetingCard
-        item={item}
-        cardWidth={cardWidth}
-        theme={theme}
-        categoryTemplates={categoryTemplates}
-        searchQuery="bhagvat gita"
-        navigation={navigation}
-      />
-    );
-  }, [navigation, theme, cardWidth, bhagvatGitaTemplatesRaw, bhagvatGitaTemplates]);
-
-  const renderBooksCard = useMemo(() => {
-    const categoryTemplates = booksTemplatesRaw.length > 0 ? booksTemplatesRaw : booksTemplates;
-    return ({ item }: { item: any }) => (
-      <GreetingCard
-        item={item}
-        cardWidth={cardWidth}
-        theme={theme}
-        categoryTemplates={categoryTemplates}
-        searchQuery="books"
-        navigation={navigation}
-      />
-    );
-  }, [navigation, theme, cardWidth, booksTemplatesRaw, booksTemplates]);
-
-  const renderCelebratesMomentsCard = useMemo(() => {
-    const categoryTemplates = celebratesMomentsTemplatesRaw.length > 0 ? celebratesMomentsTemplatesRaw : celebratesMomentsTemplates;
-    return ({ item }: { item: any }) => (
-      <GreetingCard
-        item={item}
-        cardWidth={cardWidth}
-        theme={theme}
-        categoryTemplates={categoryTemplates}
-        searchQuery="celebrates the moments"
-        navigation={navigation}
-      />
-    );
-  }, [navigation, theme, cardWidth, celebratesMomentsTemplatesRaw, celebratesMomentsTemplates]);
 
 
 
@@ -2734,6 +2673,546 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
       </LinearGradient>
     </TouchableOpacity>
   ), [theme.colors.primary, theme.colors.secondary]);
+
+  // Memoized keyExtractor functions for modals
+  const keyExtractorId = useCallback((item: any) => item.id.toString(), []);
+  const keyExtractorIdString = useCallback((item: any) => item.id, []);
+  const keyExtractorCategory = useCallback((item: any) => `category-${item.id}`, []);
+
+  // Memoized modal item components to avoid recreating on every render
+  interface ModalTemplateItemProps {
+    template: Template;
+    modalCardWidth: number;
+    modalCardGap: number;
+    modalColumns: number;
+    index: number;
+    onPress: () => void;
+  }
+
+  const ModalTemplateItem: React.FC<ModalTemplateItemProps> = React.memo(({ 
+    template, 
+    modalCardWidth, 
+    modalCardGap, 
+    modalColumns, 
+    index, 
+    onPress 
+  }) => {
+    const isLastInRow = (index + 1) % modalColumns === 0;
+    return (
+      <TouchableOpacity
+        activeOpacity={0.8}
+        style={[
+          styles.upcomingEventModalCard,
+          { width: modalCardWidth },
+          !isLastInRow && { marginRight: modalCardGap }
+        ]}
+        onPress={onPress}
+      >
+        <View style={styles.upcomingEventModalImageContainer}>
+          <OptimizedImage 
+            uri={template.thumbnail} 
+            style={styles.upcomingEventModalImage} 
+            resizeMode="cover" 
+          />
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.8)']}
+            style={styles.upcomingEventModalOverlay}
+          />
+        </View>
+      </TouchableOpacity>
+    );
+  }, (prev, next) => {
+    return (
+      prev.template.id === next.template.id &&
+      prev.template.thumbnail === next.template.thumbnail &&
+      prev.modalCardWidth === next.modalCardWidth &&
+      prev.modalCardGap === next.modalCardGap &&
+      prev.modalColumns === next.modalColumns &&
+      prev.index === next.index
+    );
+  });
+  ModalTemplateItem.displayName = 'ModalTemplateItem';
+
+  interface ModalVideoItemProps {
+    video: VideoContent;
+    modalCardWidth: number;
+    modalCardGap: number;
+    modalColumns: number;
+    index: number;
+    onPress: () => void;
+  }
+
+  const ModalVideoItem: React.FC<ModalVideoItemProps> = React.memo(({ 
+    video, 
+    modalCardWidth, 
+    modalCardGap, 
+    modalColumns, 
+    index, 
+    onPress 
+  }) => {
+    const isLastInRow = (index + 1) % modalColumns === 0;
+    return (
+      <TouchableOpacity
+        activeOpacity={0.8}
+        style={[
+          styles.upcomingEventModalCard,
+          { width: modalCardWidth },
+          !isLastInRow && { marginRight: modalCardGap }
+        ]}
+        onPress={onPress}
+      >
+        <View style={styles.upcomingEventModalImageContainer}>
+          <OptimizedImage 
+            uri={video.thumbnail} 
+            style={styles.upcomingEventModalImage} 
+            resizeMode="cover" 
+          />
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.8)']}
+            style={styles.upcomingEventModalOverlay}
+          />
+        </View>
+      </TouchableOpacity>
+    );
+  }, (prev, next) => {
+    return (
+      prev.video.id === next.video.id &&
+      prev.video.thumbnail === next.video.thumbnail &&
+      prev.modalCardWidth === next.modalCardWidth &&
+      prev.modalCardGap === next.modalCardGap &&
+      prev.modalColumns === next.modalColumns &&
+      prev.index === next.index
+    );
+  });
+  ModalVideoItem.displayName = 'ModalVideoItem';
+
+  interface ModalFeaturedItemProps {
+    featured: FeaturedContent;
+    modalCardWidth: number;
+    modalCardGap: number;
+    modalColumns: number;
+    index: number;
+    onPress: () => void;
+  }
+
+  const ModalFeaturedItem: React.FC<ModalFeaturedItemProps> = React.memo(({ 
+    featured, 
+    modalCardWidth, 
+    modalCardGap, 
+    modalColumns, 
+    index, 
+    onPress 
+  }) => {
+    const isLastInRow = (index + 1) % modalColumns === 0;
+    return (
+      <TouchableOpacity
+        activeOpacity={0.8}
+        style={[
+          styles.upcomingEventModalCard,
+          { width: modalCardWidth },
+          !isLastInRow && { marginRight: modalCardGap }
+        ]}
+        onPress={onPress}
+      >
+        <View style={styles.upcomingEventModalImageContainer}>
+          <OptimizedImage 
+            uri={featured.imageUrl} 
+            style={styles.upcomingEventModalImage} 
+            resizeMode="cover" 
+          />
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.8)']}
+            style={styles.upcomingEventModalOverlay}
+          />
+        </View>
+      </TouchableOpacity>
+    );
+  }, (prev, next) => {
+    return (
+      prev.featured.id === next.featured.id &&
+      prev.featured.imageUrl === next.featured.imageUrl &&
+      prev.modalCardWidth === next.modalCardWidth &&
+      prev.modalCardGap === next.modalCardGap &&
+      prev.modalColumns === next.modalColumns &&
+      prev.index === next.index
+    );
+  });
+  ModalFeaturedItem.displayName = 'ModalFeaturedItem';
+
+  interface ModalBusinessCategoryItemProps {
+    category: BusinessCategory;
+    previewTemplates: Template[];
+    modalCardWidth: number;
+    modalCardGap: number;
+    modalColumns: number;
+    index: number;
+    onPress: () => void;
+  }
+
+  const ModalBusinessCategoryItem: React.FC<ModalBusinessCategoryItemProps> = React.memo(({ 
+    category, 
+    previewTemplates,
+    modalCardWidth, 
+    modalCardGap, 
+    modalColumns, 
+    index, 
+    onPress 
+  }) => {
+    const displayImage = useMemo(() => {
+      const thumbnails = previewTemplates
+        .map(template => template.thumbnail)
+        .filter((uri): uri is string => typeof uri === 'string' && uri.length > 0);
+      return thumbnails[0] || category.imageUrl || (category as any).image || null;
+    }, [previewTemplates, category]);
+    
+    const isLastInRow = (index + 1) % modalColumns === 0;
+    return (
+      <TouchableOpacity
+        activeOpacity={0.8}
+        style={[
+          styles.upcomingEventModalCard,
+          { width: modalCardWidth },
+          !isLastInRow && { marginRight: modalCardGap }
+        ]}
+        onPress={onPress}
+      >
+        <View style={styles.upcomingEventModalImageContainer}>
+          {displayImage ? (
+            <OptimizedImage 
+              uri={displayImage} 
+              style={styles.upcomingEventModalImage} 
+              resizeMode="cover" 
+            />
+          ) : (
+            <View style={[styles.upcomingEventModalImage, { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.05)' }]}>
+              <Text style={styles.businessCategoryIcon}>{category.icon || category.name?.[0] || 'MB'}</Text>
+            </View>
+          )}
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.85)']}
+            style={styles.upcomingEventModalOverlay}
+          />
+          <View style={styles.businessCategoryModalNameContainer}>
+            <Text 
+              style={styles.businessCategoryModalName}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {category.name}
+            </Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  }, (prev, next) => {
+    return (
+      prev.category.id === next.category.id &&
+      prev.modalCardWidth === next.modalCardWidth &&
+      prev.modalCardGap === next.modalCardGap &&
+      prev.modalColumns === next.modalColumns &&
+      prev.index === next.index &&
+      prev.previewTemplates === next.previewTemplates
+    );
+  });
+  ModalBusinessCategoryItem.displayName = 'ModalBusinessCategoryItem';
+
+  // Memoized renderItem functions for modal FlatLists
+  const handleBusinessCategoryPress = useCallback(async (category: BusinessCategory) => {
+    const cachedTemplates = businessCategoryPreviews[category.id];
+
+    // Navigate immediately if we have cached templates
+    if (cachedTemplates && cachedTemplates.length > 0) {
+      navigation.navigate('PosterPlayer', {
+        selectedPoster: cachedTemplates[0],
+        relatedPosters: cachedTemplates.slice(1),
+        searchQuery: '',
+        templateSource: 'greeting',
+        businessCategory: category.name,
+        posterLimit: 6, // Limit 6 for business categories from HomeScreen
+      });
+      return;
+    }
+
+    // Navigate immediately with loading state, then load data in background
+    navigation.navigate('PosterPlayer', {
+      selectedPoster: {
+        id: 'loading',
+        name: category.name,
+        thumbnail: '',
+        category: category.name,
+        downloads: 0,
+        isDownloaded: false,
+      },
+      relatedPosters: [],
+      searchQuery: '',
+      templateSource: 'professional',
+      businessCategory: category.name,
+      posterLimit: 6, // Limit 6 for business categories from HomeScreen
+    });
+
+    // Load data in background after navigation
+    InteractionManager.runAfterInteractions(async () => {
+      try {
+        const response = await businessCategoryPostersApi.getPostersByCategory(category.name, 6);
+
+        if (response?.success && Array.isArray(response.data?.posters) && response.data.posters.length > 0) {
+          const templates = response.data.posters
+            .map(poster => convertBusinessPosterToTemplate(poster, category.name))
+            .filter(template => template.thumbnail);
+
+          // Update preview cache for future use
+          setBusinessCategoryPreviews(prev => ({
+            ...prev,
+            [category.id]: templates,
+          }));
+        }
+      } catch (error) {
+        if (__DEV__) {
+          devError('Error loading business category posters:', error);
+        }
+      }
+    });
+  }, [businessCategoryPreviews, navigation]);
+
+  const renderBusinessCategoryModalItem = useCallback(({ item, index }: { item: BusinessCategory; index: number }) => {
+    const previewTemplates = businessCategoryPreviews[item.id] || [];
+    const handlePress = () => {
+      closeBusinessCategoriesModal();
+      handleBusinessCategoryPress(item);
+    };
+    return (
+      <ModalBusinessCategoryItem
+        category={item}
+        previewTemplates={previewTemplates}
+        modalCardWidth={modalCardWidth}
+        modalCardGap={modalCardGap}
+        modalColumns={modalColumns}
+        index={index}
+        onPress={handlePress}
+      />
+    );
+  }, [modalCardWidth, modalCardGap, modalColumns, businessCategoryPreviews, closeBusinessCategoriesModal, handleBusinessCategoryPress]);
+
+  const renderVideoModalItem = useCallback(({ item, index }: { item: VideoContent; index: number }) => {
+    const handlePress = () => {
+      closeVideosModal();
+      const videoData: Template = {
+        id: item.id,
+        name: item.title,
+        thumbnail: item.thumbnail,
+        category: item.category,
+        downloads: 0,
+        isDownloaded: false,
+      };
+      navigation.navigate('VideoPlayer', {
+        selectedVideo: videoData,
+        relatedVideos: videoContent.slice(0, 6),
+      });
+    };
+    return (
+      <ModalVideoItem
+        video={item}
+        modalCardWidth={modalCardWidth}
+        modalCardGap={modalCardGap}
+        modalColumns={modalColumns}
+        index={index}
+        onPress={handlePress}
+      />
+    );
+  }, [modalCardWidth, modalCardGap, modalColumns, closeVideosModal, navigation, videoContent]);
+
+
+  const renderBusinessEthicsModalItem = useCallback(({ item, index }: { item: Template; index: number }) => {
+    const templates = businessEthicsTemplatesRaw.length > 0 ? businessEthicsTemplatesRaw : businessEthicsTemplates;
+    const handlePress = () => {
+      closeBusinessEthicsModal();
+      navigation.navigate('PosterPlayer', {
+        selectedPoster: item,
+        relatedPosters: templates.filter(t => t.id !== item.id),
+      });
+    };
+    return (
+      <ModalTemplateItem
+        template={item}
+        modalCardWidth={modalCardWidth}
+        modalCardGap={modalCardGap}
+        modalColumns={modalColumns}
+        index={index}
+        onPress={handlePress}
+      />
+    );
+  }, [modalCardWidth, modalCardGap, modalColumns, businessEthicsTemplatesRaw, businessEthicsTemplates, closeBusinessEthicsModal, navigation]);
+
+  const renderSuccessMindsetModalItem = useCallback(({ item, index }: { item: Template; index: number }) => {
+    const templates = successMindsetTemplatesRaw.length > 0 ? successMindsetTemplatesRaw : successMindsetTemplates;
+    const handlePress = () => {
+      closeSuccessMindsetModal();
+      navigation.navigate('PosterPlayer', {
+        selectedPoster: item,
+        relatedPosters: templates.filter(t => t.id !== item.id),
+      });
+    };
+    return (
+      <ModalTemplateItem
+        template={item}
+        modalCardWidth={modalCardWidth}
+        modalCardGap={modalCardGap}
+        modalColumns={modalColumns}
+        index={index}
+        onPress={handlePress}
+      />
+    );
+  }, [modalCardWidth, modalCardGap, modalColumns, successMindsetTemplatesRaw, successMindsetTemplates, closeSuccessMindsetModal, navigation]);
+
+  const renderSocialMediaGrowthModalItem = useCallback(({ item, index }: { item: Template; index: number }) => {
+    const templates = socialMediaGrowthTemplatesRaw.length > 0 ? socialMediaGrowthTemplatesRaw : socialMediaGrowthTemplates;
+    const handlePress = () => {
+      closeSocialMediaGrowthModal();
+      navigation.navigate('PosterPlayer', {
+        selectedPoster: item,
+        relatedPosters: templates.filter(t => t.id !== item.id),
+      });
+    };
+    return (
+      <ModalTemplateItem
+        template={item}
+        modalCardWidth={modalCardWidth}
+        modalCardGap={modalCardGap}
+        modalColumns={modalColumns}
+        index={index}
+        onPress={handlePress}
+      />
+    );
+  }, [modalCardWidth, modalCardGap, modalColumns, socialMediaGrowthTemplatesRaw, socialMediaGrowthTemplates, closeSocialMediaGrowthModal, navigation]);
+
+  const renderMoneyAndFinanceModalItem = useCallback(({ item, index }: { item: Template; index: number }) => {
+    const templates = moneyAndFinanceTemplatesRaw.length > 0 ? moneyAndFinanceTemplatesRaw : moneyAndFinanceTemplates;
+    const handlePress = () => {
+      closeMoneyAndFinanceModal();
+      navigation.navigate('PosterPlayer', {
+        selectedPoster: item,
+        relatedPosters: templates.filter(t => t.id !== item.id),
+      });
+    };
+    return (
+      <ModalTemplateItem
+        template={item}
+        modalCardWidth={modalCardWidth}
+        modalCardGap={modalCardGap}
+        modalColumns={modalColumns}
+        index={index}
+        onPress={handlePress}
+      />
+    );
+  }, [modalCardWidth, modalCardGap, modalColumns, moneyAndFinanceTemplatesRaw, moneyAndFinanceTemplates, closeMoneyAndFinanceModal, navigation]);
+
+  const renderBusinessLegendQuoteModalItem = useCallback(({ item, index }: { item: Template; index: number }) => {
+    const templates = businessLegendQuoteTemplatesRaw.length > 0 ? businessLegendQuoteTemplatesRaw : businessLegendQuoteTemplates;
+    const handlePress = () => {
+      closeBusinessLegendQuoteModal();
+      navigation.navigate('PosterPlayer', {
+        selectedPoster: item,
+        relatedPosters: templates.filter(t => t.id !== item.id),
+      });
+    };
+    return (
+      <ModalTemplateItem
+        template={item}
+        modalCardWidth={modalCardWidth}
+        modalCardGap={modalCardGap}
+        modalColumns={modalColumns}
+        index={index}
+        onPress={handlePress}
+      />
+    );
+  }, [modalCardWidth, modalCardGap, modalColumns, businessLegendQuoteTemplatesRaw, businessLegendQuoteTemplates, closeBusinessLegendQuoteModal, navigation]);
+
+  const renderBusinessMarketingTipsModalItem = useCallback(({ item, index }: { item: Template; index: number }) => {
+    const templates = businessMarketingTipsTemplatesRaw.length > 0 ? businessMarketingTipsTemplatesRaw : businessMarketingTipsTemplates;
+    const handlePress = () => {
+      closeBusinessMarketingTipsModal();
+      navigation.navigate('PosterPlayer', {
+        selectedPoster: item,
+        relatedPosters: templates.filter(t => t.id !== item.id),
+      });
+    };
+    return (
+      <ModalTemplateItem
+        template={item}
+        modalCardWidth={modalCardWidth}
+        modalCardGap={modalCardGap}
+        modalColumns={modalColumns}
+        index={index}
+        onPress={handlePress}
+      />
+    );
+  }, [modalCardWidth, modalCardGap, modalColumns, businessMarketingTipsTemplatesRaw, businessMarketingTipsTemplates, closeBusinessMarketingTipsModal, navigation]);
+
+  const renderBusinessQuotesModalItem = useCallback(({ item, index }: { item: Template; index: number }) => {
+    const templates = businessQuotesTemplatesRaw.length > 0 ? businessQuotesTemplatesRaw : businessQuotesTemplates;
+    const handlePress = () => {
+      closeBusinessQuotesModal();
+      navigation.navigate('PosterPlayer', {
+        selectedPoster: item,
+        relatedPosters: templates.filter(t => t.id !== item.id),
+      });
+    };
+    return (
+      <ModalTemplateItem
+        template={item}
+        modalCardWidth={modalCardWidth}
+        modalCardGap={modalCardGap}
+        modalColumns={modalColumns}
+        index={index}
+        onPress={handlePress}
+      />
+    );
+  }, [modalCardWidth, modalCardGap, modalColumns, businessQuotesTemplatesRaw, businessQuotesTemplates, closeBusinessQuotesModal, navigation]);
+
+
+  const renderFeaturedContentModalItem = useCallback(({ item, index }: { item: FeaturedContent; index: number }) => {
+    const convertFeaturedContentToTemplate = (fc: FeaturedContent): Template => ({
+      id: fc.id,
+      name: fc.title,
+      thumbnail: fc.imageUrl,
+      category: fc.type || 'Featured Content',
+      downloads: 0,
+      isDownloaded: false,
+      tags: [],
+    });
+    const selectedTemplate = convertFeaturedContentToTemplate(item);
+    const relatedTemplates = featuredContent
+      .filter(fc => fc.id !== item.id)
+      .map(convertFeaturedContentToTemplate);
+    const handlePress = () => {
+      closeFeaturedContentModal();
+      navigation.navigate('PosterPlayer', {
+        selectedPoster: selectedTemplate,
+        relatedPosters: relatedTemplates,
+      });
+    };
+    return (
+      <ModalFeaturedItem
+        featured={item}
+        modalCardWidth={modalCardWidth}
+        modalCardGap={modalCardGap}
+        modalColumns={modalColumns}
+        index={index}
+        onPress={handlePress}
+      />
+    );
+  }, [modalCardWidth, modalCardGap, modalColumns, featuredContent, closeFeaturedContentModal, navigation]);
+
+  // Memoized getItemLayout for modal FlatLists
+  const getModalItemLayout = useCallback((data: any, index: number) => {
+    const rowHeight = modalCardWidth * (screenWidth >= 768 ? 1 : 0.9) + moderateScale(6); // card height + margin
+    const rowIndex = Math.floor(index / modalColumns);
+    return {
+      length: rowHeight,
+      offset: rowHeight * rowIndex,
+      index,
+    };
+  }, [modalCardWidth, modalColumns, screenWidth]);
 
   const featuredCarouselRef = useRef<FlatList<FeaturedContent>>(null);
   const [featuredCarouselIndex, setFeaturedCarouselIndex] = useState(0);
@@ -2924,73 +3403,18 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
   }), [featuredCarouselSnapInterval]);
 
   const renderFeaturedCarouselItem = useCallback(({ item }: { item: FeaturedContent }) => (
-    <TouchableOpacity
+    <View
       key={item.id}
-      activeOpacity={0.85}
-      style={[styles.featuredCarouselCard, { width: featuredCarouselItemWidth }]}
-      onPress={() => handleFeaturedCarouselPress(item)}
+      style={[styles.featuredCarouselCard, { width: featuredCarouselItemWidth, height: featuredCarouselItemHeight }]}
     >
-      <OptimizedImage uri={item.imageUrl} style={styles.featuredCarouselImage} resizeMode="cover" />
-    </TouchableOpacity>
-  ), [handleFeaturedCarouselPress, featuredCarouselItemWidth]);
-
-  const handleBusinessCategoryPress = useCallback(async (category: BusinessCategory) => {
-    const cachedTemplates = businessCategoryPreviews[category.id];
-
-    // Navigate immediately if we have cached templates
-    if (cachedTemplates && cachedTemplates.length > 0) {
-      navigation.navigate('PosterPlayer', {
-        selectedPoster: cachedTemplates[0],
-        relatedPosters: cachedTemplates.slice(1),
-        searchQuery: '',
-        templateSource: 'professional',
-        businessCategory: category.name,
-        posterLimit: 6, // Limit 6 for business categories from HomeScreen
-      });
-      return;
-    }
-
-    // Navigate immediately with loading state, then load data in background
-    navigation.navigate('PosterPlayer', {
-      selectedPoster: {
-        id: 'loading',
-        name: category.name,
-        thumbnail: '',
-        category: category.name,
-        downloads: 0,
-        isDownloaded: false,
-      },
-      relatedPosters: [],
-      searchQuery: '',
-      templateSource: 'professional',
-      businessCategory: category.name,
-      posterLimit: 6, // Limit 6 for business categories from HomeScreen
-    });
-
-    // Load data in background after navigation
-    InteractionManager.runAfterInteractions(async () => {
-      try {
-        const response = await businessCategoryPostersApi.getPostersByCategory(category.name, 6);
-
-        if (response?.success && Array.isArray(response.data?.posters) && response.data.posters.length > 0) {
-          const templates = response.data.posters
-            .map(poster => convertBusinessPosterToTemplate(poster, category.name))
-            .filter(template => template.thumbnail);
-
-          if (templates.length > 0) {
-            setBusinessCategoryPreviews(prev => ({
-              ...prev,
-              [category.id]: templates,
-            }));
-          }
-        }
-      } catch (error) {
-        if (__DEV__) {
-          devError('❌ Error loading category posters:', error);
-        }
-      }
-    });
-  }, [businessCategoryPreviews, navigation]);
+      <OptimizedImage 
+        uri={item.imageUrl} 
+        style={[styles.featuredCarouselImage, { width: featuredCarouselItemWidth, height: featuredCarouselItemHeight }]} 
+        resizeMode="cover"
+        mode="full"
+      />
+    </View>
+  ), [featuredCarouselItemWidth, featuredCarouselItemHeight]);
 
   // Handler for greeting category press - navigate to PosterPlayerScreen with selected greeting category
   const handleGreetingCategoryPress = useCallback((category: { id: string; name: string }) => {
@@ -3009,6 +3433,17 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
       greetingCategory: category.name, // Pass the selected greeting category
     });
   }, [navigation]);
+
+  // Render function for search category items
+  const renderSearchCategoryItem = useCallback(({ item }: { item: { id: string; name: string; icon: string; color?: string; imageUrl?: string } }) => (
+    <GreetingCategoryCard
+      item={item}
+      cardWidth={cardWidth}
+      theme={theme}
+      categoryImage={memoizedGreetingCategoryImages[item.id] || (item as any).imageUrl || null}
+      onPress={handleGreetingCategoryPress}
+    />
+  ), [cardWidth, theme, memoizedGreetingCategoryImages, handleGreetingCategoryPress]);
 
   // Memoized category button labels - computed only when dependencies change
   const businessCategoryButtonLabel = useMemo(() => {
@@ -3171,7 +3606,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
       edges={['top', 'left', 'right']}
     >
       <StatusBar 
-        barStyle="dark-content"
+        barStyle={isDarkMode ? "light-content" : "dark-content"}
         backgroundColor="transparent" 
         translucent={true}
       />
@@ -3280,7 +3715,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                     setSearchQuery('');
                     setIsSearching(false);
                     setDisableBackgroundUpdates(false);
-                    setTemplates(professionalTemplates);
+                    setTemplates([]);
                   }}
                   style={styles.clearIcon}
                 >
@@ -3396,7 +3831,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                 ref={featuredCarouselRef}
                 data={featuredContent}
                 renderItem={renderFeaturedCarouselItem}
-                keyExtractor={(item) => item.id}
+                keyExtractor={keyExtractorIdString}
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 pagingEnabled
@@ -3514,61 +3949,6 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
           </View> */}
 
 
-          {/* Upcoming Festivals - Hidden when searching */}
-          {!isSearching && searchQuery.trim() === '' && upcomingEvents.length > 0 && (
-            <View style={styles.upcomingEventsSection}>
-              <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
-                Upcoming Festivals
-              </Text>
-                {renderBrowseAllButton(handleViewAllUpcomingEvents)}
-              </View>
-
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.upcomingEventsList}
-                nestedScrollEnabled={true}
-              >
-                {upcomingEvents.map((event) => (
-                  <TouchableOpacity
-                    key={event.id}
-                    activeOpacity={0.8}
-                    style={styles.upcomingEventCard}
-                    onPress={() => {
-                      // Convert upcoming event to template format for navigation
-                      const eventTemplate: Template = {
-                        id: `event-${event.id}`,
-                        name: event.title,
-                        thumbnail: event.imageUrl,
-                        category: `${event.category} • ${event.date} • ${event.location}`,
-                        downloads: 0,
-                        isDownloaded: false,
-                      };
-                      navigation.navigate('PosterPlayer', {
-                        selectedPoster: eventTemplate,
-                        relatedPosters: professionalTemplates.slice(0, 6),
-                      });
-                    }}
-                  >
-                    <View style={styles.upcomingEventImageContainer}>
-                      <OptimizedImage 
-                        uri={event.imageUrl} 
-                        style={styles.upcomingEventImage}
-                        resizeMode="cover"
-                        fallbackSource={require('../assets/MainLogo/MB.png')}
-                      />
-                      <LinearGradient
-                        colors={['transparent', 'rgba(0,0,0,0.7)']}
-                        style={styles.upcomingEventOverlay}
-                      />
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          )}
-
           {/* Search Results - Shown only when searching */}
           {isSearching && searchQuery.trim() !== '' && (() => {
             const searchLower = searchQuery.toLowerCase();
@@ -3589,70 +3969,8 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                     </View>
                     <FlatList
                       data={matchingCategories}
-                      renderItem={({ item: category }) => {
-                        const categoryImage = memoizedGreetingCategoryImages[category.id] || category.imageUrl || null;
-                        return (
-                          <TouchableOpacity
-                            activeOpacity={0.85}
-                            style={[styles.businessCategoryCard, { width: cardWidth, marginRight: moderateScale(3) }]}
-                            onPress={() => handleGreetingCategoryPress(category)}
-                          >
-                            <View style={[
-                              styles.businessCategoryCardContent, 
-                              { 
-                                backgroundColor: theme.colors.cardBackground,
-                                height: cardWidth,
-                              }
-                            ]}>
-                              <View style={styles.businessCategoryImageSection}>
-                                {categoryImage ? (
-                                  <OptimizedImage 
-                                    uri={categoryImage} 
-                                    style={styles.businessCategoryImage}
-                                    resizeMode="cover"
-                                    mode="thumbnail"
-                                    cacheKey={`greeting_category_${category.id}`}
-                                  />
-                                ) : (
-                                  <View
-                                    style={[
-                                      styles.businessCategoryImage,
-                                      { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.05)' },
-                                    ]}
-                                  >
-                                    {category.icon ? (
-                                      <Text style={styles.businessCategoryIcon}>
-                                        {category.icon}
-                                      </Text>
-                                    ) : null}
-                                  </View>
-                                )}
-                                <LinearGradient
-                                  colors={['transparent', 'rgba(0,0,0,0.75)']}
-                                  style={StyleSheet.absoluteFillObject}
-                                  pointerEvents="none"
-                                />
-                                <View
-                                  style={[
-                                    StyleSheet.absoluteFillObject,
-                                    { justifyContent: 'flex-end', padding: 6 },
-                                  ]}
-                                  pointerEvents="none"
-                                >
-                                  <Text 
-                                    style={[styles.businessCategoryName, { color: '#ffffff', textAlign: 'left' }]}
-                                    numberOfLines={1}
-                                    ellipsizeMode="tail"
-                                  >
-                                    {category.name}
-                                  </Text>
-                                </View>
-                              </View>
-                            </View>
-                          </TouchableOpacity>
-                        );
-                      }}
-                      keyExtractor={(item) => `category-${item.id}`}
+                      renderItem={renderSearchCategoryItem}
+                      keyExtractor={keyExtractorCategory}
                       horizontal={true}
                       showsHorizontalScrollIndicator={false}
                       nestedScrollEnabled={true}
@@ -3727,61 +4045,6 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
             </View>
           )}
 
-          {/* Motivation Section - Hidden when searching */}
-          {!isSearching && searchQuery.trim() === '' && motivationTemplates.length > 0 && (
-            <View style={styles.templatesSection}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
-                Motivation
-              </Text>
-              {renderBrowseAllButton(handleViewAllMotivation)}
-            </View>
-              <FlatList
-                data={motivationTemplates}
-                renderItem={renderMotivationCard}
-                keyExtractor={keyExtractor}
-                horizontal={true}
-                showsHorizontalScrollIndicator={false}
-                nestedScrollEnabled={true}
-                contentContainerStyle={styles.horizontalList}
-                removeClippedSubviews={true}
-                maxToRenderPerBatch={3}
-                windowSize={2}
-                initialNumToRender={3}
-                updateCellsBatchingPeriod={150}
-                getItemLayout={getItemLayout}
-                // Performance: disable autoscroll to content size
-                maintainVisibleContentPosition={null}
-              />
-            </View>
-          )}
-
-          {/* Good Morning Section - Hidden when searching */}
-          {!isSearching && searchQuery.trim() === '' && goodMorningTemplates.length > 0 && (
-            <View style={styles.templatesSection}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
-                Good Morning
-              </Text>
-              {renderBrowseAllButton(handleViewAllGoodMorning)}
-            </View>
-              <FlatList
-                data={goodMorningTemplates}
-                renderItem={renderGoodMorningCard}
-                keyExtractor={keyExtractor}
-                horizontal={true}
-                showsHorizontalScrollIndicator={false}
-                nestedScrollEnabled={true}
-                contentContainerStyle={styles.horizontalList}
-                removeClippedSubviews={true}
-                maxToRenderPerBatch={3}
-                windowSize={2}
-                initialNumToRender={3}
-                updateCellsBatchingPeriod={150}
-                getItemLayout={getItemLayout}
-              />
-            </View>
-          )}
 
           {/* Business Ethics Section - Hidden when searching */}
           {!isSearching && searchQuery.trim() === '' && businessEthicsTemplates.length > 0 && (
@@ -3810,207 +4073,18 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
             </View>
           )}
 
-          {/* Devotional Section - Hidden when searching */}
-          {!isSearching && searchQuery.trim() === '' && devotionalTemplates.length > 0 && (
-            <View style={styles.templatesSection}>
-              <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
-                  Devotional
-                </Text>
-                {renderBrowseAllButton(handleViewAllDevotional)}
-              </View>
-              <FlatList
-                data={devotionalTemplates}
-                renderItem={renderDevotionalCard}
-                keyExtractor={keyExtractor}
-                horizontal={true}
-                showsHorizontalScrollIndicator={false}
-                nestedScrollEnabled={true}
-                contentContainerStyle={styles.horizontalList}
-                removeClippedSubviews={true}
-                maxToRenderPerBatch={3}
-                windowSize={2}
-                initialNumToRender={3}
-                updateCellsBatchingPeriod={150}
-                getItemLayout={getItemLayout}
-              />
-            </View>
-          )}
-
-          {/* Leader Quotes Section - Hidden when searching */}
-          {!isSearching && searchQuery.trim() === '' && leaderQuotesTemplates.length > 0 && (
-            <View style={styles.templatesSection}>
-              <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
-                  Leader Quotes
-                </Text>
-                {renderBrowseAllButton(handleViewAllLeaderQuotes)}
-              </View>
-              <FlatList
-                data={leaderQuotesTemplates}
-                renderItem={renderLeaderQuotesCard}
-                keyExtractor={keyExtractor}
-                horizontal={true}
-                showsHorizontalScrollIndicator={false}
-                nestedScrollEnabled={true}
-                contentContainerStyle={styles.horizontalList}
-                removeClippedSubviews={true}
-                maxToRenderPerBatch={3}
-                windowSize={2}
-                initialNumToRender={3}
-                updateCellsBatchingPeriod={150}
-                getItemLayout={getItemLayout}
-              />
-            </View>
-          )}
-
-          {/* Atmanirbhar Bharat Section - Hidden when searching */}
-          {!isSearching && searchQuery.trim() === '' && atmanirbharBharatTemplates.length > 0 && (
-            <View style={styles.templatesSection}>
-              <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
-                  Atmanirbhar Bharat
-                </Text>
-                {renderBrowseAllButton(handleViewAllAtmanirbharBharat)}
-              </View>
-              <FlatList
-                data={atmanirbharBharatTemplates}
-                renderItem={renderAtmanirbharBharatCard}
-                keyExtractor={keyExtractor}
-                horizontal={true}
-                showsHorizontalScrollIndicator={false}
-                nestedScrollEnabled={true}
-                contentContainerStyle={styles.horizontalList}
-                removeClippedSubviews={true}
-                maxToRenderPerBatch={3}
-                windowSize={2}
-                initialNumToRender={3}
-                updateCellsBatchingPeriod={150}
-                getItemLayout={getItemLayout}
-              />
-            </View>
-          )}
-
-          {/* Good Thoughts Section - Hidden when searching */}
-          {!isSearching && searchQuery.trim() === '' && goodThoughtsTemplates.length > 0 && (
-            <View style={styles.templatesSection}>
-              <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
-                  Good Thoughts
-                </Text>
-                {renderBrowseAllButton(handleViewAllGoodThoughts)}
-              </View>
-              <FlatList
-                data={goodThoughtsTemplates}
-                renderItem={renderGoodThoughtsCard}
-                keyExtractor={keyExtractor}
-                horizontal={true}
-                showsHorizontalScrollIndicator={false}
-                nestedScrollEnabled={true}
-                contentContainerStyle={styles.horizontalList}
-                removeClippedSubviews={true}
-                maxToRenderPerBatch={3}
-                windowSize={2}
-                initialNumToRender={3}
-                updateCellsBatchingPeriod={150}
-                getItemLayout={getItemLayout}
-              />
-            </View>
-          )}
-
-          {/* Trending Section - Hidden when searching */}
-          {!isSearching && searchQuery.trim() === '' && trendingTemplates.length > 0 && (
-            <View style={styles.templatesSection}>
-              <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
-                  Trending
-                </Text>
-                {renderBrowseAllButton(handleViewAllTrending)}
-              </View>
-              <FlatList
-                data={trendingTemplates}
-                renderItem={renderTrendingCard}
-                keyExtractor={keyExtractor}
-                horizontal={true}
-                showsHorizontalScrollIndicator={false}
-                nestedScrollEnabled={true}
-                contentContainerStyle={styles.horizontalList}
-                removeClippedSubviews={true}
-                maxToRenderPerBatch={3}
-                windowSize={2}
-                initialNumToRender={3}
-                updateCellsBatchingPeriod={150}
-                getItemLayout={getItemLayout}
-              />
-            </View>
-          )}
-
-          {/* Bhagvat Gita Section - Hidden when searching */}
-          {!isSearching && searchQuery.trim() === '' && bhagvatGitaTemplates.length > 0 && (
-            <View style={styles.templatesSection}>
-              <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
-                  Bhagvat Gita
-                </Text>
-                {renderBrowseAllButton(handleViewAllBhagvatGita)}
-              </View>
-              <FlatList
-                data={bhagvatGitaTemplates}
-                renderItem={renderBhagvatGitaCard}
-                keyExtractor={keyExtractor}
-                horizontal={true}
-                showsHorizontalScrollIndicator={false}
-                nestedScrollEnabled={true}
-                contentContainerStyle={styles.horizontalList}
-                removeClippedSubviews={true}
-                maxToRenderPerBatch={3}
-                windowSize={2}
-                initialNumToRender={3}
-                updateCellsBatchingPeriod={150}
-                getItemLayout={getItemLayout}
-              />
-            </View>
-          )}
-
-          {/* Books Section - Hidden when searching */}
-          {!isSearching && searchQuery.trim() === '' && booksTemplates.length > 0 && (
-            <View style={styles.templatesSection}>
-              <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
-                  Books
-                </Text>
-                {renderBrowseAllButton(handleViewAllBooks)}
-              </View>
-              <FlatList
-                data={booksTemplates}
-                renderItem={renderBooksCard}
-                keyExtractor={keyExtractor}
-                horizontal={true}
-                showsHorizontalScrollIndicator={false}
-                nestedScrollEnabled={true}
-                contentContainerStyle={styles.horizontalList}
-                removeClippedSubviews={true}
-                maxToRenderPerBatch={3}
-                windowSize={2}
-                initialNumToRender={3}
-                updateCellsBatchingPeriod={150}
-                getItemLayout={getItemLayout}
-              />
-            </View>
-          )}
-
-          {/* Celebrates the Moments Section - Hidden when searching */}
-          {!isSearching && searchQuery.trim() === '' && celebratesMomentsTemplates.length > 0 && (
+          {/* Success Mindset Section - Hidden when searching */}
+          {!isSearching && searchQuery.trim() === '' && successMindsetTemplates.length > 0 && (
             <View style={styles.templatesSection}>
             <View style={styles.sectionHeader}>
               <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
-                Celebrates the Moments
+                Success Mindset
               </Text>
-              {renderBrowseAllButton(handleViewAllCelebratesMoments)}
+              {renderBrowseAllButton(handleViewAllSuccessMindset)}
             </View>
               <FlatList
-                data={celebratesMomentsTemplates}
-                renderItem={renderCelebratesMomentsCard}
+                data={successMindsetTemplates}
+                renderItem={renderSuccessMindsetCard}
                 keyExtractor={keyExtractor}
                 horizontal={true}
                 showsHorizontalScrollIndicator={false}
@@ -4025,6 +4099,142 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
               />
             </View>
           )}
+
+          {/* Social Media Growth Section - Hidden when searching */}
+          {!isSearching && searchQuery.trim() === '' && socialMediaGrowthTemplates.length > 0 && (
+            <View style={styles.templatesSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
+                Social Media Growth
+              </Text>
+              {renderBrowseAllButton(handleViewAllSocialMediaGrowth)}
+            </View>
+              <FlatList
+                data={socialMediaGrowthTemplates}
+                renderItem={renderSocialMediaGrowthCard}
+                keyExtractor={keyExtractor}
+                horizontal={true}
+                showsHorizontalScrollIndicator={false}
+                nestedScrollEnabled={true}
+                contentContainerStyle={styles.horizontalList}
+                removeClippedSubviews={true}
+                maxToRenderPerBatch={3}
+                windowSize={2}
+                initialNumToRender={3}
+                updateCellsBatchingPeriod={150}
+                getItemLayout={getItemLayout}
+              />
+            </View>
+          )}
+
+          {/* Money and Finance Section - Hidden when searching */}
+          {!isSearching && searchQuery.trim() === '' && moneyAndFinanceTemplates.length > 0 && (
+            <View style={styles.templatesSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
+                Money and Finance
+              </Text>
+              {renderBrowseAllButton(handleViewAllMoneyAndFinance)}
+            </View>
+              <FlatList
+                data={moneyAndFinanceTemplates}
+                renderItem={renderMoneyAndFinanceCard}
+                keyExtractor={keyExtractor}
+                horizontal={true}
+                showsHorizontalScrollIndicator={false}
+                nestedScrollEnabled={true}
+                contentContainerStyle={styles.horizontalList}
+                removeClippedSubviews={true}
+                maxToRenderPerBatch={3}
+                windowSize={2}
+                initialNumToRender={3}
+                updateCellsBatchingPeriod={150}
+                getItemLayout={getItemLayout}
+              />
+            </View>
+          )}
+
+          {/* Business Legend Quote Section - Hidden when searching */}
+          {!isSearching && searchQuery.trim() === '' && businessLegendQuoteTemplates.length > 0 && (
+            <View style={styles.templatesSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
+                Business Legend Quote
+              </Text>
+              {renderBrowseAllButton(handleViewAllBusinessLegendQuote)}
+            </View>
+              <FlatList
+                data={businessLegendQuoteTemplates}
+                renderItem={renderBusinessLegendQuoteCard}
+                keyExtractor={keyExtractor}
+                horizontal={true}
+                showsHorizontalScrollIndicator={false}
+                nestedScrollEnabled={true}
+                contentContainerStyle={styles.horizontalList}
+                removeClippedSubviews={true}
+                maxToRenderPerBatch={3}
+                windowSize={2}
+                initialNumToRender={3}
+                updateCellsBatchingPeriod={150}
+                getItemLayout={getItemLayout}
+              />
+            </View>
+          )}
+
+          {/* Business Marketing Tips Section - Hidden when searching */}
+          {!isSearching && searchQuery.trim() === '' && businessMarketingTipsTemplates.length > 0 && (
+            <View style={styles.templatesSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
+                Business Marketing Tips
+              </Text>
+              {renderBrowseAllButton(handleViewAllBusinessMarketingTips)}
+            </View>
+              <FlatList
+                data={businessMarketingTipsTemplates}
+                renderItem={renderBusinessMarketingTipsCard}
+                keyExtractor={keyExtractor}
+                horizontal={true}
+                showsHorizontalScrollIndicator={false}
+                nestedScrollEnabled={true}
+                contentContainerStyle={styles.horizontalList}
+                removeClippedSubviews={true}
+                maxToRenderPerBatch={3}
+                windowSize={2}
+                initialNumToRender={3}
+                updateCellsBatchingPeriod={150}
+                getItemLayout={getItemLayout}
+              />
+            </View>
+          )}
+
+          {/* Business Quotes Section - Hidden when searching */}
+          {!isSearching && searchQuery.trim() === '' && businessQuotesTemplates.length > 0 && (
+            <View style={styles.templatesSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
+                Business Quotes
+              </Text>
+              {renderBrowseAllButton(handleViewAllBusinessQuotes)}
+            </View>
+              <FlatList
+                data={businessQuotesTemplates}
+                renderItem={renderBusinessQuotesCard}
+                keyExtractor={keyExtractor}
+                horizontal={true}
+                showsHorizontalScrollIndicator={false}
+                nestedScrollEnabled={true}
+                contentContainerStyle={styles.horizontalList}
+                removeClippedSubviews={true}
+                maxToRenderPerBatch={3}
+                windowSize={2}
+                initialNumToRender={3}
+                updateCellsBatchingPeriod={150}
+                getItemLayout={getItemLayout}
+              />
+            </View>
+          )}
+
                  </ScrollView>
        </LinearGradient>
 
@@ -4080,92 +4290,6 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
          </View>
                </Modal>
 
-        {/* Upcoming Festivals Modal */}
-        <Modal
-          visible={isUpcomingEventsModalVisible}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={closeUpcomingEventsModal}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.upcomingEventsModalContent}>
-              <LinearGradient
-                colors={['#f5f5f5', '#ffffff']}
-                style={styles.upcomingEventsModalGradient}
-              >
-                <View style={styles.upcomingEventsModalHeader}>
-                  <View style={styles.upcomingEventsModalTitleContainer}>
-                    <Text style={styles.upcomingEventsModalTitle}>Upcoming Festivals</Text>
-                  </View>
-                  <TouchableOpacity 
-                    style={styles.upcomingEventsCloseButton}
-                    onPress={closeUpcomingEventsModal}
-                  >
-                    <Text style={styles.upcomingEventsCloseButtonText}>✕</Text>
-                  </TouchableOpacity>
-                </View>
-              </LinearGradient>
-              <View style={styles.upcomingEventsModalBody}>
-                <FlatList
-                  key={`upcoming-events-modal-${upcomingEvents.length}`}
-                  data={upcomingEvents}
-                  keyExtractor={(item) => item.id.toString()}
-                  numColumns={modalColumns}
-                  columnWrapperStyle={styles.upcomingEventModalRow}
-                  contentContainerStyle={styles.upcomingEventsModalScroll}
-                  showsVerticalScrollIndicator={false}
-                  removeClippedSubviews={true}
-                  maxToRenderPerBatch={10}
-                  windowSize={5}
-                  initialNumToRender={10}
-                  updateCellsBatchingPeriod={50}
-                  renderItem={({ item: event, index }) => {
-                    const isLastInRow = (index + 1) % modalColumns === 0;
-                    return (
-                    <TouchableOpacity
-                      activeOpacity={0.8}
-                      style={[
-                        styles.upcomingEventModalCard, 
-                        { width: modalCardWidth },
-                        !isLastInRow && { marginRight: modalCardGap }
-                      ]}
-                      onPress={() => {
-                        // Convert upcoming event to template format for navigation
-                        const eventTemplate: Template = {
-                          id: `event-${event.id}`,
-                          name: event.title,
-                          thumbnail: event.imageUrl,
-                          category: `${event.category} • ${event.date} • ${event.location}`,
-                          downloads: 0,
-                          isDownloaded: false,
-                        };
-                        navigation.navigate('PosterPlayer', {
-                          selectedPoster: eventTemplate,
-                          relatedPosters: professionalTemplates.slice(0, 6),
-                        });
-                      }}
-                    >
-                      <View style={styles.upcomingEventModalImageContainer}>
-                        <OptimizedImage 
-                          uri={event.imageUrl} 
-                          style={styles.upcomingEventModalImage}
-                          resizeMode="cover"
-                          fallbackSource={require('../assets/MainLogo/MB.png')}
-                        />
-                        <LinearGradient
-                          colors={['transparent', 'rgba(0,0,0,0.8)']}
-                          style={styles.upcomingEventModalOverlay}
-                        />
-                      </View>
-                    </TouchableOpacity>
-                    );
-                  }}
-                />
-              </View>
-            </View>
-          </View>
-        </Modal>
-
         {/* Business Categories Modal */}
         <Modal
           visible={isBusinessCategoriesModalVisible}
@@ -4195,7 +4319,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                 <FlatList
                   key={`business-categories-modal-${businessCategories.length}`}
                   data={businessCategories}
-                  keyExtractor={(item) => item.id}
+                  keyExtractor={keyExtractorIdString}
                   numColumns={modalColumns}
                   columnWrapperStyle={styles.upcomingEventModalRow}
                   contentContainerStyle={styles.upcomingEventsModalScroll}
@@ -4205,58 +4329,8 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                   windowSize={5}
                   initialNumToRender={10}
                   updateCellsBatchingPeriod={50}
-                  renderItem={({ item, index }) => {
-                    const previewTemplates = businessCategoryPreviews[item.id] || [];
-                    const thumbnails = previewTemplates
-                      .map(template => template.thumbnail)
-                      .filter((uri): uri is string => typeof uri === 'string' && uri.length > 0);
-                    
-                    // Only use the first image
-                    const displayImage = thumbnails[0] || item.imageUrl || item.image || null;
-                    const isLastInRow = (index + 1) % modalColumns === 0;
-
-                    return (
-                      <TouchableOpacity
-                        activeOpacity={0.8}
-                        style={[
-                          styles.upcomingEventModalCard, 
-                          { width: modalCardWidth },
-                          !isLastInRow && { marginRight: modalCardGap }
-                        ]}
-                        onPress={() => {
-                          closeBusinessCategoriesModal();
-                          handleBusinessCategoryPress(item);
-                        }}
-                      >
-                        <View style={styles.upcomingEventModalImageContainer}>
-                          {displayImage ? (
-                            <OptimizedImage 
-                              uri={displayImage} 
-                              style={styles.upcomingEventModalImage} 
-                              resizeMode="cover" 
-                            />
-                          ) : (
-                            <View style={[styles.upcomingEventModalImage, { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.05)' }]}>
-                              <Text style={styles.businessCategoryIcon}>{item.icon || item.name?.[0] || 'MB'}</Text>
-                            </View>
-                          )}
-                          <LinearGradient
-                            colors={['transparent', 'rgba(0,0,0,0.85)']}
-                            style={styles.upcomingEventModalOverlay}
-                          />
-                          <View style={styles.businessCategoryModalNameContainer}>
-                            <Text 
-                              style={styles.businessCategoryModalName}
-                              numberOfLines={1}
-                              ellipsizeMode="tail"
-                            >
-                              {item.name}
-                            </Text>
-                          </View>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  }}
+                  getItemLayout={getModalItemLayout}
+                  renderItem={renderBusinessCategoryModalItem}
                 />
               </View>
             </View>
@@ -4292,7 +4366,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                 <FlatList
                   key={`general-categories-modal-${generalCategoryModalColumns}-${filteredGreetingCategoriesList.length}`}
                   data={filteredGreetingCategoriesList}
-                  keyExtractor={(item) => item.id}
+                  keyExtractor={keyExtractorIdString}
                   numColumns={generalCategoryModalColumns}
                   columnWrapperStyle={styles.generalCategoryModalRow}
                   contentContainerStyle={[
@@ -4368,7 +4442,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                 <FlatList
                   key={`videos-modal-${videoContent.length}`}
                   data={videoContent}
-                  keyExtractor={(item) => item.id.toString()}
+                  keyExtractor={keyExtractorId}
                   numColumns={modalColumns}
                   columnWrapperStyle={styles.upcomingEventModalRow}
                   contentContainerStyle={styles.upcomingEventsModalScroll}
@@ -4378,42 +4452,8 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                   windowSize={5}
                   initialNumToRender={10}
                   updateCellsBatchingPeriod={50}
-                  renderItem={({ item: video, index }) => {
-                    const isLastInRow = (index + 1) % modalColumns === 0;
-                    return (
-                    <TouchableOpacity
-                      activeOpacity={0.8}
-                      style={[
-                        styles.upcomingEventModalCard, 
-                        { width: modalCardWidth },
-                        !isLastInRow && { marginRight: modalCardGap }
-                      ]}
-                      onPress={() => {
-                        closeVideosModal();
-                        const videoData: Template = {
-                          id: video.id,
-                          name: video.title,
-                          thumbnail: video.thumbnail,
-                          category: video.category,
-                          downloads: 0,
-                          isDownloaded: false,
-                        };
-                        navigation.navigate('VideoPlayer', {
-                          selectedVideo: videoData,
-                          relatedVideos: videoContent.slice(0, 6),
-                        });
-                      }}
-                    >
-                      <View style={styles.upcomingEventModalImageContainer}>
-                        <OptimizedImage uri={video.thumbnail} style={styles.upcomingEventModalImage} resizeMode="cover" />
-                        <LinearGradient
-                          colors={['transparent', 'rgba(0,0,0,0.8)']}
-                          style={styles.upcomingEventModalOverlay}
-                        />
-                      </View>
-                    </TouchableOpacity>
-                    );
-                  }}
+                  getItemLayout={getModalItemLayout}
+                  renderItem={renderVideoModalItem}
                 />
               </View>
             </View>
@@ -4505,155 +4545,6 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
           subtitle="We are polishing the video creation experience. Stay tuned for the next update!"
         />
 
-        {/* Motivation Modal */}
-        <Modal
-          visible={isMotivationModalVisible}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={closeMotivationModal}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.upcomingEventsModalContent}>
-              <LinearGradient
-                colors={['#f5f5f5', '#ffffff']}
-                style={styles.upcomingEventsModalGradient}
-              >
-                <View style={styles.upcomingEventsModalHeader}>
-                  <View style={styles.upcomingEventsModalTitleContainer}>
-                    <Text style={styles.upcomingEventsModalTitle}>Motivation</Text>
-                  </View>
-                  <TouchableOpacity 
-                    style={styles.upcomingEventsCloseButton}
-                    onPress={closeMotivationModal}
-                  >
-                    <Text style={styles.upcomingEventsCloseButtonText}>✕</Text>
-                  </TouchableOpacity>
-                </View>
-              </LinearGradient>
-              <View style={styles.upcomingEventsModalBody}>
-                <FlatList
-                  key={`motivation-modal-${motivationTemplatesRaw.length > 0 ? motivationTemplatesRaw.length : motivationTemplates.length}`}
-                  data={motivationTemplatesRaw.length > 0 ? motivationTemplatesRaw : motivationTemplates}
-                  keyExtractor={(item) => item.id.toString()}
-                  numColumns={modalColumns}
-                  columnWrapperStyle={styles.upcomingEventModalRow}
-                  contentContainerStyle={styles.upcomingEventsModalScroll}
-                  showsVerticalScrollIndicator={false}
-                  removeClippedSubviews={true}
-                  maxToRenderPerBatch={10}
-                  windowSize={5}
-                  initialNumToRender={10}
-                  updateCellsBatchingPeriod={50}
-                  renderItem={({ item: template, index }) => {
-                    const isLastInRow = (index + 1) % modalColumns === 0;
-                    return (
-                    <TouchableOpacity
-                      activeOpacity={0.8}
-                      style={[
-                        styles.upcomingEventModalCard, 
-                        { width: modalCardWidth },
-                        !isLastInRow && { marginRight: modalCardGap }
-                      ]}
-                      onPress={() => {
-                        closeMotivationModal();
-                        navigation.navigate('PosterPlayer', {
-                          selectedPoster: template,
-                          relatedPosters: (motivationTemplatesRaw.length > 0 ? motivationTemplatesRaw : motivationTemplates).filter(
-                            t => t.id !== template.id
-                          ),
-                        });
-                      }}
-                    >
-                      <View style={styles.upcomingEventModalImageContainer}>
-                        <OptimizedImage uri={template.thumbnail} style={styles.upcomingEventModalImage} resizeMode="cover" />
-                        <LinearGradient
-                          colors={['transparent', 'rgba(0,0,0,0.8)']}
-                          style={styles.upcomingEventModalOverlay}
-                        />
-                      </View>
-                    </TouchableOpacity>
-                    );
-                  }}
-                />
-              </View>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Good Morning Modal */}
-        <Modal
-          visible={isGoodMorningModalVisible}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={closeGoodMorningModal}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.upcomingEventsModalContent}>
-              <LinearGradient
-                colors={['#f5f5f5', '#ffffff']}
-                style={styles.upcomingEventsModalGradient}
-              >
-                <View style={styles.upcomingEventsModalHeader}>
-                  <View style={styles.upcomingEventsModalTitleContainer}>
-                    <Text style={styles.upcomingEventsModalTitle}>Good Morning</Text>
-                  </View>
-                  <TouchableOpacity 
-                    style={styles.upcomingEventsCloseButton}
-                    onPress={closeGoodMorningModal}
-                  >
-                    <Text style={styles.upcomingEventsCloseButtonText}>✕</Text>
-                  </TouchableOpacity>
-                </View>
-              </LinearGradient>
-              <View style={styles.upcomingEventsModalBody}>
-                <FlatList
-                  key={`goodmorning-modal-${goodMorningTemplatesRaw.length > 0 ? goodMorningTemplatesRaw.length : goodMorningTemplates.length}`}
-                  data={goodMorningTemplatesRaw.length > 0 ? goodMorningTemplatesRaw : goodMorningTemplates}
-                  keyExtractor={(item) => item.id.toString()}
-                  numColumns={modalColumns}
-                  columnWrapperStyle={styles.upcomingEventModalRow}
-                  contentContainerStyle={styles.upcomingEventsModalScroll}
-                  showsVerticalScrollIndicator={false}
-                  removeClippedSubviews={true}
-                  maxToRenderPerBatch={10}
-                  windowSize={5}
-                  initialNumToRender={10}
-                  updateCellsBatchingPeriod={50}
-                  renderItem={({ item: template, index }) => {
-                    const isLastInRow = (index + 1) % modalColumns === 0;
-                    return (
-                    <TouchableOpacity
-                      activeOpacity={0.8}
-                      style={[
-                        styles.upcomingEventModalCard, 
-                        { width: modalCardWidth },
-                        !isLastInRow && { marginRight: modalCardGap }
-                      ]}
-                      onPress={() => {
-                        closeGoodMorningModal();
-                        navigation.navigate('PosterPlayer', {
-                          selectedPoster: template,
-                          relatedPosters: (goodMorningTemplatesRaw.length > 0 ? goodMorningTemplatesRaw : goodMorningTemplates).filter(
-                            t => t.id !== template.id
-                          ),
-                        });
-                      }}
-                    >
-                      <View style={styles.upcomingEventModalImageContainer}>
-                        <OptimizedImage uri={template.thumbnail} style={styles.upcomingEventModalImage} resizeMode="cover" />
-                        <LinearGradient
-                          colors={['transparent', 'rgba(0,0,0,0.8)']}
-                          style={styles.upcomingEventModalOverlay}
-                        />
-                      </View>
-                    </TouchableOpacity>
-                    );
-                  }}
-                />
-              </View>
-            </View>
-          </View>
-        </Modal>
 
         {/* Business Ethics Modal */}
         <Modal
@@ -4684,7 +4575,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                 <FlatList
                   key={`businessethics-modal-${businessEthicsTemplatesRaw.length > 0 ? businessEthicsTemplatesRaw.length : businessEthicsTemplates.length}`}
                   data={businessEthicsTemplatesRaw.length > 0 ? businessEthicsTemplatesRaw : businessEthicsTemplates}
-                  keyExtractor={(item) => item.id.toString()}
+                  keyExtractor={keyExtractorId}
                   numColumns={modalColumns}
                   columnWrapperStyle={styles.upcomingEventModalRow}
                   contentContainerStyle={styles.upcomingEventsModalScroll}
@@ -4694,48 +4585,20 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                   windowSize={5}
                   initialNumToRender={10}
                   updateCellsBatchingPeriod={50}
-                  renderItem={({ item: template, index }) => {
-                    const isLastInRow = (index + 1) % modalColumns === 0;
-                    return (
-                    <TouchableOpacity
-                      activeOpacity={0.8}
-                      style={[
-                        styles.upcomingEventModalCard, 
-                        { width: modalCardWidth },
-                        !isLastInRow && { marginRight: modalCardGap }
-                      ]}
-                      onPress={() => {
-                        closeBusinessEthicsModal();
-                        navigation.navigate('PosterPlayer', {
-                          selectedPoster: template,
-                          relatedPosters: (businessEthicsTemplatesRaw.length > 0 ? businessEthicsTemplatesRaw : businessEthicsTemplates).filter(
-                            t => t.id !== template.id
-                          ),
-                        });
-                      }}
-                    >
-                      <View style={styles.upcomingEventModalImageContainer}>
-                        <OptimizedImage uri={template.thumbnail} style={styles.upcomingEventModalImage} resizeMode="cover" />
-                        <LinearGradient
-                          colors={['transparent', 'rgba(0,0,0,0.8)']}
-                          style={styles.upcomingEventModalOverlay}
-                        />
-                      </View>
-                    </TouchableOpacity>
-                    );
-                  }}
+                  getItemLayout={getModalItemLayout}
+                  renderItem={renderBusinessEthicsModalItem}
                 />
               </View>
             </View>
           </View>
         </Modal>
 
-        {/* Devotional Modal */}
+        {/* Success Mindset Modal */}
         <Modal
-          visible={isDevotionalModalVisible}
+          visible={isSuccessMindsetModalVisible}
           transparent={true}
           animationType="slide"
-          onRequestClose={closeDevotionalModal}
+          onRequestClose={closeSuccessMindsetModal}
         >
           <View style={styles.modalOverlay}>
             <View style={styles.upcomingEventsModalContent}>
@@ -4745,11 +4608,11 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
               >
                 <View style={styles.upcomingEventsModalHeader}>
                   <View style={styles.upcomingEventsModalTitleContainer}>
-                    <Text style={styles.upcomingEventsModalTitle}>Devotional</Text>
+                    <Text style={styles.upcomingEventsModalTitle}>Success Mindset</Text>
                   </View>
                   <TouchableOpacity 
                     style={styles.upcomingEventsCloseButton}
-                    onPress={closeDevotionalModal}
+                    onPress={closeSuccessMindsetModal}
                   >
                     <Text style={styles.upcomingEventsCloseButtonText}>✕</Text>
                   </TouchableOpacity>
@@ -4757,9 +4620,9 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
               </LinearGradient>
               <View style={styles.upcomingEventsModalBody}>
                 <FlatList
-                  key={`devotional-modal-${devotionalTemplatesRaw.length > 0 ? devotionalTemplatesRaw.length : devotionalTemplates.length}`}
-                  data={devotionalTemplatesRaw.length > 0 ? devotionalTemplatesRaw : devotionalTemplates}
-                  keyExtractor={(item) => item.id.toString()}
+                  key={`successmindset-modal-${successMindsetTemplatesRaw.length > 0 ? successMindsetTemplatesRaw.length : successMindsetTemplates.length}`}
+                  data={successMindsetTemplatesRaw.length > 0 ? successMindsetTemplatesRaw : successMindsetTemplates}
+                  keyExtractor={keyExtractorId}
                   numColumns={modalColumns}
                   columnWrapperStyle={styles.upcomingEventModalRow}
                   contentContainerStyle={styles.upcomingEventsModalScroll}
@@ -4769,48 +4632,20 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                   windowSize={5}
                   initialNumToRender={10}
                   updateCellsBatchingPeriod={50}
-                  renderItem={({ item: template, index }) => {
-                    const isLastInRow = (index + 1) % modalColumns === 0;
-                    return (
-                    <TouchableOpacity
-                      activeOpacity={0.8}
-                      style={[
-                        styles.upcomingEventModalCard, 
-                        { width: modalCardWidth },
-                        !isLastInRow && { marginRight: modalCardGap }
-                      ]}
-                      onPress={() => {
-                        closeDevotionalModal();
-                        navigation.navigate('PosterPlayer', {
-                          selectedPoster: template,
-                          relatedPosters: (devotionalTemplatesRaw.length > 0 ? devotionalTemplatesRaw : devotionalTemplates).filter(
-                            t => t.id !== template.id
-                          ),
-                        });
-                      }}
-                    >
-                      <View style={styles.upcomingEventModalImageContainer}>
-                        <OptimizedImage uri={template.thumbnail} style={styles.upcomingEventModalImage} resizeMode="cover" />
-                        <LinearGradient
-                          colors={['transparent', 'rgba(0,0,0,0.8)']}
-                          style={styles.upcomingEventModalOverlay}
-                        />
-                      </View>
-                    </TouchableOpacity>
-                    );
-                  }}
+                  getItemLayout={getModalItemLayout}
+                  renderItem={renderSuccessMindsetModalItem}
                 />
               </View>
             </View>
           </View>
         </Modal>
 
-        {/* Leader Quotes Modal */}
+        {/* Social Media Growth Modal */}
         <Modal
-          visible={isLeaderQuotesModalVisible}
+          visible={isSocialMediaGrowthModalVisible}
           transparent={true}
           animationType="slide"
-          onRequestClose={closeLeaderQuotesModal}
+          onRequestClose={closeSocialMediaGrowthModal}
         >
           <View style={styles.modalOverlay}>
             <View style={styles.upcomingEventsModalContent}>
@@ -4820,11 +4655,11 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
               >
                 <View style={styles.upcomingEventsModalHeader}>
                   <View style={styles.upcomingEventsModalTitleContainer}>
-                    <Text style={styles.upcomingEventsModalTitle}>Leader Quotes</Text>
+                    <Text style={styles.upcomingEventsModalTitle}>Social Media Growth</Text>
                   </View>
                   <TouchableOpacity 
                     style={styles.upcomingEventsCloseButton}
-                    onPress={closeLeaderQuotesModal}
+                    onPress={closeSocialMediaGrowthModal}
                   >
                     <Text style={styles.upcomingEventsCloseButtonText}>✕</Text>
                   </TouchableOpacity>
@@ -4832,9 +4667,9 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
               </LinearGradient>
               <View style={styles.upcomingEventsModalBody}>
                 <FlatList
-                  key={`leaderquotes-modal-${leaderQuotesTemplatesRaw.length > 0 ? leaderQuotesTemplatesRaw.length : leaderQuotesTemplates.length}`}
-                  data={leaderQuotesTemplatesRaw.length > 0 ? leaderQuotesTemplatesRaw : leaderQuotesTemplates}
-                  keyExtractor={(item) => item.id.toString()}
+                  key={`socialmediagrowth-modal-${socialMediaGrowthTemplatesRaw.length > 0 ? socialMediaGrowthTemplatesRaw.length : socialMediaGrowthTemplates.length}`}
+                  data={socialMediaGrowthTemplatesRaw.length > 0 ? socialMediaGrowthTemplatesRaw : socialMediaGrowthTemplates}
+                  keyExtractor={keyExtractorId}
                   numColumns={modalColumns}
                   columnWrapperStyle={styles.upcomingEventModalRow}
                   contentContainerStyle={styles.upcomingEventsModalScroll}
@@ -4844,61 +4679,44 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                   windowSize={5}
                   initialNumToRender={10}
                   updateCellsBatchingPeriod={50}
-                  renderItem={({ item: template, index }) => {
-                    const isLastInRow = (index + 1) % modalColumns === 0;
-                    return (
-                    <TouchableOpacity
-                      activeOpacity={0.8}
-                      style={[
-                        styles.upcomingEventModalCard, 
-                        { width: modalCardWidth },
-                        !isLastInRow && { marginRight: modalCardGap }
-                      ]}
-                      onPress={() => {
-                        closeLeaderQuotesModal();
-                        navigation.navigate('PosterPlayer', {
-                          selectedPoster: template,
-                          relatedPosters: (leaderQuotesTemplatesRaw.length > 0 ? leaderQuotesTemplatesRaw : leaderQuotesTemplates).filter(
-                            t => t.id !== template.id
-                          ),
-                        });
-                      }}
-                    >
-                      <View style={styles.upcomingEventModalImageContainer}>
-                        <OptimizedImage uri={template.thumbnail} style={styles.upcomingEventModalImage} resizeMode="cover" />
-                        <LinearGradient
-                          colors={['transparent', 'rgba(0,0,0,0.8)']}
-                          style={styles.upcomingEventModalOverlay}
-                        />
-                      </View>
-                    </TouchableOpacity>
-                    );
-                  }}
+                  getItemLayout={getModalItemLayout}
+                  renderItem={renderSocialMediaGrowthModalItem}
                 />
               </View>
             </View>
           </View>
         </Modal>
 
-        {/* Atmanirbhar Bharat Modal */}
-        <Modal visible={isAtmanirbharBharatModalVisible} transparent={true} animationType="slide" onRequestClose={closeAtmanirbharBharatModal}>
+        {/* Money and Finance Modal */}
+        <Modal
+          visible={isMoneyAndFinanceModalVisible}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={closeMoneyAndFinanceModal}
+        >
           <View style={styles.modalOverlay}>
             <View style={styles.upcomingEventsModalContent}>
-              <LinearGradient colors={['#f5f5f5', '#ffffff']} style={styles.upcomingEventsModalGradient}>
+              <LinearGradient
+                colors={['#f5f5f5', '#ffffff']}
+                style={styles.upcomingEventsModalGradient}
+              >
                 <View style={styles.upcomingEventsModalHeader}>
                   <View style={styles.upcomingEventsModalTitleContainer}>
-                    <Text style={styles.upcomingEventsModalTitle}>Atmanirbhar Bharat</Text>
+                    <Text style={styles.upcomingEventsModalTitle}>Money and Finance</Text>
                   </View>
-                  <TouchableOpacity style={styles.upcomingEventsCloseButton} onPress={closeAtmanirbharBharatModal}>
+                  <TouchableOpacity 
+                    style={styles.upcomingEventsCloseButton}
+                    onPress={closeMoneyAndFinanceModal}
+                  >
                     <Text style={styles.upcomingEventsCloseButtonText}>✕</Text>
                   </TouchableOpacity>
                 </View>
               </LinearGradient>
               <View style={styles.upcomingEventsModalBody}>
                 <FlatList
-                  key={`atmanirbhar-modal-${atmanirbharBharatTemplatesRaw.length > 0 ? atmanirbharBharatTemplatesRaw.length : atmanirbharBharatTemplates.length}`}
-                  data={atmanirbharBharatTemplatesRaw.length > 0 ? atmanirbharBharatTemplatesRaw : atmanirbharBharatTemplates}
-                  keyExtractor={(item) => item.id.toString()}
+                  key={`moneyandfinance-modal-${moneyAndFinanceTemplatesRaw.length > 0 ? moneyAndFinanceTemplatesRaw.length : moneyAndFinanceTemplates.length}`}
+                  data={moneyAndFinanceTemplatesRaw.length > 0 ? moneyAndFinanceTemplatesRaw : moneyAndFinanceTemplates}
+                  keyExtractor={keyExtractorId}
                   numColumns={modalColumns}
                   columnWrapperStyle={styles.upcomingEventModalRow}
                   contentContainerStyle={styles.upcomingEventsModalScroll}
@@ -4908,53 +4726,44 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                   windowSize={5}
                   initialNumToRender={10}
                   updateCellsBatchingPeriod={50}
-                  renderItem={({ item: template, index }) => {
-                    const isLastInRow = (index + 1) % modalColumns === 0;
-                    return (
-                    <TouchableOpacity activeOpacity={0.8} style={[
-                      styles.upcomingEventModalCard, 
-                      { width: modalCardWidth },
-                      !isLastInRow && { marginRight: modalCardGap }
-                    ]} onPress={() => {
-                      closeAtmanirbharBharatModal();
-                      navigation.navigate('PosterPlayer', { selectedPoster: template, relatedPosters: (atmanirbharBharatTemplatesRaw.length > 0 ? atmanirbharBharatTemplatesRaw : atmanirbharBharatTemplates).filter(t => t.id !== template.id) });
-                    }}>
-                      <View style={styles.upcomingEventModalImageContainer}>
-                        <OptimizedImage uri={template.thumbnail} style={styles.upcomingEventModalImage} resizeMode="cover" />
-                        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} style={styles.upcomingEventModalOverlay} />
-                        <LinearGradient colors={['#4ecdc4', '#44a08d']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.upcomingEventModalBadge}>
-                          <Icon name="star" size={12} color="#ffffff" />
-                          <Text style={styles.upcomingEventModalBadgeText}>Free</Text>
-                        </LinearGradient>
-                      </View>
-                    </TouchableOpacity>
-                    );
-                  }}
+                  getItemLayout={getModalItemLayout}
+                  renderItem={renderMoneyAndFinanceModalItem}
                 />
               </View>
             </View>
           </View>
         </Modal>
 
-        {/* Good Thoughts Modal */}
-        <Modal visible={isGoodThoughtsModalVisible} transparent={true} animationType="slide" onRequestClose={closeGoodThoughtsModal}>
+        {/* Business Legend Quote Modal */}
+        <Modal
+          visible={isBusinessLegendQuoteModalVisible}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={closeBusinessLegendQuoteModal}
+        >
           <View style={styles.modalOverlay}>
             <View style={styles.upcomingEventsModalContent}>
-              <LinearGradient colors={['#f5f5f5', '#ffffff']} style={styles.upcomingEventsModalGradient}>
+              <LinearGradient
+                colors={['#f5f5f5', '#ffffff']}
+                style={styles.upcomingEventsModalGradient}
+              >
                 <View style={styles.upcomingEventsModalHeader}>
                   <View style={styles.upcomingEventsModalTitleContainer}>
-                    <Text style={styles.upcomingEventsModalTitle}>Good Thoughts</Text>
+                    <Text style={styles.upcomingEventsModalTitle}>Business Legend Quote</Text>
                   </View>
-                  <TouchableOpacity style={styles.upcomingEventsCloseButton} onPress={closeGoodThoughtsModal}>
+                  <TouchableOpacity 
+                    style={styles.upcomingEventsCloseButton}
+                    onPress={closeBusinessLegendQuoteModal}
+                  >
                     <Text style={styles.upcomingEventsCloseButtonText}>✕</Text>
                   </TouchableOpacity>
                 </View>
               </LinearGradient>
               <View style={styles.upcomingEventsModalBody}>
                 <FlatList
-                  key={`goodthoughts-modal-${goodThoughtsTemplatesRaw.length > 0 ? goodThoughtsTemplatesRaw.length : goodThoughtsTemplates.length}`}
-                  data={goodThoughtsTemplatesRaw.length > 0 ? goodThoughtsTemplatesRaw : goodThoughtsTemplates}
-                  keyExtractor={(item) => item.id.toString()}
+                  key={`businesslegendquote-modal-${businessLegendQuoteTemplatesRaw.length > 0 ? businessLegendQuoteTemplatesRaw.length : businessLegendQuoteTemplates.length}`}
+                  data={businessLegendQuoteTemplatesRaw.length > 0 ? businessLegendQuoteTemplatesRaw : businessLegendQuoteTemplates}
+                  keyExtractor={keyExtractorId}
                   numColumns={modalColumns}
                   columnWrapperStyle={styles.upcomingEventModalRow}
                   contentContainerStyle={styles.upcomingEventsModalScroll}
@@ -4964,53 +4773,44 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                   windowSize={5}
                   initialNumToRender={10}
                   updateCellsBatchingPeriod={50}
-                  renderItem={({ item: template, index }) => {
-                    const isLastInRow = (index + 1) % modalColumns === 0;
-                    return (
-                    <TouchableOpacity activeOpacity={0.8} style={[
-                      styles.upcomingEventModalCard, 
-                      { width: modalCardWidth },
-                      !isLastInRow && { marginRight: modalCardGap }
-                    ]} onPress={() => {
-                      closeGoodThoughtsModal();
-                      navigation.navigate('PosterPlayer', { selectedPoster: template, relatedPosters: (goodThoughtsTemplatesRaw.length > 0 ? goodThoughtsTemplatesRaw : goodThoughtsTemplates).filter(t => t.id !== template.id) });
-                    }}>
-                      <View style={styles.upcomingEventModalImageContainer}>
-                        <OptimizedImage uri={template.thumbnail} style={styles.upcomingEventModalImage} resizeMode="cover" />
-                        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} style={styles.upcomingEventModalOverlay} />
-                        <LinearGradient colors={['#4ecdc4', '#44a08d']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.upcomingEventModalBadge}>
-                          <Icon name="star" size={12} color="#ffffff" />
-                          <Text style={styles.upcomingEventModalBadgeText}>Free</Text>
-                        </LinearGradient>
-                      </View>
-                    </TouchableOpacity>
-                    );
-                  }}
+                  getItemLayout={getModalItemLayout}
+                  renderItem={renderBusinessLegendQuoteModalItem}
                 />
               </View>
             </View>
           </View>
         </Modal>
 
-        {/* Trending Modal */}
-        <Modal visible={isTrendingModalVisible} transparent={true} animationType="slide" onRequestClose={closeTrendingModal}>
+        {/* Business Marketing Tips Modal */}
+        <Modal
+          visible={isBusinessMarketingTipsModalVisible}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={closeBusinessMarketingTipsModal}
+        >
           <View style={styles.modalOverlay}>
             <View style={styles.upcomingEventsModalContent}>
-              <LinearGradient colors={['#f5f5f5', '#ffffff']} style={styles.upcomingEventsModalGradient}>
+              <LinearGradient
+                colors={['#f5f5f5', '#ffffff']}
+                style={styles.upcomingEventsModalGradient}
+              >
                 <View style={styles.upcomingEventsModalHeader}>
                   <View style={styles.upcomingEventsModalTitleContainer}>
-                    <Text style={styles.upcomingEventsModalTitle}>Trending</Text>
+                    <Text style={styles.upcomingEventsModalTitle}>Business Marketing Tips</Text>
                   </View>
-                  <TouchableOpacity style={styles.upcomingEventsCloseButton} onPress={closeTrendingModal}>
+                  <TouchableOpacity 
+                    style={styles.upcomingEventsCloseButton}
+                    onPress={closeBusinessMarketingTipsModal}
+                  >
                     <Text style={styles.upcomingEventsCloseButtonText}>✕</Text>
                   </TouchableOpacity>
                 </View>
               </LinearGradient>
               <View style={styles.upcomingEventsModalBody}>
                 <FlatList
-                  key={`trending-modal-${trendingTemplatesRaw.length > 0 ? trendingTemplatesRaw.length : trendingTemplates.length}`}
-                  data={trendingTemplatesRaw.length > 0 ? trendingTemplatesRaw : trendingTemplates}
-                  keyExtractor={(item) => item.id.toString()}
+                  key={`businessmarketingtips-modal-${businessMarketingTipsTemplatesRaw.length > 0 ? businessMarketingTipsTemplatesRaw.length : businessMarketingTipsTemplates.length}`}
+                  data={businessMarketingTipsTemplatesRaw.length > 0 ? businessMarketingTipsTemplatesRaw : businessMarketingTipsTemplates}
+                  keyExtractor={keyExtractorId}
                   numColumns={modalColumns}
                   columnWrapperStyle={styles.upcomingEventModalRow}
                   contentContainerStyle={styles.upcomingEventsModalScroll}
@@ -5020,53 +4820,44 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                   windowSize={5}
                   initialNumToRender={10}
                   updateCellsBatchingPeriod={50}
-                  renderItem={({ item: template, index }) => {
-                    const isLastInRow = (index + 1) % modalColumns === 0;
-                    return (
-                    <TouchableOpacity activeOpacity={0.8} style={[
-                      styles.upcomingEventModalCard, 
-                      { width: modalCardWidth },
-                      !isLastInRow && { marginRight: modalCardGap }
-                    ]} onPress={() => {
-                      closeTrendingModal();
-                      navigation.navigate('PosterPlayer', { selectedPoster: template, relatedPosters: (trendingTemplatesRaw.length > 0 ? trendingTemplatesRaw : trendingTemplates).filter(t => t.id !== template.id) });
-                    }}>
-                      <View style={styles.upcomingEventModalImageContainer}>
-                        <OptimizedImage uri={template.thumbnail} style={styles.upcomingEventModalImage} resizeMode="cover" />
-                        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} style={styles.upcomingEventModalOverlay} />
-                        <LinearGradient colors={['#4ecdc4', '#44a08d']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.upcomingEventModalBadge}>
-                          <Icon name="star" size={12} color="#ffffff" />
-                          <Text style={styles.upcomingEventModalBadgeText}>Free</Text>
-                        </LinearGradient>
-                      </View>
-                    </TouchableOpacity>
-                    );
-                  }}
+                  getItemLayout={getModalItemLayout}
+                  renderItem={renderBusinessMarketingTipsModalItem}
                 />
               </View>
             </View>
           </View>
         </Modal>
 
-        {/* Bhagvat Gita Modal */}
-        <Modal visible={isBhagvatGitaModalVisible} transparent={true} animationType="slide" onRequestClose={closeBhagvatGitaModal}>
+        {/* Business Quotes Modal */}
+        <Modal
+          visible={isBusinessQuotesModalVisible}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={closeBusinessQuotesModal}
+        >
           <View style={styles.modalOverlay}>
             <View style={styles.upcomingEventsModalContent}>
-              <LinearGradient colors={['#f5f5f5', '#ffffff']} style={styles.upcomingEventsModalGradient}>
+              <LinearGradient
+                colors={['#f5f5f5', '#ffffff']}
+                style={styles.upcomingEventsModalGradient}
+              >
                 <View style={styles.upcomingEventsModalHeader}>
                   <View style={styles.upcomingEventsModalTitleContainer}>
-                    <Text style={styles.upcomingEventsModalTitle}>Bhagvat Gita</Text>
+                    <Text style={styles.upcomingEventsModalTitle}>Business Quotes</Text>
                   </View>
-                  <TouchableOpacity style={styles.upcomingEventsCloseButton} onPress={closeBhagvatGitaModal}>
+                  <TouchableOpacity 
+                    style={styles.upcomingEventsCloseButton}
+                    onPress={closeBusinessQuotesModal}
+                  >
                     <Text style={styles.upcomingEventsCloseButtonText}>✕</Text>
                   </TouchableOpacity>
                 </View>
               </LinearGradient>
               <View style={styles.upcomingEventsModalBody}>
                 <FlatList
-                  key={`bhagvatgita-modal-${bhagvatGitaTemplatesRaw.length > 0 ? bhagvatGitaTemplatesRaw.length : bhagvatGitaTemplates.length}`}
-                  data={bhagvatGitaTemplatesRaw.length > 0 ? bhagvatGitaTemplatesRaw : bhagvatGitaTemplates}
-                  keyExtractor={(item) => item.id.toString()}
+                  key={`businessquotes-modal-${businessQuotesTemplatesRaw.length > 0 ? businessQuotesTemplatesRaw.length : businessQuotesTemplates.length}`}
+                  data={businessQuotesTemplatesRaw.length > 0 ? businessQuotesTemplatesRaw : businessQuotesTemplates}
+                  keyExtractor={keyExtractorId}
                   numColumns={modalColumns}
                   columnWrapperStyle={styles.upcomingEventModalRow}
                   contentContainerStyle={styles.upcomingEventsModalScroll}
@@ -5076,145 +4867,14 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                   windowSize={5}
                   initialNumToRender={10}
                   updateCellsBatchingPeriod={50}
-                  renderItem={({ item: template, index }) => {
-                    const isLastInRow = (index + 1) % modalColumns === 0;
-                    return (
-                    <TouchableOpacity activeOpacity={0.8} style={[
-                      styles.upcomingEventModalCard, 
-                      { width: modalCardWidth },
-                      !isLastInRow && { marginRight: modalCardGap }
-                    ]} onPress={() => {
-                      closeBhagvatGitaModal();
-                      navigation.navigate('PosterPlayer', { selectedPoster: template, relatedPosters: (bhagvatGitaTemplatesRaw.length > 0 ? bhagvatGitaTemplatesRaw : bhagvatGitaTemplates).filter(t => t.id !== template.id) });
-                    }}>
-                      <View style={styles.upcomingEventModalImageContainer}>
-                        <OptimizedImage uri={template.thumbnail} style={styles.upcomingEventModalImage} resizeMode="cover" />
-                        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} style={styles.upcomingEventModalOverlay} />
-                        <LinearGradient colors={['#4ecdc4', '#44a08d']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.upcomingEventModalBadge}>
-                          <Icon name="star" size={12} color="#ffffff" />
-                          <Text style={styles.upcomingEventModalBadgeText}>Free</Text>
-                        </LinearGradient>
-                      </View>
-                    </TouchableOpacity>
-                    );
-                  }}
+                  getItemLayout={getModalItemLayout}
+                  renderItem={renderBusinessQuotesModalItem}
                 />
               </View>
             </View>
           </View>
         </Modal>
 
-        {/* Books Modal */}
-        <Modal visible={isBooksModalVisible} transparent={true} animationType="slide" onRequestClose={closeBooksModal}>
-          <View style={styles.modalOverlay}>
-            <View style={styles.upcomingEventsModalContent}>
-              <LinearGradient colors={['#f5f5f5', '#ffffff']} style={styles.upcomingEventsModalGradient}>
-                <View style={styles.upcomingEventsModalHeader}>
-                  <View style={styles.upcomingEventsModalTitleContainer}>
-                    <Text style={styles.upcomingEventsModalTitle}>Books</Text>
-                  </View>
-                  <TouchableOpacity style={styles.upcomingEventsCloseButton} onPress={closeBooksModal}>
-                    <Text style={styles.upcomingEventsCloseButtonText}>✕</Text>
-                  </TouchableOpacity>
-                </View>
-              </LinearGradient>
-              <View style={styles.upcomingEventsModalBody}>
-                <FlatList
-                  key={`books-modal-${booksTemplatesRaw.length > 0 ? booksTemplatesRaw.length : booksTemplates.length}`}
-                  data={booksTemplatesRaw.length > 0 ? booksTemplatesRaw : booksTemplates}
-                  keyExtractor={(item) => item.id.toString()}
-                  numColumns={modalColumns}
-                  columnWrapperStyle={styles.upcomingEventModalRow}
-                  contentContainerStyle={styles.upcomingEventsModalScroll}
-                  showsVerticalScrollIndicator={false}
-                  removeClippedSubviews={true}
-                  maxToRenderPerBatch={10}
-                  windowSize={5}
-                  initialNumToRender={10}
-                  updateCellsBatchingPeriod={50}
-                  renderItem={({ item: template, index }) => {
-                    const isLastInRow = (index + 1) % modalColumns === 0;
-                    return (
-                    <TouchableOpacity activeOpacity={0.8} style={[
-                      styles.upcomingEventModalCard, 
-                      { width: modalCardWidth },
-                      !isLastInRow && { marginRight: modalCardGap }
-                    ]} onPress={() => {
-                      closeBooksModal();
-                      navigation.navigate('PosterPlayer', { selectedPoster: template, relatedPosters: (booksTemplatesRaw.length > 0 ? booksTemplatesRaw : booksTemplates).filter(t => t.id !== template.id) });
-                    }}>
-                      <View style={styles.upcomingEventModalImageContainer}>
-                        <OptimizedImage uri={template.thumbnail} style={styles.upcomingEventModalImage} resizeMode="cover" />
-                        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} style={styles.upcomingEventModalOverlay} />
-                        <LinearGradient colors={['#4ecdc4', '#44a08d']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.upcomingEventModalBadge}>
-                          <Icon name="star" size={12} color="#ffffff" />
-                          <Text style={styles.upcomingEventModalBadgeText}>Free</Text>
-                        </LinearGradient>
-                      </View>
-                    </TouchableOpacity>
-                    );
-                  }}
-                />
-              </View>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Celebrates the Moments Modal */}
-        <Modal visible={isCelebratesMomentsModalVisible} transparent={true} animationType="slide" onRequestClose={closeCelebratesMomentsModal}>
-          <View style={styles.modalOverlay}>
-            <View style={styles.upcomingEventsModalContent}>
-              <LinearGradient colors={['#f5f5f5', '#ffffff']} style={styles.upcomingEventsModalGradient}>
-                <View style={styles.upcomingEventsModalHeader}>
-                  <View style={styles.upcomingEventsModalTitleContainer}>
-                    <Text style={styles.upcomingEventsModalTitle}>Celebrates the Moments</Text>
-                  </View>
-                  <TouchableOpacity style={styles.upcomingEventsCloseButton} onPress={closeCelebratesMomentsModal}>
-                    <Text style={styles.upcomingEventsCloseButtonText}>✕</Text>
-                  </TouchableOpacity>
-                </View>
-              </LinearGradient>
-              <View style={styles.upcomingEventsModalBody}>
-                <FlatList
-                  key={`celebrates-modal-${celebratesMomentsTemplatesRaw.length > 0 ? celebratesMomentsTemplatesRaw.length : celebratesMomentsTemplates.length}`}
-                  data={celebratesMomentsTemplatesRaw.length > 0 ? celebratesMomentsTemplatesRaw : celebratesMomentsTemplates}
-                  keyExtractor={(item) => item.id.toString()}
-                  numColumns={modalColumns}
-                  columnWrapperStyle={styles.upcomingEventModalRow}
-                  contentContainerStyle={styles.upcomingEventsModalScroll}
-                  showsVerticalScrollIndicator={false}
-                  removeClippedSubviews={true}
-                  maxToRenderPerBatch={10}
-                  windowSize={5}
-                  initialNumToRender={10}
-                  updateCellsBatchingPeriod={50}
-                  renderItem={({ item: template, index }) => {
-                    const isLastInRow = (index + 1) % modalColumns === 0;
-                    return (
-                    <TouchableOpacity activeOpacity={0.8} style={[
-                      styles.upcomingEventModalCard, 
-                      { width: modalCardWidth },
-                      !isLastInRow && { marginRight: modalCardGap }
-                    ]} onPress={() => {
-                      closeCelebratesMomentsModal();
-                      navigation.navigate('PosterPlayer', { selectedPoster: template, relatedPosters: (celebratesMomentsTemplatesRaw.length > 0 ? celebratesMomentsTemplatesRaw : celebratesMomentsTemplates).filter(t => t.id !== template.id) });
-                    }}>
-                      <View style={styles.upcomingEventModalImageContainer}>
-                        <OptimizedImage uri={template.thumbnail} style={styles.upcomingEventModalImage} resizeMode="cover" />
-                        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} style={styles.upcomingEventModalOverlay} />
-                        <LinearGradient colors={['#4ecdc4', '#44a08d']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.upcomingEventModalBadge}>
-                          <Icon name="star" size={12} color="#ffffff" />
-                          <Text style={styles.upcomingEventModalBadgeText}>Free</Text>
-                        </LinearGradient>
-                      </View>
-                    </TouchableOpacity>
-                    );
-                  }}
-                />
-              </View>
-            </View>
-          </View>
-        </Modal>
 
         {/* Featured Content Modal */}
         <Modal visible={isFeaturedContentModalVisible} transparent={true} animationType="slide" onRequestClose={closeFeaturedContentModal}>
@@ -5234,56 +4894,18 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                 <FlatList
                   key={`featured-content-modal-${featuredContent.length}`}
                   data={featuredContent}
-                  keyExtractor={(item) => item.id.toString()}
+                  keyExtractor={keyExtractorId}
                   numColumns={modalColumns}
                   columnWrapperStyle={styles.upcomingEventModalRow}
                   contentContainerStyle={styles.upcomingEventsModalScroll}
                   showsVerticalScrollIndicator={false}
-                  renderItem={({ item: featured, index }) => {
-                    // Convert featured content to Template format for navigation
-                    const convertFeaturedContentToTemplate = (fc: FeaturedContent): Template => ({
-                      id: fc.id,
-                      name: fc.title,
-                      thumbnail: fc.imageUrl,
-                      category: fc.type || 'Featured Content',
-                      downloads: 0,
-                      isDownloaded: false,
-                      tags: [],
-                    });
-
-                    const selectedTemplate = convertFeaturedContentToTemplate(featured);
-                    const relatedTemplates = featuredContent
-                      .filter(fc => fc.id !== featured.id)
-                      .map(convertFeaturedContentToTemplate);
-                    const isLastInRow = (index + 1) % modalColumns === 0;
-
-                    return (
-                      <TouchableOpacity 
-                        activeOpacity={0.8} 
-                        style={[
-                          styles.upcomingEventModalCard, 
-                          { width: modalCardWidth },
-                          !isLastInRow && { marginRight: modalCardGap }
-                        ]} 
-                        onPress={() => {
-                          closeFeaturedContentModal();
-                          navigation.navigate('PosterPlayer', {
-                            selectedPoster: selectedTemplate,
-                            relatedPosters: relatedTemplates,
-                          });
-                        }}
-                      >
-                        <View style={styles.upcomingEventModalImageContainer}>
-                          <OptimizedImage uri={featured.imageUrl} style={styles.upcomingEventModalImage} resizeMode="cover" />
-                          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} style={styles.upcomingEventModalOverlay} />
-                          {/* <LinearGradient colors={['#4ecdc4', '#44a08d']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.upcomingEventModalBadge}>
-                            <Icon name="star" size={12} color="#ffffff" />
-                            <Text style={styles.upcomingEventModalBadgeText}>Featured</Text>
-                          </LinearGradient> */}
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  }}
+                  removeClippedSubviews={true}
+                  maxToRenderPerBatch={10}
+                  windowSize={5}
+                  initialNumToRender={10}
+                  updateCellsBatchingPeriod={50}
+                  getItemLayout={getModalItemLayout}
+                  renderItem={renderFeaturedContentModalItem}
                 />
               </View>
             </View>
@@ -5473,11 +5095,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: moderateScale(12),
   },
   featuredCarouselCard: {
-    height: verticalScale(110),
     borderRadius: moderateScale(8),
     overflow: 'hidden',
     marginRight: moderateScale(10),
     backgroundColor: '#f2f2f2',
+    position: 'relative',
   },
   featuredCarouselImage: {
     width: '100%',

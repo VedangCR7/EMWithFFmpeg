@@ -10,6 +10,8 @@ import {
   FlatList,
   ActivityIndicator,
   Image,
+  Animated,
+  Easing,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -48,6 +50,14 @@ const TodaysPickScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [avatarErrored, setAvatarErrored] = useState(false);
   const preloadedImagesRef = useRef<Set<string>>(new Set());
+  
+  // Animation values
+  const headerOpacity = useRef(new Animated.Value(0)).current;
+  const headerTranslateY = useRef(new Animated.Value(-20)).current;
+  const sectionAnimations = useRef<Map<string, Animated.Value>>(new Map()).current;
+  const cardAnimations = useRef<Map<string, Animated.Value>>(new Map()).current;
+  const loadingScale = useRef(new Animated.Value(0.8)).current;
+  const loadingRotation = useRef(new Animated.Value(0)).current;
   
   const currentUser = authService.getCurrentUser();
 
@@ -91,8 +101,14 @@ const TodaysPickScreen: React.FC = () => {
 
   // Avatar size for header
   const avatarSize = useMemo(() => {
-    return moderateScale(isCurrentlySmall ? 32 : isCurrentlyMedium ? 36 : 40);
+    return moderateScale(isCurrentlySmall ? 28 : isCurrentlyMedium ? 32 : 36);
   }, [isCurrentlySmall, isCurrentlyMedium]);
+
+  // Responsive icon sizes (matching PosterPlayerScreen.tsx)
+  const getIconSize = useCallback((baseSize: number) => {
+    const scale = currentScreenWidth / 375;
+    return Math.round(baseSize * scale);
+  }, [currentScreenWidth]);
 
   // Normalize possibly relative image URLs to absolute
   const toAbsoluteUrl = (url?: string | null): string | null => {
@@ -205,7 +221,55 @@ const TodaysPickScreen: React.FC = () => {
 
   useEffect(() => {
     loadTodayPosters();
+    
+    // Animate header on mount
+    Animated.parallel([
+      Animated.timing(headerOpacity, {
+        toValue: 1,
+        duration: 600,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+      Animated.timing(headerTranslateY, {
+        toValue: 0,
+        duration: 600,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+    ]).start();
   }, []);
+
+  // Animate loading indicator
+  useEffect(() => {
+    if (loading) {
+      Animated.parallel([
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(loadingScale, {
+              toValue: 1.1,
+              duration: 1000,
+              easing: Easing.inOut(Easing.ease),
+              useNativeDriver: true,
+            }),
+            Animated.timing(loadingScale, {
+              toValue: 0.8,
+              duration: 1000,
+              easing: Easing.inOut(Easing.ease),
+              useNativeDriver: true,
+            }),
+          ])
+        ),
+        Animated.loop(
+          Animated.timing(loadingRotation, {
+            toValue: 1,
+            duration: 2000,
+            easing: Easing.linear,
+            useNativeDriver: true,
+          })
+        ),
+      ]).start();
+    }
+  }, [loading]);
 
   // Preload images when posters are loaded
   useEffect(() => {
@@ -224,32 +288,120 @@ const TodaysPickScreen: React.FC = () => {
     }
   }, [todayPosters, loading, preloadImages]);
 
-  // Render section header
-  const renderSectionHeader = useCallback((title: string) => {
-    return (
-      <View style={[
-        styles.sectionHeader,
-        {
-          backgroundColor: '#f5f5f5',
-          paddingHorizontal: moderateScale(isCurrentlySmall ? 12 : isCurrentlyMedium ? 16 : 20),
-          paddingVertical: moderateVerticalScale(isCurrentlySmall ? 12 : isCurrentlyMedium ? 14 : 16),
-          marginTop: moderateVerticalScale(isCurrentlySmall ? 8 : isCurrentlyMedium ? 10 : 12),
-          marginBottom: moderateVerticalScale(isCurrentlySmall ? 8 : isCurrentlyMedium ? 10 : 12),
+  // Get icon for section type
+  const getSectionIcon = useCallback((title: string) => {
+    if (title.includes('Festival')) return 'celebration';
+    if (title.includes('Motivation')) return 'favorite';
+    if (title.includes('Business')) return 'business-center';
+    return 'collections';
+  }, []);
+
+  // Animate sections when they appear
+  useEffect(() => {
+    if (sections.length > 0 && !loading) {
+      sections.forEach((_, sectionIndex) => {
+        const sectionKey = `section-${sectionIndex}`;
+        if (!sectionAnimations.has(sectionKey)) {
+          sectionAnimations.set(sectionKey, new Animated.Value(0));
         }
-      ]}>
-        <Text style={[
-          styles.sectionHeaderText,
+        if (!sectionAnimations.has(`${sectionKey}-translate`)) {
+          sectionAnimations.set(`${sectionKey}-translate`, new Animated.Value(30));
+        }
+        
+        const opacity = sectionAnimations.get(sectionKey)!;
+        const translateAnim = sectionAnimations.get(`${sectionKey}-translate`)!;
+        
+        Animated.parallel([
+          Animated.timing(opacity, {
+            toValue: 1,
+            duration: 500,
+            delay: sectionIndex * 100,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(translateAnim, {
+            toValue: 0,
+            duration: 500,
+            delay: sectionIndex * 100,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ]).start();
+      });
+    }
+  }, [sections, loading, sectionAnimations]);
+
+  // Render section header
+  const renderSectionHeader = useCallback((title: string, sectionIndex: number) => {
+    const iconName = getSectionIcon(title);
+    const sectionKey = `section-${sectionIndex}`;
+    const opacity = sectionAnimations.get(sectionKey) || new Animated.Value(1);
+    const translateY = sectionAnimations.get(`${sectionKey}-translate`) || new Animated.Value(0);
+
+    return (
+      <Animated.View
+        style={[
+          styles.sectionHeaderContainer,
           {
-            color: theme.colors.text,
-            fontSize: responsiveFontSize.lg,
-            fontWeight: 'bold',
+            paddingHorizontal: moderateScale(isCurrentlySmall ? 12 : isCurrentlyMedium ? 16 : 20),
+            paddingTop: moderateVerticalScale(isCurrentlySmall ? 12 : isCurrentlyMedium ? 14 : 16),
+            paddingBottom: moderateVerticalScale(isCurrentlySmall ? 8 : isCurrentlyMedium ? 10 : 12),
+            marginBottom: moderateVerticalScale(isCurrentlySmall ? 8 : isCurrentlyMedium ? 10 : 12),
+            opacity,
+            transform: [{ translateY }],
           }
-        ]}>
-          {title}
-        </Text>
-      </View>
+        ]}
+      >
+        <View style={styles.sectionHeaderWrapper}>
+          <LinearGradient
+            colors={isDarkMode 
+              ? [theme.colors.primary + '30', theme.colors.secondary + '20', 'transparent']
+              : [theme.colors.primary + '18', theme.colors.secondary + '10', 'transparent']
+            }
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.sectionHeaderGradient}
+          >
+            <View style={styles.sectionHeaderContent}>
+              <LinearGradient
+                colors={[theme.colors.primary, theme.colors.secondary]}
+                style={styles.sectionIconContainer}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <Icon
+                  name={iconName}
+                  size={moderateScale(isCurrentlySmall ? 18 : isCurrentlyMedium ? 20 : 22)}
+                  color="#ffffff"
+                />
+              </LinearGradient>
+              <View style={styles.sectionTitleContainer}>
+                <Text style={[
+                  styles.sectionHeaderText,
+                  {
+                    color: theme.colors.text,
+                    fontSize: responsiveFontSize.lg,
+                    fontWeight: '700',
+                    marginLeft: moderateScale(10),
+                  }
+                ]}>
+                  {title}
+                </Text>
+                <View style={[
+                  styles.sectionUnderline,
+                  {
+                    backgroundColor: theme.colors.primary,
+                    marginLeft: moderateScale(10),
+                    marginTop: moderateVerticalScale(2),
+                  }
+                ]} />
+              </View>
+            </View>
+          </LinearGradient>
+        </View>
+      </Animated.View>
     );
-  }, [theme, isCurrentlySmall, isCurrentlyMedium, responsiveFontSize]);
+  }, [theme, isDarkMode, isCurrentlySmall, isCurrentlyMedium, responsiveFontSize, getSectionIcon, sectionAnimations]);
 
   const loadTodayPosters = async () => {
     try {
@@ -534,29 +686,162 @@ const TodaysPickScreen: React.FC = () => {
     return uri;
   }, []);
 
+  // Animate cards when they appear
+  useEffect(() => {
+    if (todayPosters.length > 0 && !loading) {
+      todayPosters.forEach((item, index) => {
+        const cardKey = `card-${item.id}`;
+        if (!cardAnimations.has(cardKey)) {
+          cardAnimations.set(cardKey, new Animated.Value(0));
+        }
+        if (!cardAnimations.has(`${cardKey}-scale`)) {
+          cardAnimations.set(`${cardKey}-scale`, new Animated.Value(1));
+        }
+        if (!cardAnimations.has(`${cardKey}-translate`)) {
+          cardAnimations.set(`${cardKey}-translate`, new Animated.Value(30));
+        }
+        
+        const opacity = cardAnimations.get(cardKey)!;
+        const translateAnim = cardAnimations.get(`${cardKey}-translate`)!;
+        const delay = index * 50;
+        
+        Animated.parallel([
+          Animated.timing(opacity, {
+            toValue: 1,
+            duration: 400,
+            delay,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(translateAnim, {
+            toValue: 0,
+            duration: 400,
+            delay,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ]).start();
+      });
+    }
+  }, [todayPosters, loading, cardAnimations]);
+
+  // Calculate card dimensions to match image aspect ratio (square-ish to landscape orientation)
+  const getCardDimensions = useCallback((index: number, totalInSection: number) => {
+    const isFirst = index === 0;
+    const isFeatured = isFirst && totalInSection > 2;
+    
+    // Use a wider aspect ratio (more square/landscape) to match typical image formats
+    // This reduces height and eliminates top/bottom spacing
+    const posterAspectRatio = isTablet ? 1.0 : 0.9; // Closer to square/landscape format
+    
+    if (isFeatured && numColumns === 2) {
+      // Featured card spans full width
+      const featuredWidth = currentScreenWidth - moderateScale(isCurrentlySmall ? 24 : isCurrentlyMedium ? 32 : 40);
+      return {
+        width: featuredWidth,
+        height: featuredWidth / posterAspectRatio,
+        isFeatured: true,
+      };
+    }
+    
+    // Regular cards - height matches image aspect ratio
+    return {
+      width: cardWidth,
+      height: cardWidth / posterAspectRatio,
+      isFeatured: false,
+    };
+  }, [cardWidth, currentScreenWidth, numColumns, isCurrentlySmall, isCurrentlyMedium, isTablet]);
+
   // Memoized poster card component for better performance
-  const renderPosterCard = useCallback(({ item }: { item: Template }) => {
+  const renderPosterCard = useCallback(({ item, index, localIndex }: { item: Template; index: number; localIndex: number }, sectionData: Template[]) => {
     // Enhance URI for motivational quotes to improve quality
     // ThumbnailImage will still apply its own width constraint, so no cropping
     const isMotivational = item.category === 'Motivational';
     const imageUri = isMotivational ? getEnhancedUri(item.thumbnail, item.category) : item.thumbnail;
     
+    const cardKey = `card-${item.id}`;
+    const opacity = cardAnimations.get(cardKey) || new Animated.Value(1);
+    const scale = cardAnimations.get(`${cardKey}-scale`) || new Animated.Value(1);
+    const translateY = cardAnimations.get(`${cardKey}-translate`) || new Animated.Value(0);
+    
+    const { width, height, isFeatured } = getCardDimensions(localIndex, sectionData.length);
+
+    const handlePressIn = () => {
+      Animated.spring(scale, {
+        toValue: 0.95,
+        useNativeDriver: true,
+        tension: 300,
+        friction: 10,
+      }).start();
+    };
+
+    const handlePressOut = () => {
+      Animated.spring(scale, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 300,
+        friction: 10,
+      }).start();
+    };
+    
     return (
-      <TouchableOpacity
-        style={[styles.posterCard, { width: cardWidth }]}
-        onPress={() => handlePosterPress(item)}
-        activeOpacity={0.8}
+      <Animated.View
+        style={[
+          styles.posterCard,
+          isFeatured && styles.featuredCard,
+          {
+            width,
+            height,
+            opacity,
+            transform: [
+              { scale },
+              { translateY },
+            ],
+          }
+        ]}
       >
-        <OptimizedImage
-          uri={imageUri}
-          style={styles.posterImage}
-          resizeMode="cover"
-          mode="thumbnail"
-          showLoader={false}
-        />
-      </TouchableOpacity>
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={() => handlePosterPress(item)}
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          style={styles.posterTouchable}
+        >
+          <View style={[styles.posterImageContainer, { height: '100%' }]}>
+            <OptimizedImage
+              uri={imageUri}
+              style={[styles.posterImage, { height: '100%' }]}
+              resizeMode="cover"
+              mode="thumbnail"
+              showLoader={false}
+            />
+            <LinearGradient
+              colors={isFeatured 
+                ? ['transparent', 'rgba(0,0,0,0.2)']
+                : ['transparent', 'rgba(0,0,0,0.05)']
+              }
+              style={styles.posterGradientOverlay}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+            />
+            {isFeatured && (
+              <View style={styles.featuredBadge}>
+                <LinearGradient
+                  colors={[theme.colors.primary, theme.colors.secondary]}
+                  style={styles.featuredBadgeGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                >
+                  <Icon name="star" size={moderateScale(14)} color="#ffffff" />
+                  <Text style={styles.featuredBadgeText}>Featured</Text>
+                </LinearGradient>
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Animated.View>
     );
-  }, [cardWidth, handlePosterPress, getEnhancedUri]);
+  }, [handlePosterPress, getEnhancedUri, cardAnimations, getCardDimensions, theme, isCurrentlySmall, isCurrentlyMedium, responsiveFontSize]);
 
   // Preload next batch when scrolling
   const handleViewableItemsChanged = useCallback(({ viewableItems }: any) => {
@@ -587,43 +872,96 @@ const TodaysPickScreen: React.FC = () => {
   }).current;
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={theme.colors.background}
-        translucent={false}
+    <View style={[styles.container, { backgroundColor: theme.colors.gradient[0] || '#e8e8e8' }]}>
+      <LinearGradient
+        colors={theme.colors.gradient}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
       />
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar
+          barStyle="dark-content"
+          backgroundColor="transparent"
+          translucent={true}
+        />
       
       {/* Header */}
-      <View style={[
-        styles.header,
-        {
-          backgroundColor: theme.colors.surface,
-          paddingHorizontal: responsiveLayout.headerPaddingHorizontal,
-          paddingVertical: moderateVerticalScale(isCurrentlySmall ? 10 : isCurrentlyMedium ? 12 : 14),
-          minHeight: responsiveLayout.headerHeight,
-        }
-      ]}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.7}
+      <Animated.View
+        style={{
+          opacity: headerOpacity,
+          transform: [{ translateY: headerTranslateY }],
+        }}
+      >
+        <LinearGradient
+          colors={isDarkMode 
+            ? [theme.colors.surface, theme.colors.surface, theme.colors.background + '80']
+            : ['#ffffff', '#ffffff', theme.colors.background + '40']
+          }
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={[
+            styles.header,
+            {
+              paddingHorizontal: responsiveLayout.headerPaddingHorizontal,
+              paddingVertical: moderateVerticalScale(isCurrentlySmall ? 8 : isCurrentlyMedium ? 10 : 12),
+              minHeight: moderateVerticalScale(isCurrentlySmall ? 48 : isCurrentlyMedium ? 52 : 56),
+              borderBottomWidth: 1,
+              borderBottomColor: isDarkMode 
+                ? theme.colors.border + '20'
+                : theme.colors.border + '30',
+              ...responsiveShadow.small,
+            }
+          ]}
         >
-          <Icon
-            name="arrow-back"
-            size={responsiveSize.iconLarge}
-            color={theme.colors.text}
-          />
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backArrowButton}
+          activeOpacity={0.85}
+        >
+          <LinearGradient
+            colors={[theme.colors.secondary, theme.colors.primary]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.backArrowButtonGradient}
+          >
+            <Icon name="chevron-left" size={getIconSize(20)} color="#ffffff" />
+          </LinearGradient>
         </TouchableOpacity>
+        <View style={styles.headerTitleContainer}>
+          <View style={styles.headerTitleRow}>
+            <Text style={[
+              styles.headerTitle,
+              {
+                color: theme.colors.text,
+              fontSize: responsiveFontSize.lg,
+              fontWeight: '700',
+            }
+          ]}>
+            Today's Pick
+          </Text>
+          <View style={[
+            styles.headerTitleDot,
+            {
+              backgroundColor: theme.colors.primary,
+              width: moderateScale(6),
+              height: moderateScale(6),
+              borderRadius: moderateScale(3),
+              marginLeft: moderateScale(6),
+            }
+          ]} />
+        </View>
         <Text style={[
-          styles.headerTitle,
+          styles.headerSubtitle,
           {
-            color: theme.colors.text,
-            fontSize: responsiveFontSize.lg,
+            color: theme.colors.textSecondary,
+            fontSize: responsiveFontSize.xs,
+            marginTop: moderateVerticalScale(2),
           }
         ]}>
-          Today's Pick
-        </Text>
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+          </Text>
+        </View>
         <View style={[styles.headerRight, { width: avatarSize + moderateScale(8) }]}>
           {avatarUri && !avatarErrored ? (
             <View style={[
@@ -632,10 +970,13 @@ const TodaysPickScreen: React.FC = () => {
                 width: avatarSize,
                 height: avatarSize,
                 borderRadius: avatarSize / 2,
-                borderWidth: 2,
-                borderColor: theme.colors.border || '#e0e0e0',
+                borderWidth: 3,
+                borderColor: isDarkMode 
+                  ? theme.colors.primary + '60'
+                  : theme.colors.primary + '40',
                 backgroundColor: '#eaeaea',
                 overflow: 'hidden',
+                ...responsiveShadow.small,
               }
             ]}>
               <OptimizedImage
@@ -657,6 +998,7 @@ const TodaysPickScreen: React.FC = () => {
                   width: avatarSize,
                   height: avatarSize,
                   borderRadius: avatarSize / 2,
+                  ...responsiveShadow.small,
                 }
               ]}
             >
@@ -665,6 +1007,7 @@ const TodaysPickScreen: React.FC = () => {
                 {
                   fontSize: moderateScale(isCurrentlySmall ? 14 : isCurrentlyMedium ? 16 : 18),
                   color: '#ffffff',
+                  fontWeight: '700',
                 }
               ]}>
                 {(currentUser?.companyName || currentUser?.displayName)?.charAt(0)?.toUpperCase() || 
@@ -673,24 +1016,66 @@ const TodaysPickScreen: React.FC = () => {
             </LinearGradient>
           )}
         </View>
-      </View>
+        </LinearGradient>
+      </Animated.View>
 
       {/* Content */}
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator
-            size={isCurrentlyTablet ? 'large' : 'large'}
-            color={theme.colors.primary}
-          />
+          <View style={styles.loadingIconWrapper}>
+            <Animated.View
+              style={{
+                transform: [
+                  { scale: loadingScale },
+                  {
+                    rotate: loadingRotation.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0deg', '360deg'],
+                    }),
+                  },
+                ],
+              }}
+            >
+              <LinearGradient
+                colors={[theme.colors.primary, theme.colors.secondary]}
+                style={[
+                  styles.loadingIconContainer,
+                  {
+                    width: moderateScale(70),
+                    height: moderateScale(70),
+                    borderRadius: moderateScale(35),
+                  }
+                ]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <ActivityIndicator
+                  size={isCurrentlyTablet ? 'large' : 'large'}
+                  color="#ffffff"
+                />
+              </LinearGradient>
+            </Animated.View>
+          </View>
           <Text style={[
             styles.loadingText,
             {
-              color: theme.colors.textSecondary,
+              color: theme.colors.text,
               fontSize: responsiveFontSize.md,
-              marginTop: responsiveSpacing.md,
+              marginTop: responsiveSpacing.lg,
+              fontWeight: '600',
             }
           ]}>
             Loading today's picks...
+          </Text>
+          <Text style={[
+            styles.loadingSubtext,
+            {
+              color: theme.colors.textSecondary,
+              fontSize: responsiveFontSize.xs,
+              marginTop: responsiveSpacing.xs,
+            }
+          ]}>
+            Curating the best content for you
           </Text>
         </View>
       ) : sections.length > 0 ? (
@@ -700,8 +1085,8 @@ const TodaysPickScreen: React.FC = () => {
             styles.content,
             {
               paddingBottom: Math.max(
-                moderateVerticalScale(20),
-                insets.bottom + moderateVerticalScale(20)
+                moderateVerticalScale(12),
+                insets.bottom + moderateVerticalScale(12)
               ),
             }
           ]}
@@ -709,29 +1094,54 @@ const TodaysPickScreen: React.FC = () => {
         >
           {sections.map((section, sectionIndex) => (
             <View key={`section-${sectionIndex}`}>
-              {renderSectionHeader(section.title)}
-              <FlatList
-                data={section.data}
-                renderItem={renderPosterCard}
-                keyExtractor={(item) => item.id}
-                numColumns={numColumns}
-                columnWrapperStyle={numColumns > 1 ? [
-                  styles.row,
-                  {
-                    paddingHorizontal: moderateScale(isCurrentlySmall ? 12 : isCurrentlyMedium ? 16 : 20),
-                    marginBottom: moderateVerticalScale(isCurrentlySmall ? 8 : isCurrentlyMedium ? 10 : 12),
-                    gap: moderateScale(isCurrentlySmall ? 8 : isCurrentlyMedium ? 12 : 16),
+              {renderSectionHeader(section.title, sectionIndex)}
+              <View style={styles.sectionContent}>
+                {section.data.map((item, index) => {
+                  const globalIndex = sectionIndex * 100 + index;
+                  const isFeatured = index === 0 && section.data.length > 2 && numColumns === 2;
+                  
+                  // Featured card should be full width
+                  if (isFeatured) {
+                    return (
+                      <View 
+                        key={item.id}
+                        style={[
+                          styles.featuredCardWrapper,
+                          {
+                            paddingHorizontal: moderateScale(isCurrentlySmall ? 12 : isCurrentlyMedium ? 16 : 20),
+                            marginBottom: moderateVerticalScale(isCurrentlySmall ? 12 : isCurrentlyMedium ? 14 : 16),
+                          }
+                        ]}
+                      >
+                        {renderPosterCard({ item, index: globalIndex, localIndex: index }, section.data)}
+                      </View>
+                    );
                   }
-                ] : undefined}
-                scrollEnabled={false}
-                key={`section-grid-${sectionIndex}-${numColumns}-${currentScreenWidth}`}
-                // Performance optimizations
-                removeClippedSubviews={true}
-                maxToRenderPerBatch={6}
-                updateCellsBatchingPeriod={50}
-                windowSize={5}
-                initialNumToRender={6}
-              />
+                  
+                  // Regular grid items - adjust index for featured card
+                  const adjustedIndex = isFeatured ? index - 1 : index;
+                  const rowIndex = Math.floor(adjustedIndex / numColumns);
+                  const colIndex = adjustedIndex % numColumns;
+                  const isFirstInRow = colIndex === 0;
+                  const isLastInRow = colIndex === numColumns - 1;
+                  
+                  return (
+                    <View
+                      key={item.id}
+                      style={[
+                        styles.gridItemWrapper,
+                        {
+                          marginLeft: isFirstInRow ? moderateScale(isCurrentlySmall ? 12 : isCurrentlyMedium ? 16 : 20) : moderateScale(isCurrentlySmall ? 5 : isCurrentlyMedium ? 6 : 7),
+                          marginRight: isLastInRow ? moderateScale(isCurrentlySmall ? 12 : isCurrentlyMedium ? 16 : 20) : moderateScale(isCurrentlySmall ? 5 : isCurrentlyMedium ? 6 : 7),
+                          marginBottom: moderateVerticalScale(isCurrentlySmall ? 10 : isCurrentlyMedium ? 12 : 14),
+                        }
+                      ]}
+                    >
+                      {renderPosterCard({ item, index: globalIndex, localIndex: index }, section.data)}
+                    </View>
+                  );
+                })}
+              </View>
             </View>
           ))}
         </ScrollView>
@@ -742,17 +1152,44 @@ const TodaysPickScreen: React.FC = () => {
             paddingHorizontal: responsiveLayout.containerPaddingHorizontal,
           }
         ]}>
-          <Icon
-            name="today"
-            size={responsiveSize.avatarXLarge}
-            color={theme.colors.textSecondary}
-          />
+          <View style={styles.emptyIconWrapper}>
+            <LinearGradient
+              colors={[theme.colors.primary, theme.colors.secondary]}
+              style={[
+                styles.emptyIconOuter,
+              {
+                width: moderateScale(100),
+                height: moderateScale(100),
+                borderRadius: moderateScale(50),
+              }
+            ]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <View style={[
+              styles.emptyIconInner,
+              {
+                width: moderateScale(85),
+                height: moderateScale(85),
+                borderRadius: moderateScale(42.5),
+                backgroundColor: isDarkMode ? theme.colors.background : '#ffffff',
+              }
+            ]}>
+              <Icon
+                name="today"
+                size={moderateScale(45)}
+                color={theme.colors.primary}
+              />
+              </View>
+            </LinearGradient>
+          </View>
           <Text style={[
             styles.emptyText,
             {
-              color: theme.colors.textSecondary,
+              color: theme.colors.text,
               fontSize: responsiveFontSize.lg,
               marginTop: responsiveSpacing.lg,
+              fontWeight: '700',
             }
           ]}>
             No picks available for today
@@ -761,15 +1198,18 @@ const TodaysPickScreen: React.FC = () => {
             styles.emptySubtext,
             {
               color: theme.colors.textSecondary,
-              fontSize: responsiveFontSize.md,
+              fontSize: responsiveFontSize.sm,
               marginTop: responsiveSpacing.sm,
+              textAlign: 'center',
+              lineHeight: moderateVerticalScale(18),
             }
           ]}>
-            Check back tomorrow for new picks!
+            Check back tomorrow for fresh picks!{'\n'}We're preparing something special for you.
           </Text>
         </View>
       )}
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 };
 
@@ -777,22 +1217,46 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  safeArea: {
+    flex: 1,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+    ...responsiveShadow.small,
   },
-  backButton: {
-    padding: moderateScale(4),
-    minWidth: responsiveSize.iconLarge + moderateScale(8),
-    alignItems: 'flex-start',
+  backArrowButton: {
+    borderRadius: moderateScale(6),
+    overflow: 'hidden',
+  },
+  backArrowButtonGradient: {
+    width: moderateScale(36),
+    height: moderateScale(36),
+    borderRadius: moderateScale(6),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitleContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
-    fontWeight: 'bold',
-    flex: 1,
     textAlign: 'center',
+    letterSpacing: 0.5,
+  },
+  headerTitleDot: {
+    ...responsiveShadow.small,
+  },
+  headerSubtitle: {
+    textAlign: 'center',
+    letterSpacing: 0.3,
   },
   headerRight: {
     alignItems: 'center',
@@ -810,7 +1274,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   avatarText: {
-    fontWeight: 'bold',
+    textAlign: 'center',
   },
   scrollView: {
     flex: 1,
@@ -823,15 +1287,91 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   posterCard: {
-    borderRadius: moderateScale(6),
+    borderRadius: moderateScale(14),
     overflow: 'hidden',
     backgroundColor: '#ffffff',
-    ...responsiveShadow.medium,
+    ...responsiveShadow.large,
+    borderWidth: 0.5,
+    borderColor: 'rgba(0, 0, 0, 0.08)',
+  },
+  featuredCard: {
+    ...responsiveShadow.large,
+    elevation: 8,
+  },
+  posterTouchable: {
+    width: '100%',
+    height: '100%',
+  },
+  posterImageContainer: {
+    width: '100%',
+    height: '100%',
+    overflow: 'hidden',
+    borderRadius: moderateScale(14),
+    position: 'relative',
   },
   posterImage: {
     width: '100%',
-    aspectRatio: isTablet ? 0.8 : 0.75,
-    borderRadius: moderateScale(6),
+    height: '100%',
+    borderRadius: moderateScale(14),
+  },
+  posterGradientOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '50%',
+    pointerEvents: 'none',
+  },
+  cardOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: moderateScale(12),
+    pointerEvents: 'none',
+  },
+  cardOverlayContent: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+  },
+  cardTitle: {
+    fontWeight: '600',
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+    letterSpacing: 0.3,
+  },
+  featuredBadge: {
+    position: 'absolute',
+    top: moderateScale(12),
+    right: moderateScale(12),
+    ...responsiveShadow.small,
+  },
+  featuredBadgeGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: moderateScale(10),
+    paddingVertical: moderateVerticalScale(6),
+    borderRadius: moderateScale(20),
+    gap: moderateScale(4),
+  },
+  featuredBadgeText: {
+    color: '#ffffff',
+    fontSize: moderateScale(11),
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  sectionContent: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+  },
+  gridItemWrapper: {
+    // Wrapper for grid items
+  },
+  featuredCardWrapper: {
+    width: '100%',
+    alignItems: 'center',
   },
   loadingContainer: {
     flex: 1,
@@ -839,27 +1379,83 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: responsiveLayout.containerPaddingHorizontal,
   },
+  loadingIconWrapper: {
+    ...responsiveShadow.large,
+  },
+  loadingIconContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   loadingText: {
     textAlign: 'center',
+    letterSpacing: 0.3,
+  },
+  loadingSubtext: {
+    textAlign: 'center',
+    letterSpacing: 0.2,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: responsiveLayout.containerPaddingHorizontal,
+  },
+  emptyIconWrapper: {
+    ...responsiveShadow.large,
+  },
+  emptyIconOuter: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: moderateScale(10),
+  },
+  emptyIconInner: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   emptyText: {
-    fontWeight: '600',
     textAlign: 'center',
+    letterSpacing: 0.3,
   },
   emptySubtext: {
-    textAlign: 'center',
+    maxWidth: moderateScale(280),
   },
-  sectionHeader: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+  sectionHeaderContainer: {
+    width: '100%',
+  },
+  sectionHeaderWrapper: {
+    borderRadius: moderateScale(20),
+    overflow: 'hidden',
+  },
+  sectionHeaderGradient: {
+    borderRadius: moderateScale(14),
+    overflow: 'hidden',
+    paddingHorizontal: moderateScale(14),
+    paddingVertical: moderateVerticalScale(10),
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(0, 0, 0, 0.04)',
+  },
+  sectionHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sectionIconContainer: {
+    width: moderateScale(36),
+    height: moderateScale(36),
+    borderRadius: moderateScale(18),
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...responsiveShadow.small,
+  },
+  sectionTitleContainer: {
+    flex: 1,
   },
   sectionHeaderText: {
-    fontWeight: 'bold',
+    letterSpacing: 0.4,
+  },
+  sectionUnderline: {
+    height: 2,
+    width: moderateScale(32),
+    borderRadius: moderateScale(1),
   },
 });
 

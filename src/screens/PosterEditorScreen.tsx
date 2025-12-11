@@ -3238,16 +3238,6 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                 Address
               </Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[styles.fieldToggleButton, visibleFields.services && styles.fieldToggleButtonActive]}
-              onPress={() => toggleFieldVisibility('services')}
-            >
-              <Icon name="handyman" size={getResponsiveIconSize()} color={visibleFields.services ? "#ffffff" : "#667eea"} />
-              <Text style={[styles.fieldToggleButtonText, visibleFields.services && styles.fieldToggleButtonTextActive]}>
-                Services
-              </Text>
-            </TouchableOpacity>
           </ScrollView>
         </View>
         
