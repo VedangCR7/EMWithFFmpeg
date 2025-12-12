@@ -24,6 +24,7 @@ import {
   ScrollView,
   Animated,
   Easing,
+  InteractionManager,
 } from 'react-native';
 
 // Responsive scaling functions
@@ -408,9 +409,15 @@ const CustomTabBar = (props: any) => {
   }>({});
 
   const startAnimations = React.useCallback(() => {
-    // Stop existing animations first
+    // Stop existing animations first (only if they exist and are running)
     Object.values(animationRefs.current).forEach(anim => {
-      if (anim) anim.stop();
+      if (anim) {
+        try {
+          anim.stop();
+        } catch (e) {
+          // Animation might already be stopped, ignore error
+        }
+      }
     });
 
     // Pulse animation
@@ -602,22 +609,46 @@ const CustomTabBar = (props: any) => {
     entranceAnimation.start();
   }, [pulseAnim, borderAnim, shadowAnim, floatAnim, rippleAnim1, rippleAnim2, logoRotateAnim, sparkleAnim, bgColorAnim, entranceAnim]);
 
-  // Start animations on mount
+  // Start animations on mount - start immediately and also after interactions complete
   React.useEffect(() => {
-    startAnimations();
+    // Start animations immediately to ensure they begin right away
+    const timeoutId = setTimeout(() => {
+      startAnimations();
+    }, 50);
+    
+    // Also restart after interactions complete to ensure they continue during loading
+    const interaction = InteractionManager.runAfterInteractions(() => {
+      startAnimations();
+    });
 
     return () => {
-      // Stop all animations on unmount
+      clearTimeout(timeoutId);
+      interaction.cancel();
       Object.values(animationRefs.current).forEach(anim => {
-        if (anim) anim.stop();
+        if (anim) {
+          try {
+            anim.stop();
+          } catch (e) {
+            // Ignore errors when stopping
+          }
+        }
       });
     };
   }, [startAnimations]);
 
-  // Restart animations when Home screen is focused
+  // Restart animations when Home screen is focused - ensure they continue during loading
   React.useEffect(() => {
     if (isHomeFocused) {
+      // Use InteractionManager to ensure smooth restart, but also start immediately
+      // This ensures animations start even during loading
       startAnimations();
+      const interaction = InteractionManager.runAfterInteractions(() => {
+        // Restart to ensure they're running smoothly after interactions complete
+        startAnimations();
+      });
+      return () => {
+        interaction.cancel();
+      };
     }
   }, [isHomeFocused, startAnimations]);
 
@@ -975,50 +1006,64 @@ const CustomTabBar = (props: any) => {
               width: '100%',
               height: '100%',
               borderRadius: fabSize / 2,
-              backgroundColor: '#ffffff',
               justifyContent: 'center',
               alignItems: 'center',
               padding: currentModerateScale(4),
               overflow: 'hidden',
             }}
           >
+            {/* Yellow-Orange Gradient Background */}
+            <LinearGradient
+              colors={['#FFD700', '#FF8C00', '#FF6347']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{
+                position: 'absolute',
+                width: '100%',
+                height: '100%',
+                borderRadius: fabSize / 2,
+                zIndex: 1,
+              }}
+            />
+            
             {/* Sparkle/Shimmer overlay - reduced opacity */}
             <Animated.View
               style={{
                 position: 'absolute',
                 width: '100%',
                 height: '100%',
-                backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
                 opacity: sparkleOpacity,
                 borderRadius: fabSize / 2,
-                zIndex: 1,
+                zIndex: 2,
               }}
             />
             
+            {/* Today's Pick Text */}
             <Animated.View
               style={{
-                transform: [{ rotate: logoRotation }],
-                zIndex: 2,
+                zIndex: 3,
                 width: '100%',
                 height: '100%',
                 justifyContent: 'center',
                 alignItems: 'center',
               }}
             >
-              <Image 
-                source={require('../assets/floatingLogo/7.png')}
+              <Text
                 style={{
-                  width: '120%',
-                  height: '120%',
-                  resizeMode: 'contain',
+                  color: '#FFFFFF',
+                  fontSize: currentModerateScale(9),
+                  fontWeight: '700',
+                  textAlign: 'center',
+                  textShadowColor: 'rgba(0, 0, 0, 0.3)',
+                  textShadowOffset: { width: 0, height: 1 },
+                  textShadowRadius: 2,
+                  letterSpacing: 0.3,
                 }}
-                onError={(error) => {
-                  console.error('Error loading floating logo:', error);
-                }}
-                onLoad={() => {
-                  console.log('Floating logo loaded successfully');
-                }}
-              />
+                numberOfLines={2}
+              >
+                Today's{'\n'}Pick
+              </Text>
             </Animated.View>
           </TouchableOpacity>
         </Animated.View>

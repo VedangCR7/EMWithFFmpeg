@@ -787,6 +787,9 @@ const HomeScreen: React.FC = React.memo(() => {
   const [rotatingBusinessCategories, setRotatingBusinessCategories] = useState<Array<{ id: string; name: string }>>([]);
   const [currentBusinessCategoryIndex, setCurrentBusinessCategoryIndex] = useState(0);
   const businessCategoryFadeAnim = useRef(new Animated.Value(1)).current;
+  
+  // Track if animations have been initialized
+  const animationsInitializedRef = useRef(false);
   // Highlight state for business categories section
   const [isBusinessCategoriesHighlighted, setIsBusinessCategoriesHighlighted] = useState(false);
   const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -1549,7 +1552,16 @@ const HomeScreen: React.FC = React.memo(() => {
 
           // Set both states from single API call
           setGreetingCategoriesList(mappedCategories);
-          setGreetingCategories(mappedCategories.map(({ id, name, icon }) => ({ id, name, icon }))); // Also set for rotating categories
+          const newGreetingCategories = mappedCategories.map(({ id, name, icon }) => ({ id, name, icon }));
+          setGreetingCategories(newGreetingCategories); // Also set for rotating categories
+          
+          // Trigger initial animation when categories are first loaded
+          if (newGreetingCategories.length > 0) {
+            InteractionManager.runAfterInteractions(() => {
+              animateCategoryChange();
+            });
+          }
+          
           fetchGreetingCategoryPreviewImages(mappedCategories);
           
           if (__DEV__) {
@@ -1665,6 +1677,12 @@ const HomeScreen: React.FC = React.memo(() => {
             setRotatingBusinessCategories(rotatingCategories);
             // Reset index to 0 when categories are loaded
             setCurrentBusinessCategoryIndex(0);
+            
+            // Trigger initial animation when categories are first loaded
+            InteractionManager.runAfterInteractions(() => {
+              animateBusinessCategoryChange();
+            });
+            
             if (__DEV__) {
             }
           } else {
@@ -1700,30 +1718,105 @@ const HomeScreen: React.FC = React.memo(() => {
     };
   }, []); // Empty dependency array - only run once on mount (fetchBusinessCategoryPreviewImages is stable)
 
-  // Rotate categories every 3 seconds - optimized for immediate rendering
+  // Initialize animations immediately on mount
   useEffect(() => {
-    if (greetingCategories.length === 0) return;
+    if (animationsInitializedRef.current) return;
     
-    // Start rotation immediately when categories are available
-    const interval = setInterval(() => {
-      animateCategoryChange();
-      setCurrentCategoryIndex((prevIndex) => (prevIndex + 1) % greetingCategories.length);
-    }, 3000); // Change every 3 seconds
+    // Use InteractionManager to start animations after initial render
+    const interaction = InteractionManager.runAfterInteractions(() => {
+      // Ensure fade animations start at visible state
+      categoryFadeAnim.setValue(1);
+      businessCategoryFadeAnim.setValue(1);
+      animationsInitializedRef.current = true;
+    });
     
-    return () => clearInterval(interval);
+    return () => {
+      interaction.cancel();
+    };
+  }, [categoryFadeAnim, businessCategoryFadeAnim]);
+
+  // Rotate categories every 3 seconds - start immediately even if categories are loading
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    let interactionHandle: any = null;
+    
+    // Start rotation immediately, even if categories are empty (will use fallback)
+    const startRotation = () => {
+      if (greetingCategories.length > 0) {
+        // If categories are loaded, rotate through them
+        interval = setInterval(() => {
+          animateCategoryChange();
+          setCurrentCategoryIndex((prevIndex) => (prevIndex + 1) % greetingCategories.length);
+        }, 3000);
+      } else {
+        // Even if no categories, trigger animation to show it's working
+        interval = setInterval(() => {
+          animateCategoryChange();
+        }, 3000);
+      }
+    };
+    
+    // Start immediately
+    startRotation();
+    
+    // Also ensure it starts after interactions complete
+    interactionHandle = InteractionManager.runAfterInteractions(() => {
+      if (interval) {
+        clearInterval(interval);
+      }
+      startRotation();
+    });
+    
+    return () => {
+      if (interactionHandle) {
+        interactionHandle.cancel();
+      }
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
   }, [greetingCategories, animateCategoryChange]);
 
-  // Rotate business categories every 3 seconds - optimized for immediate rendering
+  // Rotate business categories every 3 seconds - start immediately even if categories are loading
   useEffect(() => {
-    if (rotatingBusinessCategories.length === 0) return;
+    let interval: NodeJS.Timeout | null = null;
+    let interactionHandle: any = null;
     
-    // Start rotation immediately when categories are available
-    const interval = setInterval(() => {
-      animateBusinessCategoryChange();
-      setCurrentBusinessCategoryIndex((prevIndex) => (prevIndex + 1) % rotatingBusinessCategories.length);
-    }, 3000); // Change every 3 seconds
+    // Start rotation immediately, even if categories are empty (will use fallback)
+    const startRotation = () => {
+      if (rotatingBusinessCategories.length > 0) {
+        // If categories are loaded, rotate through them
+        interval = setInterval(() => {
+          animateBusinessCategoryChange();
+          setCurrentBusinessCategoryIndex((prevIndex) => (prevIndex + 1) % rotatingBusinessCategories.length);
+        }, 3000);
+      } else {
+        // Even if no categories, trigger animation to show it's working
+        interval = setInterval(() => {
+          animateBusinessCategoryChange();
+        }, 3000);
+      }
+    };
     
-    return () => clearInterval(interval);
+    // Start immediately
+    startRotation();
+    
+    // Also ensure it starts after interactions complete
+    interactionHandle = InteractionManager.runAfterInteractions(() => {
+      if (interval) {
+        clearInterval(interval);
+      }
+      startRotation();
+    });
+    
+    return () => {
+      if (interactionHandle) {
+        interactionHandle.cancel();
+      }
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
   }, [rotatingBusinessCategories, animateBusinessCategoryChange]);
 
   // Cleanup highlight timeout on unmount
