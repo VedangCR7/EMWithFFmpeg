@@ -364,6 +364,7 @@ const PosterPlayerScreen: React.FC = () => {
   const [selectedLanguage, setSelectedLanguage] = useState<string>('all');
   const lastAutoDetectedPosterIdRef = useRef<string | null>(null); // Track which poster triggered auto-detection to prevent duplicate detection
   const userSelectedPosterRef = useRef<string | null>(null); // Track user-selected poster (via swipe or click) to prevent reset
+  const userManuallySelectedLanguageRef = useRef<boolean>(false); // Track if user manually selected a language (including "All")
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const [selectedServiceFilter, setSelectedServiceFilter] = useState<string | null>(null);
   const [isBusinessProfileReminderVisible, setIsBusinessProfileReminderVisible] = useState(false);
@@ -512,21 +513,22 @@ const PosterPlayerScreen: React.FC = () => {
     // Ensure all templates have languages merged before filtering
     const templatesWithLanguages = allTemplates.map(t => mergeTemplateLanguages(t));
     
-    // If "All" is selected, skip language filtering
-    let languageFiltered: Template[];
+    // If "All" is selected, return ALL templates without any language filtering
     if (selectedLanguage === 'all') {
-      languageFiltered = templatesWithLanguages;
-    } else {
-      // Filter by language - if no matches, return empty array
-      languageFiltered = templatesWithLanguages.filter(template => {
-        const matches = templateContainsLanguage(template, selectedLanguage);
-        return matches;
-      });
-      
-      // If no language matches, show nothing
-      if (languageFiltered.length === 0) {
-        return [];
-      }
+      // Only apply service filter if applicable (for Event Planner category)
+      // No language filtering at all when "All" is selected
+      return templatesWithLanguages.filter(templateMatchesServiceFilter);
+    }
+    
+    // Filter by language - if no matches, return empty array
+    const languageFiltered = templatesWithLanguages.filter(template => {
+      const matches = templateContainsLanguage(template, selectedLanguage);
+      return matches;
+    });
+    
+    // If no language matches, show nothing
+    if (languageFiltered.length === 0) {
+      return [];
     }
     
     // Then apply service filter if applicable
@@ -621,9 +623,11 @@ const PosterPlayerScreen: React.FC = () => {
     
     // If initialPoster ID changed, it means a different poster was selected
     // Reset auto-detection tracking so it can work for the new poster
+    // Also allow auto-detection again when navigating to a new category/poster
     if (prevId !== null && prevId !== initialPosterId) {
       lastAutoDetectedPosterIdRef.current = null; // Reset auto-detection tracking for new poster
       userSelectedPosterRef.current = null; // Clear user selection when navigating from different screen
+      userManuallySelectedLanguageRef.current = false; // Allow auto-detection for new category/poster
       // Clear allTemplates immediately to prevent showing old posters in grid
       setAllTemplates([]);
     }
@@ -687,6 +691,8 @@ const PosterPlayerScreen: React.FC = () => {
 
     // Clear allTemplates immediately to prevent showing old posters in grid
     setAllTemplates([]);
+    // Reset manual language selection when switching categories to allow auto-detection
+    userManuallySelectedLanguageRef.current = false;
 
     const fetchBusinessCategoryPosters = async () => {
       try {
@@ -758,6 +764,8 @@ const PosterPlayerScreen: React.FC = () => {
 
     // Clear allTemplates immediately to prevent showing old posters in grid
     setAllTemplates([]);
+    // Reset manual language selection when switching categories to allow auto-detection
+    userManuallySelectedLanguageRef.current = false;
 
     const fetchGreetingCategoryTemplates = async () => {
       // Use convertedInitialPoster which has thumbnail properly set for GreetingTemplates
@@ -961,9 +969,10 @@ const PosterPlayerScreen: React.FC = () => {
           }
           
           // Auto-detect language from the first poster's tags
-          // Always auto-detect based on the current poster's language
-          // Only skip if we've already detected for this poster to avoid duplicate detection
-          if (lastAutoDetectedPosterIdRef.current !== finalPoster.id && finalPoster.tags && finalPoster.tags.length > 0) {
+          // Only auto-detect if user hasn't manually selected a language
+          if (!userManuallySelectedLanguageRef.current && 
+              lastAutoDetectedPosterIdRef.current !== finalPoster.id && 
+              finalPoster.tags && finalPoster.tags.length > 0) {
             const languagesFromTags = extractLanguagesFromTags(finalPoster.tags);
             
             // Only auto-detect if we actually found language keywords
@@ -1005,6 +1014,8 @@ const PosterPlayerScreen: React.FC = () => {
 
     // Clear allTemplates immediately to prevent showing old posters in grid
     setAllTemplates([]);
+    // Reset manual language selection when switching categories to allow auto-detection
+    userManuallySelectedLanguageRef.current = false;
 
     const fetchCalendarPosters = async () => {
       try {
@@ -1201,6 +1212,11 @@ const PosterPlayerScreen: React.FC = () => {
 
   // Detect language from initial poster on mount
   useEffect(() => {
+    // Don't auto-detect if user manually selected "All" or any language
+    if (userManuallySelectedLanguageRef.current) {
+      return;
+    }
+    
     const initialPosterWithLanguages = mergeTemplateLanguages(initialPoster);
     
     // Detect the primary language from the initial poster
@@ -1245,6 +1261,11 @@ const PosterPlayerScreen: React.FC = () => {
   // Detect language from current poster when business category, greeting category, or calendar posters are loaded
   // This ensures language detection works when clicking category cards or calendar posters
   useEffect(() => {
+    // Don't auto-detect if user manually selected "All" or any language
+    if (userManuallySelectedLanguageRef.current) {
+      return;
+    }
+    
     // Skip if no currentPoster or if it's a loading placeholder
     if (!currentPoster || currentPoster.id === 'loading' || (!currentPoster.thumbnail && !(currentPoster as any).content?.background)) {
       return;
@@ -1296,18 +1317,50 @@ const PosterPlayerScreen: React.FC = () => {
 
   // Ensure poster selection respects the active language filter
   // BUT: Don't override user-selected posters (via swipe or click)
+  // When "All" is selected, show ALL templates without any language filtering
   useEffect(() => {
     if (!allTemplates.length) {
       return;
     }
 
+    // If "All" is selected, no language filtering - allow any poster to be shown
+    if (selectedLanguage === 'all') {
+      // Skip if user manually selected a poster - don't override their choice
+      if (userSelectedPosterRef.current) {
+        const userSelectedPoster = allTemplates.find(t => t.id === userSelectedPosterRef.current);
+        if (userSelectedPoster) {
+          // User's selection is always valid when "All" is selected
+          return;
+        }
+        // User-selected poster not found in templates, clear ref
+        userSelectedPosterRef.current = null;
+      }
+
+      // Ensure all templates have languages merged
+      const templatesWithLanguages = allTemplates.map(t => mergeTemplateLanguages(t));
+
+      setCurrentPoster(previousPoster => {
+        const resolvedPrevious = previousPoster
+          ? templatesWithLanguages.find(template => template.id === previousPoster.id) || previousPoster
+          : null;
+
+        // When "All" is selected, show any template (no language filtering)
+        if (resolvedPrevious) {
+          return resolvedPrevious;
+        }
+        return templatesWithLanguages[0];
+      });
+      return;
+    }
+
+    // Language filtering is active (not "All")
     // Skip if user manually selected a poster - don't override their choice
     if (userSelectedPosterRef.current) {
       const userSelectedPoster = allTemplates.find(t => t.id === userSelectedPosterRef.current);
       if (userSelectedPoster) {
         const posterWithLanguages = mergeTemplateLanguages(userSelectedPoster);
         // Check if the user-selected poster matches the current language filter
-        if (selectedLanguage === 'all' || templateContainsLanguage(posterWithLanguages, selectedLanguage)) {
+        if (templateContainsLanguage(posterWithLanguages, selectedLanguage)) {
           // User's selection is valid for current language, keep it
           return;
         }
@@ -1326,14 +1379,6 @@ const PosterPlayerScreen: React.FC = () => {
       const resolvedPrevious = previousPoster
         ? templatesWithLanguages.find(template => template.id === previousPoster.id) || previousPoster
         : null;
-
-      // If "All" is selected, show any template
-      if (selectedLanguage === 'all') {
-        if (resolvedPrevious) {
-          return resolvedPrevious;
-        }
-        return templatesWithLanguages[0];
-      }
 
       // Check if current poster matches the selected language
       if (resolvedPrevious && templateContainsLanguage(resolvedPrevious, selectedLanguage)) {
@@ -1366,41 +1411,44 @@ const PosterPlayerScreen: React.FC = () => {
     // Mark this as a user-selected poster (via swipe or click)
     userSelectedPosterRef.current = posterWithLanguages.id;
     
-    // Detect the primary language from the poster
-    const posterLanguages = Array.isArray(posterWithLanguages.languages)
-      ? posterWithLanguages.languages.map((lang: string) => lang.toLowerCase())
-      : [];
-    
-    const posterTags = Array.isArray(posterWithLanguages.tags) ? posterWithLanguages.tags : [];
-    const languagesFromTags = extractLanguagesFromTags(posterTags);
-    const allPosterLanguages = Array.from(new Set([...posterLanguages, ...languagesFromTags.map(l => l.toLowerCase())]));
-    
-    // Available language IDs that we support
-    const availableLanguageIds = ['english', 'hindi'];
-    
-    // Find the first matching language from available languages
-    const detectedLanguage = availableLanguageIds.find(langId => {
-      const normalizedLangId = langId.toLowerCase();
-      // Check if the poster's languages include this language
-      if (allPosterLanguages.includes(normalizedLangId)) {
-        return true;
+    // Only auto-detect language if user hasn't manually selected a language (including "All")
+    if (!userManuallySelectedLanguageRef.current) {
+      // Detect the primary language from the poster
+      const posterLanguages = Array.isArray(posterWithLanguages.languages)
+        ? posterWithLanguages.languages.map((lang: string) => lang.toLowerCase())
+        : [];
+      
+      const posterTags = Array.isArray(posterWithLanguages.tags) ? posterWithLanguages.tags : [];
+      const languagesFromTags = extractLanguagesFromTags(posterTags);
+      const allPosterLanguages = Array.from(new Set([...posterLanguages, ...languagesFromTags.map(l => l.toLowerCase())]));
+      
+      // Available language IDs that we support
+      const availableLanguageIds = ['english', 'hindi'];
+      
+      // Find the first matching language from available languages
+      const detectedLanguage = availableLanguageIds.find(langId => {
+        const normalizedLangId = langId.toLowerCase();
+        // Check if the poster's languages include this language
+        if (allPosterLanguages.includes(normalizedLangId)) {
+          return true;
+        }
+        // Check if tags contain keywords for this language
+        const keywords = LANGUAGE_KEYWORDS[normalizedLangId] || [normalizedLangId];
+        return keywords.some(keyword => 
+          allPosterLanguages.some(posterLang => posterLang.includes(keyword)) ||
+          posterTags.some((tag: unknown) => 
+            typeof tag === 'string' && tag.toLowerCase().includes(keyword)
+          )
+        );
+      });
+      
+      // If a language is detected and it's different from current selection, switch to it
+      // Always auto-detect based on the current poster's language
+      // Only skip if we've already detected for this poster to avoid duplicate detection
+      if (detectedLanguage && lastAutoDetectedPosterIdRef.current !== posterWithLanguages?.id) {
+        setSelectedLanguage(detectedLanguage);
+        lastAutoDetectedPosterIdRef.current = posterWithLanguages?.id || null;
       }
-      // Check if tags contain keywords for this language
-      const keywords = LANGUAGE_KEYWORDS[normalizedLangId] || [normalizedLangId];
-      return keywords.some(keyword => 
-        allPosterLanguages.some(posterLang => posterLang.includes(keyword)) ||
-        posterTags.some((tag: unknown) => 
-          typeof tag === 'string' && tag.toLowerCase().includes(keyword)
-        )
-      );
-    });
-    
-    // If a language is detected and it's different from current selection, switch to it
-    // Always auto-detect based on the current poster's language
-    // Only skip if we've already detected for this poster to avoid duplicate detection
-    if (detectedLanguage && lastAutoDetectedPosterIdRef.current !== posterWithLanguages?.id) {
-      setSelectedLanguage(detectedLanguage);
-      lastAutoDetectedPosterIdRef.current = posterWithLanguages?.id || null;
     }
     
     // Update the current poster
@@ -1482,10 +1530,20 @@ const PosterPlayerScreen: React.FC = () => {
   );
 
   const handleLanguageChange = useCallback((languageId: string) => {
-    // User manually selected a language, but we'll still auto-detect when poster changes
+    // Mark that user manually selected a language (including "All")
+    // This prevents auto-detection from overriding user's choice
+    userManuallySelectedLanguageRef.current = true;
+    
     // Reset auto-detection tracking so it can work for the current poster if needed
-    // This allows the language to update when user navigates to a different poster
-    lastAutoDetectedPosterIdRef.current = null;
+    // But only if user selects a specific language (not "All")
+    if (languageId !== 'all') {
+      lastAutoDetectedPosterIdRef.current = null;
+    } else {
+      // When "All" is selected, clear auto-detection tracking completely
+      // This prevents auto-detection from switching away from "All"
+      lastAutoDetectedPosterIdRef.current = null;
+    }
+    
     setSelectedLanguage(languageId);
 
     /*
