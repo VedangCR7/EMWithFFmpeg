@@ -459,11 +459,13 @@ const GreetingCard: React.FC<GreetingCardProps> = React.memo(({ item, cardWidth,
     }
     
     // Navigate immediately - related templates already computed
+    // Pass greetingCategory derived from searchQuery so PosterPlayerScreen can fetch the correct templates
     navigation.navigate('PosterPlayer', {
       selectedPoster: item,
       relatedPosters: relatedTemplates,
       searchQuery: searchQuery || '',
       templateSource: 'greeting',
+      greetingCategory: searchQuery || undefined, // Pass searchQuery as greetingCategory for proper template fetching
     });
     
     // Call onCardPress after navigation to avoid blocking
@@ -1525,13 +1527,25 @@ const HomeScreen: React.FC = React.memo(() => {
       try {
         const categories = await greetingTemplatesService.getCategories();
         if (isMounted && categories && categories.length > 0) {
+          // Print the categories received from the service
+          console.log('📋 [HOME SCREEN] Greeting Categories from Service:', JSON.stringify(categories, null, 2));
+          
           const mappedCategories = categories.map(category => ({
             id: category.id,
             name: category.name,
             icon: category.icon,
             color: (category as any).color,
-            imageUrl: (category as any).imageUrl || (category as any).image || (category as any).thumbnail || ''
+            imageUrl: (category as any).imageUrl || (category as any).image || (category as any).thumbnail || '',
+            parentCategoryName: (category as any).parentCategoryName // Include parentCategoryName
           }));
+
+          // Print the mapped categories
+          console.log('📋 [HOME SCREEN] Mapped Greeting Categories:', JSON.stringify(mappedCategories.slice(0, 3), null, 2));
+          console.log('📋 [HOME SCREEN] Total Mapped Categories:', mappedCategories.length);
+          
+          // Check parentCategoryName in mapped categories
+          const categoriesWithParent = mappedCategories.filter(cat => (cat as any).parentCategoryName);
+          console.log(`📋 [HOME SCREEN] Mapped Categories WITH parentCategoryName: ${categoriesWithParent.length}`);
 
           // Set both states from single API call
           setGreetingCategoriesList(mappedCategories);
@@ -1609,6 +1623,8 @@ const HomeScreen: React.FC = React.memo(() => {
       setBusinessCategoriesLoading(true);
       try {
         const response = await businessCategoriesService.getBusinessCategories();
+        // Print the full response
+        console.log('📋 [BUSINESS CATEGORIES] Full Response:', JSON.stringify(response, null, 2));
         if (isMounted && response && response.success) {
           // Get all categories from response (for rotation)
           // Handle both response structures: response.categories or response.data?.categories
@@ -2533,14 +2549,14 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
     );
   }, [theme, cardWidth, playIconSize, handleVideoCardPress]);
 
-  const featuredCarouselItemWidth = useMemo(() => {
-    // Account for list padding (12px on each side = 24px total) and card margins
-    const listPadding = moderateScale(12) * 2; // paddingHorizontal on both sides
-    const cardMargin = moderateScale(10); // marginRight on card
-    return screenWidth - listPadding - cardMargin;
-  }, [screenWidth]);
+  // Carousel card dimensions with spacing
+  const SCREEN_WIDTH = screenWidth;
+  const CARD_SPACING = 20;
+  const SIDE_PADDING = 20;
+  const CARD_WIDTH = SCREEN_WIDTH - (SIDE_PADDING * 2);
+  const featuredCarouselItemWidth = CARD_WIDTH;
   const featuredCarouselItemHeight = useMemo(() => featuredCarouselItemWidth / 3, [featuredCarouselItemWidth]); // 3:1 aspect ratio
-  const featuredCarouselSnapInterval = useMemo(() => featuredCarouselItemWidth + moderateScale(10), [featuredCarouselItemWidth]);
+  const featuredCarouselSnapInterval = useMemo(() => CARD_WIDTH + CARD_SPACING, [CARD_WIDTH, CARD_SPACING]);
 
   // Memoized key extractors
   const keyExtractor = useCallback((item: any) => item.id, []);
@@ -3302,12 +3318,14 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
 
   const handleFeaturedCarouselScrollFailure = useCallback((info: { index: number }) => {
     requestAnimationFrame(() => {
+      // Offset accounts for SIDE_PADDING and spacing between items
+      const offset = SIDE_PADDING + (info.index * (CARD_WIDTH + CARD_SPACING));
       featuredCarouselRef.current?.scrollToOffset({
-        offset: info.index * featuredCarouselSnapInterval,
+        offset,
         animated: true,
       });
     });
-  }, [featuredCarouselSnapInterval]);
+  }, [CARD_WIDTH, CARD_SPACING, SIDE_PADDING]);
 
   const handleFeaturedCarouselScroll = useCallback((event: any) => {
     // Completely disable onScroll updates - onViewableItemsChanged is the single source of truth
@@ -3348,8 +3366,9 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
 
   const handleFeaturedCarouselMomentumScrollEnd = useCallback((event: any) => {
     const scrollOffset = event.nativeEvent.contentOffset.x;
-    // Use the same calculation method as onScroll for consistency
-    const calculatedIndex = scrollOffset / featuredCarouselSnapInterval;
+    // Calculate index accounting for SIDE_PADDING and spacing between items
+    const adjustedOffset = scrollOffset - SIDE_PADDING;
+    const calculatedIndex = adjustedOffset / (CARD_WIDTH + CARD_SPACING);
     const currentIndex = Math.round(calculatedIndex);
     
     // Update to final position - this should match what onScroll already set
@@ -3380,7 +3399,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
         }, 4000);
       }
     }, 3000);
-  }, [featuredCarouselSnapInterval, featuredContent.length]);
+  }, [CARD_WIDTH, CARD_SPACING, SIDE_PADDING, featuredContent.length]);
 
   const handleFeaturedCarouselScrollBeginDrag = useCallback(() => {
     // Pause auto-scroll when user starts dragging
@@ -3396,25 +3415,38 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
     // Don't restart auto-scroll here - let onMomentumScrollEnd handle it
   }, []);
 
-  const getFeaturedCarouselItemLayout = useCallback((_: any, index: number) => ({
-    length: featuredCarouselSnapInterval,
-    offset: featuredCarouselSnapInterval * index,
-    index,
-  }), [featuredCarouselSnapInterval]);
+  const getFeaturedCarouselItemLayout = useCallback((_: any, index: number) => {
+    // Each item is CARD_WIDTH, with CARD_SPACING between items (except after last item)
+    // Offset accounts for SIDE_PADDING and spacing between items
+    return {
+      length: CARD_WIDTH,
+      offset: SIDE_PADDING + (index * (CARD_WIDTH + CARD_SPACING)),
+      index,
+    };
+  }, [CARD_WIDTH, CARD_SPACING, SIDE_PADDING]);
+
+  // Item separator component for spacing between cards
+  const renderItemSeparator = useCallback(() => (
+    <View style={{ width: CARD_SPACING }} />
+  ), [CARD_SPACING]);
 
   const renderFeaturedCarouselItem = useCallback(({ item }: { item: FeaturedContent }) => (
     <View
       key={item.id}
-      style={[styles.featuredCarouselCard, { width: featuredCarouselItemWidth, height: featuredCarouselItemHeight }]}
+      style={{ width: CARD_WIDTH }}
     >
-      <OptimizedImage 
-        uri={item.imageUrl} 
-        style={[styles.featuredCarouselImage, { width: featuredCarouselItemWidth, height: featuredCarouselItemHeight }]} 
-        resizeMode="cover"
-        mode="full"
-      />
+      <View
+        style={[styles.featuredCarouselCard, { width: '100%', height: featuredCarouselItemHeight }]}
+      >
+        <OptimizedImage 
+          uri={item.imageUrl} 
+          style={[styles.featuredCarouselImage, { width: '100%', height: '100%' }]} 
+          resizeMode="cover"
+          mode="full"
+        />
+      </View>
     </View>
-  ), [featuredCarouselItemWidth, featuredCarouselItemHeight]);
+  ), [CARD_WIDTH, featuredCarouselItemHeight]);
 
   // Handler for greeting category press - navigate to PosterPlayerScreen with selected greeting category
   const handleGreetingCategoryPress = useCallback((category: { id: string; name: string }) => {
@@ -3826,37 +3858,40 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
           )}
 
           {!isSearching && searchQuery.trim() === '' && featuredContent.length > 0 && (
-            <View style={styles.featuredCarouselContainer}>
-              <FlatList
-                ref={featuredCarouselRef}
-                data={featuredContent}
-                renderItem={renderFeaturedCarouselItem}
-                keyExtractor={keyExtractorIdString}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                pagingEnabled
-                snapToAlignment="center"
-                snapToInterval={featuredCarouselSnapInterval}
-                decelerationRate="fast"
-                getItemLayout={getFeaturedCarouselItemLayout}
-                onScrollToIndexFailed={handleFeaturedCarouselScrollFailure}
-                onScrollBeginDrag={handleFeaturedCarouselScrollBeginDrag}
-                onScrollEndDrag={handleFeaturedCarouselScrollEndDrag}
-                onMomentumScrollEnd={handleFeaturedCarouselMomentumScrollEnd}
-                onViewableItemsChanged={handleViewableItemsChanged}
-                viewabilityConfig={viewabilityConfig}
-                contentContainerStyle={styles.featuredCarouselList}
-              />
-              <View style={styles.featuredCarouselIndicators}>
-                {featuredContent.map((_, index) => (
-                  <View
-                    key={index}
-                    style={[
-                      styles.featuredCarouselDot,
-                      index === featuredCarouselIndex && styles.featuredCarouselDotActive,
-                    ]}
-                  />
-                ))}
+            <View style={styles.featuredCarouselWrapper}>
+              <View style={styles.featuredCarouselContainer}>
+                <FlatList
+                  ref={featuredCarouselRef}
+                  data={featuredContent}
+                  renderItem={renderFeaturedCarouselItem}
+                  keyExtractor={keyExtractorIdString}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  pagingEnabled={false}
+                  snapToInterval={featuredCarouselSnapInterval}
+                  snapToAlignment="start"
+                  decelerationRate="fast"
+                  getItemLayout={getFeaturedCarouselItemLayout}
+                  ItemSeparatorComponent={renderItemSeparator}
+                  onScrollToIndexFailed={handleFeaturedCarouselScrollFailure}
+                  onScrollBeginDrag={handleFeaturedCarouselScrollBeginDrag}
+                  onScrollEndDrag={handleFeaturedCarouselScrollEndDrag}
+                  onMomentumScrollEnd={handleFeaturedCarouselMomentumScrollEnd}
+                  onViewableItemsChanged={handleViewableItemsChanged}
+                  viewabilityConfig={viewabilityConfig}
+                  contentContainerStyle={{ paddingHorizontal: SIDE_PADDING }}
+                />
+                <View style={styles.featuredCarouselIndicators}>
+                  {featuredContent.map((_, index) => (
+                    <View
+                      key={index}
+                      style={[
+                        styles.featuredCarouselDot,
+                        index === featuredCarouselIndex && styles.featuredCarouselDotActive,
+                      ]}
+                    />
+                  ))}
+                </View>
               </View>
             </View>
           )}
@@ -5087,17 +5122,20 @@ const styles = StyleSheet.create({
     marginRight: moderateScale(4),
     padding: moderateScale(2),
   },
+  featuredCarouselWrapper: {
+    width: '100%',
+  },
   featuredCarouselContainer: {
     marginTop: moderateScale(10),
     marginBottom: moderateScale(6),
+    // No horizontal padding or margin - spacing comes from FlatList paddingHorizontal
   },
   featuredCarouselList: {
-    paddingHorizontal: moderateScale(12),
+    paddingHorizontal: 20, // 20px padding on each side - spacing comes from container, not card margins
   },
   featuredCarouselCard: {
     borderRadius: moderateScale(8),
     overflow: 'hidden',
-    marginRight: moderateScale(10),
     backgroundColor: '#f2f2f2',
     position: 'relative',
   },

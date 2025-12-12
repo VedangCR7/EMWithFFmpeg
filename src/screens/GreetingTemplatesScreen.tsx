@@ -360,17 +360,99 @@ const GreetingTemplatesScreen: React.FC = () => {
     }
   }, []);
 
-  const handleCategoryPress = useCallback((category: GreetingCategory) => {
-    const placeholderPoster = createPlaceholderPoster(category);
+  const handleCategoryPress = useCallback(async (category: GreetingCategory) => {
+    // Get the preview image for this category if available
+    const previewUri = categoryPreviewImages[category.id] || null;
+    
+    let selectedPoster: Template = createPlaceholderPoster(category);
+    
+    // If we have a preview image, try to find the actual template that matches it
+    if (previewUri) {
+      try {
+        const normalizedName = category.name?.trim();
+        if (normalizedName) {
+          // Search for templates in this category
+          const searchResults = await greetingTemplatesService.searchTemplates(normalizedName);
+          if (Array.isArray(searchResults) && searchResults.length > 0) {
+            // Try to find a template that matches the preview image URL
+            const matchingTemplate = searchResults.find(template => {
+              const templatePreview = extractTemplatePreview(template);
+              return templatePreview === previewUri;
+            });
+            
+            if (matchingTemplate) {
+              // Convert GreetingTemplate to Template format
+              const templateAny = matchingTemplate as any;
+              selectedPoster = {
+                id: matchingTemplate.id,
+                name: matchingTemplate.name || category.name,
+                thumbnail: matchingTemplate.thumbnail || templateAny.content?.background || previewUri,
+                category: matchingTemplate.category || category.name,
+                downloads: matchingTemplate.downloads || 0,
+                isDownloaded: matchingTemplate.isDownloaded || false,
+                tags: Array.isArray(templateAny.tags) ? templateAny.tags : [category.name],
+              };
+            } else {
+              // If no exact match, use the preview image with the first template's ID
+              const firstTemplate = searchResults[0];
+              const templateAny = firstTemplate as any;
+              selectedPoster = {
+                id: firstTemplate.id,
+                name: firstTemplate.name || category.name,
+                thumbnail: previewUri,
+                category: firstTemplate.category || category.name,
+                downloads: firstTemplate.downloads || 0,
+                isDownloaded: firstTemplate.isDownloaded || false,
+                tags: Array.isArray(templateAny.tags) ? templateAny.tags : [category.name],
+              };
+            }
+          } else {
+            // No search results, create poster with preview image
+            selectedPoster = {
+              id: `preview-${category.id}`,
+              name: category.name,
+              thumbnail: previewUri,
+              category: category.name,
+              downloads: 0,
+              isDownloaded: false,
+              tags: [category.name],
+            };
+          }
+        } else {
+          // No category name, create poster with preview image
+          selectedPoster = {
+            id: `preview-${category.id}`,
+            name: category.name,
+            thumbnail: previewUri,
+            category: category.name,
+            downloads: 0,
+            isDownloaded: false,
+            tags: [category.name],
+          };
+        }
+      } catch (error) {
+        console.warn('[GreetingTemplatesScreen] Error finding template for preview:', error);
+        // Fallback to preview image poster
+        selectedPoster = {
+          id: `preview-${category.id}`,
+          name: category.name,
+          thumbnail: previewUri,
+          category: category.name,
+          downloads: 0,
+          isDownloaded: false,
+          tags: [category.name],
+        };
+      }
+    }
 
     navigation.navigate('PosterPlayer', {
-      selectedPoster: placeholderPoster,
+      selectedPoster: selectedPoster,
       relatedPosters: [],
       greetingCategory: category.name,
       originScreen: 'GreetingTemplates',
       posterLimit: 200,
     });
-  }, [navigation]);
+  }, [navigation, categoryPreviewImages, extractTemplatePreview]);
 
   const categoryColumns = useMemo(() => {
     if (screenWidth >= 768) {

@@ -9,6 +9,7 @@ export interface BusinessCategory {
   icon: string;
   imageUrl?: string;
   image?: string;
+  parentCategoryName?: string; // Backend returns this field name
 }
 
 export interface BusinessCategoriesResponse {
@@ -27,14 +28,50 @@ class BusinessCategoriesService {
         logger.log('📡 [CATEGORY API] Calling: /api/mobile/business-categories/business');
         const response = await api.get('/api/mobile/business-categories/business');
         
+        // Print the full response
+        console.log('📋 [BUSINESS CATEGORIES] Full Response:', JSON.stringify(response.data, null, 2));
+        
         // Handle new response structure: categories are in response.data.data.categories
         const categories = response.data.data?.categories || response.data.categories || [];
         logger.log(`✅ [CATEGORY API] ${categories.length} categories fetched`);
         
-        // Return in expected format
+        // Log parent category information for debugging
+        if (categories.length > 0) {
+          console.log('📋 [BUSINESS CATEGORIES] Total Categories:', categories.length);
+          
+          // Check all categories for parentCategoryName
+          const categoriesWithParent = categories.filter((cat: any) => cat.parentCategoryName);
+          const categoriesWithoutParent = categories.filter((cat: any) => !cat.parentCategoryName);
+          
+          console.log(`📋 [BUSINESS CATEGORIES] Categories WITH parentCategoryName: ${categoriesWithParent.length}`);
+          console.log(`📋 [BUSINESS CATEGORIES] Categories WITHOUT parentCategoryName: ${categoriesWithoutParent.length}`);
+          
+          // Show sample categories
+          const sampleCategories = categories.slice(0, 3);
+          sampleCategories.forEach((category: any, index: number) => {
+            console.log(`📋 [BUSINESS CATEGORIES] Category ${index + 1} (${category.name}):`, {
+              id: category.id,
+              name: category.name,
+              parentCategoryName: category.parentCategoryName,
+              hasParentCategoryName: 'parentCategoryName' in category,
+              parentCategoryNameType: typeof category.parentCategoryName,
+              allKeys: Object.keys(category)
+            });
+          });
+          
+          // If any category has parentCategoryName, show it
+          if (categoriesWithParent.length > 0) {
+            console.log('📋 [BUSINESS CATEGORIES] Sample category WITH parentCategoryName:', JSON.stringify(categoriesWithParent[0], null, 2));
+          }
+          if (categoriesWithoutParent.length > 0) {
+            console.log('📋 [BUSINESS CATEGORIES] Sample category WITHOUT parentCategoryName:', JSON.stringify(categoriesWithoutParent[0], null, 2));
+          }
+        }
+        
+        // Return in expected format - backend returns parentCategoryName
         return {
           success: response.data.success || true,
-          categories: categories
+          categories: categories // Backend already returns parentCategoryName field
         };
       },
       10 * 60 * 1000, // 10 minutes TTL (categories rarely change)

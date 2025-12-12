@@ -11,6 +11,7 @@ import {
   ScrollView,
   PanResponder,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
@@ -279,6 +280,9 @@ const PosterPlayerScreen: React.FC = () => {
   const navigation = useNavigation<PosterPlayerScreenNavigationProp>();
   const route = useRoute<PosterPlayerScreenRouteProp>();
   const insets = useSafeAreaInsets();
+  
+  // Track previous initialPoster ID to detect when a different poster is selected
+  const prevInitialPosterIdRef = useRef<string | null>(null);
   const previewOverlayColors = useMemo(() => {
     const startColor = secondaryColor || primaryColor;
     const endColor = primaryColor;
@@ -342,9 +346,24 @@ const PosterPlayerScreen: React.FC = () => {
     posterLimit,
     calendarDate,
   } = route.params;
-  const [currentPoster, setCurrentPoster] = useState<Template>(initialPoster);
+  // Convert initialPoster to Template format if it's a GreetingTemplate
+  // GreetingTemplates have content.background which should be used as thumbnail if thumbnail is missing
+  const convertedInitialPoster = useMemo(() => {
+    // If it's a GreetingTemplate (has content.background), ensure thumbnail is set
+    if ((initialPoster as any).content?.background) {
+      return {
+        ...initialPoster,
+        thumbnail: initialPoster.thumbnail || (initialPoster as any).content.background,
+      } as Template;
+    }
+    return initialPoster;
+  }, [initialPoster]);
+  
+  const [currentPoster, setCurrentPoster] = useState<Template>(convertedInitialPoster);
   const [allTemplates, setAllTemplates] = useState<Template[]>([]);
   const [selectedLanguage, setSelectedLanguage] = useState<string>('all');
+  const lastAutoDetectedPosterIdRef = useRef<string | null>(null); // Track which poster triggered auto-detection to prevent duplicate detection
+  const userSelectedPosterRef = useRef<string | null>(null); // Track user-selected poster (via swipe or click) to prevent reset
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const [selectedServiceFilter, setSelectedServiceFilter] = useState<string | null>(null);
   const [isBusinessProfileReminderVisible, setIsBusinessProfileReminderVisible] = useState(false);
@@ -583,28 +602,91 @@ const PosterPlayerScreen: React.FC = () => {
     };
   }, []);
 
-  // Watch for route param changes and update currentPoster when real data arrives
+  // Watch for route param changes and update currentPoster when navigation occurs with new poster
+  // This runs for ALL cases (including greetingCategory) to ensure immediate update
   useEffect(() => {
-    // Skip if we have a loading placeholder
-    if (initialPoster.id === 'loading' || !initialPoster.thumbnail) {
+    // Use convertedInitialPoster which has thumbnail properly set for GreetingTemplates
+    const initialPosterToUse = convertedInitialPoster;
+    const initialPosterImage = initialPosterToUse.thumbnail || (initialPosterToUse as any).content?.background || '';
+    
+    // Skip if we have a loading placeholder or no image
+    if (initialPosterToUse.id === 'loading' || !initialPosterImage) {
       return;
     }
 
-    // If currentPoster is still the loading placeholder, update it
-    if (currentPoster.id === 'loading' || !currentPoster.thumbnail) {
-      const newPoster = mergeTemplateLanguages(initialPoster);
-      if (newPoster.thumbnail) {
-        console.log('🔄 [POSTER PLAYER] Updating currentPoster with loaded data:', newPoster.id);
+    // Check if initialPoster has changed (different ID means different poster was selected)
+    // This handles the case when user navigates back and selects a different image
+    const initialPosterId = initialPosterToUse.id;
+    const prevId = prevInitialPosterIdRef.current;
+    
+    // If initialPoster ID changed, it means a different poster was selected
+    // Reset auto-detection tracking so it can work for the new poster
+    if (prevId !== null && prevId !== initialPosterId) {
+      lastAutoDetectedPosterIdRef.current = null; // Reset auto-detection tracking for new poster
+      userSelectedPosterRef.current = null; // Clear user selection when navigating from different screen
+      // Clear allTemplates immediately to prevent showing old posters in grid
+      setAllTemplates([]);
+    }
+    
+    // If initialPoster ID changed, update immediately regardless of category type
+    if (prevId !== null && prevId !== initialPosterId) {
+      // Ensure thumbnail is set from content.background if needed
+      let newPoster = mergeTemplateLanguages(initialPosterToUse);
+      if (!newPoster.thumbnail && (newPoster as any).content?.background) {
+        newPoster = { ...newPoster, thumbnail: (newPoster as any).content.background };
+      }
+      
+      if (newPoster.thumbnail || (newPoster as any).content?.background) {
+        console.log('🔄 [POSTER PLAYER] New poster selected - updating immediately:', initialPosterId, 'from:', prevId);
+        // Update poster immediately
         setCurrentPoster(newPoster);
+        setImageDimensions(null); // Reset image dimensions when poster changes
+        prevInitialPosterIdRef.current = initialPosterId;
+        // Mark this as the new user-selected poster (from navigation)
+        userSelectedPosterRef.current = initialPosterId;
+        return;
       }
     }
-  }, [initialPoster, currentPoster]);
+    
+    // Update ref to track current initialPoster ID (first time or when it changes)
+    // On first load (prevId is null), reset auto-detection tracking
+    if (prevId === null) {
+      lastAutoDetectedPosterIdRef.current = null; // Allow auto-detection on initial load
+    }
+    
+    if (prevInitialPosterIdRef.current !== initialPosterId) {
+      prevInitialPosterIdRef.current = initialPosterId;
+    }
+
+    // If currentPoster is still the loading placeholder or doesn't match, update it
+    // BUT: Don't reset if user manually selected a poster (via swipe or click)
+    const isUserSelected = userSelectedPosterRef.current === currentPoster.id;
+    if (!isUserSelected && (currentPoster.id === 'loading' || 
+        currentPoster.id !== initialPosterId ||
+        (!currentPoster.thumbnail && !(currentPoster as any).content?.background))) {
+      // Ensure thumbnail is set from content.background if needed
+      let newPoster = mergeTemplateLanguages(initialPosterToUse);
+      if (!newPoster.thumbnail && (newPoster as any).content?.background) {
+        newPoster = { ...newPoster, thumbnail: (newPoster as any).content.background };
+      }
+      
+      if (newPoster.thumbnail || (newPoster as any).content?.background) {
+        console.log('🔄 [POSTER PLAYER] Updating currentPoster with loaded data:', newPoster.id);
+        setCurrentPoster(newPoster);
+        // Clear user selection ref when resetting to initial poster
+        userSelectedPosterRef.current = null;
+      }
+    }
+  }, [convertedInitialPoster, currentPoster.id, initialPoster]);
 
   // Fetch business category posters when businessCategory is provided
   useEffect(() => {
     if (!businessCategory) {
       return;
     }
+
+    // Clear allTemplates immediately to prevent showing old posters in grid
+    setAllTemplates([]);
 
     const fetchBusinessCategoryPosters = async () => {
       try {
@@ -645,11 +727,18 @@ const PosterPlayerScreen: React.FC = () => {
             // Set first poster as current poster and others as related
             const ensuredTemplates = convertedTemplates.map(t => mergeTemplateLanguages(t));
             setAllTemplates(ensuredTemplates);
-            setCurrentPoster(ensuredTemplates[0]);
+            
+            // Try to find the initialPoster (the one that was clicked) in the loaded templates
+            // Use the clicked poster if it exists, otherwise use the first one
+            const ensuredInitialPoster = mergeTemplateLanguages(initialPoster);
+            const matchingPoster = ensuredTemplates.find(t => t.id === ensuredInitialPoster.id && ensuredInitialPoster.thumbnail);
+            const posterToSet = matchingPoster || ensuredTemplates[0];
+            setCurrentPoster(posterToSet);
             
             console.log('✅ [POSTER PLAYER] Loaded', ensuredTemplates.length, 'business category posters');
-            if (__DEV__ && ensuredTemplates[0]?.tags) {
-              console.log('📋 [POSTER PLAYER] First poster tags:', ensuredTemplates[0].tags);
+            console.log('📌 [POSTER PLAYER] Using poster:', matchingPoster ? 'clicked poster found' : 'first poster (clicked not found)');
+            if (__DEV__ && posterToSet?.tags) {
+              console.log('📋 [POSTER PLAYER] Selected poster tags:', posterToSet.tags);
             }
           }
         }
@@ -667,7 +756,15 @@ const PosterPlayerScreen: React.FC = () => {
       return;
     }
 
+    // Clear allTemplates immediately to prevent showing old posters in grid
+    setAllTemplates([]);
+
     const fetchGreetingCategoryTemplates = async () => {
+      // Use convertedInitialPoster which has thumbnail properly set for GreetingTemplates
+      const posterToMatch = convertedInitialPoster;
+      
+      // Note: Immediate update is handled by the route param change detection useEffect above
+      // This ensures the correct image is shown immediately when a new poster is selected
       try {
         // Normalize category name for search (like HomeScreen does)
         // Convert "Money & Finance" to "money and finance" to match how templates are tagged
@@ -683,8 +780,8 @@ const PosterPlayerScreen: React.FC = () => {
         // Both calls use limit: 200 to get all available images for the category
         const [categoryTemplates, searchTemplatesOriginal, searchTemplatesNormalized] = await Promise.all([
           greetingTemplatesService.getTemplates({ category: greetingCategory, limit: 200 }),
-          greetingTemplatesService.searchTemplates(greetingCategory, undefined, 200),
-          greetingTemplatesService.searchTemplates(normalizedCategory, undefined, 200)
+          greetingTemplatesService.searchTemplates(greetingCategory, undefined),
+          greetingTemplatesService.searchTemplates(normalizedCategory, undefined)
         ]);
         
         // Combine all search results
@@ -765,24 +862,108 @@ const PosterPlayerScreen: React.FC = () => {
           const ensuredTemplates = convertedTemplates.map(t => mergeTemplateLanguages(t));
 
           // Ensure the initially selected poster is present
-          const initialPosterWithLanguages = mergeTemplateLanguages(initialPoster);
+          // Use convertedInitialPoster which has thumbnail properly set
+          const initialPosterWithLanguages = mergeTemplateLanguages(posterToMatch);
+          
+          // Log for debugging
+          if (__DEV__) {
+            console.log('🔍 [POSTER PLAYER] Looking for clicked poster:', {
+              id: initialPosterWithLanguages.id,
+              thumbnail: initialPosterWithLanguages.thumbnail,
+              contentBackground: (initialPosterWithLanguages as any).content?.background,
+              totalTemplates: ensuredTemplates.length
+            });
+          }
+          
           const existingIndex = ensuredTemplates.findIndex(t => t.id === initialPosterWithLanguages.id);
           let nextTemplates = ensuredTemplates;
           if (existingIndex === -1 && initialPosterWithLanguages.thumbnail) {
             nextTemplates = [initialPosterWithLanguages, ...ensuredTemplates];
+            if (__DEV__) {
+              console.log('➕ [POSTER PLAYER] Added clicked poster to templates (not found in fetched templates)');
+            }
           }
 
-          const matchingPoster = nextTemplates.find(t => t.id === initialPosterWithLanguages.id && initialPosterWithLanguages.thumbnail);
+          // Try to find the initialPoster (the one that was clicked) in the loaded templates
+          // First check by ID, then also check by thumbnail URL to handle cases where IDs might differ
+          // For GreetingTemplates, also check content.background as it might be the actual image URL
+          const initialPosterThumbnail = initialPosterWithLanguages.thumbnail || (initialPosterWithLanguages as any).content?.background || '';
+          const initialPosterBackground = (initialPosterWithLanguages as any).content?.background || '';
+          
+          const matchingPosterById = nextTemplates.find(t => {
+            if (t.id !== initialPosterWithLanguages.id) return false;
+            // Must have a valid thumbnail/background
+            const tThumbnail = t.thumbnail || (t as any).content?.background || '';
+            return tThumbnail && (initialPosterThumbnail || initialPosterBackground);
+          });
+          
+          const matchingPosterByThumbnail = !matchingPosterById && (initialPosterThumbnail || initialPosterBackground)
+            ? nextTemplates.find(t => {
+                const tThumbnail = t.thumbnail || (t as any).content?.background || '';
+                // Compare both thumbnail and background URLs
+                return (tThumbnail && initialPosterThumbnail && tThumbnail === initialPosterThumbnail) ||
+                       (tThumbnail && initialPosterBackground && tThumbnail === initialPosterBackground) ||
+                       (initialPosterBackground && tThumbnail && tThumbnail === initialPosterBackground);
+              })
+            : null;
+          const matchingPoster = matchingPosterById || matchingPosterByThumbnail;
+          
           setAllTemplates(nextTemplates);
           
           // Set current poster and trigger language detection
-          const posterToSet = matchingPoster || nextTemplates[0];
-          const finalPoster = mergeTemplateLanguages(posterToSet);
-          setCurrentPoster(finalPoster);
+          // Use the clicked poster if found, otherwise use the first one
+          // IMPORTANT: Always prefer the clicked poster (posterToMatch) if it has a valid image
+          // This ensures the exact clicked image is shown, even if matching fails
+          let posterToSet: Template | null = matchingPoster || null;
           
-          // Auto-detect language from the first poster's tags if language is "all"
-          // Only auto-detect if we actually find language keywords in tags
-          if (selectedLanguage === 'all' && finalPoster.tags && finalPoster.tags.length > 0) {
+          // If no match found OR if the matching poster is different from the clicked one,
+          // use the clicked poster if it has a valid image
+          if (!posterToSet || posterToSet.id !== posterToMatch.id) {
+            const clickedPosterThumbnail = posterToMatch.thumbnail || (posterToMatch as any).content?.background || '';
+            if (clickedPosterThumbnail) {
+              // Use the clicked poster directly
+              posterToSet = posterToMatch;
+              console.log('✅ [POSTER PLAYER] Using clicked poster directly (not found in fetched templates):', posterToMatch.id);
+            } else if (!posterToSet && nextTemplates.length > 0) {
+              // Fallback to first template only if clicked poster has no image
+              posterToSet = nextTemplates[0];
+            }
+          }
+          
+          // Ensure we have a valid poster
+          if (!posterToSet) {
+            console.warn('⚠️ [POSTER PLAYER] No valid poster found, skipping update');
+            return;
+          }
+          
+          // Ensure the poster has thumbnail set (for GreetingTemplates, use content.background if thumbnail is missing)
+          if (!posterToSet.thumbnail && (posterToSet as any).content?.background) {
+            posterToSet = { ...posterToSet, thumbnail: (posterToSet as any).content.background };
+          }
+          
+          const finalPoster = mergeTemplateLanguages(posterToSet);
+          
+          // Only update if the poster is actually different to avoid unnecessary re-renders
+          setCurrentPoster(prevPoster => {
+            if (prevPoster.id === finalPoster.id && 
+                prevPoster.thumbnail === finalPoster.thumbnail) {
+              return prevPoster; // No change needed
+            }
+            return finalPoster;
+          });
+          
+          if (matchingPoster) {
+            console.log('✅ [POSTER PLAYER] Using clicked greeting poster:', matchingPoster.id);
+          } else if (initialPosterWithLanguages.thumbnail && posterToSet.id === initialPosterWithLanguages.id) {
+            console.log('✅ [POSTER PLAYER] Using clicked greeting poster (from initialPoster):', initialPosterWithLanguages.id);
+          } else {
+            console.log('⚠️ [POSTER PLAYER] Clicked greeting poster not found, using first:', nextTemplates[0]?.id, 'clicked was:', initialPosterWithLanguages.id);
+          }
+          
+          // Auto-detect language from the first poster's tags
+          // Always auto-detect based on the current poster's language
+          // Only skip if we've already detected for this poster to avoid duplicate detection
+          if (lastAutoDetectedPosterIdRef.current !== finalPoster.id && finalPoster.tags && finalPoster.tags.length > 0) {
             const languagesFromTags = extractLanguagesFromTags(finalPoster.tags);
             
             // Only auto-detect if we actually found language keywords
@@ -795,13 +976,16 @@ const PosterPlayerScreen: React.FC = () => {
               
               if (detectedLanguage) {
                 setSelectedLanguage(detectedLanguage);
+                lastAutoDetectedPosterIdRef.current = finalPoster.id; // Track that we auto-detected for this poster
               } else {
                 // If no matching language found, default to English for templates without language tags
                 setSelectedLanguage('english');
+                lastAutoDetectedPosterIdRef.current = finalPoster.id;
               }
             } else {
               // No language keywords found in tags, default to English
               setSelectedLanguage('english');
+              lastAutoDetectedPosterIdRef.current = finalPoster.id;
             }
           }
         }
@@ -811,13 +995,16 @@ const PosterPlayerScreen: React.FC = () => {
     };
 
     fetchGreetingCategoryTemplates();
-  }, [greetingCategory]);
+  }, [greetingCategory, convertedInitialPoster.id]);
 
   // Fetch calendar posters when calendarDate is provided
   useEffect(() => {
     if (!calendarDate) {
       return;
     }
+
+    // Clear allTemplates immediately to prevent showing old posters in grid
+    setAllTemplates([]);
 
     const fetchCalendarPosters = async () => {
       try {
@@ -876,8 +1063,8 @@ const PosterPlayerScreen: React.FC = () => {
             console.log(`  Template ${index + 1}:`, JSON.stringify({
               id: template.id,
               name: template.name,
-              tags: template.tags,
-              tagsLength: template.tags.length,
+                tags: template.tags || [],
+                tagsLength: (template.tags || []).length,
             }, null, 2));
           });
 
@@ -905,12 +1092,23 @@ const PosterPlayerScreen: React.FC = () => {
             // Use the initial poster if it exists in the list, otherwise use the first one
             // Ensure the initial poster also has languages merged
             const ensuredInitialPoster = mergeTemplateLanguages(initialPoster);
-            const matchingPoster = ensuredTemplates.find(t => t.id === ensuredInitialPoster.id);
+            // Try to find by ID first, then by thumbnail URL
+            const matchingPosterById = ensuredTemplates.find(t => t.id === ensuredInitialPoster.id && ensuredInitialPoster.thumbnail);
+            const matchingPosterByThumbnail = !matchingPosterById && ensuredInitialPoster.thumbnail
+              ? ensuredTemplates.find(t => t.thumbnail === ensuredInitialPoster.thumbnail)
+              : null;
+            const matchingPoster = matchingPosterById || matchingPosterByThumbnail;
             const posterToSet = matchingPoster || ensuredTemplates[0];
             
             // Ensure the selected poster has languages properly merged
             const finalPoster = mergeTemplateLanguages(posterToSet);
             setCurrentPoster(finalPoster);
+            
+            if (matchingPoster) {
+              console.log('📌 [POSTER PLAYER] Using clicked calendar poster:', matchingPoster.id);
+            } else {
+              console.log('📌 [POSTER PLAYER] Clicked calendar poster not found, using first:', ensuredTemplates[0]?.id);
+            }
             
             console.log('✅ [POSTER PLAYER] Loaded', ensuredTemplates.length, 'calendar posters for date:', calendarDate);
             console.log('═══════════════════════════════════════════════════════');
@@ -941,6 +1139,13 @@ const PosterPlayerScreen: React.FC = () => {
       return;
     }
 
+    // Clear allTemplates immediately when initialPoster changes to prevent showing old posters
+    const initialPosterId = initialPoster.id;
+    const prevId = prevInitialPosterIdRef.current;
+    if (prevId !== null && prevId !== initialPosterId) {
+      setAllTemplates([]);
+    }
+
     const ensureLanguages = (template: Template): Template => mergeTemplateLanguages(template);
 
     // Skip if we have a loading placeholder
@@ -966,9 +1171,22 @@ const PosterPlayerScreen: React.FC = () => {
     const updatedTemplates = Array.from(templatesMap.values());
     setAllTemplates(updatedTemplates);
 
-    // Update currentPoster when new data arrives (when initialPoster changes from loading to real data)
-    // Check if currentPoster is still the loading placeholder or has no thumbnail
+    // Update currentPoster when new data arrives
+    // Check if initialPoster has changed (different ID means different poster was selected)
+    // This handles the case when user navigates back and selects a different image
     setCurrentPoster(prevPoster => {
+      // If initialPoster ID is different, it means a new poster was selected - update immediately
+      if (prevPoster.id !== initialPoster.id && ensuredInitialPoster.thumbnail) {
+        console.log('🔄 [POSTER PLAYER] Route params changed - updating to new poster:', initialPoster.id, 'from:', prevPoster.id);
+        setImageDimensions(null); // Reset image dimensions when poster changes
+        // Update the ref to track the new poster ID
+        if (prevInitialPosterIdRef.current !== initialPoster.id) {
+          prevInitialPosterIdRef.current = initialPoster.id;
+        }
+        return ensuredInitialPoster;
+      }
+      
+      // If currentPoster is still the loading placeholder or has no thumbnail
       if (prevPoster.id === 'loading' || !prevPoster.thumbnail) {
         // If we have a valid poster with thumbnail, use it
         if (ensuredInitialPoster.thumbnail) {
@@ -1015,9 +1233,11 @@ const PosterPlayerScreen: React.FC = () => {
     });
     
     // If a language is detected, switch to it
-    // Only auto-detect if currently on "All" to avoid overriding user's manual selection
-    if (detectedLanguage && selectedLanguage === 'all') {
+    // Always auto-detect based on the current poster's language
+    // Only skip if we've already detected for this poster to avoid duplicate detection
+    if (detectedLanguage && lastAutoDetectedPosterIdRef.current !== initialPoster?.id) {
       setSelectedLanguage(detectedLanguage);
+      lastAutoDetectedPosterIdRef.current = initialPoster?.id || null;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialPoster?.id]); // Run when initial poster changes
@@ -1026,7 +1246,7 @@ const PosterPlayerScreen: React.FC = () => {
   // This ensures language detection works when clicking category cards or calendar posters
   useEffect(() => {
     // Skip if no currentPoster or if it's a loading placeholder
-    if (!currentPoster || currentPoster.id === 'loading' || !currentPoster.thumbnail) {
+    if (!currentPoster || currentPoster.id === 'loading' || (!currentPoster.thumbnail && !(currentPoster as any).content?.background)) {
       return;
     }
 
@@ -1065,19 +1285,38 @@ const PosterPlayerScreen: React.FC = () => {
     });
     
     // If a language is detected and it's different from current selection, switch to it
-    // Only auto-detect if currently on "All" to avoid overriding user's manual selection
-    if (detectedLanguage) {
-      if (detectedLanguage !== selectedLanguage && selectedLanguage === 'all') {
-        setSelectedLanguage(detectedLanguage);
-      }
+    // Always auto-detect based on the current poster's language
+    // Only skip if we've already detected for this poster to avoid duplicate detection
+    if (detectedLanguage && lastAutoDetectedPosterIdRef.current !== currentPoster?.id) {
+      setSelectedLanguage(detectedLanguage);
+      lastAutoDetectedPosterIdRef.current = currentPoster?.id || null;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPoster?.id, businessCategory, greetingCategory, calendarDate]); // Run when current poster changes for category or calendar
 
   // Ensure poster selection respects the active language filter
+  // BUT: Don't override user-selected posters (via swipe or click)
   useEffect(() => {
     if (!allTemplates.length) {
       return;
+    }
+
+    // Skip if user manually selected a poster - don't override their choice
+    if (userSelectedPosterRef.current) {
+      const userSelectedPoster = allTemplates.find(t => t.id === userSelectedPosterRef.current);
+      if (userSelectedPoster) {
+        const posterWithLanguages = mergeTemplateLanguages(userSelectedPoster);
+        // Check if the user-selected poster matches the current language filter
+        if (selectedLanguage === 'all' || templateContainsLanguage(posterWithLanguages, selectedLanguage)) {
+          // User's selection is valid for current language, keep it
+          return;
+        }
+        // User's selection doesn't match language filter, allow override
+        userSelectedPosterRef.current = null;
+      } else {
+        // User-selected poster not found in templates, clear ref
+        userSelectedPosterRef.current = null;
+      }
     }
 
     // Ensure all templates have languages merged before filtering
@@ -1124,6 +1363,9 @@ const PosterPlayerScreen: React.FC = () => {
     // Merge template languages to ensure we have all language info
     const posterWithLanguages = mergeTemplateLanguages(poster);
     
+    // Mark this as a user-selected poster (via swipe or click)
+    userSelectedPosterRef.current = posterWithLanguages.id;
+    
     // Detect the primary language from the poster
     const posterLanguages = Array.isArray(posterWithLanguages.languages)
       ? posterWithLanguages.languages.map((lang: string) => lang.toLowerCase())
@@ -1154,9 +1396,11 @@ const PosterPlayerScreen: React.FC = () => {
     });
     
     // If a language is detected and it's different from current selection, switch to it
-    // Only auto-detect if currently on "All" to avoid overriding user's manual selection
-    if (detectedLanguage && detectedLanguage !== selectedLanguage && selectedLanguage === 'all') {
+    // Always auto-detect based on the current poster's language
+    // Only skip if we've already detected for this poster to avoid duplicate detection
+    if (detectedLanguage && lastAutoDetectedPosterIdRef.current !== posterWithLanguages?.id) {
       setSelectedLanguage(detectedLanguage);
+      lastAutoDetectedPosterIdRef.current = posterWithLanguages?.id || null;
     }
     
     // Update the current poster
@@ -1204,28 +1448,44 @@ const PosterPlayerScreen: React.FC = () => {
     }
   }, [currentPosterIndex, showPosterAtIndex]);
 
-  const swipeThreshold = 30;
+  const swipeThreshold = 50;
 
   const swipeResponder = useMemo(
     () =>
       PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
         onMoveShouldSetPanResponder: (_, gestureState) => {
           const { dx, dy } = gestureState;
-          return Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 10;
+          // Only capture horizontal swipes (left/right)
+          return Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 15;
+        },
+        onPanResponderGrant: () => {
+          // Gesture started
+        },
+        onPanResponderMove: () => {
+          // Gesture in progress
         },
         onPanResponderRelease: (_, gestureState) => {
-          const { dx } = gestureState;
-          if (dx < -swipeThreshold) {
+          const { dx, vx } = gestureState;
+          // Check both distance and velocity for better gesture recognition
+          if (dx < -swipeThreshold || vx < -0.5) {
             goToNextPoster();
-          } else if (dx > swipeThreshold) {
+          } else if (dx > swipeThreshold || vx > 0.5) {
             goToPreviousPoster();
           }
+        },
+        onPanResponderTerminate: () => {
+          // Gesture cancelled
         },
       }),
     [goToNextPoster, goToPreviousPoster, swipeThreshold],
   );
 
   const handleLanguageChange = useCallback((languageId: string) => {
+    // User manually selected a language, but we'll still auto-detect when poster changes
+    // Reset auto-detection tracking so it can work for the current poster if needed
+    // This allows the language to update when user navigates to a different poster
+    lastAutoDetectedPosterIdRef.current = null;
     setSelectedLanguage(languageId);
 
     /*
@@ -1589,9 +1849,11 @@ const PosterPlayerScreen: React.FC = () => {
          <View
            style={[styles.posterContainer, { height: computedPreviewHeight, width: '100%' }]}
            {...swipeResponder.panHandlers}
+           collapsable={false}
          >
          <LazyFullImage
-           thumbnailUri={currentPoster.thumbnail}
+           key={`poster-${currentPoster.id}-${currentPoster.thumbnail || (currentPoster as any).content?.background || ''}`}
+           thumbnailUri={currentPoster.thumbnail || (currentPoster as any).content?.background || ''}
            fullImageUri={getHighQualityImageUrl(currentPoster)}
            style={styles.posterImage}
            resizeMode="contain"
@@ -1599,6 +1861,7 @@ const PosterPlayerScreen: React.FC = () => {
            preload={true}
            quality="high"
            maxWidth={2400}
+           showLoader={false}
          />
          </View>
 

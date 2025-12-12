@@ -54,6 +54,7 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({
   const [error, setError] = useState(false);
   const [cachedUri, setCachedUri] = useState<string | null>(null);
   const [uriVariant, setUriVariant] = useState<'optimized' | 'low' | 'original'>('optimized');
+  const [isPrefetched, setIsPrefetched] = useState(false);
   const shimmerAnim = useRef(new Animated.Value(0)).current;
   
   const sanitizedUri = useMemo(() => (typeof uri === 'string' ? uri.trim() : ''), [uri]);
@@ -115,12 +116,14 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({
     return `${sanitizedUri}?w=400&q=70`;
   }, [sanitizedUri]);
 
-  // Reset retry flag whenever the incoming URI changes
+  // Reset retry flag whenever the incoming URI changes (only when sanitizedUri changes, not optimizedThumbnailUri)
   useEffect(() => {
     setUriVariant('optimized');
     setError(false);
-    setCachedUri(null);
-  }, [sanitizedUri, optimizedThumbnailUri]);
+    setIsPrefetched(false);
+    // Don't reset cachedUri here - let the cache check effect handle it
+    // This prevents unnecessary cache clearing when optimizedThumbnailUri recalculates
+  }, [sanitizedUri]);
 
   // Shimmer animation effect
   useEffect(() => {
@@ -156,51 +159,98 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({
     return optimizedThumbnailUri || sanitizedUri;
   }, [uriVariant, optimizedThumbnailUri, lowResThumbnailUri, sanitizedUri]);
 
-  // Check cache on mount
+  // Check cache on mount - use sanitizedUri as dependency to avoid unnecessary cache checks
   useEffect(() => {
-    if (!cacheEnabled || !storageKey || !targetUri) {
+    if (!cacheEnabled || !storageKey || !sanitizedUri) {
       setCachedUri(targetUri || null);
       return;
     }
 
+    let isMounted = true;
+
     const checkCache = async () => {
       try {
         const cached = await AsyncStorage.getItem(storageKey);
+        if (!isMounted) return;
+        
         if (cached) {
           const entry: CacheEntry = JSON.parse(cached);
           const now = Date.now();
           
-          // Check if cache is still valid
-          if (now < entry.expiresAt && entry.uri === targetUri) {
-            // Cache hit - use cached URI
-            setCachedUri(entry.uri);
-            setLoading(false);
+          // Check if cache is still valid (only check expiry, not URI match)
+          // The cache key is based on sanitizedUri, so if the key matches, the URI is the same
+          if (now < entry.expiresAt) {
+            // Cache hit - use cached URI immediately and don't show loading
+            if (isMounted) {
+              setCachedUri(entry.uri);
+              setIsPrefetched(true); // Mark as prefetched since it's in our cache
+              setLoading(false); // Don't show loading for cached images
+              // Prefetch into React Native's image cache for instant display (non-blocking)
+              if (entry.uri) {
+                Image.prefetch(entry.uri)
+                  .then(() => {
+                    if (isMounted) {
+                      setIsPrefetched(true);
+                    }
+                  })
+                  .catch(() => {
+                    // Prefetch failed, but we still have the URI cached
+                  });
+              }
+            }
             return;
           } else {
-            // Cache expired or URI changed - remove old cache
+            // Cache expired - remove old cache
             await AsyncStorage.removeItem(storageKey);
+            if (!isMounted) return;
           }
         }
         
-        // Cache miss - use optimized URI
-        setCachedUri(targetUri);
+        // Cache miss - use optimized URI and will be saved on load
+        if (isMounted) {
+          setCachedUri(targetUri);
+          // Prefetch the optimized URI to cache it in React Native
+          if (targetUri) {
+            Image.prefetch(targetUri)
+              .then(() => {
+                if (isMounted) {
+                  setIsPrefetched(true);
+                }
+              })
+              .catch(() => {
+                // Prefetch failed, will load normally
+              });
+          }
+        }
       } catch (error) {
         logger.warn('Error checking thumbnail cache:', error);
-        setCachedUri(targetUri);
+        if (isMounted) {
+          setCachedUri(targetUri);
+        }
       }
     };
 
     checkCache();
-  }, [storageKey, targetUri, cacheEnabled]);
+    
+    return () => {
+      isMounted = false;
+    };
+    // Only depend on sanitizedUri and storageKey to avoid unnecessary re-checks
+    // targetUri is stable for a given sanitizedUri, so we don't need it in deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey, sanitizedUri, cacheEnabled]);
 
   // Save to cache on successful load
   const handleLoadEnd = () => {
     setLoading(false);
+    setIsPrefetched(true); // Mark as prefetched after successful load
     
     const uriToCache = targetUri;
     
-    if (cacheEnabled && storageKey && uriToCache) {
+    if (cacheEnabled && storageKey && uriToCache && sanitizedUri) {
       // Save to cache in background
+      // Use the optimized URI for caching, but the cache key is based on sanitizedUri
+      // This ensures the same image URI always uses the same cache entry
       const cacheEntry: CacheEntry = {
         uri: uriToCache,
         cachedAt: Date.now(),
@@ -209,6 +259,15 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({
       
       AsyncStorage.setItem(storageKey, JSON.stringify(cacheEntry))
         .catch(err => logger.warn('Error saving thumbnail cache:', err));
+      
+      // Prefetch into React Native's cache for future instant loading
+      Image.prefetch(uriToCache)
+        .then(() => {
+          setIsPrefetched(true);
+        })
+        .catch(() => {
+          // Prefetch failed, but image is already loaded
+        });
     }
   };
 
@@ -218,7 +277,17 @@ const ThumbnailImage: React.FC<ThumbnailImageProps> = ({
       setError(true);
       return;
     }
-    setLoading(true);
+    // Don't show loading if:
+    // 1. Image is already prefetched (in React Native's cache)
+    // 2. We have a cached URI from AsyncStorage (means we've seen this image before)
+    // This prevents loading spinner from showing for cached images
+    // Use functional update to avoid stale closure issues
+    setLoading(prevLoading => {
+      if (isPrefetched || cachedUri) {
+        return false; // Don't show loading for cached/prefetched images
+      }
+      return true; // Show loading for new images
+    });
     setError(false);
   };
 

@@ -89,6 +89,9 @@ export interface BusinessCategory {
   name: string;
   description: string;
   icon: string;
+  imageUrl?: string;
+  image?: string;
+  parentCategoryName?: string; // Backend returns this field name
 }
 
 export interface User {
