@@ -5000,6 +5000,7 @@ const styles = StyleSheet.create({
     borderRadius: moderateScale(20),
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
     ...responsiveShadow.small,
   },
   userAvatarText: {
