@@ -3139,14 +3139,102 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
     return sections;
   }, [businessCategories, modalColumns]);
 
+  // Get icon for section type (parentCategoryName) - Business category specific icons
+  const getSectionIcon = useCallback((title: string) => {
+    const titleLower = title.toLowerCase();
+    
+    // Business category specific icons
+    if (titleLower.includes('restaurant') || titleLower.includes('food') || titleLower.includes('dining')) return 'restaurant';
+    if (titleLower.includes('wedding') || titleLower.includes('event') || titleLower.includes('celebration')) return 'celebration';
+    if (titleLower.includes('electronics') || titleLower.includes('tech') || titleLower.includes('gadget')) return 'devices';
+    if (titleLower.includes('fashion') || titleLower.includes('clothing') || titleLower.includes('apparel')) return 'checkroom';
+    if (titleLower.includes('health') || titleLower.includes('fitness') || titleLower.includes('wellness')) return 'fitness-center';
+    if (titleLower.includes('beauty') || titleLower.includes('salon') || titleLower.includes('spa')) return 'spa';
+    if (titleLower.includes('education') || titleLower.includes('school') || titleLower.includes('learning')) return 'school';
+    if (titleLower.includes('real estate') || titleLower.includes('property') || titleLower.includes('housing')) return 'home';
+    if (titleLower.includes('automotive') || titleLower.includes('car') || titleLower.includes('vehicle')) return 'directions-car';
+    if (titleLower.includes('travel') || titleLower.includes('tourism') || titleLower.includes('hotel')) return 'flight';
+    if (titleLower.includes('finance') || titleLower.includes('bank') || titleLower.includes('money')) return 'account-balance';
+    if (titleLower.includes('retail') || titleLower.includes('shop') || titleLower.includes('store')) return 'store';
+    if (titleLower.includes('medical') || titleLower.includes('hospital') || titleLower.includes('clinic')) return 'local-hospital';
+    if (titleLower.includes('legal') || titleLower.includes('law') || titleLower.includes('attorney')) return 'gavel';
+    if (titleLower.includes('construction') || titleLower.includes('building') || titleLower.includes('contractor')) return 'construction';
+    if (titleLower.includes('agriculture') || titleLower.includes('farming') || titleLower.includes('farm')) return 'agriculture';
+    if (titleLower.includes('entertainment') || titleLower.includes('media') || titleLower.includes('music')) return 'movie';
+    if (titleLower.includes('sports') || titleLower.includes('gym') || titleLower.includes('athletic')) return 'sports';
+    if (titleLower.includes('pharmacy') || titleLower.includes('drug') || titleLower.includes('medicine')) return 'local-pharmacy';
+    if (titleLower.includes('pet') || titleLower.includes('animal') || titleLower.includes('veterinary')) return 'pets';
+    
+    // Default business icons
+    return 'business-center';
+  }, []);
+
   // Render section header for grouped business categories
   const renderBusinessCategorySectionHeader = useCallback((info: { section: { title: string; data: BusinessCategory[][] } }) => {
+    const iconName = getSectionIcon(info.section.title);
+    
     return (
-      <View style={styles.businessCategorySectionHeader}>
-        <Text style={styles.businessCategorySectionHeaderText}>{info.section.title}</Text>
+      <View
+        style={[
+          styles.businessCategorySectionHeaderContainer,
+          {
+            paddingHorizontal: moderateScale(isTabletDevice ? 16 : 12),
+            paddingTop: moderateScale(isTabletDevice ? 16 : 12),
+            paddingBottom: moderateScale(isTabletDevice ? 12 : 8),
+            marginBottom: moderateScale(isTabletDevice ? 12 : 8),
+          }
+        ]}
+      >
+        <View style={styles.businessCategorySectionHeaderWrapper}>
+          <LinearGradient
+            colors={isDarkMode 
+              ? [theme.colors.primary + '30', theme.colors.secondary + '20', 'transparent']
+              : [theme.colors.primary + '18', theme.colors.secondary + '10', 'transparent']
+            }
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.businessCategorySectionHeaderGradient}
+          >
+            <View style={styles.businessCategorySectionHeaderContent}>
+              <LinearGradient
+                colors={[theme.colors.primary, theme.colors.secondary]}
+                style={styles.businessCategorySectionIconContainer}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <Icon
+                  name={iconName}
+                  size={moderateScale(isTabletDevice ? 22 : 20)}
+                  color="#ffffff"
+                />
+              </LinearGradient>
+              <View style={styles.businessCategorySectionTitleContainer}>
+                <Text style={[
+                  styles.businessCategorySectionHeaderText,
+                  {
+                    color: theme.colors.text,
+                    fontSize: responsiveFontSize.lg,
+                    fontWeight: '700',
+                    marginLeft: moderateScale(10),
+                  }
+                ]}>
+                  {info.section.title}
+                </Text>
+                <View style={[
+                  styles.businessCategorySectionUnderline,
+                  {
+                    backgroundColor: theme.colors.primary,
+                    marginLeft: moderateScale(10),
+                    marginTop: moderateScale(2),
+                  }
+                ]} />
+              </View>
+            </View>
+          </LinearGradient>
+        </View>
       </View>
     );
-  }, []);
+  }, [theme, isDarkMode, isTabletDevice, responsiveFontSize, getSectionIcon]);
 
   // Memoized renderItem functions for modal FlatLists
   const handleBusinessCategoryPress = useCallback(async (category: BusinessCategory) => {
@@ -6350,19 +6438,43 @@ const styles = StyleSheet.create({
       marginRight: 0,
       marginBottom: moderateScale(6),
     },
-    businessCategorySectionHeader: {
-      backgroundColor: '#f8f9fa',
-      paddingHorizontal: moderateScale(16),
-      paddingVertical: moderateScale(12),
-      paddingTop: moderateScale(16),
-      borderBottomWidth: 1,
-      borderBottomColor: 'rgba(0,0,0,0.08)',
+    businessCategorySectionHeaderContainer: {
+      width: '100%',
+    },
+    businessCategorySectionHeaderWrapper: {
+      borderRadius: moderateScale(20),
+      overflow: 'hidden',
+    },
+    businessCategorySectionHeaderGradient: {
+      borderRadius: moderateScale(14),
+      overflow: 'hidden',
+      paddingHorizontal: moderateScale(14),
+      paddingVertical: moderateScale(10),
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: 'rgba(0, 0, 0, 0.04)',
+    },
+    businessCategorySectionHeaderContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    businessCategorySectionIconContainer: {
+      width: moderateScale(36),
+      height: moderateScale(36),
+      borderRadius: moderateScale(18),
+      justifyContent: 'center',
+      alignItems: 'center',
+      ...responsiveShadow.small,
+    },
+    businessCategorySectionTitleContainer: {
+      flex: 1,
     },
     businessCategorySectionHeaderText: {
-      fontSize: moderateScale(16),
-      fontWeight: '700',
-      color: '#333333',
-      letterSpacing: 0.3,
+      letterSpacing: 0.4,
+    },
+    businessCategorySectionUnderline: {
+      height: 2,
+      width: moderateScale(32),
+      borderRadius: moderateScale(1),
     },
 
   });

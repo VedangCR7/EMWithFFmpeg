@@ -122,12 +122,22 @@ const HelpSupportScreen: React.FC = () => {
     return Math.max(10, Math.round(baseSize * (currentScreenWidth / 375) * multiplier));
   };
   
-  // Responsive text size helper (slightly larger for small screens)
+  // Responsive text size helper (larger for small screens)
   const getFontSize = (baseSize: number) => {
-    const isCurrentlySmall = currentScreenWidth < 375;
+    // Increased threshold to 450px to catch more devices including medium phones
+    const isCurrentlySmall = currentScreenWidth < 450;
+    
+    if (isCurrentlySmall) {
+      // For small screens, use a moderate multiplier approach
+      // Apply a reasonable boost to make text more readable without being too large
+      // Using 1.3x multiplier + 3px for a balanced increase
+      const boostedSize = baseSize * 1.3 + 3;
+      return Math.round(boostedSize);
+    }
+    
+    // For medium and large screens, use normal scaling
     const baseFontSize = dynamicModerateScale(baseSize);
-    // Add small boost for small screens (increased from +1 to +2px)
-    return isCurrentlySmall ? baseFontSize + 2 : baseFontSize;
+    return baseFontSize;
   };
   
   // Device size detection

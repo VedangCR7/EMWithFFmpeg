@@ -100,12 +100,22 @@ const PrivacyPolicyScreen = () => {
     return Math.max(10, Math.round(baseSize * (currentScreenWidth / 375) * multiplier));
   };
   
-  // Responsive text size helper (slightly larger for small screens)
+  // Responsive text size helper (larger for small screens)
   const getFontSize = (baseSize: number) => {
-    const isCurrentlySmall = currentScreenWidth < 375;
+    // Increased threshold to 450px to catch more devices including medium phones
+    const isCurrentlySmall = currentScreenWidth < 450;
+    
+    if (isCurrentlySmall) {
+      // For small screens, use a moderate multiplier approach
+      // Apply a reasonable boost to make text more readable without being too large
+      // Using 1.3x multiplier + 3px for a balanced increase
+      const boostedSize = baseSize * 1.3 + 3;
+      return Math.round(boostedSize);
+    }
+    
+    // For medium and large screens, use normal scaling
     const baseFontSize = dynamicModerateScale(baseSize);
-    // Add small boost for small screens (increased from +1 to +2px)
-    return isCurrentlySmall ? baseFontSize + 2 : baseFontSize;
+    return baseFontSize;
   };
   
   // Device size detection
@@ -308,6 +318,7 @@ const PrivacyPolicyScreen = () => {
     lastUpdated: {
       textAlign: 'center',
       fontStyle: 'italic',
+      fontWeight: '400', // Explicitly set to normal weight for content
     },
     cardWrapper: {
       position: 'relative',
@@ -346,6 +357,7 @@ const PrivacyPolicyScreen = () => {
     sectionContent: {
       fontSize: moderateScale(isTablet ? 8 : 7.5), // Fixed text size
       lineHeight: moderateScale(isTablet ? 12 : 11),
+      fontWeight: '400', // Explicitly set to normal weight for content
       // marginBottom uses dynamic scaling in inline styles
     },
     bulletPoint: {
@@ -365,10 +377,11 @@ const PrivacyPolicyScreen = () => {
     bulletText: {
       fontSize: moderateScale(isTablet ? 8 : 7.5), // Fixed text size
       lineHeight: moderateScale(isTablet ? 12 : 11),
+      fontWeight: '400', // Explicitly set to normal weight for content
       flex: 1,
     },
     highlight: {
-      fontWeight: '600',
+      fontWeight: '400', // Explicitly set to normal weight for content subheadings
     },
     contactSection: {
       borderWidth: 1,
@@ -392,6 +405,7 @@ const PrivacyPolicyScreen = () => {
       fontSize: moderateScale(isTablet ? 8 : 7.5), // Fixed text size
       textAlign: 'center',
       lineHeight: moderateScale(isTablet ? 12 : 11),
+      fontWeight: '400', // Explicitly set to normal weight for content
       // Dynamic spacing applied inline
     },
     emailLink: {
@@ -415,6 +429,7 @@ const PrivacyPolicyScreen = () => {
     heroSubtitle: {
       textAlign: 'center',
       maxWidth: isTablet ? 700 : '100%',
+      fontWeight: '400', // Explicitly set to normal weight for content
     },
     divider: {
       backgroundColor: 'rgba(0, 0, 0, 0.1)',

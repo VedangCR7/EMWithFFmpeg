@@ -73,6 +73,24 @@ const AboutUsScreen: React.FC = () => {
     return Math.max(10, Math.round(baseSize * (currentScreenWidth / 375) * 0.6));
   };
   
+  // Responsive text size helper (larger for small screens)
+  const getFontSize = (baseSize: number) => {
+    // Increased threshold to 450px to catch more devices including medium phones
+    const isCurrentlySmall = currentScreenWidth < 450;
+    
+    if (isCurrentlySmall) {
+      // For small screens, use a moderate multiplier approach
+      // Apply a reasonable boost to make text more readable without being too large
+      // Using 1.3x multiplier + 3px for a balanced increase
+      const boostedSize = baseSize * 1.3 + 3;
+      return Math.round(boostedSize);
+    }
+    
+    // For medium and large screens, use normal scaling
+    const baseFontSize = dynamicModerateScale(baseSize);
+    return baseFontSize;
+  };
+  
   // Device size detection
   const isTabletDevice = currentScreenWidth >= 768;
   const isSmallScreenDevice = currentScreenWidth < 375;
@@ -116,7 +134,7 @@ const AboutUsScreen: React.FC = () => {
       elevation: 1,
     },
     headerTitle: {
-      fontSize: moderateScale(isTablet ? 12 : 11), // Fixed compact text size
+      fontSize: isTabletDevice ? getFontSize(12) : getFontSize(11),
       fontWeight: '700',
       color: theme.colors.text,
       flex: 1,
@@ -150,7 +168,7 @@ const AboutUsScreen: React.FC = () => {
       height: '100%',
     },
     heroTitle: {
-      fontSize: moderateScale(isTablet ? 16 : 14), // Fixed compact text size
+      fontSize: isTabletDevice ? getFontSize(16) : getFontSize(14),
       fontWeight: '900',
       color: theme.colors.text,
       textAlign: 'center',
@@ -159,7 +177,7 @@ const AboutUsScreen: React.FC = () => {
       textShadowRadius: 2,
     },
     heroSubtitle: {
-      fontSize: moderateScale(isTablet ? 8 : 7.5), // Fixed compact text size
+      fontSize: isTabletDevice ? getFontSize(8) : getFontSize(7.5),
       color: theme.colors.textSecondary,
       textAlign: 'center',
       lineHeight: moderateScale(isTablet ? 12 : 11),
@@ -177,7 +195,7 @@ const AboutUsScreen: React.FC = () => {
       elevation: 2,
     },
     statsTitle: {
-      fontSize: moderateScale(isTablet ? 12 : 11), // Fixed compact text size
+      fontSize: isTabletDevice ? getFontSize(12) : getFontSize(11),
       fontWeight: '800',
       color: theme.colors.text,
       textAlign: 'center',
@@ -199,7 +217,7 @@ const AboutUsScreen: React.FC = () => {
       justifyContent: 'center',
     },
     statNumber: {
-      fontSize: moderateScale(isTablet ? 16 : 14), // Fixed compact text size
+      fontSize: isTabletDevice ? getFontSize(16) : getFontSize(14),
       fontWeight: '900',
       color: theme.colors.primary,
       textShadowColor: `${theme.colors.primary}30`,
@@ -207,7 +225,7 @@ const AboutUsScreen: React.FC = () => {
       textShadowRadius: 2,
     },
     statLabel: {
-      fontSize: moderateScale(isTablet ? 7.5 : 7), // Fixed compact text size
+      fontSize: isTabletDevice ? getFontSize(7.5) : getFontSize(7),
       color: theme.colors.textSecondary,
       textAlign: 'center',
       lineHeight: moderateScale(isTablet ? 11 : 10),
@@ -224,7 +242,7 @@ const AboutUsScreen: React.FC = () => {
       elevation: 2,
     },
     sectionTitle: {
-      fontSize: moderateScale(isTablet ? 11 : 10), // Fixed compact text size
+      fontSize: isTabletDevice ? getFontSize(11) : getFontSize(10),
       fontWeight: '800',
       color: theme.colors.text,
       textShadowColor: 'rgba(0, 0, 0, 0.1)',
@@ -232,7 +250,7 @@ const AboutUsScreen: React.FC = () => {
       textShadowRadius: 2,
     },
     sectionText: {
-      fontSize: moderateScale(isTablet ? 8 : 7.5), // Fixed compact text size
+      fontSize: isTabletDevice ? getFontSize(8) : getFontSize(7.5),
       color: theme.colors.textSecondary,
       lineHeight: moderateScale(isTablet ? 12 : 11),
       fontWeight: '400',
@@ -251,7 +269,7 @@ const AboutUsScreen: React.FC = () => {
       // Inline styles used
     },
     featureText: {
-      fontSize: moderateScale(isTablet ? 8 : 7.5), // Fixed compact text size
+      fontSize: isTabletDevice ? getFontSize(8) : getFontSize(7.5),
       color: theme.colors.textSecondary,
       lineHeight: moderateScale(isTablet ? 12 : 11),
       flex: 1,
@@ -268,7 +286,7 @@ const AboutUsScreen: React.FC = () => {
       elevation: 2,
     },
     trialTitle: {
-      fontSize: moderateScale(isTablet ? 12 : 11), // Fixed compact text size
+      fontSize: isTabletDevice ? getFontSize(12) : getFontSize(11),
       fontWeight: '800',
       color: theme.colors.text,
       textAlign: 'center',
@@ -290,7 +308,7 @@ const AboutUsScreen: React.FC = () => {
       borderColor: `${theme.colors.primary}30`,
     },
     trialFeatureText: {
-      fontSize: moderateScale(isTablet ? 8 : 7.5), // Fixed compact text size
+      fontSize: isTabletDevice ? getFontSize(8) : getFontSize(7.5),
       color: theme.colors.textSecondary,
       fontWeight: '600',
       flex: 1,
@@ -301,7 +319,7 @@ const AboutUsScreen: React.FC = () => {
       borderTopColor: theme.colors.border,
     },
     versionText: {
-      fontSize: moderateScale(isTablet ? 7.5 : 7), // Fixed compact text size
+      fontSize: isTabletDevice ? getFontSize(7.5) : getFontSize(7),
       color: theme.colors.textSecondary,
       textAlign: 'center',
     },
@@ -318,7 +336,7 @@ const AboutUsScreen: React.FC = () => {
       elevation: 2,
     },
     privacyLinkText: {
-      fontSize: moderateScale(isTablet ? 9 : 8), // Fixed compact text size
+      fontSize: isTabletDevice ? getFontSize(9) : getFontSize(8),
       color: '#ffffff',
       fontWeight: '700',
       letterSpacing: 0.5,

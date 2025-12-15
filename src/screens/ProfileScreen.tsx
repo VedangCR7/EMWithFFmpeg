@@ -94,6 +94,17 @@ const ProfileScreen: React.FC = () => {
   const currentScreenWidth = dimensions.width;
   const currentScreenHeight = dimensions.height;
   
+  // DEBUG: Log screen dimensions on mount and when they change
+  useEffect(() => {
+    console.log('📐 [ProfileScreen] Screen Dimensions:', {
+      width: currentScreenWidth,
+      height: currentScreenHeight,
+      isSmallScreen: currentScreenWidth < 450,
+      threshold: 450,
+      deviceType: currentScreenWidth < 450 ? 'SMALL/MEDIUM' : 'LARGE/TABLET',
+    });
+  }, [currentScreenWidth, currentScreenHeight]);
+  
   // Dynamic responsive scaling functions
   const dynamicScale = (size: number) => (currentScreenWidth / 375) * size;
   const dynamicVerticalScale = (size: number) => (currentScreenHeight / 667) * size;
@@ -151,12 +162,67 @@ const ProfileScreen: React.FC = () => {
     return Math.max(10, Math.round(baseSize * (currentScreenWidth / 375) * multiplier));
   };
   
-  // Responsive text size helper (slightly larger for small screens)
+  // Track logged base sizes to reduce console noise
+  const loggedBaseSizes = useRef<Set<number>>(new Set());
+  const hasLoggedScreenInfo = useRef(false);
+  
+  // Responsive text size helper (much larger for small screens)
   const getFontSize = (baseSize: number) => {
-    const isCurrentlySmall = currentScreenWidth < 375;
+    // Increased threshold to 450px to catch more devices including medium phones
+    // True small screens are typically < 375px, but we extend to 450px for better coverage
+    const isCurrentlySmall = currentScreenWidth < 450;
+    
+    // DEBUG: Log screen info once
+    if (!hasLoggedScreenInfo.current) {
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('🔍 [getFontSize] SCREEN DETECTION:');
+      console.log('   Screen Width:', currentScreenWidth);
+      console.log('   Screen Height:', currentScreenHeight);
+      console.log('   Is Small Screen (< 450px):', isCurrentlySmall);
+      console.log('   Threshold:', 450);
+      console.log('   Device Type:', isCurrentlySmall ? 'SMALL/MEDIUM' : 'LARGE/TABLET');
+      console.log('═══════════════════════════════════════════════════════════');
+      hasLoggedScreenInfo.current = true;
+    }
+    
+    if (isCurrentlySmall) {
+      // For small screens, use a moderate multiplier approach
+      // Apply a reasonable boost to make text more readable without being too large
+      // Using 1.3x multiplier + 3px for a balanced increase
+      const boostedSize = baseSize * 1.3 + 3;
+      const finalSize = Math.round(boostedSize);
+      
+      // DEBUG: Log each unique baseSize calculation (only once per unique size)
+      if (!loggedBaseSizes.current.has(baseSize)) {
+        console.log('📱 [getFontSize] SMALL SCREEN CALCULATION:', {
+          baseSize,
+          multiplier: '1.3x',
+          boost: '+3px',
+          calculation: `${baseSize} × 1.3 + 3`,
+          boostedSize: boostedSize.toFixed(2),
+          finalSize,
+        });
+        loggedBaseSizes.current.add(baseSize);
+      }
+      
+      return finalSize;
+    }
+    
+    // For medium and large screens, use normal scaling
     const baseFontSize = dynamicModerateScale(baseSize);
-    // Add small boost for small screens (increased from +1 to +2px)
-    return isCurrentlySmall ? baseFontSize + 2 : baseFontSize;
+    
+    // DEBUG: Log each unique baseSize for normal screens (only once per unique size)
+    if (!loggedBaseSizes.current.has(baseSize)) {
+      console.log('💻 [getFontSize] NORMAL SCREEN CALCULATION:', {
+        baseSize,
+        screenWidth: currentScreenWidth,
+        baseFontSize: baseFontSize.toFixed(2),
+        scaling: 'dynamicModerateScale',
+      });
+      loggedBaseSizes.current.add(baseSize);
+    }
+    
+    return baseFontSize;
   };
   
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
