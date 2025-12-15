@@ -442,7 +442,7 @@ const GreetingTemplatesScreen: React.FC = () => {
     }
     
     return sections;
-  }, [filteredCategories, screenWidth, categoryColumns]);
+  }, [filteredCategories, screenWidth]);
 
   // Animate sections when they appear (only once per section)
   useEffect(() => {
@@ -771,7 +771,6 @@ const GreetingTemplatesScreen: React.FC = () => {
         style={[
           styles.categorySectionHeaderContainer,
           {
-            paddingHorizontal: moderateScale(isSmallScreen ? 8 : 12),
             paddingTop: moderateScale(isSmallScreen ? 12 : 16),
             paddingBottom: moderateScale(isSmallScreen ? 8 : 12),
             marginBottom: moderateScale(isSmallScreen ? 8 : 12),
@@ -790,7 +789,7 @@ const GreetingTemplatesScreen: React.FC = () => {
             end={{ x: 1, y: 0 }}
             style={styles.categorySectionHeaderGradient}
           >
-            <View style={styles.categorySectionHeaderContent}>
+            <View style={[styles.categorySectionHeaderContent, { paddingLeft: moderateScale(12), paddingRight: moderateScale(16) }]}>
               <LinearGradient
                 colors={[theme.colors.primary, theme.colors.secondary]}
                 style={styles.categorySectionIconContainer}
@@ -1120,8 +1119,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     alignItems: 'flex-start',
     marginBottom: moderateScale(6),
-    paddingLeft: moderateScale(8),
-    paddingRight: moderateScale(8),
     width: '100%',
   },
   categorySectionHeaderContainer: {
