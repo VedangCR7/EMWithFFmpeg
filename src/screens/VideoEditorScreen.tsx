@@ -30,9 +30,6 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { PanGestureHandler, State, PinchGestureHandler } from 'react-native-gesture-handler';
 import businessProfileService, { BusinessProfile } from '../services/businessProfile';
 import authService from '../services/auth';
-import { frames, Frame, getFramesByCategory } from '../data/frames';
-import { mapBusinessProfileToFrameContent, generateLayersFromFrame, getFrameBackgroundSource } from '../utils/frameUtils';
-import FrameSelector from '../components/FrameSelector';
 import { GOOGLE_FONTS, getFontsByCategory, SYSTEM_FONTS, getFontFamily } from '../services/fontService';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { useTheme } from '../context/ThemeContext';
@@ -339,9 +336,7 @@ const VideoEditorScreen: React.FC<VideoEditorScreenProps> = ({ route }) => {
   const [loadingProfiles, setLoadingProfiles] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
 
-  // Template and frame state
-  const [selectedFrame, setSelectedFrame] = useState<Frame | null>(null);
-  const [showFrameSelector, setShowFrameSelector] = useState(false);
+  // Template state
   const [showFontModal, setShowFontModal] = useState(false);
   const [visibleFields, setVisibleFields] = useState<{[key: string]: boolean}>({
     logo: true,
@@ -359,7 +354,6 @@ const VideoEditorScreen: React.FC<VideoEditorScreenProps> = ({ route }) => {
   const [selectedTemplate, setSelectedTemplate] = useState('business');
   const [originalLayers, setOriginalLayers] = useState<VideoLayer[]>([]);
   const [originalTemplate, setOriginalTemplate] = useState<string>('business');
-  const [showRemoveFrameWarningModal, setShowRemoveFrameWarningModal] = useState(false);
 
   const [canvasDimensions, setCanvasDimensions] = useState({
     width: videoCanvasWidth,
@@ -1046,89 +1040,9 @@ const [videoDimensions, setVideoDimensions] = useState<{ width: number; height: 
     applyTemplate(selectedTemplate);
   };
 
-  const applyFrame = useCallback((frame: Frame) => {
-    setSelectedFrame(frame);
-    setShowFrameSelector(false);
-
-    if (originalLayers.length === 0) {
-      const clonedLayers = layers.map(layer => ({
-        ...layer,
-        position: { ...layer.position },
-        size: { ...layer.size },
-        style: layer.style ? { ...layer.style } : undefined,
-      }));
-      setOriginalLayers(clonedLayers);
-      setOriginalTemplate(selectedTemplate);
-    }
-
-    const profileForFrame = selectedProfile || DEFAULT_FRAME_PROFILE;
-    const content = mapBusinessProfileToFrameContent(profileForFrame);
-
-    const frameLayers = generateLayersFromFrame(
-      frame,
-      content,
-      currentCanvasWidth || videoCanvasWidth,
-      currentCanvasHeight || videoCanvasHeight
-    );
-
-    const converted = frameLayers.map(fl => ({
-      id: fl.id,
-      type: fl.type as 'text' | 'image' | 'logo',
-      content: fl.content,
-      position: fl.position,
-      size: fl.size,
-      style: fl.style,
-      fieldType: (fl as any).fieldType,
-    })) as VideoLayer[];
-
-    setLayers(converted);
-
-    const frameFieldTypes = frame.placeholders.map(p => p.key);
-    setVisibleFields(prev => {
-      const updated = { ...prev };
-      frameFieldTypes.forEach(fieldType => {
-        if (fieldType) {
-          updated[fieldType] = true;
-        }
-      });
-      return updated;
-    });
-  }, [selectedProfile, currentCanvasWidth, currentCanvasHeight, layers, originalLayers.length, selectedTemplate]);
-
   const toggleFieldVisibility = useCallback((field: string) => {
     setVisibleFields(prev => ({ ...prev, [field]: !prev[field] }));
   }, []);
-
-  const removeFrame = useCallback(() => {
-    if (!selectedFrame) return;
-
-    setSelectedFrame(null);
-    setShowRemoveFrameWarningModal(false);
-
-    if (originalLayers.length > 0) {
-      setSelectedTemplate(originalTemplate);
-      const restoredLayers = applyTemplateStylesToLayers(
-        originalTemplate,
-        originalLayers,
-        currentCanvasWidth,
-        currentCanvasHeight
-      );
-      setLayers(restoredLayers);
-
-      setVisibleFields(prev => {
-        const updated = { ...prev };
-        originalLayers.forEach(layer => {
-          if (layer.fieldType) {
-            updated[layer.fieldType] = true;
-          }
-        });
-        return updated;
-      });
-
-      setOriginalLayers([]);
-      setOriginalTemplate('business');
-    }
-  }, [selectedFrame, originalLayers, originalTemplate, applyTemplateStylesToLayers, currentCanvasWidth, currentCanvasHeight]);
 
   // Video Processing Functions
   const handleVideoGenerated = useCallback((videoPath: string) => {
@@ -1715,10 +1629,6 @@ const [videoDimensions, setVideoDimensions] = useState<{ width: number; height: 
 
   // Apply template function
   const applyTemplate = (template: string) => {
-    if (selectedFrame) {
-      setShowRemoveFrameWarningModal(true);
-      return;
-    }
 
     setSelectedTemplate(template);
     console.log('Applying template:', template); // Debug log
@@ -2587,15 +2497,6 @@ const renderLayer = (
              return renderLayer(layer, idx);
            })}
 
-          {selectedFrame && (
-            <View pointerEvents="none" style={styles.frameOverlayContainer}>
-              <Image
-                source={getFrameBackgroundSource(selectedFrame)}
-                style={styles.frameOverlayImage}
-                resizeMode="stretch"
-              />
-            </View>
-          )}
 
           {/* Play/Pause Button Overlay */}
           <TouchableOpacity
@@ -2657,15 +2558,6 @@ const renderLayer = (
                   if (l.fieldType && !visibleFields[l.fieldType]) return null;
                   return renderLayer(l, idx);
                 })}
-                {selectedFrame && (
-                  <View pointerEvents="none" style={styles.frameOverlayContainer}>
-                    <Image
-                      source={getFrameBackgroundSource(selectedFrame)}
-                      style={styles.frameOverlayImage}
-                      resizeMode="stretch"
-                    />
-                  </View>
-                )}
               </View>
             </ViewShot>
           </View>
@@ -2701,15 +2593,6 @@ const renderLayer = (
                     forceOpaqueBackground: true,
                   });
                 })}
-                {selectedFrame && (
-                  <View pointerEvents="none" style={styles.frameOverlayContainer}>
-                    <Image
-                      source={getFrameBackgroundSource(selectedFrame)}
-                      style={[styles.frameOverlayImage, { width: exportWidth, height: exportHeight }]}
-                      resizeMode="stretch"
-                    />
-                  </View>
-                )}
               </View>
             </ViewShot>
           </View>
@@ -2834,21 +2717,6 @@ const renderLayer = (
               </LinearGradient>
             </TouchableOpacity>
 
-            {selectedFrame && (
-              <TouchableOpacity
-                style={styles.toolbarButton}
-                onPress={removeFrame}
-                activeOpacity={0.8}
-              >
-                <LinearGradient
-                  colors={['#dc3545', '#c82333']}
-                  style={styles.toolbarButtonGradient}
-                >
-                  <Icon name="delete" size={getResponsiveIconSize(16)} color="#ffffff" />
-                  <Text style={styles.toolbarButtonText}>Remove Frame</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            )}
           </ScrollView>
         </View>
 
@@ -3362,48 +3230,8 @@ const renderLayer = (
           </ScrollView>
         </View>
 
-        {/* Frames Section */}
-        {false && (
-          <View style={styles.templatesSection}>
-            <View style={styles.templatesHeader}>
-              <Text style={styles.templatesTitle}>Frames</Text>
-            </View>
-            <ScrollView
-              style={styles.templatesContent}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.templatesScrollContent}
-            >
-              {frames.map(frame => (
-                <TouchableOpacity
-                  key={frame.id}
-                  style={[styles.templateButton, selectedFrame?.id === frame.id && styles.templateButtonActive]}
-                  onPress={() => applyFrame(frame)}
-                  activeOpacity={0.85}
-                >
-                  <View style={styles.templatePreview}>
-                    <Image
-                      source={frame.background}
-                      style={{ width: '100%', height: '100%' }}
-                      resizeMode="cover"
-                    />
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        )}
         </ScrollView>
       </View>
-      {/* Frame Selector */}
-      {false && showFrameSelector && (
-        <FrameSelector
-          frames={frames}
-          selectedFrameId={selectedFrame?.id || ''}
-          onFrameSelect={applyFrame}
-        />
-      )}
 
       {/* Text Modal */}
       <Modal visible={showTextModal} transparent animationType="slide">
@@ -3631,47 +3459,6 @@ const renderLayer = (
 
       {/* Video Processing Modal - Removed, using direct generation */}
 
-      {/* Frame Selector */}
-      <Modal
-        visible={showRemoveFrameWarningModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowRemoveFrameWarningModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={{ alignItems: 'center', marginBottom: 12 }}>
-              <View style={{
-                width: moderateScale(50),
-                height: moderateScale(50),
-                borderRadius: moderateScale(25),
-                backgroundColor: '#fff8f0',
-                justifyContent: 'center',
-                alignItems: 'center',
-                marginBottom: 12,
-              }}>
-                <Icon name="warning" size={moderateScale(24)} color="#ff9800" />
-              </View>
-              <Text style={[styles.modalTitle, { textAlign: 'center', marginBottom: 6 }]}>Remove Frame First</Text>
-              <Text style={[styles.modalSubtitle, { textAlign: 'center' }]}>Please remove the current frame before applying a new template.</Text>
-            </View>
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={styles.modalButton}
-                onPress={() => setShowRemoveFrameWarningModal(false)}
-              >
-                <Text style={styles.modalButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonPrimary]}
-                onPress={removeFrame}
-              >
-                <Text style={[styles.modalButtonText, styles.modalButtonTextPrimary]}>Remove Frame</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 };
@@ -4345,18 +4132,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
-  frameOverlayContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'transparent',
-  },
-  frameOverlayImage: {
-    width: '100%',
-    height: '100%',
-  },
   // Template Preview Styles
   businessTemplatePreview: {
     borderWidth: 0,

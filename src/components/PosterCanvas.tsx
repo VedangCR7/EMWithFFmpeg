@@ -8,13 +8,11 @@ interface PosterCanvasProps {
     title?: string;
     description?: string;
   };
-  selectedFrame?: any;
   layers: any[];
   selectedTemplate: string;
   canvasWidth: number;
   canvasHeight: number;
   posterRef: React.RefObject<ViewShot | null>;
-  getFrameBackgroundSource: (frame: any) => any;
   layerAnimations?: { [key: string]: { x: any; y: any } };
   translationValues?: { [key: string]: { x: any; y: any } };
   currentPositions?: { [key: string]: { x: number; y: number } };
@@ -22,13 +20,11 @@ interface PosterCanvasProps {
 
 const PosterCanvas: React.FC<PosterCanvasProps> = ({
   selectedImage,
-  selectedFrame,
   layers,
   selectedTemplate,
   canvasWidth,
   canvasHeight,
   posterRef,
-  getFrameBackgroundSource,
   layerAnimations,
   translationValues,
   currentPositions,
@@ -37,7 +33,6 @@ const PosterCanvas: React.FC<PosterCanvasProps> = ({
   console.log('=== POSTER CANVAS CAPTURE DEBUG ===');
   console.log('Canvas rendering with:', {
     selectedImage: selectedImage?.uri?.substring(0, 50) + '...',
-    selectedFrame: selectedFrame?.id,
     layersCount: layers?.length,
     selectedTemplate,
     canvasWidth,
@@ -275,16 +270,6 @@ const PosterCanvas: React.FC<PosterCanvasProps> = ({
         />
       </View>
       
-      {/* Frame Overlay */}
-      {selectedFrame && (
-        <View style={styles.frameOverlayContainer}>
-          <Image
-            source={getFrameBackgroundSource(selectedFrame)}
-            style={styles.frameOverlayImage}
-            resizeMode="cover"
-          />
-        </View>
-      )}
       
              {/* Layers */}
                {layers.map(layer => {
@@ -355,19 +340,6 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 12,
-  },
-  frameOverlayContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 1,
-  },
-  frameOverlayImage: {
-    width: '100%',
-    height: '100%',
-    opacity: 0.9,
   },
   layer: {
     position: 'absolute',

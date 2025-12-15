@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   TextInput,
   FlatList,
+  SectionList,
   Image,
   ActivityIndicator,
   RefreshControl,
@@ -79,22 +80,47 @@ interface TemplateCardProps {
 
 const TemplateCard: React.FC<TemplateCardProps> = React.memo(({ item, cardWidth, theme, onPress }) => {
   const scaleAnim = React.useRef(new Animated.Value(1)).current;
+  const animationRef = React.useRef<Animated.CompositeAnimation | null>(null);
 
   const handlePressIn = useCallback(() => {
-    Animated.timing(scaleAnim, {
+    // Stop any ongoing animation
+    if (animationRef.current) {
+      animationRef.current.stop();
+    }
+    animationRef.current = Animated.timing(scaleAnim, {
       toValue: 0.95,
       duration: 150,
       useNativeDriver: true,
-    }).start();
+    });
+    animationRef.current.start(() => {
+      animationRef.current = null;
+    });
   }, [scaleAnim]);
 
   const handlePressOut = useCallback(() => {
-    Animated.timing(scaleAnim, {
+    // Stop any ongoing animation
+    if (animationRef.current) {
+      animationRef.current.stop();
+    }
+    animationRef.current = Animated.timing(scaleAnim, {
       toValue: 1,
       duration: 150,
       useNativeDriver: true,
-    }).start();
+    });
+    animationRef.current.start(() => {
+      animationRef.current = null;
+    });
   }, [scaleAnim]);
+
+  // Cleanup on unmount
+  React.useEffect(() => {
+    return () => {
+      if (animationRef.current) {
+        animationRef.current.stop();
+        animationRef.current = null;
+      }
+    };
+  }, []);
 
   const handleCardPress = useCallback(() => {
     onPress(item);
@@ -261,22 +287,47 @@ interface VideoTemplateCardProps {
 
 const VideoTemplateCard: React.FC<VideoTemplateCardProps> = React.memo(({ item, cardWidth, theme, playIconSize, onPress }) => {
   const scaleAnim = React.useRef(new Animated.Value(1)).current;
+  const animationRef = React.useRef<Animated.CompositeAnimation | null>(null);
 
   const handlePressIn = useCallback(() => {
-    Animated.timing(scaleAnim, {
+    // Stop any ongoing animation
+    if (animationRef.current) {
+      animationRef.current.stop();
+    }
+    animationRef.current = Animated.timing(scaleAnim, {
       toValue: 0.95,
       duration: 150,
       useNativeDriver: true,
-    }).start();
+    });
+    animationRef.current.start(() => {
+      animationRef.current = null;
+    });
   }, [scaleAnim]);
 
   const handlePressOut = useCallback(() => {
-    Animated.timing(scaleAnim, {
+    // Stop any ongoing animation
+    if (animationRef.current) {
+      animationRef.current.stop();
+    }
+    animationRef.current = Animated.timing(scaleAnim, {
       toValue: 1,
       duration: 150,
       useNativeDriver: true,
-    }).start();
+    });
+    animationRef.current.start(() => {
+      animationRef.current = null;
+    });
   }, [scaleAnim]);
+
+  // Cleanup on unmount
+  React.useEffect(() => {
+    return () => {
+      if (animationRef.current) {
+        animationRef.current.stop();
+        animationRef.current = null;
+      }
+    };
+  }, []);
 
   const handleCardPress = useCallback(() => {
     onPress();
@@ -675,8 +726,17 @@ const HomeScreen: React.FC = React.memo(() => {
     return () => subscription?.remove();
   }, []);
 
+  const [isBusinessCategoriesModalClosing, setIsBusinessCategoriesModalClosing] = useState(false);
+  
   const closeBusinessCategoriesModal = useCallback(() => {
+    // Hide content immediately for instant feedback
+    setIsBusinessCategoriesModalClosing(true);
+    // Hide modal immediately - no delay
     setIsBusinessCategoriesModalVisible(false);
+    // Reset closing state after animation would complete
+    requestAnimationFrame(() => {
+      setIsBusinessCategoriesModalClosing(false);
+    });
   }, []);
 
   const screenWidth = dimensions.width;
@@ -1635,8 +1695,11 @@ const HomeScreen: React.FC = React.memo(() => {
       setBusinessCategoriesLoading(true);
       try {
         const response = await businessCategoriesService.getBusinessCategories();
-        // Print the full response
-        console.log('📋 [BUSINESS CATEGORIES] Full Response:', JSON.stringify(response, null, 2));
+        // Print the full response (only in dev mode, and limit size)
+        if (__DEV__ && response && response.success) {
+          const categories = response.categories || (response as any).data?.categories || [];
+          console.log(`📋 [BUSINESS CATEGORIES] Loaded ${categories.length} categories`);
+        }
         if (isMounted && response && response.success) {
           // Get all categories from response (for rotation)
           // Handle both response structures: response.categories or response.data?.categories
@@ -1717,6 +1780,23 @@ const HomeScreen: React.FC = React.memo(() => {
       isMounted = false;
     };
   }, []); // Empty dependency array - only run once on mount (fetchBusinessCategoryPreviewImages is stable)
+
+  // Fetch preview images for categories missing previews when modal opens
+  useEffect(() => {
+    if (!isBusinessCategoriesModalVisible) {
+      return;
+    }
+
+    // Find categories that don't have preview images yet
+    const categoriesWithoutPreviews = businessCategories.filter(
+      category => !businessCategoryPreviews[category.id] || businessCategoryPreviews[category.id].length === 0
+    );
+
+    if (categoriesWithoutPreviews.length > 0) {
+      // Fetch preview images for missing categories
+      fetchBusinessCategoryPreviewImages(categoriesWithoutPreviews);
+    }
+  }, [isBusinessCategoriesModalVisible, businessCategories, businessCategoryPreviews, fetchBusinessCategoryPreviewImages]);
 
   // Initialize animations immediately on mount
   useEffect(() => {
@@ -2955,6 +3035,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
     modalCardGap: number;
     modalColumns: number;
     index: number;
+    isLastInRow?: boolean;
     onPress: () => void;
   }
 
@@ -2964,7 +3045,8 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
     modalCardWidth, 
     modalCardGap, 
     modalColumns, 
-    index, 
+    index,
+    isLastInRow: isLastInRowProp,
     onPress 
   }) => {
     const displayImage = useMemo(() => {
@@ -2974,7 +3056,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
       return thumbnails[0] || category.imageUrl || (category as any).image || null;
     }, [previewTemplates, category]);
     
-    const isLastInRow = (index + 1) % modalColumns === 0;
+    const isLastInRow = isLastInRowProp !== undefined ? isLastInRowProp : (index + 1) % modalColumns === 0;
     return (
       <TouchableOpacity
         activeOpacity={0.8}
@@ -3024,6 +3106,47 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
     );
   });
   ModalBusinessCategoryItem.displayName = 'ModalBusinessCategoryItem';
+
+  // Group business categories by parentCategoryName for sectioned display
+  const groupedBusinessCategories = useMemo(() => {
+    const groups: Record<string, BusinessCategory[]> = {};
+    
+    businessCategories.forEach(category => {
+      const parentName = category.parentCategoryName || 'General';
+      if (!groups[parentName]) {
+        groups[parentName] = [];
+      }
+      groups[parentName].push(category);
+    });
+    
+    // Convert to SectionList format with rows for proper grid layout
+    const sections = Object.keys(groups)
+      .sort() // Sort section names alphabetically
+      .map(parentName => {
+        const categories = groups[parentName];
+        // Group categories into rows based on modalColumns
+        const rows: BusinessCategory[][] = [];
+        for (let i = 0; i < categories.length; i += modalColumns) {
+          const row = categories.slice(i, i + modalColumns);
+          rows.push(row);
+        }
+        return {
+          title: parentName,
+          data: rows, // Each row is an array of categories
+        };
+      });
+    
+    return sections;
+  }, [businessCategories, modalColumns]);
+
+  // Render section header for grouped business categories
+  const renderBusinessCategorySectionHeader = useCallback((info: { section: { title: string; data: BusinessCategory[][] } }) => {
+    return (
+      <View style={styles.businessCategorySectionHeader}>
+        <Text style={styles.businessCategorySectionHeaderText}>{info.section.title}</Text>
+      </View>
+    );
+  }, []);
 
   // Memoized renderItem functions for modal FlatLists
   const handleBusinessCategoryPress = useCallback(async (category: BusinessCategory) => {
@@ -3083,22 +3206,37 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
     });
   }, [businessCategoryPreviews, navigation]);
 
-  const renderBusinessCategoryModalItem = useCallback(({ item, index }: { item: BusinessCategory; index: number }) => {
-    const previewTemplates = businessCategoryPreviews[item.id] || [];
-    const handlePress = () => {
-      closeBusinessCategoriesModal();
-      handleBusinessCategoryPress(item);
-    };
+  const renderBusinessCategoryModalItem = useCallback(({ item, index, section }: { item: BusinessCategory[]; index: number; section: { title: string; data: BusinessCategory[][] } }) => {
+    // item is now a row (array of categories)
+    // Each row should only contain up to modalColumns items
     return (
-      <ModalBusinessCategoryItem
-        category={item}
-        previewTemplates={previewTemplates}
-        modalCardWidth={modalCardWidth}
-        modalCardGap={modalCardGap}
-        modalColumns={modalColumns}
-        index={index}
-        onPress={handlePress}
-      />
+      <View style={[styles.upcomingEventModalRow, { 
+        flexDirection: 'row', 
+        flexWrap: 'nowrap',
+        width: '100%',
+      }]}>
+        {item.map((category, categoryIndex) => {
+          const previewTemplates = businessCategoryPreviews[category.id] || [];
+          const handlePress = () => {
+            closeBusinessCategoriesModal();
+            handleBusinessCategoryPress(category);
+          };
+          const isLastInRow = categoryIndex === item.length - 1;
+          return (
+            <ModalBusinessCategoryItem
+              key={category.id}
+              category={category}
+              previewTemplates={previewTemplates}
+              modalCardWidth={modalCardWidth}
+              modalCardGap={modalCardGap}
+              modalColumns={modalColumns}
+              index={categoryIndex}
+              isLastInRow={isLastInRow}
+              onPress={handlePress}
+            />
+          );
+        })}
+      </View>
     );
   }, [modalCardWidth, modalCardGap, modalColumns, businessCategoryPreviews, closeBusinessCategoriesModal, handleBusinessCategoryPress]);
 
@@ -4422,10 +4560,15 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
         <Modal
           visible={isBusinessCategoriesModalVisible}
           transparent={true}
-          animationType="slide"
+          animationType="fade"
           onRequestClose={closeBusinessCategoriesModal}
         >
-          <View style={styles.modalOverlay}>
+          <View style={styles.modalOverlay} pointerEvents="box-none">
+            <TouchableOpacity
+              style={StyleSheet.absoluteFill}
+              activeOpacity={1}
+              onPress={closeBusinessCategoriesModal}
+            />
             <View style={styles.upcomingEventsModalContent}>
               <LinearGradient
                 colors={['#f5f5f5', '#ffffff']}
@@ -4438,29 +4581,31 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                   <TouchableOpacity 
                     style={styles.upcomingEventsCloseButton}
                     onPress={closeBusinessCategoriesModal}
+                    activeOpacity={0.7}
                   >
                     <Text style={styles.upcomingEventsCloseButtonText}>✕</Text>
                   </TouchableOpacity>
                 </View>
               </LinearGradient>
-              <View style={styles.upcomingEventsModalBody}>
-                <FlatList
-                  key={`business-categories-modal-${businessCategories.length}`}
-                  data={businessCategories}
-                  keyExtractor={keyExtractorIdString}
-                  numColumns={modalColumns}
-                  columnWrapperStyle={styles.upcomingEventModalRow}
-                  contentContainerStyle={styles.upcomingEventsModalScroll}
-                  showsVerticalScrollIndicator={false}
-                  removeClippedSubviews={true}
-                  maxToRenderPerBatch={10}
-                  windowSize={5}
-                  initialNumToRender={10}
-                  updateCellsBatchingPeriod={50}
-                  getItemLayout={getModalItemLayout}
-                  renderItem={renderBusinessCategoryModalItem}
-                />
-              </View>
+              {!isBusinessCategoriesModalClosing && (
+                <View style={styles.upcomingEventsModalBody}>
+                  <SectionList
+                    key={`business-categories-modal-${businessCategories.length}`}
+                    sections={groupedBusinessCategories}
+                    keyExtractor={(item, index) => `row-${index}-${item.map(c => c.id).join('-')}`}
+                    renderItem={renderBusinessCategoryModalItem}
+                    renderSectionHeader={renderBusinessCategorySectionHeader}
+                    contentContainerStyle={styles.upcomingEventsModalScroll}
+                    showsVerticalScrollIndicator={false}
+                    removeClippedSubviews={true}
+                    maxToRenderPerBatch={10}
+                    windowSize={5}
+                    initialNumToRender={10}
+                    updateCellsBatchingPeriod={50}
+                    stickySectionHeadersEnabled={false}
+                  />
+                </View>
+              )}
             </View>
           </View>
         </Modal>
@@ -5872,10 +6017,12 @@ const styles = StyleSheet.create({
       paddingBottom: moderateScale(12),
     },
     upcomingEventModalRow: {
+      flexDirection: 'row',
       justifyContent: 'flex-start', // Changed from space-between to align items from left
       marginBottom: moderateScale(6),
       paddingLeft: moderateScale(8), // Left padding
       paddingRight: moderateScale(8), // Right padding - equal to left
+      width: '100%',
     },
     upcomingEventModalCard: {
       // Width is set dynamically via inline styles based on modalColumns
@@ -6202,6 +6349,20 @@ const styles = StyleSheet.create({
     generalCategoryModalCardWrapper: {
       marginRight: 0,
       marginBottom: moderateScale(6),
+    },
+    businessCategorySectionHeader: {
+      backgroundColor: '#f8f9fa',
+      paddingHorizontal: moderateScale(16),
+      paddingVertical: moderateScale(12),
+      paddingTop: moderateScale(16),
+      borderBottomWidth: 1,
+      borderBottomColor: 'rgba(0,0,0,0.08)',
+    },
+    businessCategorySectionHeaderText: {
+      fontSize: moderateScale(16),
+      fontWeight: '700',
+      color: '#333333',
+      letterSpacing: 0.3,
     },
 
   });

@@ -41,9 +41,6 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { PanGestureHandler, State, PinchGestureHandler } from 'react-native-gesture-handler';
 import businessProfileService, { BusinessProfile } from '../services/businessProfile';
 import authService from '../services/auth';
-import { frames, Frame, getFramesByCategory } from '../data/frames';
-import { mapBusinessProfileToFrameContent, generateLayersFromFrame, getFrameBackgroundSource } from '../utils/frameUtils';
-import FrameSelector from '../components/FrameSelector';
 import { GOOGLE_FONTS, getFontsByCategory, SYSTEM_FONTS, getFontFamily } from '../services/fontService';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import Watermark from '../components/Watermark';
@@ -1074,17 +1071,10 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
 
 
 
-  // State for frames
-  const [selectedFrame, setSelectedFrame] = useState<Frame | null>(null);
-  const [showFrameSelector, setShowFrameSelector] = useState(false);
-  const [frameContent, setFrameContent] = useState<{[key: string]: string}>({});
-  const [applyingFrame, setApplyingFrame] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
   const [forceWatermarkCapture, setForceWatermarkCapture] = useState(false);
-  const [showRemoveFrameWarningModal, setShowRemoveFrameWarningModal] = useState(false);
   const [currentPositions, setCurrentPositions] = useState<{ [key: string]: { x: number; y: number } }>({});
   const currentPositionsRef = useRef<{ [key: string]: { x: number; y: number } }>({});
-  const [showRemoveFrameModal, setShowRemoveFrameModal] = useState(false);
   const [showDeleteElementModal, setShowDeleteElementModal] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [showConnectionErrorModal, setShowConnectionErrorModal] = useState(false);
@@ -1335,14 +1325,6 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     }
     
     // Generate content from business profile
-    const content = mapBusinessProfileToFrameContent(profile);
-    setFrameContent(content);
-    
-    // If a frame is selected, apply it with the new content
-    if (selectedFrame) {
-      const frameLayers = generateLayersFromFrame(selectedFrame, content, canvasWidth, canvasHeight);
-      setLayers(frameLayers);
-    } else {
       // Create default layers from business profile
       const newLayers: Layer[] = [];
 
@@ -1570,7 +1552,6 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
         };
       }
     });
-    }
   };
 
   // Handle business profile selection
@@ -1709,15 +1690,12 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
         newY = Number.isFinite(newY) ? newY : 0;
         
         // Debug: Log the current position and field type
-        const frameFileName = selectedFrame?.background ? 
-          (typeof selectedFrame.background === 'number' ? selectedFrame.id : selectedFrame.background.toString()) : 
-          'unknown';
         console.log(`🎯 DEBUG: ${currentLayer.fieldType || 'Unknown Field'} moved to position:`);
         console.log(`   📍 X: ${newX.toFixed(1)}, Y: ${newY.toFixed(1)}`);
         console.log(`   📏 Canvas Size: ${canvasWidth}x${canvasHeight}`);
         console.log(`   🏷️ Field Type: ${currentLayer.fieldType || 'Unknown'}`);
         console.log(`   📝 Content: ${currentLayer.content || 'No content'}`);
-        console.log(`   🔧 For ${frameFileName}.png, use: x: ${newX.toFixed(0)}, y: ${newY.toFixed(0)}`);
+        console.log(`   🔧 Position: x: ${newX.toFixed(0)}, y: ${newY.toFixed(0)}`);
         
         // Update the animated position values directly
         if (layerAnimations[layerId]) {
@@ -1747,7 +1725,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
         setDraggedLayer(null);
       }
     };
-  }, [canvasHeight, canvasWidth, clearAlignmentGuides, dragTranslationRef, ensureSnapOffsets, getLayerEffectiveSize, layerAnimations, layers, selectedFrame, translationValues]);
+  }, [canvasHeight, canvasWidth, clearAlignmentGuides, dragTranslationRef, ensureSnapOffsets, getLayerEffectiveSize, layerAnimations, layers, translationValues]);
 
   // Handle pinch gesture for zooming
   const onPinchGestureEvent = useCallback((layerId: string) => {
@@ -2121,11 +2099,6 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
 
   // Apply template to poster
   const applyTemplate = useCallback((templateType: string) => {
-    // Check if a frame is already selected
-    if (selectedFrame) {
-      setShowRemoveFrameWarningModal(true);
-      return; // Don't apply template if frame is selected
-    }
     
     setSelectedTemplate(templateType);
     setShowTemplatesModal(false);
@@ -2136,15 +2109,15 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     
     // Apply different poster layouts and styles based on template
     setLayers(prev => applyTemplateStylesToLayers(templateType, prev));
-  }, [selectedFrame, applyTemplateStylesToLayers]);
+  }, [applyTemplateStylesToLayers]);
 
   useEffect(() => {
-    if (!initialTemplateApplied && layers.length > 0 && !selectedFrame) {
+    if (!initialTemplateApplied && layers.length > 0) {
       const defaultTemplate = TEMPLATE_OPTIONS[0]?.id || 'business';
       setInitialTemplateApplied(true);
       applyTemplate(defaultTemplate);
     }
-  }, [applyTemplate, initialTemplateApplied, layers.length, selectedFrame]);
+  }, [applyTemplate, initialTemplateApplied, layers.length]);
 
   // Update layer position
   const updateLayerPosition = useCallback((layerId: string, position: { x: number; y: number }) => {
@@ -2180,98 +2153,6 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     }
   }, [selectedLayer, deleteLayer]);
 
-  // Apply frame
-  const applyFrame = useCallback((frame: Frame) => {
-    setApplyingFrame(true);
-    
-    // ONLY store original layers if they haven't been stored yet
-    // This ensures we always return to the TRUE original template positions
-    if (originalLayers.length === 0) {
-      const clonedLayers = layers.map(layer => ({
-        ...layer,
-        position: { ...layer.position },
-        size: { ...layer.size },
-        style: { ...layer.style }
-      }));
-      setOriginalLayers(clonedLayers);
-      setOriginalTemplate(selectedTemplate);
-      console.log('📦 [FIRST TIME] Stored original layers for restoration:', clonedLayers.length, 'layers');
-    } else {
-      console.log('✅ [ALREADY STORED] Using existing original layers, not overwriting');
-    }
-    
-    setSelectedFrame(frame);
-    setShowFrameSelector(false);
-    
-    // Generate content from business profile
-    if (selectedBusinessProfile) {
-      const content = mapBusinessProfileToFrameContent(selectedBusinessProfile);
-      setFrameContent(content);
-      
-      // Generate layers from frame
-      const frameLayers = generateLayersFromFrame(frame, content, canvasWidth, canvasHeight);
-      
-      console.log('🎨 Applying frame with', frameLayers.length, 'layers');
-      
-      // Initialize animated values for all new frame layers to make them moveable
-      frameLayers.forEach(layer => {
-        // Initialize position animation values
-        if (!layerAnimations[layer.id]) {
-          layerAnimations[layer.id] = {
-            x: new Animated.Value(layer.position.x),
-            y: new Animated.Value(layer.position.y)
-          };
-          console.log(`✅ Initialized position animations for layer ${layer.id}`);
-        } else {
-          // Update existing animation values
-          layerAnimations[layer.id].x.setValue(layer.position.x);
-          layerAnimations[layer.id].y.setValue(layer.position.y);
-          console.log(`♻️ Updated position animations for layer ${layer.id}`);
-        }
-        
-        // Initialize translation values for dragging
-        if (!translationValues[layer.id]) {
-          translationValues[layer.id] = {
-            x: new Animated.Value(0),
-            y: new Animated.Value(0)
-          };
-          console.log(`✅ Initialized translation values for layer ${layer.id}`);
-        } else {
-          // Reset translation values
-          translationValues[layer.id].x.setValue(0);
-          translationValues[layer.id].y.setValue(0);
-        }
-        
-        // Initialize scale values for pinch gestures
-        if (!scaleValues[layer.id]) {
-          scaleValues[layer.id] = new Animated.Value(1);
-          console.log(`✅ Initialized scale values for layer ${layer.id}`);
-        } else {
-          scaleValues[layer.id].setValue(1);
-        }
-      });
-      
-      // Replace existing layers with frame layers
-      setLayers(frameLayers);
-      
-      // Make all frame-generated content visible
-      const frameFieldTypes = frame.placeholders.map(p => p.key);
-      setVisibleFields(prev => {
-        const newVisibleFields = { ...prev };
-        frameFieldTypes.forEach(fieldType => {
-          newVisibleFields[fieldType] = true;
-        });
-        return newVisibleFields;
-      });
-      
-      console.log('✨ Frame applied successfully with moveable layers');
-    }
-    
-    // Hide loading after a short delay
-    setTimeout(() => {
-      setApplyingFrame(false);
-    }, 500);
-  }, [selectedBusinessProfile, canvasWidth, canvasHeight, layers, layerAnimations, translationValues, scaleValues, selectedTemplate]);
 
   // Apply font style
   const applyFontStyle = useCallback((fontFamily: string) => {
@@ -2288,7 +2169,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
       return layer;
     }));
     // Modal stays open so user can continue trying different fonts
-  }, [selectedLayer, selectedFontSize]);
+  }, [selectedLayer, selectedFontSize, getFontFamily]);
   
   // Apply font size (selected layer or all text when none selected)
   const applyFontSize = useCallback((fontSize: number) => {
@@ -2591,34 +2472,36 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
   }, [selectedLayer, visibleFields, draggedLayer, layerAnimations, translationValues, selectedTemplate, ensureSnapOffsets, snapOffsets]);
 
   // Render business profile selection item
-  const renderProfileItem = ({ item }: { item: BusinessProfile }) => (
-    <TouchableOpacity
-      style={themeStyles.profileItem}
-      onPress={() => handleProfileSelection(item)}
-    >
-      <View style={styles.profileItemContent}>
-        {item.companyLogo || item.logo ? (
-          <Image
-            source={{ uri: item.companyLogo || item.logo }}
-            style={themeStyles.profileLogo}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={themeStyles.profileLogoPlaceholder}>
-            <Icon name="business" size={dynamicModerateScale(16)} color="#667eea" />
+  const renderProfileItem = ({ item }: { item: BusinessProfile }) => {
+    return (
+      <TouchableOpacity
+        style={themeStyles.profileItem}
+        onPress={() => handleProfileSelection(item)}
+      >
+        <View style={styles.profileItemContent}>
+          {item.companyLogo || item.logo ? (
+            <Image
+              source={{ uri: item.companyLogo || item.logo }}
+              style={themeStyles.profileLogo}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={themeStyles.profileLogoPlaceholder}>
+              <Icon name="business" size={dynamicModerateScale(16)} color="#667eea" />
+            </View>
+          )}
+          <View style={styles.profileInfo}>
+            <Text style={themeStyles.profileName}>{item.name}</Text>
+            <Text style={themeStyles.profileCategory}>{item.category}</Text>
+            <Text style={themeStyles.profileDescription} numberOfLines={2}>
+              {item.description}
+            </Text>
           </View>
-        )}
-        <View style={styles.profileInfo}>
-          <Text style={themeStyles.profileName}>{item.name}</Text>
-          <Text style={themeStyles.profileCategory}>{item.category}</Text>
-          <Text style={themeStyles.profileDescription} numberOfLines={2}>
-            {item.description}
-          </Text>
         </View>
-      </View>
-      <Icon name="chevron-right" size={dynamicModerateScale(16)} color="#666666" />
-    </TouchableOpacity>
-  );
+        <Icon name="chevron-right" size={dynamicModerateScale(16)} color="#666666" />
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <Animated.View 
@@ -2681,7 +2564,6 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
             console.log('Canvas dimensions - Hidden:', { width: screenWidth * 0.98, height: screenHeight * 0.65 });
             console.log('Canvas dimensions - Visible:', { width: screenWidth * 0.98, height: screenHeight * 0.65 });
             console.log('Layers count:', layers.length);
-            console.log('Selected frame:', selectedFrame?.id);
             console.log('Selected template:', selectedTemplate);
             try {
               if (posterRef.current && posterRef.current.capture) {
@@ -2836,42 +2718,42 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
               <TouchableWithoutFeedback onPress={() => setSelectedLayer(null)}>
               <View style={[
                 styles.canvas,
-                !selectedFrame && selectedTemplate !== 'business' && styles.canvasWithFrame,
-                !selectedFrame && selectedTemplate === 'business' && styles.businessFrame,
-                !selectedFrame && selectedTemplate === 'event' && styles.eventFrame,
-                !selectedFrame && selectedTemplate === 'restaurant' && styles.restaurantFrame,
-                !selectedFrame && selectedTemplate === 'fashion' && styles.fashionFrame,
-                !selectedFrame && selectedTemplate === 'real-estate' && styles.realEstateFrame,
-                !selectedFrame && selectedTemplate === 'education' && styles.educationFrame,
-                !selectedFrame && selectedTemplate === 'healthcare' && styles.healthcareFrame,
-                !selectedFrame && selectedTemplate === 'fitness' && styles.fitnessFrame,
-                !selectedFrame && selectedTemplate === 'wedding' && styles.weddingFrame,
-                !selectedFrame && selectedTemplate === 'birthday' && styles.birthdayFrame,
-                !selectedFrame && selectedTemplate === 'corporate' && styles.corporateFrame,
-                !selectedFrame && selectedTemplate === 'creative' && styles.creativeFrame,
-                !selectedFrame && selectedTemplate === 'minimal' && styles.minimalFrame,
-                !selectedFrame && selectedTemplate === 'luxury' && styles.luxuryFrame,
-                !selectedFrame && selectedTemplate === 'vintage' && styles.vintageFrame,
-                !selectedFrame && selectedTemplate === 'retro' && styles.retroFrame,
-                !selectedFrame && selectedTemplate === 'elegant' && styles.elegantFrame,
-                !selectedFrame && selectedTemplate === 'tech' && styles.techFrame,
-                !selectedFrame && selectedTemplate === 'ocean' && styles.oceanFrame,
-                !selectedFrame && selectedTemplate === 'sunset' && styles.sunsetFrame,
-                !selectedFrame && selectedTemplate === 'artistic' && styles.artisticFrame,
-                !selectedFrame && selectedTemplate === 'ombre-sunset' && styles.ombreSunsetFrame,
-                !selectedFrame && selectedTemplate === 'ombre-ocean' && styles.ombreOceanFrame,
-                !selectedFrame && selectedTemplate === 'ombre-purple' && styles.ombrePurpleFrame,
-                !selectedFrame && selectedTemplate === 'ombre-forest' && styles.ombreForestFrame,
-                !selectedFrame && selectedTemplate === 'ombre-fire' && styles.ombreFireFrame,
-                !selectedFrame && selectedTemplate === 'ombre-night' && styles.ombreNightFrame,
-                !selectedFrame && selectedTemplate === 'ombre-tropical' && styles.ombreTropicalFrame,
-                !selectedFrame && selectedTemplate === 'ombre-autumn' && styles.ombreAutumnFrame,
-                !selectedFrame && selectedTemplate === 'ombre-rose' && styles.ombreRoseFrame,
-                !selectedFrame && selectedTemplate === 'ombre-galaxy' && styles.ombreGalaxyFrame,
+                selectedTemplate !== 'business' && styles.canvasWithFrame,
+                selectedTemplate === 'business' && styles.businessFrame,
+                selectedTemplate === 'event' && styles.eventFrame,
+                selectedTemplate === 'restaurant' && styles.restaurantFrame,
+                selectedTemplate === 'fashion' && styles.fashionFrame,
+                selectedTemplate === 'real-estate' && styles.realEstateFrame,
+                selectedTemplate === 'education' && styles.educationFrame,
+                selectedTemplate === 'healthcare' && styles.healthcareFrame,
+                selectedTemplate === 'fitness' && styles.fitnessFrame,
+                selectedTemplate === 'wedding' && styles.weddingFrame,
+                selectedTemplate === 'birthday' && styles.birthdayFrame,
+                selectedTemplate === 'corporate' && styles.corporateFrame,
+                selectedTemplate === 'creative' && styles.creativeFrame,
+                selectedTemplate === 'minimal' && styles.minimalFrame,
+                selectedTemplate === 'luxury' && styles.luxuryFrame,
+                selectedTemplate === 'vintage' && styles.vintageFrame,
+                selectedTemplate === 'retro' && styles.retroFrame,
+                selectedTemplate === 'elegant' && styles.elegantFrame,
+                selectedTemplate === 'tech' && styles.techFrame,
+                selectedTemplate === 'ocean' && styles.oceanFrame,
+                selectedTemplate === 'sunset' && styles.sunsetFrame,
+                selectedTemplate === 'artistic' && styles.artisticFrame,
+                selectedTemplate === 'ombre-sunset' && styles.ombreSunsetFrame,
+                selectedTemplate === 'ombre-ocean' && styles.ombreOceanFrame,
+                selectedTemplate === 'ombre-purple' && styles.ombrePurpleFrame,
+                selectedTemplate === 'ombre-forest' && styles.ombreForestFrame,
+                selectedTemplate === 'ombre-fire' && styles.ombreFireFrame,
+                selectedTemplate === 'ombre-night' && styles.ombreNightFrame,
+                selectedTemplate === 'ombre-tropical' && styles.ombreTropicalFrame,
+                selectedTemplate === 'ombre-autumn' && styles.ombreAutumnFrame,
+                selectedTemplate === 'ombre-rose' && styles.ombreRoseFrame,
+                selectedTemplate === 'ombre-galaxy' && styles.ombreGalaxyFrame,
                 { 
                   width: canvasWidth, 
                   height: canvasHeight,
-                  backgroundColor: selectedFrame ? 'transparent' : '#ffffff' // MUST BE LAST: Make transparent when frame is applied!
+                  backgroundColor: '#ffffff'
                 },
               ]}
 >
@@ -2884,28 +2766,6 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
             />
           </View>
           
-          {/* Frame Overlay (when frame is selected) - rendered FIRST so layers appear on top */}
-          {selectedFrame && (
-            <View 
-              style={styles.frameOverlayContainer} 
-              pointerEvents="none"
-            >
-              <Image
-                source={getFrameBackgroundSource(selectedFrame)}
-                style={styles.frameOverlayImage}
-                resizeMode="stretch"
-              />
-            </View>
-          )}
-          
-          {/* Frame Application Indicator */}
-          {applyingFrame && (
-            <View style={styles.frameApplicationOverlay}>
-              <View style={styles.frameApplicationIndicator}>
-                <Text style={styles.frameApplicationText}>Applying Frame...</Text>
-              </View>
-            </View>
-          )}
           
           {/* Layers - rendered AFTER frame so they appear on top */}
           {layers.map((layer) => {
@@ -3001,15 +2861,6 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
           )}
         </View>
         
-        {/* Frame Selector */}
-        {false && showFrameSelector && (
-          <FrameSelector
-            frames={frames}
-            selectedFrameId={selectedFrame?.id || ''}
-            onFrameSelect={applyFrame}
-            onClose={() => setShowFrameSelector(false)}
-          />
-        )}
         
         {/* Controls Container - Fixed layout with responsive heights */}
         <View 
@@ -3058,77 +2909,6 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
               </LinearGradient>
             </TouchableOpacity>
             
-            {selectedFrame && (
-              <TouchableOpacity
-                style={styles.toolbarButton}
-                onPress={() => {
-                  // Remove frame directly without confirmation modal
-                  console.log('🗑️ [REMOVE FRAME] Starting frame removal...');
-                  
-                  setSelectedFrame(null);
-                  setFrameContent({});
-                  
-                  // Restore original layers and their positions
-                  if (originalLayers.length > 0) {
-                    console.log('🔄 [REMOVE FRAME] Restoring', originalLayers.length, 'layers to original positions');
-                    
-                    // Update animation values for all original layers
-                    originalLayers.forEach(layer => {
-                      // Update position animations
-                      if (layerAnimations[layer.id]) {
-                        layerAnimations[layer.id].x.setValue(layer.position.x);
-                        layerAnimations[layer.id].y.setValue(layer.position.y);
-                      } else {
-                        layerAnimations[layer.id] = {
-                          x: new Animated.Value(layer.position.x),
-                          y: new Animated.Value(layer.position.y)
-                        };
-                      }
-                      
-                      // Reset translation values
-                      if (translationValues[layer.id]) {
-                        translationValues[layer.id].x.setValue(0);
-                        translationValues[layer.id].y.setValue(0);
-                      } else {
-                        translationValues[layer.id] = {
-                          x: new Animated.Value(0),
-                          y: new Animated.Value(0)
-                        };
-                      }
-                      
-                      // Reset scale values
-                      if (scaleValues[layer.id]) {
-                        scaleValues[layer.id].setValue(1);
-                      } else {
-                        scaleValues[layer.id] = new Animated.Value(1);
-                      }
-                    });
-                    
-                    // Restore layers with their original positions
-                    setLayers(originalLayers);
-                    
-                    // Restore original template and apply template styles
-                    setSelectedTemplate(originalTemplate);
-                    
-                    // Apply template styles to the restored layers
-                    const styledLayers = applyTemplateStylesToLayers(originalTemplate, originalLayers);
-                    setLayers(styledLayers);
-                    
-                    console.log('✅ [REMOVE FRAME] Frame removed and original positions restored with template styles');
-                  } else {
-                    console.log('⚠️ [REMOVE FRAME] No original layers found');
-                  }
-                }}
-              >
-                <LinearGradient
-                  colors={['#dc3545', '#c82333']}
-                  style={styles.toolbarButtonGradient}
-                >
-                  <Icon name="delete" size={getResponsiveIconSize()} color="#ffffff" />
-                  <Text style={styles.toolbarButtonText}>Remove Frame</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            )}
             
             {selectedLayer && (
               <TouchableOpacity
@@ -3287,37 +3067,6 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
           </ScrollView>
         </View>
         
-        {/* Frames Section */}
-        {false && (
-          <View style={styles.templatesSection}>
-            <View style={styles.templatesHeader}>
-              <Text style={styles.templatesTitle}>Frames</Text>
-            </View>
-            <ScrollView 
-              style={styles.templatesContent} 
-              horizontal={true}
-              showsHorizontalScrollIndicator={false}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.templatesScrollContent}
-            >
-              {frames.map((frame) => (
-                <TouchableOpacity
-                  key={frame.id}
-                  style={[styles.templateButton, selectedFrame?.id === frame.id && styles.templateButtonActive]}
-                  onPress={() => applyFrame(frame)}
-                >
-                  <View style={styles.templatePreview}>
-                    <Image
-                      source={frame.background}
-                      style={{ width: '100%', height: '100%' }}
-                      resizeMode="cover"
-                    />
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        )}
         </View>
 
       {/* Business Profile Selection Modal */}
@@ -3731,104 +3480,6 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
       </Modal>
       */}
 
-      {/* Frame Warning Modal - Responsive across all screen sizes */}
-      <Modal
-        visible={showRemoveFrameWarningModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowRemoveFrameWarningModal(false)}
-      >
-        <View style={[styles.modalOverlay, { paddingHorizontal: isTabletDevice ? responsiveSpacing.xl : isLandscapeMode ? responsiveSpacing.lg : responsiveSpacing.md }]}>
-          <View style={[
-            themeStyles.modalContent,
-            {
-              width: isTabletDevice 
-                ? screenWidth * 0.5 
-                : isLandscapeMode 
-                  ? screenWidth * 0.6 
-                  : isUltraSmallDevice 
-                    ? screenWidth * 0.92 
-                    : isSmallScreen 
-                      ? screenWidth * 0.9 
-                      : screenWidth * 0.85,
-              maxHeight: isTabletDevice 
-                ? screenHeight * 0.5 
-                : isLandscapeMode 
-                  ? screenHeight * 0.5 
-                  : screenHeight * 0.4,
-            }
-          ]}>
-            <View style={{ alignItems: 'center', marginBottom: isTabletDevice ? responsiveSpacing.lg : responsiveSpacing.md }}>
-              <View style={{ 
-                width: isTabletDevice ? 70 : isLandscape ? 60 : isUltraSmallScreen ? 50 : 60, 
-                height: isTabletDevice ? 70 : isLandscapeMode ? 60 : isUltraSmallDevice ? 50 : 60, 
-                borderRadius: isTabletDevice ? 35 : isLandscapeMode ? 30 : isUltraSmallDevice ? 25 : 30, 
-                backgroundColor: '#fff8f0', 
-                justifyContent: 'center', 
-                alignItems: 'center',
-                marginBottom: isTabletDevice ? responsiveSpacing.md : responsiveSpacing.sm
-              }}>
-                <Icon 
-                  name="warning" 
-                  size={isTabletDevice ? 36 : isLandscapeMode ? 32 : isUltraSmallDevice ? 24 : 32} 
-                  color="#ff9800" 
-                />
-              </View>
-              <Text style={[
-                themeStyles.modalTitle, 
-                { 
-                  fontSize: isTabletDevice ? 24 : isLandscapeMode ? 20 : isUltraSmallDevice ? 18 : 20,
-                  marginBottom: responsiveSpacing.sm,
-                  textAlign: 'center'
-                }
-              ]}>
-                Remove Frame First
-              </Text>
-              <Text style={[
-                themeStyles.modalSubtitle, 
-                { 
-                  fontSize: isTabletDevice ? 15 : isLandscapeMode ? 13 : isUltraSmallDevice ? 12 : 14,
-                  textAlign: 'center',
-                  lineHeight: isTabletDevice ? 22 : isLandscapeMode ? 18 : isUltraSmallDevice ? 16 : 20,
-                  paddingHorizontal: isTabletDevice ? responsiveSpacing.md : responsiveSpacing.sm
-                }
-              ]}>
-                Please remove the current frame before applying a new template. You can remove the frame by clicking the "Remove Frame" button.
-              </Text>
-            </View>
-            <View style={[
-              styles.modalButtons,
-              {
-                flexDirection: 'row',
-                gap: isTabletDevice ? responsiveSpacing.md : responsiveSpacing.sm
-              }
-            ]}>
-              <TouchableOpacity
-                style={[
-                  styles.modalButton,
-                  {
-                    flex: 1,
-                    backgroundColor: '#ff9800',
-                    paddingVertical: isTabletDevice ? 16 : isLandscapeMode ? 14 : isUltraSmallDevice ? 12 : 14,
-                    borderRadius: isTabletDevice ? 12 : isLandscapeMode ? 10 : isUltraSmallDevice ? 8 : 10,
-                    marginHorizontal: 0
-                  }
-                ]}
-                onPress={() => setShowRemoveFrameWarningModal(false)}
-              >
-                <Text style={[
-                  styles.addButtonText,
-                  {
-                    fontSize: isTabletDevice ? 16 : isLandscapeMode ? 14 : isUltraSmallDevice ? 13 : 15
-                  }
-                ]}>
-                  Got it
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       {/* Delete Element Confirmation Modal - Responsive across all screen sizes */}
       <Modal
@@ -4213,7 +3864,6 @@ const styles = StyleSheet.create({
   },
   canvas: {
     // These will be set dynamically based on responsive dimensions
-    // backgroundColor set inline based on selectedFrame state
     borderRadius: 0,
     shadowColor: '#000',
     borderWidth:1,
@@ -6125,48 +5775,6 @@ const styles = StyleSheet.create({
   footerStylesScrollContent: {
     paddingHorizontal: 5,
     alignItems: 'center',
-  },
-  frameApplicationOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-  },
-  frameApplicationIndicator: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    paddingHorizontal: moderateScale(12),
-    paddingVertical: moderateScale(8),
-    borderRadius: moderateScale(6),
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: moderateScale(1),
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: moderateScale(2),
-    elevation: moderateScale(3),
-  },
-  frameApplicationText: {
-    fontSize: moderateScale(11),
-    fontWeight: '600',
-    color: '#333333',
-  },
-  frameOverlayContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'transparent',
-  },
-  frameOverlayImage: {
-    width: '100%',
-    height: '100%',
   },
   // Font Modal Header
   fontModalHeader: {

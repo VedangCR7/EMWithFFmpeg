@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   FlatList,
+  SectionList,
   TouchableOpacity,
   TextInput,
   Alert,
@@ -11,6 +12,8 @@ import {
   Dimensions,
   RefreshControl,
   ActivityIndicator,
+  Animated,
+  Easing,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets, Edge } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -25,10 +28,11 @@ import OptimizedImage from '../components/OptimizedImage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import logger from '../utils/logger';
 
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+// Initial dimensions for module-level scale functions (used in styles)
+const { width: INITIAL_SCREEN_WIDTH, height: INITIAL_SCREEN_HEIGHT } = Dimensions.get('window');
 
-const scale = (size: number) => (screenWidth / 375) * size;
-const verticalScale = (size: number) => (screenHeight / 667) * size;
+const scale = (size: number) => (INITIAL_SCREEN_WIDTH / 375) * size;
+const verticalScale = (size: number) => (INITIAL_SCREEN_HEIGHT / 667) * size;
 const moderateScale = (size: number, factor = 0.5) => size + (scale(size) - size) * factor;
 const EMOJI_REGEX = /[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/u;
 
@@ -82,6 +86,32 @@ const GreetingTemplatesScreen: React.FC = () => {
   const navigation = useNavigation<StackNavigationProp<MainStackParamList>>();
   const insets = useSafeAreaInsets();
 
+  // Dynamic dimensions for responsive layout (matches HomeScreen pattern)
+  const [dimensions, setDimensions] = useState(() => {
+    const { width, height } = Dimensions.get('window');
+    return { width, height };
+  });
+
+  // Update dimensions on screen rotation/resize
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setDimensions({ width: window.width, height: window.height });
+    });
+
+    return () => subscription?.remove();
+  }, []);
+
+  const screenWidth = dimensions.width;
+  const screenHeight = dimensions.height;
+
+  // Scale functions using reactive dimensions
+  const scale = useCallback((size: number) => (screenWidth / 375) * size, [screenWidth]);
+  const verticalScale = useCallback((size: number) => (screenHeight / 667) * size, [screenHeight]);
+  const moderateScale = useCallback((size: number, factor = 0.5) => {
+    const scaled = scale(size);
+    return size + (scaled - size) * factor;
+  }, [scale]);
+
   const isSmallScreen = screenWidth <= SMALL_SCREEN_WIDTH_THRESHOLD;
   const [categories, setCategories] = useState<GreetingCategory[]>([]);
   const safeAreaEdges = useMemo<Edge[]>(() => (isSmallScreen ? ['left', 'right'] : ['top', 'left', 'right']), [isSmallScreen]);
@@ -92,6 +122,8 @@ const GreetingTemplatesScreen: React.FC = () => {
   const [categoryPreviewImages, setCategoryPreviewImages] = useState<Record<string, string | null>>({});
   const isMountedRef = useRef(true);
   const previewCacheRef = useRef<Record<string, string | null>>({});
+  const sectionAnimations = useRef<Map<string, Animated.Value>>(new Map()).current;
+  const animatedSectionsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     return () => {
@@ -138,18 +170,29 @@ const GreetingTemplatesScreen: React.FC = () => {
   const fetchCategories = useCallback(async (isRefresh: boolean = false) => {
     try {
       const data = await greetingTemplatesService.getCategories();
+      if (__DEV__) {
+        console.log(`[GreetingTemplatesScreen] Fetched ${data?.length || 0} categories`);
+        if (data && data.length > 0) {
+          console.log('[GreetingTemplatesScreen] Sample category:', JSON.stringify(data[0], null, 2));
+        }
+      }
       if (isMountedRef.current) {
-        setCategories(data);
+        setCategories(data || []);
         setInitialLoading(false);
-        AsyncStorage.setItem(CATEGORIES_CACHE_KEY, JSON.stringify(data)).catch(() => {});
+        if (data && data.length > 0) {
+          AsyncStorage.setItem(CATEGORIES_CACHE_KEY, JSON.stringify(data)).catch(() => {});
+        }
       }
     } catch (error) {
       logger.error('Error fetching greeting categories:', error);
+      if (__DEV__) {
+        console.error('[GreetingTemplatesScreen] Error details:', error);
+      }
       if (!isRefresh) {
         Alert.alert('Error', 'Failed to load greeting categories. Please try again.');
       }
       if (isMountedRef.current) {
-      setInitialLoading(false);
+        setInitialLoading(false);
       }
     }
   }, []);
@@ -328,9 +371,167 @@ const GreetingTemplatesScreen: React.FC = () => {
       return categories;
     }
     const lowerQuery = normalizedSearchQuery;
-    return categories.filter(category => category.name?.toLowerCase().includes(lowerQuery));
+    return categories.filter(category => {
+      const nameMatch = category.name?.toLowerCase().includes(lowerQuery);
+      const parentCategoryMatch = category.parentCategoryName?.toLowerCase().includes(lowerQuery);
+      return nameMatch || parentCategoryMatch;
+    });
   }, [categories, normalizedSearchQuery]);
   const isSearching = normalizedSearchQuery.length > 0;
+
+  // Group categories by parentCategoryName for sectioned display (matching HomeScreen structure)
+  const groupedCategories = useMemo(() => {
+    if (filteredCategories.length === 0) {
+      return [];
+    }
+    
+    // Recalculate columns here to ensure we always use the current screenWidth
+    // This prevents stale closure issues
+    const cols = screenWidth >= 768 ? 4 : 2;
+    
+    if (__DEV__) {
+      console.log('[GreetingTemplatesScreen] groupedCategories - starting with:', {
+        filteredCategoriesCount: filteredCategories.length,
+        categoryColumns: cols,
+        screenWidth,
+        categoryColumnsMemo: categoryColumns, // Also log the memo value for comparison
+      });
+    }
+    
+    const groups: Record<string, GreetingCategory[]> = {};
+    
+    filteredCategories.forEach(category => {
+      // Use 'General' for categories without parentCategoryName (null, undefined, or empty string)
+      const parentName = (category.parentCategoryName && category.parentCategoryName.trim()) || 'General';
+      if (!groups[parentName]) {
+        groups[parentName] = [];
+      }
+      groups[parentName].push(category);
+    });
+    
+    // Convert to SectionList format with rows for proper grid layout
+    const sections = Object.keys(groups)
+      .sort((a, b) => {
+        // Sort: "General" first, then alphabetically
+        if (a === 'General') return -1;
+        if (b === 'General') return 1;
+        return a.localeCompare(b);
+      })
+      .map(parentName => {
+        const categories = groups[parentName];
+        // Group categories into rows based on cols
+        const rows: GreetingCategory[][] = [];
+        for (let i = 0; i < categories.length; i += cols) {
+          const row = categories.slice(i, i + cols);
+          rows.push(row);
+        }
+        return {
+          title: parentName,
+          data: rows, // Each row is an array of categories
+        };
+      })
+      .filter(section => section.data.length > 0); // Filter out empty sections
+    
+    if (__DEV__) {
+      console.log('[GreetingTemplatesScreen] groupedCategories - result:', {
+        sectionsCount: sections.length,
+        totalCategories: filteredCategories.length,
+        categoryColumns: cols,
+        sections: sections.map(s => ({ title: s.title, rows: s.data.length, categoriesInRows: s.data.map(r => r.length) })),
+      });
+    }
+    
+    return sections;
+  }, [filteredCategories, screenWidth, categoryColumns]);
+
+  // Animate sections when they appear (only once per section)
+  useEffect(() => {
+    if (groupedCategories.length > 0 && !initialLoading) {
+      const animationRefs: Animated.CompositeAnimation[] = [];
+      
+      // Clean up animations for sections that no longer exist
+      const currentSectionKeys = new Set(
+        groupedCategories.map((_, index) => [`section-${index}`, `section-${index}-translate`]).flat()
+      );
+      const keysToRemove: string[] = [];
+      sectionAnimations.forEach((_, key) => {
+        if (!currentSectionKeys.has(key)) {
+          keysToRemove.push(key);
+        }
+      });
+      keysToRemove.forEach(key => {
+        const animValue = sectionAnimations.get(key);
+        if (animValue) {
+          animValue.stopAnimation();
+          sectionAnimations.delete(key);
+        }
+      });
+      
+      groupedCategories.forEach((section, sectionIndex) => {
+        const sectionKey = `section-${sectionIndex}`;
+        const fullSectionKey = `${section.title}-${sectionIndex}`;
+        
+        // Only animate if this section hasn't been animated before
+        if (animatedSectionsRef.current.has(fullSectionKey)) {
+          // Section already animated, just ensure values are set
+          if (sectionAnimations.has(sectionKey)) {
+            const opacity = sectionAnimations.get(sectionKey)!;
+            opacity.setValue(1);
+          }
+          if (sectionAnimations.has(`${sectionKey}-translate`)) {
+            const translateAnim = sectionAnimations.get(`${sectionKey}-translate`)!;
+            translateAnim.setValue(0);
+          }
+          return;
+        }
+        
+        // Create animation values if they don't exist
+        if (!sectionAnimations.has(sectionKey)) {
+          sectionAnimations.set(sectionKey, new Animated.Value(0));
+        }
+        if (!sectionAnimations.has(`${sectionKey}-translate`)) {
+          sectionAnimations.set(`${sectionKey}-translate`, new Animated.Value(30));
+        }
+        
+        const opacity = sectionAnimations.get(sectionKey)!;
+        const translateAnim = sectionAnimations.get(`${sectionKey}-translate`)!;
+        
+        // Stop any existing animations first
+        opacity.stopAnimation();
+        translateAnim.stopAnimation();
+        
+        const animation = Animated.parallel([
+          Animated.timing(opacity, {
+            toValue: 1,
+            duration: 500,
+            delay: sectionIndex * 100,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(translateAnim, {
+            toValue: 0,
+            duration: 500,
+            delay: sectionIndex * 100,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ]);
+        
+        animationRefs.push(animation);
+        animation.start(() => {
+          // Mark as animated after completion
+          animatedSectionsRef.current.add(fullSectionKey);
+        });
+      });
+      
+      // Cleanup: stop all animations when component unmounts or dependencies change
+      return () => {
+        animationRefs.forEach(anim => {
+          anim.stop();
+        });
+      };
+    }
+  }, [groupedCategories, initialLoading]);
 
   const toggleSearchBar = useCallback(() => {
     setIsSearchVisible(prev => !prev);
@@ -455,13 +656,18 @@ const GreetingTemplatesScreen: React.FC = () => {
   }, [navigation, categoryPreviewImages, extractTemplatePreview]);
 
   const categoryColumns = useMemo(() => {
-    if (screenWidth >= 768) {
-      return 4;
+    // Tablets and bigger screens: 4 columns
+    // Small screens: 2 columns
+    const columns = screenWidth >= 768 ? 4 : 2;
+    if (__DEV__) {
+      console.log('[GreetingTemplatesScreen] categoryColumns calculation:', {
+        screenWidth,
+        columns,
+        isTablet: screenWidth >= 768,
+        timestamp: Date.now(),
+      });
     }
-    if (screenWidth >= 480) {
-      return 3;
-    }
-    return 2;
+    return columns;
   }, [screenWidth]);
 
   const categoryCardGap = moderateScale(8);
@@ -487,10 +693,11 @@ const GreetingTemplatesScreen: React.FC = () => {
     categoryCardGap: number;
     categoryColumns: number;
     previewUri: string | null;
+    isLastInRow?: boolean;
     onPress: (item: GreetingCategory) => void;
-  }>(({ item, index, categoryCardSize, categoryCardGap, categoryColumns, previewUri, onPress }) => {
+  }>(({ item, index, categoryCardSize, categoryCardGap, categoryColumns, previewUri, isLastInRow: isLastInRowProp, onPress }) => {
     const cardColor = item.color || '#667eea';
-    const isLastInRow = (index + 1) % categoryColumns === 0;
+    const isLastInRow = isLastInRowProp !== undefined ? isLastInRowProp : (index + 1) % categoryColumns === 0;
     const isEmoji = Boolean(item.icon && EMOJI_REGEX.test(item.icon));
     const initials = item.name?.slice(0, 2).toUpperCase() || 'GC';
     
@@ -545,38 +752,129 @@ const GreetingTemplatesScreen: React.FC = () => {
     );
   });
 
-  const renderCategoryCard = useCallback(({ item, index }: { item: GreetingCategory; index: number }) => {
-    const previewUri = categoryPreviewImages[item.id] || null;
+  // Get icon for section type
+  const getSectionIcon = useCallback((title: string) => {
+    if (title.includes('General') || title.toLowerCase().includes('general')) return 'category';
+    return 'collections';
+  }, []);
+
+  // Render section header for grouped categories (matching TodaysPickScreen style)
+  const renderSectionHeader = useCallback((info: { section: { title: string; data: GreetingCategory[][] } }) => {
+    const iconName = getSectionIcon(info.section.title);
+    const sectionIndex = groupedCategories.findIndex(s => s.title === info.section.title);
+    const sectionKey = `section-${sectionIndex}`;
+    const opacity = sectionAnimations.get(sectionKey) || new Animated.Value(1);
+    const translateY = sectionAnimations.get(`${sectionKey}-translate`) || new Animated.Value(0);
+
+    return (
+      <Animated.View
+        style={[
+          styles.categorySectionHeaderContainer,
+          {
+            paddingHorizontal: moderateScale(isSmallScreen ? 8 : 12),
+            paddingTop: moderateScale(isSmallScreen ? 12 : 16),
+            paddingBottom: moderateScale(isSmallScreen ? 8 : 12),
+            marginBottom: moderateScale(isSmallScreen ? 8 : 12),
+            opacity,
+            transform: [{ translateY }],
+          }
+        ]}
+      >
+        <View style={styles.categorySectionHeaderWrapper}>
+          <LinearGradient
+            colors={isDarkMode 
+              ? [theme.colors.primary + '30', theme.colors.secondary + '20', 'transparent']
+              : [theme.colors.primary + '18', theme.colors.secondary + '10', 'transparent']
+            }
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.categorySectionHeaderGradient}
+          >
+            <View style={styles.categorySectionHeaderContent}>
+              <LinearGradient
+                colors={[theme.colors.primary, theme.colors.secondary]}
+                style={styles.categorySectionIconContainer}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <Icon
+                  name={iconName}
+                  size={moderateScale(isSmallScreen ? 18 : 22)}
+                  color="#ffffff"
+                />
+              </LinearGradient>
+              <View style={styles.categorySectionTitleContainer}>
+                <Text style={[
+                  styles.categorySectionHeaderText,
+                  {
+                    color: theme.colors.text,
+                    fontSize: moderateScale(isSmallScreen ? 14 : 16),
+                    fontWeight: '700',
+                    marginLeft: moderateScale(10),
+                  }
+                ]}>
+                  {info.section.title}
+                </Text>
+                <View style={[
+                  styles.categorySectionUnderline,
+                  {
+                    backgroundColor: theme.colors.primary,
+                    marginLeft: moderateScale(10),
+                    marginTop: moderateScale(2),
+                  }
+                ]} />
+              </View>
+            </View>
+          </LinearGradient>
+        </View>
+      </Animated.View>
+    );
+  }, [groupedCategories, isDarkMode, theme, isSmallScreen, getSectionIcon, sectionAnimations, moderateScale]);
+
+  const renderCategoryCard = useCallback(({ item, index, section }: { item: GreetingCategory[]; index: number; section: { title: string; data: GreetingCategory[][] } }) => {
+    // item is now a row (array of categories)
+    // Each row should only contain up to categoryColumns items
+    if (__DEV__ && index === 0) {
+      console.log('[GreetingTemplatesScreen] renderCategoryCard:', {
+        sectionTitle: section.title,
+        rowIndex: index,
+        categoriesInRow: item.length,
+        categoryIds: item.map(c => c.id),
+      });
+    }
+    
+    if (!item || item.length === 0) {
+      return null;
+    }
     
     return (
-      <CategoryCard
-        item={item}
-        index={index}
-        categoryCardSize={categoryCardSize}
-        categoryCardGap={categoryCardGap}
-        categoryColumns={categoryColumns}
-        previewUri={previewUri}
-        onPress={handleCategoryPress}
-      />
+      <View style={[styles.categoryRow, { 
+        flexDirection: 'row', 
+        flexWrap: 'nowrap',
+        width: '100%',
+      }]}>
+        {item.map((category, categoryIndex) => {
+          const previewUri = categoryPreviewImages[category.id] || null;
+          const isLastInRow = categoryIndex === item.length - 1;
+          
+          return (
+            <CategoryCard
+              key={category.id}
+              item={category}
+              index={categoryIndex}
+              categoryCardSize={categoryCardSize}
+              categoryCardGap={categoryCardGap}
+              categoryColumns={categoryColumns}
+              previewUri={previewUri}
+              isLastInRow={isLastInRow}
+              onPress={handleCategoryPress}
+            />
+          );
+        })}
+      </View>
     );
   }, [categoryCardSize, categoryCardGap, categoryColumns, categoryPreviewImages, handleCategoryPress]);
 
-  const keyExtractor = useCallback((item: GreetingCategory) => item.id, []);
-
-  const getItemLayout = useCallback(
-    (_: any, index: number) => {
-      // Calculate row height including card size, gap, and row margin
-      const rowMargin = categoryColumns > 1 ? moderateScale(8) : 0;
-      const rowHeight = categoryCardSize + categoryCardGap + rowMargin;
-      const rowIndex = Math.floor(index / categoryColumns);
-      return {
-        length: rowHeight,
-        offset: rowIndex * rowHeight,
-        index,
-      };
-    },
-    [categoryCardGap, categoryCardSize, categoryColumns],
-  );
 
   // Removed flatListPerfConfig - using inline props for better control
 
@@ -712,14 +1010,16 @@ const GreetingTemplatesScreen: React.FC = () => {
         </View>
         )}
 
-        <FlatList
-          data={filteredCategories}
-          keyExtractor={keyExtractor}
-          numColumns={categoryColumns}
+        <SectionList
+          sections={groupedCategories}
+          keyExtractor={(item, index) => {
+            // item is a row (array of categories), create a unique key from all category IDs in the row
+            return `row-${index}-${item.map(c => c.id).join('-')}`;
+          }}
           key={`category-grid-${categoryColumns}`}
           renderItem={renderCategoryCard}
-          columnWrapperStyle={categoryColumns > 1 ? styles.categoryRow : undefined}
-            contentContainerStyle={[
+          renderSectionHeader={renderSectionHeader}
+          contentContainerStyle={[
             styles.categoriesList,
             {
               paddingBottom: Math.max(insets.bottom, moderateScale(12)),
@@ -739,7 +1039,7 @@ const GreetingTemplatesScreen: React.FC = () => {
               tintColor={theme.colors.primary}
             />
           }
-          getItemLayout={getItemLayout}
+          stickySectionHeadersEnabled={false}
           // Enhanced performance optimizations
           removeClippedSubviews={true}
           maxToRenderPerBatch={Math.max(categoryColumns * 2, 8)}
@@ -816,8 +1116,58 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.03)',
   },
   categoryRow: {
-    marginBottom: moderateScale(8),
+    flexDirection: 'row',
     justifyContent: 'flex-start',
+    alignItems: 'flex-start',
+    marginBottom: moderateScale(6),
+    paddingLeft: moderateScale(8),
+    paddingRight: moderateScale(8),
+    width: '100%',
+  },
+  categorySectionHeaderContainer: {
+    width: '100%',
+  },
+  categorySectionHeaderWrapper: {
+    borderRadius: moderateScale(20),
+    overflow: 'hidden',
+  },
+  categorySectionHeaderGradient: {
+    borderRadius: moderateScale(14),
+    overflow: 'hidden',
+    paddingHorizontal: moderateScale(10),
+    paddingVertical: moderateScale(10),
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(0, 0, 0, 0.04)',
+  },
+  categorySectionHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  categorySectionIconContainer: {
+    width: moderateScale(36),
+    height: moderateScale(36),
+    borderRadius: moderateScale(18),
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  categorySectionTitleContainer: {
+    flex: 1,
+  },
+  categorySectionHeaderText: {
+    letterSpacing: 0.4,
+  },
+  categorySectionUnderline: {
+    height: 2,
+    width: moderateScale(32),
+    borderRadius: moderateScale(1),
   },
   categoryImage: {
     width: '100%',

@@ -131,8 +131,6 @@ interface PosterPreviewScreenProps {
       selectedTemplateId: string;
       selectedBusinessProfile?: any;
       posterLayers?: any[];
-      selectedFrame?: any;
-      frameContent?: any;
       selectedTemplate?: string;
       selectedFooterStyle?: string;
       visibleFields?: {[key: string]: boolean};
@@ -186,8 +184,6 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
     selectedTemplateId, 
     selectedBusinessProfile, 
     posterLayers, 
-    selectedFrame, 
-    frameContent,
     selectedTemplate,
     selectedFooterStyle,
     visibleFields,
