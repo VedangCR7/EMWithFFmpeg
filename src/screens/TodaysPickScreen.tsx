@@ -573,10 +573,25 @@ const TodaysPickScreen: React.FC = () => {
   }, [isEventPlannerCategory, selectedServiceFilter, serviceFilterKeywords]);
 
 
-  // Original TodaysPickScreen loadTodayPosters function
+  // Helper function to batch AsyncStorage reads
+  const getRecentDaysBatch = useCallback(async (today: Date, categoryPrefix: string): Promise<string[]> => {
+    const keys: string[] = [];
+    for (let i = 0; i < 7; i++) {
+      const pastDate = new Date(today);
+      pastDate.setDate(today.getDate() - i);
+      const pastDateString = `${pastDate.getFullYear()}-${String(pastDate.getMonth() + 1).padStart(2, '0')}-${String(pastDate.getDate()).padStart(2, '0')}`;
+      keys.push(`daily_${categoryPrefix}_${pastDateString}`);
+    }
+    
+    // Batch read all keys at once
+    const values = await Promise.all(keys.map(key => AsyncStorage.getItem(key)));
+    return values.filter((v): v is string => v !== null);
+  }, []);
+
+  // Original TodaysPickScreen loadTodayPosters function - OPTIMIZED for fast loading
   const loadTodayPosters = useCallback(async () => {
     try {
-      setLoading(true);
+      // Don't set loading to true immediately - load cached data first
       const today = new Date();
       const year = today.getFullYear();
       const month = today.getMonth() + 1;
@@ -584,53 +599,62 @@ const TodaysPickScreen: React.FC = () => {
       const dateString = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
       const dailySeed = getDailySeed();
+      
+      // Load cached data first for instant display
+      const cachedKeys = [
+        `daily_motivational_${dateString}`,
+        `daily_business_${dateString}`,
+        `daily_marketing_tips_${dateString}`,
+        `daily_wellness_${dateString}`,
+      ];
+      
+      // Try to load cached selections first (non-blocking)
+      const cachedData = await Promise.all(cachedKeys.map(key => AsyncStorage.getItem(key))).catch(() => []);
+      
+      // Start all API calls in parallel immediately (don't wait for each other)
+      setLoading(true);
+      
+      const [
+        calendarResponse,
+        motivationalTemplates,
+        businessResponse,
+        marketingTipsByCategory,
+        wellnessByCategory,
+      ] = await Promise.allSettled([
+        calendarApi.getPostersByDate(dateString, false),
+        greetingTemplatesService.searchTemplates('motivational'),
+        businessCategoryPostersApi.getUserCategoryPosters(),
+        greetingTemplatesService.getTemplatesByCategory('Business Marketing Tips', 200).catch(() => null),
+        greetingTemplatesService.getTemplatesByCategory('Wellness Awareness', 200).catch(() => null),
+      ]);
+
       const allPosters: Template[] = [];
 
-      // 1. Fetch calendar posters for today
-      try {
-        const calendarResponse = await calendarApi.getPostersByDate(dateString, false);
-        if (calendarResponse.success && calendarResponse.data.posters.length > 0) {
-          const calendarTemplates: Template[] = calendarResponse.data.posters.map((poster) => ({
-            id: poster.id,
-            name: poster.name || poster.title || 'Today\'s Pick',
-            thumbnail: poster.thumbnail,
-            category: poster.category || 'Festival',
-            downloads: poster.downloads || 0,
-            isDownloaded: poster.isDownloaded || false,
-            tags: poster.tags || [],
-          }));
-          allPosters.push(...calendarTemplates);
-        }
-      } catch (error) {
-        console.error('Error loading calendar posters:', error);
+      // 1. Process calendar posters
+      if (calendarResponse.status === 'fulfilled' && calendarResponse.value.success && calendarResponse.value.data.posters.length > 0) {
+        const calendarTemplates: Template[] = calendarResponse.value.data.posters.map((poster) => ({
+          id: poster.id,
+          name: poster.name || poster.title || 'Today\'s Pick',
+          thumbnail: poster.thumbnail,
+          category: poster.category || 'Festival',
+          downloads: poster.downloads || 0,
+          isDownloaded: poster.isDownloaded || false,
+          tags: poster.tags || [],
+        }));
+        allPosters.push(...calendarTemplates);
       }
 
-      // 2. Fetch 1 motivational quote (daily shuffled)
-      try {
-        const motivationalTemplates = await greetingTemplatesService.searchTemplates('motivational');
-        if (motivationalTemplates && motivationalTemplates.length > 0) {
-          // Get previously shown IDs for the last few days to avoid immediate repeats
-          const recentDays: string[] = [];
-          for (let i = 0; i < 7; i++) {
-            const pastDate = new Date(today);
-            pastDate.setDate(today.getDate() - i);
-            const pastDateString = `${pastDate.getFullYear()}-${String(pastDate.getMonth() + 1).padStart(2, '0')}-${String(pastDate.getDate()).padStart(2, '0')}`;
-            const pastKey = `daily_motivational_${pastDateString}`;
-            const pastId = await AsyncStorage.getItem(pastKey);
-            if (pastId) recentDays.push(pastId);
-          }
-          
-          // Filter out recently shown items
-          const availableTemplates = motivationalTemplates.filter(t => !recentDays.includes(t.id));
-          
-          // If all items were shown recently, use all (reset cycle)
-          const templatesToSelect = availableTemplates.length > 0 ? availableTemplates : motivationalTemplates;
+      // 2. Process motivational quote (daily shuffled) - with batched AsyncStorage
+      if (motivationalTemplates.status === 'fulfilled' && motivationalTemplates.value && motivationalTemplates.value.length > 0) {
+        try {
+          const recentDays = await getRecentDaysBatch(today, 'motivational');
+          const availableTemplates = motivationalTemplates.value.filter(t => !recentDays.includes(t.id));
+          const templatesToSelect = availableTemplates.length > 0 ? availableTemplates : motivationalTemplates.value;
           
           const selectedMotivational = selectDailyItem(templatesToSelect, dailySeed, 'motivational');
           if (selectedMotivational) {
-            // Save selected ID for today
             const storageKey = `daily_motivational_${dateString}`;
-            await AsyncStorage.setItem(storageKey, selectedMotivational.id);
+            AsyncStorage.setItem(storageKey, selectedMotivational.id).catch(() => {});
             
             const motivationalTemplate: Template = {
               id: selectedMotivational.id,
@@ -643,39 +667,23 @@ const TodaysPickScreen: React.FC = () => {
             };
             allPosters.push(motivationalTemplate);
           }
+        } catch (error) {
+          console.error('Error processing motivational quotes:', error);
         }
-      } catch (error) {
-        console.error('Error loading motivational quotes:', error);
       }
 
-      // 3. Fetch 1 business category poster (daily shuffled)
-      try {
-        const businessResponse = await businessCategoryPostersApi.getUserCategoryPosters();
-        if (businessResponse.success && businessResponse.data.posters.length > 0) {
-          const businessPosters = businessResponse.data.posters;
-          
-          // Get previously shown IDs for the last few days to avoid immediate repeats
-          const recentDays: string[] = [];
-          for (let i = 0; i < 7; i++) {
-            const pastDate = new Date(today);
-            pastDate.setDate(today.getDate() - i);
-            const pastDateString = `${pastDate.getFullYear()}-${String(pastDate.getMonth() + 1).padStart(2, '0')}-${String(pastDate.getDate()).padStart(2, '0')}`;
-            const pastKey = `daily_business_${pastDateString}`;
-            const pastId = await AsyncStorage.getItem(pastKey);
-            if (pastId) recentDays.push(pastId);
-          }
-          
-          // Filter out recently shown items
+      // 3. Process business category poster (daily shuffled) - with batched AsyncStorage
+      if (businessResponse.status === 'fulfilled' && businessResponse.value.success && businessResponse.value.data.posters.length > 0) {
+        try {
+          const businessPosters = businessResponse.value.data.posters;
+          const recentDays = await getRecentDaysBatch(today, 'business');
           const availablePosters = businessPosters.filter(p => !recentDays.includes(p.id));
-          
-          // If all items were shown recently, use all (reset cycle)
           const postersToSelect = availablePosters.length > 0 ? availablePosters : businessPosters;
           
           const selectedBusiness = selectDailyItem(postersToSelect, dailySeed, 'business');
           if (selectedBusiness) {
-            // Save selected ID for today
             const storageKey = `daily_business_${dateString}`;
-            await AsyncStorage.setItem(storageKey, selectedBusiness.id);
+            AsyncStorage.setItem(storageKey, selectedBusiness.id).catch(() => {});
             
             const businessTemplate: Template = {
               id: selectedBusiness.id,
@@ -688,15 +696,159 @@ const TodaysPickScreen: React.FC = () => {
             };
             allPosters.push(businessTemplate);
           }
+        } catch (error) {
+          console.error('Error processing business category posters:', error);
         }
-      } catch (error) {
-        console.error('Error loading business category posters:', error);
+      }
+
+      // 4. Process Business Marketing Tips poster (daily shuffled) - optimized with parallel fallbacks
+      const marketingTipsTemplates = marketingTipsByCategory.status === 'fulfilled' && marketingTipsByCategory.value && marketingTipsByCategory.value.length > 0
+        ? marketingTipsByCategory.value
+        : null;
+      
+      if (!marketingTipsTemplates) {
+        // Try fallbacks in parallel if primary failed
+        const [byNameResult, searchResult] = await Promise.allSettled([
+          greetingTemplatesService.getTemplates({ category: 'Business Marketing Tips', limit: 200 }).catch(() => null),
+          greetingTemplatesService.searchTemplates('business marketing tips').catch(() => null),
+        ]);
+        
+        const finalMarketingTips = 
+          (byNameResult.status === 'fulfilled' && byNameResult.value && byNameResult.value.length > 0) ? byNameResult.value :
+          (searchResult.status === 'fulfilled' && searchResult.value && searchResult.value.length > 0) ? searchResult.value :
+          null;
+        
+        if (finalMarketingTips) {
+          try {
+            const recentDays = await getRecentDaysBatch(today, 'marketing_tips');
+            const availableTemplates = finalMarketingTips.filter(t => !recentDays.includes(t.id));
+            const templatesToSelect = availableTemplates.length > 0 ? availableTemplates : finalMarketingTips;
+            
+            const selectedMarketingTip = selectDailyItem(templatesToSelect, dailySeed, 'marketing_tips');
+            if (selectedMarketingTip) {
+              const storageKey = `daily_marketing_tips_${dateString}`;
+              AsyncStorage.setItem(storageKey, selectedMarketingTip.id).catch(() => {});
+              
+              const marketingTipTemplate: Template = {
+                id: selectedMarketingTip.id,
+                name: selectedMarketingTip.name || 'Business Marketing Tip',
+                thumbnail: selectedMarketingTip.thumbnail,
+                category: 'Business Marketing Tips',
+                downloads: selectedMarketingTip.downloads || 0,
+                isDownloaded: selectedMarketingTip.isDownloaded || false,
+                tags: [],
+              };
+              allPosters.push(marketingTipTemplate);
+            }
+          } catch (error) {
+            console.error('Error processing business marketing tips:', error);
+          }
+        }
+      } else {
+        // Process if we got templates from primary call
+        try {
+          const recentDays = await getRecentDaysBatch(today, 'marketing_tips');
+          const availableTemplates = marketingTipsTemplates.filter(t => !recentDays.includes(t.id));
+          const templatesToSelect = availableTemplates.length > 0 ? availableTemplates : marketingTipsTemplates;
+          
+          const selectedMarketingTip = selectDailyItem(templatesToSelect, dailySeed, 'marketing_tips');
+          if (selectedMarketingTip) {
+            const storageKey = `daily_marketing_tips_${dateString}`;
+            AsyncStorage.setItem(storageKey, selectedMarketingTip.id).catch(() => {});
+            
+            const marketingTipTemplate: Template = {
+              id: selectedMarketingTip.id,
+              name: selectedMarketingTip.name || 'Business Marketing Tip',
+              thumbnail: selectedMarketingTip.thumbnail,
+              category: 'Business Marketing Tips',
+              downloads: selectedMarketingTip.downloads || 0,
+              isDownloaded: selectedMarketingTip.isDownloaded || false,
+              tags: [],
+            };
+            allPosters.push(marketingTipTemplate);
+          }
+        } catch (error) {
+          console.error('Error processing business marketing tips:', error);
+        }
+      }
+
+      // 5. Process Wellness Awareness poster (daily shuffled) - optimized with parallel fallbacks
+      const wellnessTemplates = wellnessByCategory.status === 'fulfilled' && wellnessByCategory.value && wellnessByCategory.value.length > 0
+        ? wellnessByCategory.value
+        : null;
+      
+      if (!wellnessTemplates) {
+        // Try fallbacks in parallel if primary failed
+        const [byNameResult, searchResult] = await Promise.allSettled([
+          greetingTemplatesService.getTemplates({ category: 'Wellness Awareness', limit: 200 }).catch(() => null),
+          greetingTemplatesService.searchTemplates('wellness awareness').catch(() => null),
+        ]);
+        
+        const finalWellness = 
+          (byNameResult.status === 'fulfilled' && byNameResult.value && byNameResult.value.length > 0) ? byNameResult.value :
+          (searchResult.status === 'fulfilled' && searchResult.value && searchResult.value.length > 0) ? searchResult.value :
+          null;
+        
+        if (finalWellness) {
+          try {
+            const recentDays = await getRecentDaysBatch(today, 'wellness');
+            const availableTemplates = finalWellness.filter(t => !recentDays.includes(t.id));
+            const templatesToSelect = availableTemplates.length > 0 ? availableTemplates : finalWellness;
+            
+            const selectedWellness = selectDailyItem(templatesToSelect, dailySeed, 'wellness');
+            if (selectedWellness) {
+              const storageKey = `daily_wellness_${dateString}`;
+              AsyncStorage.setItem(storageKey, selectedWellness.id).catch(() => {});
+              
+              const wellnessTemplate: Template = {
+                id: selectedWellness.id,
+                name: selectedWellness.name || 'Wellness Awareness',
+                thumbnail: selectedWellness.thumbnail,
+                category: 'Wellness Awareness',
+                downloads: selectedWellness.downloads || 0,
+                isDownloaded: selectedWellness.isDownloaded || false,
+                tags: [],
+              };
+              allPosters.push(wellnessTemplate);
+            }
+          } catch (error) {
+            console.error('Error processing wellness awareness:', error);
+          }
+        }
+      } else {
+        // Process if we got templates from primary call
+        try {
+          const recentDays = await getRecentDaysBatch(today, 'wellness');
+          const availableTemplates = wellnessTemplates.filter(t => !recentDays.includes(t.id));
+          const templatesToSelect = availableTemplates.length > 0 ? availableTemplates : wellnessTemplates;
+          
+          const selectedWellness = selectDailyItem(templatesToSelect, dailySeed, 'wellness');
+          if (selectedWellness) {
+            const storageKey = `daily_wellness_${dateString}`;
+            AsyncStorage.setItem(storageKey, selectedWellness.id).catch(() => {});
+            
+            const wellnessTemplate: Template = {
+              id: selectedWellness.id,
+              name: selectedWellness.name || 'Wellness Awareness',
+              thumbnail: selectedWellness.thumbnail,
+              category: 'Wellness Awareness',
+              downloads: selectedWellness.downloads || 0,
+              isDownloaded: selectedWellness.isDownloaded || false,
+              tags: [],
+            };
+            allPosters.push(wellnessTemplate);
+          }
+        } catch (error) {
+          console.error('Error processing wellness awareness:', error);
+        }
       }
 
       // Organize posters into sections
-      const calendarPosters = allPosters.filter(p => p.category !== 'Motivational' && p.category !== 'Business');
+      const calendarPosters = allPosters.filter(p => p.category !== 'Motivational' && p.category !== 'Business' && p.category !== 'Business Marketing Tips' && p.category !== 'Wellness Awareness');
       const motivationalPosters = allPosters.filter(p => p.category === 'Motivational');
       const businessPosters = allPosters.filter(p => p.category === 'Business');
+      const marketingTipsPosters = allPosters.filter(p => p.category === 'Business Marketing Tips');
+      const wellnessPosters = allPosters.filter(p => p.category === 'Wellness Awareness');
 
       const sectionsData: Array<{ title: string; data: Template[] }> = [];
       
@@ -708,7 +860,23 @@ const TodaysPickScreen: React.FC = () => {
         });
       }
       
-      // Add motivational section second
+      // Add Business Marketing Tips section second
+      if (marketingTipsPosters.length > 0) {
+        sectionsData.push({
+          title: 'Business Marketing Tips',
+          data: marketingTipsPosters,
+        });
+      }
+      
+      // Add Wellness Awareness section third
+      if (wellnessPosters.length > 0) {
+        sectionsData.push({
+          title: 'Wellness Awareness',
+          data: wellnessPosters,
+        });
+      }
+      
+      // Add motivational section fourth
       if (motivationalPosters.length > 0) {
         sectionsData.push({
           title: 'Daily Motivation Quotes',
@@ -727,8 +895,8 @@ const TodaysPickScreen: React.FC = () => {
       setSections(sectionsData);
       
       // Keep flat list for preloading and sync with allTemplates for layout compatibility
-      // Order: Business first, then Motivational, then Calendar
-      const orderedPosters = [...businessPosters, ...motivationalPosters, ...calendarPosters];
+      // Order: Business first, then Business Marketing Tips, then Wellness Awareness, then Motivational, then Calendar
+      const orderedPosters = [...businessPosters, ...marketingTipsPosters, ...wellnessPosters, ...motivationalPosters, ...calendarPosters];
       setTodayPosters(orderedPosters);
       
       // Sync with allTemplates for PosterPlayerScreen layout compatibility
@@ -1646,8 +1814,18 @@ const TodaysPickScreen: React.FC = () => {
   const sectionHeaderInfo = useMemo(() => {
     const category = currentPoster?.category || '';
     const categoryLower = category.toLowerCase();
-    
-    if (categoryLower.includes('business')) {
+
+    if (categoryLower.includes('business marketing tips') || categoryLower.includes('marketing tips')) {
+      return {
+        title: 'Business Marketing Tips',
+        icon: 'campaign',
+      };
+    } else if (categoryLower.includes('wellness awareness') || categoryLower.includes('wellness')) {
+      return {
+        title: 'Wellness Awareness',
+        icon: 'spa',
+      };
+    } else if (categoryLower.includes('business') && !categoryLower.includes('marketing')) {
       return {
         title: 'Daily Business Post',
         icon: 'business-center',

@@ -18,6 +18,7 @@ export interface FeaturedContent {
   title: string;
   description?: string;
   imageUrl: string;
+  thumbnailUrl?: string; // Optional thumbnail URL for faster loading
   videoUrl?: string;
   link: string;
   type: 'banner' | 'promotion' | 'highlight';
@@ -223,6 +224,7 @@ class HomeApiService {
       title: item.title,
       description: item.description || '',
       imageUrl: item.imageUrl,
+      thumbnailUrl: item.thumbnailUrl || undefined, // Extract thumbnailUrl if available
       videoUrl: item.videoUrl || undefined,
       link: `/templates/${item.id}`, // Default link to template
       type: item.isFeatured ? 'banner' : 'highlight', // Map based on isFeatured flag
@@ -282,8 +284,10 @@ class HomeApiService {
    */
   private convertProfessionalTemplatesUrls(templates: ProfessionalTemplate[]): ProfessionalTemplate[] {
     return templates.map(template => {
+      // Backend returns thumbnailUrl, map it to thumbnail for frontend
+      const thumbnailUrl = (template as any).thumbnailUrl || template.thumbnail;
       // Convert both thumbnail and preview URLs to absolute
-      let convertedThumbnail = this.convertToAbsoluteUrl(template.thumbnail);
+      let convertedThumbnail = this.convertToAbsoluteUrl(thumbnailUrl);
       let convertedPreview = template.previewUrl ? this.convertToAbsoluteUrl(template.previewUrl) : undefined;
       
       // If no previewUrl, try to derive high-quality URL from thumbnail
@@ -319,11 +323,15 @@ class HomeApiService {
    * Convert image URLs in video content
    */
   private convertVideoContentUrls(videos: VideoContent[]): VideoContent[] {
-    return videos.map(video => ({
-      ...video,
-      thumbnail: this.convertToAbsoluteUrl(video.thumbnail) || 'https://images.unsplash.com/photo-1492619375914-88005aa9e8fb?w=300&h=200&fit=crop',
-      videoUrl: this.convertToAbsoluteUrl(video.videoUrl) || video.videoUrl,
-    }));
+    return videos.map(video => {
+      // Backend returns thumbnailUrl, map it to thumbnail for frontend
+      const thumbnailUrl = (video as any).thumbnailUrl || video.thumbnail;
+      return {
+        ...video,
+        thumbnail: this.convertToAbsoluteUrl(thumbnailUrl) || 'https://images.unsplash.com/photo-1492619375914-88005aa9e8fb?w=300&h=200&fit=crop',
+        videoUrl: this.convertToAbsoluteUrl(video.videoUrl) || video.videoUrl,
+      };
+    });
   }
   // ============================================================================
   // API 1: FEATURED CONTENT
@@ -398,11 +406,13 @@ class HomeApiService {
         const convertedData = featuredData.map(item => {
           // Convert URLs to absolute if needed (backend should already return absolute URLs from Cloudinary)
           const convertedImageUrl = this.convertToAbsoluteUrl(item.imageUrl);
+          const convertedThumbnailUrl = (item as any).thumbnailUrl ? this.convertToAbsoluteUrl((item as any).thumbnailUrl) : undefined;
           const convertedVideoUrl = item.videoUrl ? this.convertToAbsoluteUrl(item.videoUrl) : item.videoUrl;
           
           return {
             ...item, // Preserve all original data from backend
             imageUrl: convertedImageUrl || item.imageUrl || '', // Keep original if conversion fails
+            thumbnailUrl: convertedThumbnailUrl || (item as any).thumbnailUrl, // Extract and convert thumbnailUrl if available
             videoUrl: convertedVideoUrl || item.videoUrl,
           };
         }).filter(item => {
@@ -577,9 +587,14 @@ class HomeApiService {
         
         const response = await api.get(url);
         
-        // Convert relative URLs to absolute URLs
+        // Convert relative URLs to absolute URLs and map thumbnailUrl to thumbnail
         if (response.data.success && response.data.data) {
-          response.data.data = this.convertProfessionalTemplatesUrls(response.data.data);
+          // Map thumbnailUrl to thumbnail before conversion
+          const mappedData = response.data.data.map((template: any) => ({
+            ...template,
+            thumbnail: template.thumbnailUrl || template.thumbnail, // Use thumbnailUrl if available, fallback to thumbnail
+          }));
+          response.data.data = this.convertProfessionalTemplatesUrls(mappedData);
           logger.log(`✅ [HOME API] Fetched ${response.data.data.length} templates`);
         }
         

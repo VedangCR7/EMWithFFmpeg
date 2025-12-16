@@ -220,6 +220,7 @@ const RelatedPosterItem: React.FC<RelatedPosterItemProps> = React.memo(({
         uri={imageUrl}
         style={styles.relatedPosterImage}
         resizeMode="cover"
+        mode="thumbnail"
       />
       {isSelected && (
         <LinearGradient
@@ -253,8 +254,13 @@ const RelatedPosterItem: React.FC<RelatedPosterItemProps> = React.memo(({
   // Check dimensions (rarely change)
   if (prevProps.cardWidth !== nextProps.cardWidth || prevProps.cardHeight !== nextProps.cardHeight) return false;
   
-  // Check computed values
+  // Check imageUrl (includes thumbnailUrl priority)
   if (prevProps.imageUrl !== nextProps.imageUrl) return false;
+  
+  // Check thumbnailUrl if available (for better cache invalidation)
+  const prevThumbnailUrl = (prevProps.item as any).thumbnailUrl || prevProps.item.thumbnail;
+  const nextThumbnailUrl = (nextProps.item as any).thumbnailUrl || nextProps.item.thumbnail;
+  if (prevThumbnailUrl !== nextThumbnailUrl) return false;
   
   // Check overlay colors array reference (should be stable)
   if (prevProps.overlayColors !== nextProps.overlayColors) {
@@ -611,8 +617,21 @@ const PosterPlayerScreen: React.FC = () => {
     const initialPosterToUse = convertedInitialPoster;
     const initialPosterImage = initialPosterToUse.thumbnail || (initialPosterToUse as any).content?.background || '';
     
-    // Skip if we have a loading placeholder or no image
-    if (initialPosterToUse.id === 'loading' || !initialPosterImage) {
+    // Skip if we have a loading placeholder with no image
+    // BUT allow loading placeholder if it has a thumbnail (for greeting category preview)
+    if (initialPosterToUse.id === 'loading' && !initialPosterImage) {
+      return;
+    }
+    
+    // If it's a loading placeholder but has a thumbnail, display it immediately
+    // This handles the case when clicking a greeting category - show the category image while templates load
+    if (initialPosterToUse.id === 'loading' && initialPosterImage) {
+      React.startTransition(() => {
+        setCurrentPoster({
+          ...initialPosterToUse,
+          thumbnail: initialPosterImage,
+        } as Template);
+      });
       return;
     }
 
@@ -1789,8 +1808,9 @@ const PosterPlayerScreen: React.FC = () => {
   }, [filteredPosters, getHighQualityImageUrl]);
 
   const renderRelatedPoster = useCallback(({ item }: { item: Template }) => {
-    const metadata = templateMetadata.get(item.id);
-    const imageUrl = metadata?.imageUrl || item.thumbnail || '';
+    // Prioritize thumbnailUrl for grid preview performance (smaller, optimized images)
+    // Fallback to thumbnail, then imageUrl for compatibility
+    const thumbnailUrl = (item as any).thumbnailUrl || item.thumbnail || '';
     const isSelected = currentPosterId === item.id;
     
     return (
@@ -1798,13 +1818,13 @@ const PosterPlayerScreen: React.FC = () => {
         item={item}
         cardWidth={cardWidth}
         cardHeight={cardHeight}
-        imageUrl={imageUrl}
+        imageUrl={thumbnailUrl}
         onPress={handlePosterSelect}
         isSelected={isSelected}
         overlayColors={previewOverlayColors}
       />
     );
-  }, [cardWidth, cardHeight, handlePosterSelect, currentPosterId, templateMetadata, previewOverlayColors]);
+  }, [cardWidth, cardHeight, handlePosterSelect, currentPosterId, previewOverlayColors]);
 
 
   const renderLanguageButton = useCallback((language: typeof languages[0]) => {

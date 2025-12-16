@@ -4,6 +4,7 @@ export interface Banner {
   id: string;
   title: string;
   imageUrl: string;
+  thumbnailUrl?: string; // Optional thumbnail URL for faster loading
   link: string;
 }
 
