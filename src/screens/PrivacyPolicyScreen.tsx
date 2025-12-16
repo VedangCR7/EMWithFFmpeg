@@ -543,7 +543,7 @@ const PrivacyPolicyScreen = () => {
               }]}>Introduction</Text>
             </View>
             <Text style={[styles.sectionContent, {
-              fontSize: isTabletDevice ? getFontSize(8) : getFontSize(7.5),
+              fontSize: isTabletDevice ? getFontSize(8) : getFontSize(6.5),
               lineHeight: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(11),
               marginBottom: dynamicModerateScale(6),
               color: theme.colors.text,
@@ -553,7 +553,7 @@ const PrivacyPolicyScreen = () => {
               (collectively, the "Service").
             </Text>
             <Text style={[styles.sectionContent, {
-              fontSize: isTabletDevice ? getFontSize(8) : getFontSize(7.5),
+              fontSize: isTabletDevice ? getFontSize(8) : getFontSize(6.5),
               lineHeight: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(11),
               marginBottom: dynamicModerateScale(6),
               color: theme.colors.text,
@@ -578,7 +578,7 @@ const PrivacyPolicyScreen = () => {
             </View>
             
             <Text style={[styles.sectionContent, styles.highlight, {
-              fontSize: isTabletDevice ? getFontSize(8) : getFontSize(7.5),
+              fontSize: isTabletDevice ? getFontSize(8) : getFontSize(6.5),
               lineHeight: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(11),
               marginBottom: dynamicModerateScale(4),
               color: theme.colors.text,
@@ -612,7 +612,7 @@ const PrivacyPolicyScreen = () => {
             </View>
 
             <Text style={[styles.sectionContent, styles.highlight, { 
-              fontSize: isTabletDevice ? getFontSize(8) : getFontSize(7.5),
+              fontSize: isTabletDevice ? getFontSize(8) : getFontSize(6.5),
               lineHeight: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(11),
               marginTop: dynamicModerateScale(8),
               marginBottom: dynamicModerateScale(4),
@@ -649,7 +649,7 @@ const PrivacyPolicyScreen = () => {
             </View>
 
             <Text style={[styles.sectionContent, styles.highlight, { 
-              fontSize: isTabletDevice ? getFontSize(8) : getFontSize(7.5),
+              fontSize: isTabletDevice ? getFontSize(8) : getFontSize(6.5),
               lineHeight: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(11),
               marginTop: dynamicModerateScale(8),
               marginBottom: dynamicModerateScale(4),
@@ -686,7 +686,7 @@ const PrivacyPolicyScreen = () => {
               }]}>How We Use Your Information</Text>
             </View>
             <Text style={[styles.sectionContent, getContentStyle(), { 
-              fontSize: isTabletDevice ? getFontSize(8) : getFontSize(7.5),
+              fontSize: isTabletDevice ? getFontSize(8) : getFontSize(6.5),
               lineHeight: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(11),
               color: theme.colors.text 
             }]}>
@@ -727,7 +727,7 @@ const PrivacyPolicyScreen = () => {
               }]}>Information Sharing</Text>
             </View>
             <Text style={[styles.sectionContent, getContentStyle(), { 
-              fontSize: isTabletDevice ? getFontSize(8) : getFontSize(7.5),
+              fontSize: isTabletDevice ? getFontSize(8) : getFontSize(6.5),
               lineHeight: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(11),
               color: theme.colors.text 
             }]}>
@@ -760,7 +760,7 @@ const PrivacyPolicyScreen = () => {
               }]}>Data Security</Text>
             </View>
             <Text style={[styles.sectionContent, getContentStyle(), { 
-              fontSize: isTabletDevice ? getFontSize(8) : getFontSize(7.5),
+              fontSize: isTabletDevice ? getFontSize(8) : getFontSize(6.5),
               lineHeight: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(11),
               color: theme.colors.text 
             }]}>
@@ -794,7 +794,7 @@ const PrivacyPolicyScreen = () => {
               }]}>Your Rights and Choices</Text>
             </View>
             <Text style={[styles.sectionContent, getContentStyle(), { 
-              fontSize: isTabletDevice ? getFontSize(8) : getFontSize(7.5),
+              fontSize: isTabletDevice ? getFontSize(8) : getFontSize(6.5),
               lineHeight: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(11),
               color: theme.colors.text 
             }]}>
@@ -831,7 +831,7 @@ const PrivacyPolicyScreen = () => {
               }]}>Cookies and Tracking</Text>
             </View>
             <Text style={[styles.sectionContent, getContentStyle(), { 
-              fontSize: isTabletDevice ? getFontSize(8) : getFontSize(7.5),
+              fontSize: isTabletDevice ? getFontSize(8) : getFontSize(6.5),
               lineHeight: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(11),
               color: theme.colors.text 
             }]}>
@@ -850,9 +850,9 @@ const PrivacyPolicyScreen = () => {
               }]}>Third-Party Services</Text>
             </View>
             <Text style={[styles.sectionContent, getContentStyle(), { 
-              fontSize: isTabletDevice ? getFontSize(8) : getFontSize(7.5),
+              fontSize: isTabletDevice ? getFontSize(8) : getFontSize(6.5), 
               lineHeight: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(11),
-              color: theme.colors.text 
+              color: theme.colors.text                      
             }]}>
               Our Service integrates with third-party services including:
             </Text>
@@ -882,7 +882,7 @@ const PrivacyPolicyScreen = () => {
               }]}>Children's Privacy</Text>
             </View>
             <Text style={[styles.sectionContent, getContentStyle(), { 
-              fontSize: isTabletDevice ? getFontSize(8) : getFontSize(7.5),
+              fontSize: isTabletDevice ? getFontSize(8) : getFontSize(6.5), 
               lineHeight: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(11),
               color: theme.colors.text 
             }]}>
@@ -901,7 +901,7 @@ const PrivacyPolicyScreen = () => {
               }]}>Changes to This Privacy Policy</Text>
             </View>
             <Text style={[styles.sectionContent, getContentStyle(), { 
-              fontSize: isTabletDevice ? getFontSize(8) : getFontSize(7.5),
+              fontSize: isTabletDevice ? getFontSize(8) : getFontSize(6.5), 
               lineHeight: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(11),
               color: theme.colors.text 
             }]}>
