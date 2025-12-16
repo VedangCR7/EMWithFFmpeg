@@ -1590,9 +1590,6 @@ const HomeScreen: React.FC = React.memo(() => {
       try {
         const categories = await greetingTemplatesService.getCategories();
         if (isMounted && categories && categories.length > 0) {
-          // Print the categories received from the service
-          console.log('📋 [HOME SCREEN] Greeting Categories from Service:', JSON.stringify(categories, null, 2));
-          
           const mappedCategories = categories.map(category => ({
             id: category.id,
             name: category.name,
@@ -1601,14 +1598,6 @@ const HomeScreen: React.FC = React.memo(() => {
             imageUrl: (category as any).imageUrl || (category as any).image || (category as any).thumbnail || '',
             parentCategoryName: (category as any).parentCategoryName // Include parentCategoryName
           }));
-
-          // Print the mapped categories
-          console.log('📋 [HOME SCREEN] Mapped Greeting Categories:', JSON.stringify(mappedCategories.slice(0, 3), null, 2));
-          console.log('📋 [HOME SCREEN] Total Mapped Categories:', mappedCategories.length);
-          
-          // Check parentCategoryName in mapped categories
-          const categoriesWithParent = mappedCategories.filter(cat => (cat as any).parentCategoryName);
-          console.log(`📋 [HOME SCREEN] Mapped Categories WITH parentCategoryName: ${categoriesWithParent.length}`);
 
           // Set both states from single API call
           setGreetingCategoriesList(mappedCategories);

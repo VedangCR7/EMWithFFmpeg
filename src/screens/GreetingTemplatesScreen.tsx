@@ -546,17 +546,31 @@ const GreetingTemplatesScreen: React.FC = () => {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
+      // Clear all caches (in-memory + AsyncStorage) before fetching fresh data
       greetingTemplatesService.clearCache();
+      await AsyncStorage.multiRemove([CATEGORIES_CACHE_KEY, CATEGORY_PREVIEWS_CACHE_KEY]).catch(() => {});
+
       const data = await greetingTemplatesService.refreshCategories();
+
       if (isMountedRef.current) {
-        setCategories(data);
+        // Update state with fresh categories
+        setCategories(data || []);
+
+        // Reset local preview caches so they are recomputed for the new data
+        previewCacheRef.current = {};
+        setCategoryPreviewImages({});
+
+        // Persist fresh categories to AsyncStorage for faster next load
+        if (data && data.length > 0) {
+          AsyncStorage.setItem(CATEGORIES_CACHE_KEY, JSON.stringify(data)).catch(() => {});
+        }
       }
     } catch (error) {
       console.error('Error refreshing greeting categories:', error);
       Alert.alert('Error', 'Unable to refresh categories right now.');
     } finally {
       if (isMountedRef.current) {
-      setRefreshing(false);
+        setRefreshing(false);
       }
     }
   }, []);

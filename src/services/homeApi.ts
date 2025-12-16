@@ -349,8 +349,6 @@ class HomeApiService {
     return cacheService.getOrFetch(
       cacheKey,
       async () => {
-        console.log('📡 [HOME API] Fetching featured content...');
-        
         const queryParams = new URLSearchParams();
         
         if (params?.limit) queryParams.append('limit', params.limit.toString());
@@ -361,16 +359,7 @@ class HomeApiService {
         const url = `/api/mobile/home/featured${queryString ? `?${queryString}` : ''}`;
         
         const response = await api.get(url);
-        
-        // ===== PRINT COMPLETE API RESPONSE =====
-        console.log('═══════════════════════════════════════════════════════');
-        console.log('📦 [FEATURED CONTENT API] COMPLETE RESPONSE');
-        console.log('═══════════════════════════════════════════════════════');
-        console.log('📋 Response Status:', response.status);
-        console.log('📋 Response Headers:', JSON.stringify(response.headers, null, 2));
-        console.log('📋 Full Response Data:', JSON.stringify(response.data, null, 2));
-        console.log('═══════════════════════════════════════════════════════');
-        
+                
         // Validate response structure
         if (!response.data.success) {
           return {

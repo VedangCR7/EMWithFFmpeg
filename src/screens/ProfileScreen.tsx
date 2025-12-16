@@ -155,6 +155,7 @@ const ProfileScreen: React.FC = () => {
     return url;
   };
   
+  
   // Responsive icon sizes (compact - 60% of original, slightly larger for small screens)
   const getIconSize = (baseSize: number) => {
     const isCurrentlySmall = currentScreenWidth < 375;
