@@ -700,15 +700,15 @@ const TodaysPickScreen: React.FC = () => {
 
       const sectionsData: Array<{ title: string; data: Template[] }> = [];
       
-      // Add calendar section if there are calendar posters
-      if (calendarPosters.length > 0) {
+      // Add business section first
+      if (businessPosters.length > 0) {
         sectionsData.push({
-          title: "Today's Festivals",
-          data: calendarPosters,
+          title: 'Daily Business Post',
+          data: businessPosters,
         });
       }
       
-      // Add motivational section
+      // Add motivational section second
       if (motivationalPosters.length > 0) {
         sectionsData.push({
           title: 'Daily Motivation Quotes',
@@ -716,22 +716,23 @@ const TodaysPickScreen: React.FC = () => {
         });
       }
       
-      // Add business section
-      if (businessPosters.length > 0) {
+      // Add calendar section last if there are calendar posters
+      if (calendarPosters.length > 0) {
         sectionsData.push({
-          title: 'Daily Business Post',
-          data: businessPosters,
+          title: "Today's Festivals",
+          data: calendarPosters,
         });
       }
 
       setSections(sectionsData);
       
       // Keep flat list for preloading and sync with allTemplates for layout compatibility
-      const shuffledPosters = [...allPosters].sort(() => seededRandom(dailySeed, allPosters.length) - 0.5);
-      setTodayPosters(shuffledPosters);
+      // Order: Business first, then Motivational, then Calendar
+      const orderedPosters = [...businessPosters, ...motivationalPosters, ...calendarPosters];
+      setTodayPosters(orderedPosters);
       
       // Sync with allTemplates for PosterPlayerScreen layout compatibility
-      const templatesWithLanguages = shuffledPosters.map(t => mergeTemplateLanguages(t));
+      const templatesWithLanguages = orderedPosters.map((t: Template) => mergeTemplateLanguages(t));
       setAllTemplates(templatesWithLanguages);
       
       // Set first poster as current poster if available
