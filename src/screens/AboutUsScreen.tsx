@@ -225,7 +225,7 @@ const AboutUsScreen: React.FC = () => {
       textShadowRadius: 2,
     },
     statLabel: {
-      fontSize: isTabletDevice ? getFontSize(7.5) : getFontSize(7),
+      fontSize: isTabletDevice ? getFontSize(8) : getFontSize(7.5),
       color: theme.colors.textSecondary,
       textAlign: 'center',
       lineHeight: moderateScale(isTablet ? 11 : 10),
@@ -250,7 +250,7 @@ const AboutUsScreen: React.FC = () => {
       textShadowRadius: 2,
     },
     sectionText: {
-      fontSize: isTabletDevice ? getFontSize(8) : getFontSize(7.5),
+      fontSize: isTabletDevice ? getFontSize(8) : getFontSize(6.5),
       color: theme.colors.textSecondary,
       lineHeight: moderateScale(isTablet ? 12 : 11),
       fontWeight: '400',
@@ -269,7 +269,7 @@ const AboutUsScreen: React.FC = () => {
       // Inline styles used
     },
     featureText: {
-      fontSize: isTabletDevice ? getFontSize(8) : getFontSize(7.5),
+      fontSize: isTabletDevice ? getFontSize(8) : getFontSize(6.5),
       color: theme.colors.textSecondary,
       lineHeight: moderateScale(isTablet ? 12 : 11),
       flex: 1,
@@ -308,7 +308,7 @@ const AboutUsScreen: React.FC = () => {
       borderColor: `${theme.colors.primary}30`,
     },
     trialFeatureText: {
-      fontSize: isTabletDevice ? getFontSize(8) : getFontSize(7.5),
+      fontSize: isTabletDevice ? getFontSize(8) : getFontSize(6.5),
       color: theme.colors.textSecondary,
       fontWeight: '600',
       flex: 1,
@@ -319,7 +319,7 @@ const AboutUsScreen: React.FC = () => {
       borderTopColor: theme.colors.border,
     },
     versionText: {
-      fontSize: isTabletDevice ? getFontSize(7.5) : getFontSize(7),
+      fontSize: isTabletDevice ? getFontSize(7) : getFontSize(6.5),
       color: theme.colors.textSecondary,
       textAlign: 'center',
     },
@@ -336,7 +336,7 @@ const AboutUsScreen: React.FC = () => {
       elevation: 2,
     },
     privacyLinkText: {
-      fontSize: isTabletDevice ? getFontSize(9) : getFontSize(8),
+      fontSize: isTabletDevice ? getFontSize(10) : getFontSize(9),
       color: '#ffffff',
       fontWeight: '700',
       letterSpacing: 0.5,
@@ -443,7 +443,7 @@ const AboutUsScreen: React.FC = () => {
             }]}>
               <Text style={[dynamicStyles.statNumber, {
                 marginBottom: dynamicModerateScale(3),
-              }]}>50,000+</Text>
+              }]}>10,000+</Text>
               <Text style={dynamicStyles.statLabel}>Happy Businesses</Text>
             </View>
             <View style={[dynamicStyles.statItem, {
