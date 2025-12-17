@@ -493,14 +493,9 @@ const AboutUsScreen: React.FC = () => {
             marginBottom: dynamicModerateScale(8),
           }]}>Our Mission</Text>
           <Text style={[dynamicStyles.sectionText, {
-            marginBottom: dynamicModerateScale(8),
-          }]}>
-            To democratize professional marketing design by making it accessible, affordable, and effortless for every business, regardless of size or design expertise.
-          </Text>
-          <Text style={[dynamicStyles.sectionText, {
             marginBottom: dynamicModerateScale(4),
           }]}>
-            We believe every business deserves access to professional marketing materials that can compete with the biggest brands. Our platform removes the barriers of cost, time, and design skills.
+            To make professional marketing easy, affordable, and accessible for every business.
           </Text>
         </View>
 
@@ -517,12 +512,12 @@ const AboutUsScreen: React.FC = () => {
           <Text style={[dynamicStyles.sectionText, {
             marginBottom: dynamicModerateScale(8),
           }]}>
-            To become the world's leading platform for business marketing materials, empowering 1 million businesses to create professional designs effortlessly.
+            Building a world where every business creates big-brand marketing with ease.
           </Text>
           <Text style={[dynamicStyles.sectionText, {
             marginBottom: dynamicModerateScale(4),
           }]}>
-            We envision a world where every business, from local shops to global enterprises, has access to the same level of professional marketing materials that drive real business growth.
+            To empower 1 million businesses worldwide with effortless, professional marketing.
           </Text>
         </View>
 
@@ -539,12 +534,12 @@ const AboutUsScreen: React.FC = () => {
           <Text style={[dynamicStyles.sectionText, {
             marginBottom: dynamicModerateScale(8),
           }]}>
-            Traditional marketing agencies charge thousands of dollars for designs that take weeks to deliver. We saw an opportunity to provide the same quality results in minutes, at a fraction of the cost.
+            Marketing shouldn't be slow or expensive.
           </Text>
           <Text style={[dynamicStyles.sectionText, {
             marginBottom: dynamicModerateScale(4),
           }]}>
-            Our founders experienced firsthand the frustration of needing professional marketing materials but lacking the budget or design skills to create them. This personal pain point became our driving force.
+            We built MarketBrand.ai to deliver professional designs in minutes, not weeks.
           </Text>
         </View>
 

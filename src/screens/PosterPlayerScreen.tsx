@@ -12,6 +12,7 @@ import {
   PanResponder,
   Modal,
   ActivityIndicator,
+  InteractionManager,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
@@ -801,64 +802,203 @@ const PosterPlayerScreen: React.FC = () => {
           .replace(/\s+/g, ' ')
           .trim();
         
-        // Use getTemplates with category filter and limit of 200 to get templates
-        // Also use searchTemplates with both original and normalized category names
-        // This ensures we get all templates that match the category (like HomeScreen does)
-        // Both calls use limit: 200 to get all available images for the category
-        const [categoryTemplates, searchTemplatesOriginal, searchTemplatesNormalized] = await Promise.all([
-          greetingTemplatesService.getTemplates({ category: greetingCategory, limit: 200 }),
-          greetingTemplatesService.searchTemplates(greetingCategory, undefined),
-          greetingTemplatesService.searchTemplates(normalizedCategory, undefined)
-        ]);
+        // Generate search variations for better matching (e.g., "hiring/vacancy" -> ["hiring", "vacancy", "hiring vacancy"])
+        const categoryWords = normalizedCategory.split(/\s+/).filter(word => word.length > 0);
+        const searchVariations = [
+          greetingCategory.toLowerCase(),
+          normalizedCategory,
+          ...categoryWords, // Individual words
+          categoryWords.join(' '), // Combined words
+        ].filter((v, i, arr) => arr.indexOf(v) === i); // Remove duplicates
         
-        // Combine all search results
-        const searchTemplates = [...searchTemplatesOriginal, ...searchTemplatesNormalized];
+        // Optimized fetching: Use fast search with limits for initial load, then load more progressively
+        // First, get initial batch quickly (50 items) for fast initial render
+        const initialLimit = 50;
         
-        // Combine both results and remove duplicates
-        const combinedTemplates = [...categoryTemplates, ...searchTemplates];
-        const uniqueTemplatesMap = new Map();
+        // Search with multiple variations to catch all related templates
+        const searchPromises = [
+          greetingTemplatesService.getTemplates({ category: greetingCategory, limit: initialLimit }),
+          greetingTemplatesService.searchTemplates(greetingCategory, undefined, initialLimit),
+          greetingTemplatesService.searchTemplates(normalizedCategory, undefined, initialLimit),
+          // Also search with individual words for better matching
+          ...searchVariations.slice(0, 3).map(variation => 
+            greetingTemplatesService.searchTemplates(variation, undefined, initialLimit)
+          ),
+        ];
+        
+        const searchResults = await Promise.all(searchPromises);
+        const [categoryTemplates, searchTemplatesOriginal, searchTemplatesNormalized, ...variationResults] = searchResults;
+        
+        // Combine all search results and remove duplicates efficiently
+        const allSearchResults = [
+          ...searchTemplatesOriginal, 
+          ...searchTemplatesNormalized,
+          ...variationResults.flat() // Flatten variation results
+        ];
+        const combinedTemplates = [...categoryTemplates, ...allSearchResults];
+        
+        // Use Set for faster duplicate removal
+        const uniqueTemplatesMap = new Map<string, any>();
         combinedTemplates.forEach(template => {
-          if (!uniqueTemplatesMap.has(template.id)) {
+          if (template?.id && !uniqueTemplatesMap.has(template.id)) {
             uniqueTemplatesMap.set(template.id, template);
           }
         });
         const allTemplates = Array.from(uniqueTemplatesMap.values());
         
-        // Filter templates to only include those that have the category name in their tags or category
-        // Use both original and normalized category names for matching (to match HomeScreen behavior)
+        // Pre-compute normalized category and variations for efficient filtering
+        const normalizedCategoryLower = normalizedCategory.toLowerCase();
+        const greetingCategoryLower = greetingCategory.toLowerCase();
+        const categoryWordsLower = categoryWords.map(w => w.toLowerCase());
+        
+        // Optimized filtering: be more lenient to catch all related templates
         const filteredTemplates = allTemplates.filter(template => {
           const templateAny = template as any;
           const templateTags = Array.isArray(templateAny.tags) ? templateAny.tags : [];
-          const normalizedTags = templateTags.map((tag: string) => 
-            typeof tag === 'string' ? tag.toLowerCase().replace(/[&]/g, 'and').replace(/[^a-z0-9\s]/g, ' ').trim() : ''
-          );
           
-          // Check if any tag contains the original or normalized category name (case-insensitive)
-          const hasMatchingTag = templateTags.some((tag: string) => {
-            if (typeof tag !== 'string') return false;
-            const normalizedTag = tag.toLowerCase().replace(/[&]/g, 'and').replace(/[^a-z0-9\s]/g, ' ').trim();
-            return tag.toLowerCase().includes(greetingCategory.toLowerCase()) ||
-                   tag.toLowerCase().includes(normalizedCategory) ||
-                   normalizedTag.includes(normalizedCategory) ||
-                   normalizedCategory.includes(normalizedTag);
-          });
+          // Quick category match check first (fastest)
+          if (template.category) {
+            const templateCategoryLower = template.category.toLowerCase();
+            // Check if category matches original, normalized, or any word
+            if (templateCategoryLower.includes(greetingCategoryLower) || 
+                templateCategoryLower.includes(normalizedCategoryLower) ||
+                categoryWordsLower.some(word => templateCategoryLower.includes(word))) {
+              return true;
+            }
+          }
           
-          // Also check if category matches (original or normalized)
-          const normalizedTemplateCategory = template.category 
-            ? template.category.toLowerCase().replace(/[&]/g, 'and').replace(/[^a-z0-9\s]/g, ' ').trim()
-            : '';
-          const categoryMatch = template.category?.toLowerCase().includes(greetingCategory.toLowerCase()) ||
-                                normalizedTemplateCategory.includes(normalizedCategory) ||
-                                normalizedCategory.includes(normalizedTemplateCategory);
+          // Then check tags (only if category didn't match)
+          if (templateTags.length > 0) {
+            return templateTags.some((tag: string) => {
+              if (typeof tag !== 'string') return false;
+              const tagLower = tag.toLowerCase();
+              // Check if tag matches original, normalized, or any word
+              return tagLower.includes(greetingCategoryLower) || 
+                     tagLower.includes(normalizedCategoryLower) ||
+                     categoryWordsLower.some(word => tagLower.includes(word) || word.includes(tagLower));
+            });
+          }
           
-          return hasMatchingTag || categoryMatch;
+          return false;
         });
         
-        // Use filtered templates if available, otherwise use all templates
-        // Limit to 200 templates (as requested by user for general categories)
-        const templatesToUse = filteredTemplates.length > 0 
-          ? filteredTemplates.slice(0, 200)
-          : allTemplates.slice(0, 200);
+        // Use filtered templates if available, otherwise fall back to all templates
+        // This ensures we always show results even if filtering is too strict
+        // Limit to initial batch for fast render
+        const templatesToUse = filteredTemplates.length > 0
+          ? filteredTemplates.slice(0, initialLimit)
+          : allTemplates.slice(0, initialLimit);
+        
+        // Load remaining templates in background after initial render (progressive loading)
+        if (templatesToUse.length >= initialLimit) {
+          InteractionManager.runAfterInteractions(async () => {
+            try {
+              // Capture values for closure
+              const currentCategory = greetingCategory;
+              const currentNormalized = normalizedCategory;
+              const currentCategoryLower = greetingCategoryLower;
+              const currentNormalizedLower = normalizedCategoryLower;
+              const currentWords = categoryWordsLower;
+              const currentPoster = posterToMatch;
+              const currentVariations = searchVariations;
+              
+              // Use same variation search for background loading
+              const moreSearchPromises = [
+                greetingTemplatesService.getTemplates({ category: currentCategory, limit: 200 }),
+                greetingTemplatesService.searchTemplates(currentCategory, undefined, 200),
+                greetingTemplatesService.searchTemplates(currentNormalized, undefined, 200),
+                ...currentVariations.slice(0, 3).map(variation => 
+                  greetingTemplatesService.searchTemplates(variation, undefined, 200)
+                ),
+              ];
+              
+              const moreSearchResults = await Promise.all(moreSearchPromises);
+              const [moreCategoryTemplates, moreSearchOriginal, moreSearchNormalized, ...moreVariationResults] = moreSearchResults;
+              
+              const moreSearchTemplates = [
+                ...moreSearchOriginal, 
+                ...moreSearchNormalized,
+                ...moreVariationResults.flat()
+              ];
+              const moreCombined = [...moreCategoryTemplates, ...moreSearchTemplates];
+              
+              // Use Set for faster duplicate removal
+              const moreUniqueMap = new Map<string, any>();
+              moreCombined.forEach(template => {
+                if (template?.id && !moreUniqueMap.has(template.id)) {
+                  moreUniqueMap.set(template.id, template);
+                }
+              });
+              
+              const allMoreTemplates = Array.from(moreUniqueMap.values());
+              const moreFiltered = allMoreTemplates.filter(template => {
+                const templateAny = template as any;
+                const templateTags = Array.isArray(templateAny.tags) ? templateAny.tags : [];
+                
+                if (template.category) {
+                  const templateCategoryLower = template.category.toLowerCase();
+                  // Check if category matches original, normalized, or any word
+                  if (templateCategoryLower.includes(currentCategoryLower) || 
+                      templateCategoryLower.includes(currentNormalizedLower) ||
+                      currentWords.some(word => templateCategoryLower.includes(word))) {
+                    return true;
+                  }
+                }
+                
+                if (templateTags.length > 0) {
+                  return templateTags.some((tag: string) => {
+                    if (typeof tag !== 'string') return false;
+                    const tagLower = tag.toLowerCase();
+                    // Check if tag matches original, normalized, or any word
+                    return tagLower.includes(currentCategoryLower) || 
+                           tagLower.includes(currentNormalizedLower) ||
+                           currentWords.some(word => tagLower.includes(word) || word.includes(tagLower));
+                  });
+                }
+                
+                return false;
+              });
+              
+              const finalTemplates = moreFiltered.length > 0 
+                ? moreFiltered.slice(0, 200)
+                : allMoreTemplates.slice(0, 200);
+              
+              // Update templates if we got more results
+              if (finalTemplates.length > initialLimit) {
+                const convertedFinal = finalTemplates.map((template: any) => {
+                  let normalizedTags: string[] = [];
+                  if (Array.isArray(template.tags)) {
+                    normalizedTags = template.tags.map((tag: any) => String(tag).trim()).filter((tag: string) => tag.length > 0);
+                  } else if (typeof template.tags === 'string') {
+                    normalizedTags = template.tags.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag.length > 0);
+                  }
+
+                  return {
+                    id: template.id,
+                    name: template.name || 'Greeting Template',
+                    thumbnail: template.thumbnail || template.content?.background || '',
+                    category: template.category || currentCategory,
+                    downloads: template.downloads || 0,
+                    isDownloaded: template.isDownloaded || false,
+                    tags: normalizedTags,
+                  };
+                });
+                
+                const ensuredFinal = convertedFinal.map(t => mergeTemplateLanguages(t));
+                const initialPosterWithLanguages = mergeTemplateLanguages(currentPoster);
+                const existingIndex = ensuredFinal.findIndex(t => t.id === initialPosterWithLanguages.id);
+                let nextTemplates = ensuredFinal;
+                if (existingIndex === -1 && initialPosterWithLanguages.thumbnail) {
+                  nextTemplates = [initialPosterWithLanguages, ...ensuredFinal];
+                }
+                
+                setAllTemplates(nextTemplates);
+              }
+            } catch (error) {
+              // Silently fail background load - initial templates are already shown
+            }
+          });
+        }
         
         if (templatesToUse.length > 0) {
           // Convert GreetingTemplate to Template format

@@ -90,9 +90,35 @@ class CacheService {
         `${this.STORAGE_PREFIX}${key}`,
         JSON.stringify(entry)
       );
-    } catch (error) {
-      logger.error(`[CACHE] Error writing to AsyncStorage for key ${key}:`, error);
-      // If AsyncStorage fails, we still have memory cache
+    } catch (error: any) {
+      // Handle storage full error by clearing expired entries
+      if (error?.code === 13 || error?.message?.includes('SQLITE_FULL') || error?.message?.includes('database or disk is full')) {
+        logger.warn(`[CACHE] Storage full, clearing expired entries before retry for key ${key}`);
+        try {
+          await this.clearExpired();
+          // Retry once after clearing expired entries
+          await AsyncStorage.setItem(
+            `${this.STORAGE_PREFIX}${key}`,
+            JSON.stringify(entry)
+          );
+        } catch (retryError) {
+          logger.error(`[CACHE] Error writing to AsyncStorage for key ${key} after clearing expired:`, retryError);
+          // If still fails, try clearing old cache entries
+          try {
+            await this.clearOldCacheEntries(10); // Clear 10 oldest entries
+            await AsyncStorage.setItem(
+              `${this.STORAGE_PREFIX}${key}`,
+              JSON.stringify(entry)
+            );
+          } catch (finalError) {
+            logger.error(`[CACHE] Error writing to AsyncStorage for key ${key} after clearing old entries:`, finalError);
+            // If AsyncStorage fails, we still have memory cache
+          }
+        }
+      } else {
+        logger.error(`[CACHE] Error writing to AsyncStorage for key ${key}:`, error);
+        // If AsyncStorage fails, we still have memory cache
+      }
     }
   }
 
@@ -246,6 +272,58 @@ class CacheService {
       }
     } catch (error) {
       logger.error('[CACHE] Error clearing expired cache:', error);
+    }
+  }
+
+  /**
+   * Clear oldest cache entries to free up space
+   * @param count Number of oldest entries to clear
+   */
+  async clearOldCacheEntries(count: number = 10): Promise<void> {
+    try {
+      const keys = await AsyncStorage.getAllKeys();
+      const cacheKeys = keys.filter(k => k.startsWith(this.STORAGE_PREFIX));
+
+      const entriesWithTimestamps: Array<{ key: string; timestamp: number }> = [];
+
+      for (const key of cacheKeys) {
+        const stored = await AsyncStorage.getItem(key);
+        if (stored) {
+          try {
+            const entry: CacheEntry<any> = JSON.parse(stored);
+            entriesWithTimestamps.push({
+              key,
+              timestamp: entry.timestamp,
+            });
+          } catch (parseError) {
+            // Invalid entry, add it to removal list
+            entriesWithTimestamps.push({
+              key,
+              timestamp: 0, // Oldest
+            });
+          }
+        }
+      }
+
+      // Sort by timestamp (oldest first)
+      entriesWithTimestamps.sort((a, b) => a.timestamp - b.timestamp);
+
+      // Get oldest N entries to remove
+      const keysToRemove = entriesWithTimestamps
+        .slice(0, Math.min(count, entriesWithTimestamps.length))
+        .map(e => e.key);
+
+      if (keysToRemove.length > 0) {
+        // Also remove from memory cache
+        for (const key of keysToRemove) {
+          const keyWithoutPrefix = key.replace(this.STORAGE_PREFIX, '');
+          this.memoryCache.delete(keyWithoutPrefix);
+        }
+        await AsyncStorage.multiRemove(keysToRemove);
+        logger.warn(`[CACHE] Cleared ${keysToRemove.length} oldest cache entries to free space`);
+      }
+    } catch (error) {
+      logger.error('[CACHE] Error clearing old cache entries:', error);
     }
   }
 

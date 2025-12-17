@@ -130,7 +130,8 @@ class GreetingTemplatesService {
   clearCache(): void {
     cacheService.clear('greeting_categories');
     cacheService.clearPattern('greeting_templates_');
-    cacheService.clearPattern('greeting_search_'); // Clear search results cache
+    cacheService.clearPattern('greeting_search_'); // Clear search results cache (includes greeting_search_fast_)
+    cacheService.clearPattern('greeting_search_fast_'); // Explicitly clear fast search cache
   }
 
   // Get all greeting categories
@@ -220,8 +221,8 @@ class GreetingTemplatesService {
 
   // Force refresh categories by clearing cache and fetching fresh data
   async refreshCategories(): Promise<GreetingCategory[]> {
-    // Clear cache before fetching
-    cacheService.clear('greeting_categories');
+    // Clear all caches before fetching to ensure fresh data
+    this.clearCache();
     return this.getCategories();
   }
 
@@ -231,13 +232,38 @@ class GreetingTemplatesService {
       const response = await api.get(`/api/mobile/greetings/templates?category=${category}&limit=${limit}`);
       
       if (response.data.success) {
-        // API returns images in businessCategoryImages, not templates
+        // When category is provided, backend only returns templates (no businessCategoryImages)
+        // Always use templates for category-specific requests to ensure correct category matching
         const templates = response.data.data?.templates || [];
         const businessCategoryImages = response.data.data?.businessCategoryImages || [];
         
-        // Use businessCategoryImages if templates is empty
-        const dataToMap = businessCategoryImages.length > 0 ? businessCategoryImages : templates;
+        // For category-specific requests, ONLY use templates and filter to ensure category matches exactly
+        // Never use businessCategoryImages for category-specific requests
+        let dataToMap = templates;
         
+        // Additional safety: Filter templates to ensure they match the requested category EXACTLY
+        // This prevents templates from other categories (like business categories) from being returned
+        if (templates.length > 0 && category) {
+          const normalizedRequestedCategory = category.toLowerCase().trim();
+          dataToMap = templates.filter((template: any) => {
+            // ONLY check template.category field - ignore business_categories completely
+            const templateCategory = (template.category || '').toLowerCase().trim();
+            const matches = templateCategory === normalizedRequestedCategory;
+            
+            // Log mismatches for debugging
+            if (!matches && __DEV__) {
+              console.warn(`[getTemplatesByCategory] Template ${template.id} category mismatch:`, {
+                requested: normalizedRequestedCategory,
+                templateCategory: templateCategory,
+                templateTitle: template.title
+              });
+            }
+            
+            return matches;
+          });
+        }
+        
+        // If no matching templates found, return empty array (don't fall back to businessCategoryImages)
         if (dataToMap.length === 0) {
           return [];
         }
@@ -252,8 +278,10 @@ class GreetingTemplatesService {
             id: backendTemplate.id,
             name: backendTemplate.title,
             thumbnail: optimized.thumbnail,
-            category: backendTemplate.business_categories?.name || backendTemplate.category || 'General',
-            categoryId: backendTemplate.business_categories?.id || backendTemplate.businessCategoryId || undefined,
+            // CRITICAL: Always use template.category field only - never use business_categories.name
+            // This ensures templates are correctly associated with their greeting category
+            category: backendTemplate.category || 'General',
+            categoryId: undefined, // Don't use business category ID for greeting templates
             content: {
               text: backendTemplate.description || '',
               background: optimized.background,
@@ -298,12 +326,35 @@ class GreetingTemplatesService {
         const response = await api.get(endpoint);
         
         if (response.data.success) {
-          // API returns images in businessCategoryImages, not templates
           const templates = response.data.data?.templates || [];
           const businessCategoryImages = response.data.data?.businessCategoryImages || [];
           
-          // Use businessCategoryImages if templates is empty
-          const dataToMap = businessCategoryImages.length > 0 ? businessCategoryImages : templates;
+          let dataToMap: any[] = [];
+          
+          if (filters?.category) {
+            // Category filter: ONLY use templates and ensure they match the category exactly
+            // Never use businessCategoryImages when category filter is applied
+            const normalizedRequestedCategory = filters.category.toLowerCase().trim();
+            dataToMap = templates.filter((template: any) => {
+              // ONLY check template.category field - ignore business_categories completely
+              const templateCategory = (template.category || '').toLowerCase().trim();
+              const matches = templateCategory === normalizedRequestedCategory;
+              
+              // Log mismatches for debugging
+              if (!matches && __DEV__) {
+                console.warn(`[getTemplates] Template ${template.id} category mismatch:`, {
+                  requested: normalizedRequestedCategory,
+                  templateCategory: templateCategory,
+                  templateTitle: template.title
+                });
+              }
+              
+              return matches;
+            });
+          } else {
+            // No category filter: use businessCategoryImages if available, otherwise templates
+            dataToMap = businessCategoryImages.length > 0 ? businessCategoryImages : templates;
+          }
           
           if (dataToMap.length === 0) {
             return [];
@@ -319,8 +370,10 @@ class GreetingTemplatesService {
               id: backendTemplate.id,
               name: backendTemplate.title,
               thumbnail: optimized.thumbnail,
-              category: backendTemplate.business_categories?.name || backendTemplate.category || 'General',
-              categoryId: backendTemplate.business_categories?.id || backendTemplate.businessCategoryId || undefined,
+              // CRITICAL: Always use template.category field only - never use business_categories.name
+              // This ensures templates are correctly associated with their greeting category
+              category: backendTemplate.category || 'General',
+              categoryId: undefined, // Don't use business category ID for greeting templates
               content: {
                 text: backendTemplate.description || '',
                 background: optimized.background,
@@ -346,10 +399,93 @@ class GreetingTemplatesService {
     });
   }
 
+  // Fast search for thumbnail/preview fetching (optimized with lower limit)
+  async searchTemplatesFast(query: string, language?: string, limit: number = 12): Promise<GreetingTemplate[]> {
+    // Create cache key from query, language, and limit
+    const searchKey = `greeting_search_fast_${query}_${language || 'all'}_${limit}`;
+    const SEARCH_CACHE_TTL = 5 * 60 * 1000; // 5 minutes for fast search results (longer cache for previews)
+
+    return await cacheService.getOrFetch(
+      searchKey,
+      async () => {
+        const params = new URLSearchParams();
+        params.append('search', encodeURIComponent(query));
+        if (language) {
+          params.append('language', language);
+        }
+        params.append('limit', limit.toString()); // Use smaller limit for faster response
+        
+        const response = await api.get(`/api/mobile/greetings/templates?${params.toString()}`);
+      
+        if (response.data.success) {
+          const templates = response.data.data?.templates || [];
+          const businessCategoryImages = response.data.data?.businessCategoryImages || [];
+          
+          // For search queries, prefer templates over businessCategoryImages to ensure category accuracy
+          // Backend may return businessCategoryImages for search, but we prioritize templates for better category matching
+          const dataToMap = templates.length > 0 ? templates : businessCategoryImages;
+          
+          if (dataToMap.length === 0) {
+            return [];
+          }
+          
+          // Map backend response to frontend format (optimized - only map what we need)
+          const mappedTemplates = dataToMap.slice(0, limit).map((backendTemplate: any) => {
+            const fullUrl =
+              backendTemplate.url ||
+              backendTemplate.imageUrl ||
+              backendTemplate.thumbnailUrl ||
+              backendTemplate.thumbnail ||
+              backendTemplate.image;
+            const thumbnailUrl =
+              backendTemplate.thumbnailUrl ||
+              backendTemplate.url ||
+              backendTemplate.imageUrl ||
+              backendTemplate.thumbnail ||
+              backendTemplate.image;
+
+            const optimized = this.getOptimizedImageUrls(fullUrl, thumbnailUrl);
+
+            return {
+              id: backendTemplate.id,
+              name: backendTemplate.title,
+              thumbnail: optimized.thumbnail,
+              // CRITICAL: Always use template.category field only - never use business_categories.name
+              category: backendTemplate.category || 'General',
+              content: {
+                text: backendTemplate.description || '',
+                background: optimized.background,
+                layout: 'vertical' as const
+              },
+              downloads: backendTemplate.downloads || 0,
+              isDownloaded: false,
+              isPremium: backendTemplate.isPremium || false,
+              tags: Array.isArray(backendTemplate.tags) ? backendTemplate.tags : [],
+            };
+          });
+          
+          return mappedTemplates;
+        } else {
+          throw new Error('API returned unsuccessful response');
+        }
+      },
+      SEARCH_CACHE_TTL,
+      true // Allow stale data
+    ).catch((error) => {
+      console.error('Error searching greeting templates (fast):', error);
+      return []; // Return empty array instead of mock data
+    });
+  }
+
   // Search greeting templates (with caching - 2 min TTL for search results)
-  async searchTemplates(query: string, language?: string): Promise<GreetingTemplate[]> {
+  async searchTemplates(query: string, language?: string, limit?: number): Promise<GreetingTemplate[]> {
+    // Use fast search if no limit specified or limit is small (for previews)
+    if (!limit || limit <= 20) {
+      return this.searchTemplatesFast(query, language, limit || 12);
+    }
+
     // Create cache key from query and language
-    const searchKey = `greeting_search_${query}_${language || 'all'}`;
+    const searchKey = `greeting_search_${query}_${language || 'all'}_${limit || '200'}`;
     const SEARCH_CACHE_TTL = 2 * 60 * 1000; // 2 minutes for search results
 
     return await cacheService.getOrFetch(
@@ -360,60 +496,61 @@ class GreetingTemplatesService {
         if (language) {
           params.append('language', language);
         }
-        params.append('limit', '200');
+        params.append('limit', (limit || 200).toString());
         
         const response = await api.get(`/api/mobile/greetings/templates?${params.toString()}`);
       
-      if (response.data.success) {
-        // API returns images in businessCategoryImages, not templates
-        const templates = response.data.data?.templates || [];
-        const businessCategoryImages = response.data.data?.businessCategoryImages || [];
-        
-        // Use businessCategoryImages if templates is empty
-        const dataToMap = businessCategoryImages.length > 0 ? businessCategoryImages : templates;
-        
-        if (dataToMap.length === 0) {
-          return [];
+        if (response.data.success) {
+          const templates = response.data.data?.templates || [];
+          const businessCategoryImages = response.data.data?.businessCategoryImages || [];
+          
+          // For search queries, prefer templates over businessCategoryImages to ensure category accuracy
+          // Backend may return businessCategoryImages for search, but we prioritize templates for better category matching
+          const dataToMap = templates.length > 0 ? templates : businessCategoryImages;
+          
+          if (dataToMap.length === 0) {
+            return [];
+          }
+          
+          // Map backend response to frontend format
+          const mappedTemplates = dataToMap.map((backendTemplate: any) => {
+            const fullUrl =
+              backendTemplate.url ||
+              backendTemplate.imageUrl ||
+              backendTemplate.thumbnailUrl ||
+              backendTemplate.thumbnail ||
+              backendTemplate.image;
+            const thumbnailUrl =
+              backendTemplate.thumbnailUrl ||
+              backendTemplate.url ||
+              backendTemplate.imageUrl ||
+              backendTemplate.thumbnail ||
+              backendTemplate.image;
+
+            const optimized = this.getOptimizedImageUrls(fullUrl, thumbnailUrl);
+
+            return {
+              id: backendTemplate.id,
+              name: backendTemplate.title,
+              thumbnail: optimized.thumbnail,
+              // CRITICAL: Always use template.category field only - never use business_categories.name
+              category: backendTemplate.category || 'General',
+              content: {
+                text: backendTemplate.description || '',
+                background: optimized.background,
+                layout: 'vertical' as const
+              },
+              downloads: backendTemplate.downloads || 0,
+              isDownloaded: false,
+              isPremium: backendTemplate.isPremium || false,
+              tags: Array.isArray(backendTemplate.tags) ? backendTemplate.tags : [],
+            };
+          });
+          
+          return mappedTemplates;
+        } else {
+          throw new Error('API returned unsuccessful response');
         }
-        
-        // Map backend response to frontend format
-        const mappedTemplates = dataToMap.map((backendTemplate: any) => {
-          const fullUrl =
-            backendTemplate.url ||
-            backendTemplate.imageUrl ||
-            backendTemplate.thumbnailUrl ||
-            backendTemplate.thumbnail ||
-            backendTemplate.image;
-          const thumbnailUrl =
-            backendTemplate.thumbnailUrl ||
-            backendTemplate.url ||
-            backendTemplate.imageUrl ||
-            backendTemplate.thumbnail ||
-            backendTemplate.image;
-
-          const optimized = this.getOptimizedImageUrls(fullUrl, thumbnailUrl);
-
-          return {
-            id: backendTemplate.id,
-            name: backendTemplate.title,
-            thumbnail: optimized.thumbnail,
-            category: backendTemplate.business_categories?.name || backendTemplate.category || 'General',
-            content: {
-              text: backendTemplate.description || '',
-              background: optimized.background,
-              layout: 'vertical' as const
-            },
-            downloads: backendTemplate.downloads || 0,
-            isDownloaded: false,
-            isPremium: backendTemplate.isPremium || false,
-            tags: Array.isArray(backendTemplate.tags) ? backendTemplate.tags : [],
-          };
-        });
-        
-        return mappedTemplates;
-      } else {
-        throw new Error('API returned unsuccessful response');
-      }
       },
       SEARCH_CACHE_TTL,
       true // Allow stale data

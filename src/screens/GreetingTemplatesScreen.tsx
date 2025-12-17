@@ -14,6 +14,7 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
+  InteractionManager,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets, Edge } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -23,6 +24,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { MainStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../context/ThemeContext';
 import greetingTemplatesService, { GreetingCategory, GreetingTemplate } from '../services/greetingTemplates';
+import api from '../services/api';
 import { Template } from '../services/dashboard';
 import OptimizedImage from '../components/OptimizedImage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -68,6 +70,8 @@ const addOpacityToColor = (color: string = '#667eea', opacity: number): string =
 
 const CATEGORIES_CACHE_KEY = 'greeting_categories_cache_v1';
 const CATEGORY_PREVIEWS_CACHE_KEY = 'greeting_category_previews_cache_v1';
+const MIN_GENERAL_CATEGORY_COUNT = 8;
+const PREVIEW_TIMEOUT_MS = 6500;
 
 const createPlaceholderPoster = (category: GreetingCategory): Template => ({
   id: `loading-${category.id}`,
@@ -122,6 +126,7 @@ const GreetingTemplatesScreen: React.FC = () => {
   const [categoryPreviewImages, setCategoryPreviewImages] = useState<Record<string, string | null>>({});
   const isMountedRef = useRef(true);
   const previewCacheRef = useRef<Record<string, string | null>>({});
+  const previewRefreshKeyRef = useRef(0); // Force preview re-fetch on refresh
   const sectionAnimations = useRef<Map<string, Animated.Value>>(new Map()).current;
   const animatedSectionsRef = useRef<Set<string>>(new Set());
 
@@ -167,20 +172,90 @@ const GreetingTemplatesScreen: React.FC = () => {
     };
   }, []);
 
+  const ensureAllGeneralCategories = useCallback(async (initialCategories: GreetingCategory[] = [], deferFallback: boolean = false) => {
+    // Build a map so we can merge primary and fallback results without duplicates
+    const categoryMap = new Map<string, GreetingCategory>();
+    initialCategories.forEach(category => {
+      if (!category?.name) {
+        return;
+      }
+      const key = (category.id || category.name).toString();
+      categoryMap.set(key, category);
+    });
+
+    // If we already have a reasonable number of categories, skip the fallback fetch
+    if (categoryMap.size >= MIN_GENERAL_CATEGORY_COUNT) {
+      return Array.from(categoryMap.values());
+    }
+
+    // Defer fallback fetch to not block initial load
+    const fetchFallback = async () => {
+      try {
+        // Fallback to the dedicated greeting categories endpoint to make sure we have every general category
+        const response = await api.get('/api/mobile/greeting-categories');
+        const fallbackCategories = response?.data?.data?.categories || response?.data?.categories || [];
+
+        const newCategories: GreetingCategory[] = [];
+        fallbackCategories.forEach((category: any) => {
+          const name = category?.name || category?.category;
+          if (!name) {
+            return;
+          }
+          const key = category?.id || name;
+          if (categoryMap.has(key)) {
+            return;
+          }
+
+          const newCategory: GreetingCategory = {
+            id: key,
+            name,
+            icon: category.icon || '📄',
+            color: category.color || '#4A90E2',
+            parentCategoryName:
+              category.parentCategoryName ||
+              category.parentCategory ||
+              category.mainCategory ||
+              'General',
+          };
+          categoryMap.set(key, newCategory);
+          newCategories.push(newCategory);
+        });
+
+        // Update categories if new ones were found
+        if (newCategories.length > 0 && isMountedRef.current) {
+          setCategories(prev => {
+            const existingIds = new Set(prev.map(c => c.id));
+            const merged = [...prev, ...newCategories.filter(c => !existingIds.has(c.id))];
+            return merged;
+          });
+        }
+      } catch (fallbackError) {
+        logger.warn('[GreetingTemplatesScreen] Fallback fetch for general categories failed:', fallbackError);
+      }
+    };
+
+    if (deferFallback) {
+      // Defer to after interactions complete
+      InteractionManager.runAfterInteractions(() => {
+        fetchFallback();
+      });
+    } else {
+      await fetchFallback();
+    }
+
+    return Array.from(categoryMap.values());
+  }, []);
+
   const fetchCategories = useCallback(async (isRefresh: boolean = false) => {
     try {
       const data = await greetingTemplatesService.getCategories();
-      if (__DEV__) {
-        console.log(`[GreetingTemplatesScreen] Fetched ${data?.length || 0} categories`);
-        if (data && data.length > 0) {
-          console.log('[GreetingTemplatesScreen] Sample category:', JSON.stringify(data[0], null, 2));
-        }
-      }
+      // Defer fallback fetch to not block initial load
+      const mergedCategories = await ensureAllGeneralCategories(data || [], !isRefresh);
       if (isMountedRef.current) {
-        setCategories(data || []);
+        setCategories(mergedCategories || []);
         setInitialLoading(false);
-        if (data && data.length > 0) {
-          AsyncStorage.setItem(CATEGORIES_CACHE_KEY, JSON.stringify(data)).catch(() => {});
+        if (mergedCategories && mergedCategories.length > 0) {
+          AsyncStorage.setItem(CATEGORIES_CACHE_KEY, JSON.stringify(mergedCategories)).catch(() => {});
         }
       }
     } catch (error) {
@@ -195,11 +270,42 @@ const GreetingTemplatesScreen: React.FC = () => {
         setInitialLoading(false);
       }
     }
-  }, []);
+  }, [ensureAllGeneralCategories]);
 
   useEffect(() => {
     fetchCategories();
   }, [fetchCategories]);
+
+  const withTimeout = useCallback(
+    async <T,>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> => {
+      return new Promise(resolve => {
+        let settled = false;
+        const timer = setTimeout(() => {
+          if (!settled) {
+            settled = true;
+            resolve(fallback);
+          }
+        }, timeoutMs);
+
+        promise
+          .then(result => {
+            if (!settled) {
+              settled = true;
+              clearTimeout(timer);
+              resolve(result);
+            }
+          })
+          .catch(() => {
+            if (!settled) {
+              settled = true;
+              clearTimeout(timer);
+              resolve(fallback);
+            }
+          });
+      });
+    },
+    [],
+  );
 
   const extractTemplatePreview = useCallback((template?: GreetingTemplate | Template | null) => {
     if (!template) {
@@ -219,8 +325,9 @@ const GreetingTemplatesScreen: React.FC = () => {
   }, []);
 
   const fetchCategoryPreview = useCallback(
-    async (category: GreetingCategory): Promise<string | null> => {
+    async (category: GreetingCategory, usedPreviewUris?: Set<string>): Promise<string | null> => {
       try {
+        // Check for direct image first (same as HomeScreen)
         const directImage =
           (category as any).imageUrl ||
           (category as any).image ||
@@ -230,54 +337,89 @@ const GreetingTemplatesScreen: React.FC = () => {
           return directImage;
         }
 
-        const normalizedName = category.name?.trim();
+        const usedUris = usedPreviewUris || new Set<string>();
         let selectedTemplate: GreetingTemplate | Template | null = null;
 
-        if (normalizedName) {
-          try {
-            const searchResults = await greetingTemplatesService.searchTemplates(normalizedName);
-            if (Array.isArray(searchResults) && searchResults.length > 0) {
-              const match = searchResults.find(result => {
-                const templateAny = result as any;
-                const tags: string[] = Array.isArray(templateAny.tags) ? templateAny.tags : [];
-                const tagMatch = tags.some(tag => tag?.toLowerCase().includes(normalizedName.toLowerCase()));
-                const categoryMatch = result.category?.toLowerCase().includes(normalizedName.toLowerCase());
-                return tagMatch || categoryMatch;
-              });
-              selectedTemplate = match || searchResults[0];
+        // Prefer a direct category query first (faster than search)
+        try {
+          const directTemplates =
+            (await withTimeout(
+              greetingTemplatesService.getTemplates({ category: category.name, limit: 12 }),
+              PREVIEW_TIMEOUT_MS,
+              [],
+            )) || [];
+
+          const matchingDirect = directTemplates.find(template => {
+            const previewUri = extractTemplatePreview(template);
+            if (!previewUri || usedUris.has(previewUri)) {
+              return false;
             }
-          } catch (searchError) {
-            console.warn(`[GreetingTemplatesScreen] searchTemplates failed for ${normalizedName}:`, searchError);
+            const templateAny = template as any;
+            const templateTags = Array.isArray(templateAny.tags) ? templateAny.tags : [];
+            const tagMatch = templateTags.some(
+              (tag: string) => typeof tag === 'string' && tag.toLowerCase().includes(category.name.toLowerCase()),
+            );
+            const categoryMatch = template.category?.toLowerCase().includes(category.name.toLowerCase());
+            return tagMatch || categoryMatch;
+          });
+
+          selectedTemplate = matchingDirect || directTemplates?.[0] || null;
+        } catch (error) {
+          if (__DEV__) {
+            console.warn(`⚠️ Direct preview fetch failed for ${category.name}:`, error);
           }
         }
 
-        if (!selectedTemplate && normalizedName) {
-          const byName = await greetingTemplatesService.getTemplates({ category: normalizedName, limit: 1 });
-          selectedTemplate = byName?.[0] || null;
+        // If direct fetch failed, fall back to fast search with timeout (limit 12 for faster response)
+        if (!selectedTemplate) {
+          try {
+            const templates =
+              (await withTimeout(
+                greetingTemplatesService.searchTemplates(category.name, undefined, 12),
+                PREVIEW_TIMEOUT_MS,
+                [],
+              )) || [];
+
+            const matchingTemplate = templates.find(template => {
+              const previewUri = extractTemplatePreview(template);
+              if (!previewUri || usedUris.has(previewUri)) {
+                return false;
+              }
+
+              const templateAny = template as any;
+              const templateTags = Array.isArray(templateAny.tags) ? templateAny.tags : [];
+
+              const tagMatch = templateTags.some(
+                (tag: string) => typeof tag === 'string' && tag.toLowerCase().includes(category.name.toLowerCase()),
+              );
+
+              const categoryMatch = template.category?.toLowerCase().includes(category.name.toLowerCase());
+
+              return tagMatch || categoryMatch;
+            });
+
+            selectedTemplate = matchingTemplate || templates?.[0] || null;
+          } catch (error) {
+            if (__DEV__) {
+              console.warn(`⚠️ Failed to fetch preview for greeting category ${category.name}:`, error);
+            }
+          }
         }
 
-        if (!selectedTemplate && category.id) {
-          const byId = await greetingTemplatesService.getTemplates({ category: category.id, limit: 1 });
-          selectedTemplate = byId?.[0] || null;
+        const previewUri = extractTemplatePreview(selectedTemplate);
+        
+        // Track this preview URI as used if we have a set to track
+        if (previewUri && usedPreviewUris) {
+          usedPreviewUris.add(previewUri);
         }
-
-        if (!selectedTemplate && normalizedName) {
-          const byCategory = await greetingTemplatesService.getTemplatesByCategory(normalizedName, 1);
-          selectedTemplate = byCategory?.[0] || null;
-        }
-
-        if (!selectedTemplate && normalizedName) {
-          const bySearchFallback = await greetingTemplatesService.searchTemplates(`${normalizedName} greeting`);
-          selectedTemplate = bySearchFallback?.[0] || null;
-        }
-
-        return extractTemplatePreview(selectedTemplate);
+        
+        return previewUri;
       } catch (error) {
         console.warn(`Error fetching preview for category ${category.name}:`, error);
         return null;
       }
     },
-    [extractTemplatePreview],
+    [extractTemplatePreview, withTimeout],
   );
 
   useEffect(() => {
@@ -287,81 +429,137 @@ const GreetingTemplatesScreen: React.FC = () => {
       return;
     }
 
-    const activeIds = new Set(categories.map(category => category.id));
-    previewCacheRef.current = Object.fromEntries(
-      Object.entries(previewCacheRef.current).filter(([id]) => activeIds.has(id)),
-    );
-    setCategoryPreviewImages(prev => {
-      const nextEntries = Object.entries(prev).filter(([id]) => activeIds.has(id));
-      if (nextEntries.length === Object.keys(prev).length) {
-        return prev;
-      }
-      return Object.fromEntries(nextEntries);
-    });
+    // Defer preview fetching until after initial render and interactions
+    const handle = InteractionManager.runAfterInteractions(() => {
+      if (!isMountedRef.current) return;
 
-    const pending = categories.filter(category => previewCacheRef.current[category.id] === undefined);
-    if (pending.length === 0) {
-      return;
-    }
-
-    let isActive = true;
-    const concurrency = 4;
-
-    const fetchBatch = async (batch: GreetingCategory[]) => {
-      const results = await Promise.allSettled(
-        batch.map(async category => {
-          const uri = await fetchCategoryPreview(category);
-          return { id: category.id, uri };
-        }),
+      const activeIds = new Set(categories.map(category => category.id));
+      const currentRefreshKey = previewRefreshKeyRef.current;
+      
+      // Clean up preview cache to only include active category IDs
+      previewCacheRef.current = Object.fromEntries(
+        Object.entries(previewCacheRef.current).filter(([id]) => activeIds.has(id)),
       );
+      setCategoryPreviewImages(prev => {
+        const nextEntries = Object.entries(prev).filter(([id]) => activeIds.has(id));
+        if (nextEntries.length === Object.keys(prev).length) {
+          return prev;
+        }
+        return Object.fromEntries(nextEntries);
+      });
 
-      if (!isActive) {
+      // Find categories that need preview fetching
+      const pending = categories.filter(category => {
+        const cached = previewCacheRef.current[category.id];
+        return cached === undefined;
+      });
+      
+      if (pending.length === 0) {
         return;
       }
 
-      const updates: Record<string, string | null> = {};
-      results.forEach((result, index) => {
-        const category = batch[index];
-        if (result.status === 'fulfilled') {
-          previewCacheRef.current[result.value.id] = result.value.uri;
-          updates[result.value.id] = result.value.uri;
-        } else {
-          previewCacheRef.current[category.id] = null;
-          updates[category.id] = null;
+      let isActive = true;
+      const concurrency = 4; // Reduced concurrency for better performance
+      const usedPreviewUris = new Set<string>(
+        Object.values(previewCacheRef.current).filter((uri): uri is string => uri !== null),
+      );
+
+      // Batch updates to reduce re-renders
+      const batchedUpdates: Record<string, string | null> = {};
+      let batchTimer: NodeJS.Timeout | null = null;
+
+      const flushBatch = () => {
+        if (Object.keys(batchedUpdates).length > 0 && isMountedRef.current) {
+          const updates = { ...batchedUpdates };
+          Object.keys(batchedUpdates).length = 0; // Clear batch
+          
+          setCategoryPreviewImages(prev => {
+            let changed = false;
+            const next = { ...prev };
+            Object.entries(updates).forEach(([id, uri]) => {
+              if (next[id] !== uri) {
+                next[id] = uri;
+                changed = true;
+              }
+            });
+            return changed ? next : prev;
+          });
         }
-      });
+        batchTimer = null;
+      };
 
-      setCategoryPreviewImages(prev => {
-        let changed = false;
-        const next = { ...prev };
-        Object.entries(updates).forEach(([id, uri]) => {
-          if (next[id] !== uri) {
-            next[id] = uri;
-            changed = true;
+      const scheduleBatchUpdate = (id: string, uri: string | null) => {
+        batchedUpdates[id] = uri;
+        if (!batchTimer) {
+          batchTimer = setTimeout(flushBatch, 100); // Batch updates every 100ms
+        }
+      };
+
+      const queue: GreetingCategory[] = [...pending];
+      const worker = async () => {
+        while (isActive) {
+          const category = queue.shift();
+          if (!category) {
+            return;
           }
+
+          try {
+            const uri = await fetchCategoryPreview(category, usedPreviewUris);
+            if (uri) {
+              usedPreviewUris.add(uri);
+            }
+            previewCacheRef.current[category.id] = uri;
+            scheduleBatchUpdate(category.id, uri);
+          } catch (error) {
+            previewCacheRef.current[category.id] = null;
+            scheduleBatchUpdate(category.id, null);
+          }
+        }
+      };
+
+      const workers = Array.from({ length: Math.min(concurrency, queue.length) }, () => worker());
+
+      Promise.all(workers)
+        .then(() => {
+          // Flush any remaining batched updates
+          if (batchTimer) {
+            clearTimeout(batchTimer);
+          }
+          flushBatch();
+        })
+        .catch(() => {
+          // swallow errors, state updates handled per-worker
+          if (batchTimer) {
+            clearTimeout(batchTimer);
+          }
+          flushBatch();
         });
-        return changed ? next : prev;
-      });
-    };
 
-    const loadPreviews = async () => {
-      for (let i = 0; i < pending.length && isActive; i += concurrency) {
-        const batch = pending.slice(i, i + concurrency);
-        await fetchBatch(batch);
-      }
-    };
-
-    loadPreviews();
+      return () => {
+        isActive = false;
+        if (batchTimer) {
+          clearTimeout(batchTimer);
+        }
+        flushBatch();
+      };
+    });
 
     return () => {
-      isActive = false;
+      handle.cancel();
     };
   }, [categories, fetchCategoryPreview]);
 
+  // Debounce AsyncStorage writes to avoid excessive I/O
   useEffect(() => {
-    AsyncStorage.setItem(CATEGORY_PREVIEWS_CACHE_KEY, JSON.stringify(previewCacheRef.current)).catch(
-      () => {},
-    );
+    const timer = setTimeout(() => {
+      if (isMountedRef.current && Object.keys(previewCacheRef.current).length > 0) {
+        AsyncStorage.setItem(CATEGORY_PREVIEWS_CACHE_KEY, JSON.stringify(previewCacheRef.current)).catch(
+          () => {},
+        );
+      }
+    }, 1000); // Debounce by 1 second
+
+    return () => clearTimeout(timer);
   }, [categoryPreviewImages]);
 
   const normalizedSearchQuery = useMemo(() => searchQuery.trim().toLowerCase(), [searchQuery]);
@@ -388,15 +586,6 @@ const GreetingTemplatesScreen: React.FC = () => {
     // Recalculate columns here to ensure we always use the current screenWidth
     // This prevents stale closure issues
     const cols = screenWidth >= 768 ? 4 : 2;
-    
-    if (__DEV__) {
-      console.log('[GreetingTemplatesScreen] groupedCategories - starting with:', {
-        filteredCategoriesCount: filteredCategories.length,
-        categoryColumns: cols,
-        screenWidth,
-        categoryColumnsMemo: categoryColumns, // Also log the memo value for comparison
-      });
-    }
     
     const groups: Record<string, GreetingCategory[]> = {};
     
@@ -431,15 +620,6 @@ const GreetingTemplatesScreen: React.FC = () => {
         };
       })
       .filter(section => section.data.length > 0); // Filter out empty sections
-    
-    if (__DEV__) {
-      console.log('[GreetingTemplatesScreen] groupedCategories - result:', {
-        sectionsCount: sections.length,
-        totalCategories: filteredCategories.length,
-        categoryColumns: cols,
-        sections: sections.map(s => ({ title: s.title, rows: s.data.length, categoriesInRows: s.data.map(r => r.length) })),
-      });
-    }
     
     return sections;
   }, [filteredCategories, screenWidth]);
@@ -546,23 +726,32 @@ const GreetingTemplatesScreen: React.FC = () => {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      // Clear all caches (in-memory + AsyncStorage) before fetching fresh data
+      // Clear ALL caches (in-memory + AsyncStorage) before fetching fresh data
+      // This ensures a complete refresh with no stale data
       greetingTemplatesService.clearCache();
+      
+      // Clear AsyncStorage caches
       await AsyncStorage.multiRemove([CATEGORIES_CACHE_KEY, CATEGORY_PREVIEWS_CACHE_KEY]).catch(() => {});
 
+      // Reset all in-memory preview caches BEFORE fetching new categories
+      // This ensures all categories will be marked as pending for preview fetching
+      previewCacheRef.current = {};
+      setCategoryPreviewImages({});
+      
+      // Increment refresh key to force preview re-fetching
+      previewRefreshKeyRef.current += 1;
+
+      // Fetch fresh categories (this will bypass cache due to clearCache call)
       const data = await greetingTemplatesService.refreshCategories();
+      const mergedCategories = await ensureAllGeneralCategories(data || []);
 
       if (isMountedRef.current) {
-        // Update state with fresh categories
-        setCategories(data || []);
-
-        // Reset local preview caches so they are recomputed for the new data
-        previewCacheRef.current = {};
-        setCategoryPreviewImages({});
+        // Update state with fresh categories (create new array reference to trigger useEffect)
+        setCategories([...mergedCategories]);
 
         // Persist fresh categories to AsyncStorage for faster next load
-        if (data && data.length > 0) {
-          AsyncStorage.setItem(CATEGORIES_CACHE_KEY, JSON.stringify(data)).catch(() => {});
+        if (mergedCategories && mergedCategories.length > 0) {
+          AsyncStorage.setItem(CATEGORIES_CACHE_KEY, JSON.stringify(mergedCategories)).catch(() => {});
         }
       }
     } catch (error) {
@@ -573,7 +762,7 @@ const GreetingTemplatesScreen: React.FC = () => {
         setRefreshing(false);
       }
     }
-  }, []);
+  }, [ensureAllGeneralCategories]);
 
   const handleCategoryPress = useCallback(async (category: GreetingCategory) => {
     // Get the preview image for this category if available
@@ -672,16 +861,7 @@ const GreetingTemplatesScreen: React.FC = () => {
   const categoryColumns = useMemo(() => {
     // Tablets and bigger screens: 4 columns
     // Small screens: 2 columns
-    const columns = screenWidth >= 768 ? 4 : 2;
-    if (__DEV__) {
-      console.log('[GreetingTemplatesScreen] categoryColumns calculation:', {
-        screenWidth,
-        columns,
-        isTablet: screenWidth >= 768,
-        timestamp: Date.now(),
-      });
-    }
-    return columns;
+    return screenWidth >= 768 ? 4 : 2;
   }, [screenWidth]);
 
   const categoryCardGap = moderateScale(8);

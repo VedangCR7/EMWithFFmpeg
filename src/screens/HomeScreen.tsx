@@ -4886,6 +4886,9 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                 initialNumToRender={3}
                 updateCellsBatchingPeriod={150}
                 getItemLayout={getItemLayout}
+                onEndReached={loadMoreBusinessLegendQuote}
+                onEndReachedThreshold={0.5}
+                ListFooterComponent={businessLegendQuoteLoading ? <ActivityIndicator size="small" color={theme.colors.primary} /> : null}
               />
             </View>
           )}
