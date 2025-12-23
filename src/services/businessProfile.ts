@@ -242,6 +242,14 @@ class BusinessProfileService {
         throw new Error('Business name, owner name, email, phone, and category are required.');
       }
       
+      // Handle logo upload if it's a local file path
+      let logoUrl = data.companyLogo || '';
+      if (logoUrl && this.isLocalFilePath(logoUrl)) {
+        console.log('⚠️ [CREATE] Logo is a local file path, will send as-is (API should handle upload)');
+        // Note: If API doesn't handle local paths, we'd need to upload first
+        // For now, send it and let the API handle it
+      }
+      
       // Map frontend data to backend format
       const backendData = {
         businessName,
@@ -250,12 +258,13 @@ class BusinessProfileService {
         phone,
         address,
         category,
-        logo: data.companyLogo || '',
+        logo: logoUrl,
         description: data.description || '',
         website: data.website || ''
       };
       
       console.log('📤 Sending business profile data:', JSON.stringify(backendData, null, 2));
+      console.log('🖼️ Logo URL being sent:', logoUrl || '(empty)');
       
       const response = await api.post('/api/mobile/business-profile', backendData);
       
@@ -266,6 +275,9 @@ class BusinessProfileService {
         
         // Map backend response to frontend format
         const backendProfile = response.data.data;
+        const returnedLogo = backendProfile.logo || '';
+        console.log('🖼️ Logo URL returned from API:', returnedLogo || '(empty)');
+        
         const newProfile: BusinessProfile = {
           id: backendProfile.id,
           name: backendProfile.businessName,
@@ -276,8 +288,8 @@ class BusinessProfileService {
           alternatePhone: backendProfile.alternatePhone || '',
           email: backendProfile.email || '',
           website: backendProfile.website || '',
-          companyLogo: backendProfile.logo || '',
-          logo: backendProfile.logo || '',
+          companyLogo: returnedLogo,
+          logo: returnedLogo,
           banner: '',
           services: [],
           createdAt: backendProfile.createdAt,
@@ -705,12 +717,38 @@ class BusinessProfileService {
       const response = await api.post('/api/mobile/business-profile/verify-payment', payload);
       
       console.log('✅ Business profile payment verified successfully:', response.data);
-      return response.data;
+      
+      if (response.data.success) {
+        return response.data;
+      } else {
+        // If API returns unsuccessful response, throw error with message
+        const errorMessage = response.data.message || 'Payment verification failed';
+        throw new Error(errorMessage);
+      }
     } catch (error: any) {
       console.error('❌ Business profile payment verification error:', error);
+      console.error('❌ Error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message,
+      });
       
       // Provide more detailed error message
-      const errorMessage = error.response?.data?.message || error.message || 'Payment verification failed';
+      let errorMessage = 'Payment verification failed';
+      
+      if (error.response?.status === 404) {
+        errorMessage = 'Payment verification endpoint not found. Please contact support.';
+      } else if (error.response?.status === 400) {
+        errorMessage = error.response?.data?.message || 'Invalid payment data. Please try again.';
+      } else if (error.response?.status === 500) {
+        errorMessage = 'Server error during payment verification. Please contact support.';
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       throw new Error(errorMessage);
     }
   }

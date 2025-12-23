@@ -69,39 +69,44 @@ class DownloadTrackingService {
         
         if (response.data.success) {
           
-          // Map backend response to frontend format with resource fetching
-          const mappedDownloads = await Promise.all(response.data.data.downloads.map(async (download: any) => {
-            // API returns: type, downloadUrl, title, resourceId, downloadedAt
-            const downloadUrl = download.downloadUrl;
-            const resourceType = download.type; // API uses 'type' not 'resourceType'
-            const isValidDownloadUrl = downloadUrl?.startsWith('http://') || downloadUrl?.startsWith('https://');
+          // Map backend response to frontend format
+          // Backend now returns: fileUrl, thumbnail, title, category, resourceType, resourceId, createdAt
+          const mappedDownloads = response.data.data.downloads.map((download: any) => {
+            // Backend returns both 'type' and 'resourceType' for compatibility
+            const resourceType = download.resourceType || download.type;
             
-            // Use downloadUrl if valid, otherwise try to fetch from resource
-            let imageUrl = isValidDownloadUrl ? downloadUrl : null;
-            let title = download.title || this.getResourceTitle(resourceType, download.resourceId);
-            let category = download.category || this.getResourceCategory(resourceType, download.resourceId);
+            // Backend now provides fileUrl and thumbnail directly
+            const fileUrl = download.fileUrl || download.downloadUrl || '';
+            const thumbnail = download.thumbnail || fileUrl || '';
             
-            // If no valid image URL, try to fetch actual resource data
-            if (!imageUrl) {
-              const resourceData = await this.fetchResourceData(resourceType, download.resourceId);
-              if (resourceData) {
-                imageUrl = resourceData.thumbnail;
-                title = resourceData.title || title;
-                category = resourceData.category || category;
-              }
-            }
+            // Validate URLs - accept http/https and file:// URLs (for local images)
+            const isValidFileUrl = fileUrl && 
+              typeof fileUrl === 'string' && 
+              fileUrl.trim() !== '' && 
+              (fileUrl.startsWith('http://') || 
+               fileUrl.startsWith('https://') || 
+               fileUrl.startsWith('file://') ||
+               fileUrl.startsWith('content://')); // Accept file:// and content:// URLs for local images
+            
+            const isValidThumbnail = thumbnail && 
+              typeof thumbnail === 'string' && 
+              thumbnail.trim() !== '' && 
+              (thumbnail.startsWith('http://') || 
+               thumbnail.startsWith('https://') || 
+               thumbnail.startsWith('file://') ||
+               thumbnail.startsWith('content://')); // Accept file:// and content:// URLs
             
             return {
               id: download.id,
               resourceType: resourceType,
               resourceId: download.resourceId,
-              fileUrl: imageUrl,
-              createdAt: download.downloadedAt || download.createdAt,
-              title: title,
-              thumbnail: imageUrl,
-              category: category
+              fileUrl: isValidFileUrl ? fileUrl : '',
+              thumbnail: isValidThumbnail ? thumbnail : (isValidFileUrl ? fileUrl : ''),
+              createdAt: download.createdAt || download.downloadedAt,
+              title: download.title || this.getResourceTitle(resourceType, download.resourceId),
+              category: download.category || this.getResourceCategory(resourceType, download.resourceId)
             };
-          }));
+          });
 
           return {
             downloads: mappedDownloads,

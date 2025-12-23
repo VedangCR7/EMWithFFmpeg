@@ -395,8 +395,20 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
          
          // Track download in backend API
          if (userId) {
-           await trackPosterDownload(
+           // Use actual template ID from selectedImage if selectedTemplateId is invalid
+           const actualTemplateId = (selectedTemplateId && selectedTemplateId !== 'loading') 
+             ? selectedTemplateId 
+             : (selectedImage?.id || selectedImage?.templateId || 'unknown');
+           
+           console.log('📥 [POSTER PREVIEW] Tracking download with:', {
              selectedTemplateId,
+             actualTemplateId,
+             selectedImageId: selectedImage?.id,
+             posterTitle,
+           });
+           
+           await trackPosterDownload(
+             actualTemplateId,
              capturedImageUri,
              posterTitle,
              capturedImageUri, // Use same URI as thumbnail

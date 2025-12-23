@@ -18,13 +18,14 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Share } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import downloadedPostersService, { DownloadedPoster } from '../services/downloadedPosters';
 import downloadTrackingService, { DownloadedContent } from '../services/downloadTracking';
 import authService from '../services/auth';
+import cacheService from '../services/cacheService';
 import { MainStackParamList } from '../navigation/AppNavigator';
 import { Template } from '../services/dashboard';
 import logger from '../utils/logger';
@@ -92,6 +93,15 @@ const MyPostersScreen: React.FC = () => {
     loadPosters();
   }, []);
 
+  // Refresh posters when screen comes into focus (e.g., after downloading a new poster)
+  useFocusEffect(
+    useCallback(() => {
+      console.log('🔄 [MY POSTERS] Screen focused - refreshing posters...');
+      loadPosters();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+  );
+
   // Filter posters when search query or category changes
   useEffect(() => {
     filterPosters();
@@ -105,26 +115,122 @@ const MyPostersScreen: React.FC = () => {
       const currentUser = authService.getCurrentUser();
       const userId = currentUser?.id;
       
+      console.log('📥 [MY POSTERS] Loading posters for user:', userId);
+      
       if (!userId) {
+        console.warn('⚠️ [MY POSTERS] No user ID available');
+        setPosters([]);
         setLoading(false);
         return;
       }
 
-      // Fetch downloads from backend API
+      // Clear cache to force fresh data fetch (especially after new downloads)
+      console.log('🗑️ [MY POSTERS] Clearing downloads cache to force refresh...');
+      await cacheService.clearPattern(`user_downloads_${userId}_`);
+      
+      // Fetch downloads from backend API (will fetch fresh data after cache clear)
+      console.log('📡 [MY POSTERS] Fetching downloads from API...');
       const downloadsResponse = await downloadTrackingService.getUserDownloads(userId);
       
       // Convert DownloadedContent to DownloadedPoster format
-      const downloadedPosters: DownloadedPoster[] = downloadsResponse.downloads.map((download: DownloadedContent) => {
+      console.log('📥 [MY POSTERS] Raw downloads data:', JSON.stringify(downloadsResponse.downloads.slice(0, 2), null, 2));
+      console.log(`📊 [MY POSTERS] Total downloads received: ${downloadsResponse.downloads.length}`);
+      
+      // Step 1: Filter out downloads without valid image URLs
+      // Accept both HTTP/HTTPS URLs and file:// URLs (for local images)
+      const validDownloads = downloadsResponse.downloads.filter((download: DownloadedContent) => {
+        const hasValidUrl = download.fileUrl || download.thumbnail;
+        const isValidUrl = hasValidUrl && 
+          typeof hasValidUrl === 'string' && 
+          hasValidUrl.trim() !== '' && 
+          (hasValidUrl.startsWith('http://') || 
+           hasValidUrl.startsWith('https://') || 
+           hasValidUrl.startsWith('file://')); // Accept file:// URLs for local images
+        
+        if (!isValidUrl) {
+          console.warn(`⚠️ [MY POSTERS] Skipping download ${download.id} - no valid URL:`, {
+            fileUrl: download.fileUrl,
+            thumbnail: download.thumbnail,
+            resourceId: download.resourceId,
+            resourceType: download.resourceType,
+          });
+        }
+        
+        return isValidUrl;
+      });
+      
+      console.log(`✅ [MY POSTERS] Valid downloads after URL filtering: ${validDownloads.length}`);
+      
+      // Step 2: Deduplicate by resourceId and resourceType (keep the most recent one)
+      const uniqueDownloadsMap = new Map<string, DownloadedContent>();
+      
+      validDownloads.forEach((download: DownloadedContent) => {
+        // Create a unique key from resourceId and resourceType
+        const uniqueKey = `${download.resourceId}_${download.resourceType}`;
+        
+        const existing = uniqueDownloadsMap.get(uniqueKey);
+        
+        if (!existing) {
+          // First occurrence, add it
+          uniqueDownloadsMap.set(uniqueKey, download);
+        } else {
+          // Duplicate found, keep the one with the most recent createdAt date
+          const existingDate = new Date(existing.createdAt || 0);
+          const currentDate = new Date(download.createdAt || 0);
+          
+          if (currentDate > existingDate) {
+            console.log(`🔄 [MY POSTERS] Replacing duplicate for ${uniqueKey}:`, {
+              oldId: existing.id,
+              newId: download.id,
+              oldDate: existing.createdAt,
+              newDate: download.createdAt,
+            });
+            uniqueDownloadsMap.set(uniqueKey, download);
+          } else {
+            console.log(`⏭️ [MY POSTERS] Skipping duplicate for ${uniqueKey} (keeping older):`, {
+              keptId: existing.id,
+              skippedId: download.id,
+            });
+          }
+        }
+      });
+      
+      const uniqueDownloads = Array.from(uniqueDownloadsMap.values());
+      console.log(`🎯 [MY POSTERS] Unique downloads after deduplication: ${uniqueDownloads.length} (removed ${validDownloads.length - uniqueDownloads.length} duplicates)`);
+      
+      // Step 3: Map to DownloadedPoster format
+      const downloadedPosters: DownloadedPoster[] = uniqueDownloads.map((download: DownloadedContent) => {
+        // Use title from download, fallback to resource type
+        const posterTitle = download.title || download.resourceType || 'Downloaded Poster';
+        
+        // Use category from download, fallback to resource type
+        const posterCategory = download.category || download.resourceType || 'Uncategorized';
+        
+        // Determine image URLs - prefer thumbnail for display, fileUrl as fallback
+        const imageUrl = download.fileUrl || download.thumbnail || '';
+        const thumbnailUrl = download.thumbnail || download.fileUrl || '';
+        
+        console.log(`✅ [MY POSTERS] Processing download ${download.id}:`, {
+          title: posterTitle,
+          category: posterCategory,
+          resourceId: download.resourceId,
+          resourceType: download.resourceType,
+          hasFileUrl: !!download.fileUrl,
+          hasThumbnail: !!download.thumbnail,
+          imageUrl: imageUrl.substring(0, 50) + '...',
+          thumbnailUrl: thumbnailUrl.substring(0, 50) + '...',
+        });
         
         return {
           id: download.id,
-          title: download.resourceType, // Show resource type as title
-          description: download.thumbnail || download.fileUrl || 'No thumbnail', // Show thumbnail URL as description
-          imageUri: download.fileUrl,
-          thumbnailUri: download.thumbnail,
-          category: download.resourceType, // Group by resource type
+          title: posterTitle,
+          description: posterCategory,
+          imageUri: imageUrl,
+          thumbnailUri: thumbnailUrl,
+          category: posterCategory,
           downloadDate: download.createdAt,
-          tags: []
+          tags: [],
+          templateId: download.resourceId, // Store resource ID for reference
         };
       });
       
@@ -222,7 +328,7 @@ const MyPostersScreen: React.FC = () => {
     // Use imageUri (full image) for main display, not thumbnailUri
     const selectedTemplate: Template = {
       id: poster.id,
-      name: poster.name || poster.title || 'Downloaded Poster',
+      name: poster.title || 'Downloaded Poster',
       thumbnail: poster.imageUri || poster.thumbnailUri || '', // Use main image first
       category: poster.category || 'Uncategorized',
       downloads: 0,
@@ -234,7 +340,7 @@ const MyPostersScreen: React.FC = () => {
       .filter(p => p.id !== poster.id)
       .map(p => ({
         id: p.id,
-        name: p.name || p.title || 'Downloaded Poster',
+        name: p.title || 'Downloaded Poster',
         thumbnail: p.imageUri || p.thumbnailUri || '', // Use main image first
         category: p.category || 'Uncategorized',
         downloads: 0,
@@ -275,9 +381,22 @@ const MyPostersScreen: React.FC = () => {
         >
           {(item.thumbnailUri || item.imageUri) ? (
             <Image
-              source={{ uri: item.thumbnailUri || item.imageUri }}
+              source={{ 
+                uri: item.thumbnailUri || item.imageUri,
+                cache: 'force-cache'
+              }}
               style={styles.posterImage}
               resizeMode="cover"
+              onError={(error) => {
+                console.error(`❌ [MY POSTERS] Image load error for ${item.id}:`, {
+                  thumbnailUri: item.thumbnailUri,
+                  imageUri: item.imageUri,
+                  error: error.nativeEvent?.error || error,
+                });
+              }}
+              onLoad={() => {
+                console.log(`✅ [MY POSTERS] Image loaded for ${item.id}:`, item.thumbnailUri || item.imageUri);
+              }}
             />
           ) : (
             <View style={[styles.posterImage, { backgroundColor: '#E0E0E0', justifyContent: 'center', alignItems: 'center' }]}>

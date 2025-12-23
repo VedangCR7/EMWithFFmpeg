@@ -157,8 +157,9 @@ const PrivacyPolicyScreen = () => {
   });
 
   const getBulletPointStyle = () => ({
-    marginBottom: dynamicModerateScale(4),
-    paddingVertical: dynamicModerateScale(4),
+    marginBottom: dynamicModerateScale(6),
+    paddingTop: dynamicModerateScale(6),
+    paddingBottom: isTabletDevice ? dynamicModerateScale(8) : dynamicModerateScale(10),
     paddingHorizontal: dynamicModerateScale(6),
     borderRadius: dynamicModerateScale(6),
   });
@@ -306,6 +307,8 @@ const PrivacyPolicyScreen = () => {
       textShadowColor: 'rgba(255, 255, 255, 0.5)',
       textShadowOffset: { width: 0, height: 1 },
       textShadowRadius: 2,
+      lineHeight: moderateScale(isTablet ? 16 : 15),
+      includeFontPadding: true,
     },
     scrollContainer: {
       flex: 1,
@@ -319,6 +322,8 @@ const PrivacyPolicyScreen = () => {
       textAlign: 'center',
       fontStyle: 'italic',
       fontWeight: '400', // Explicitly set to normal weight for content
+      lineHeight: moderateScale(isTablet ? 13 : 12),
+      includeFontPadding: true,
     },
     cardWrapper: {
       position: 'relative',
@@ -353,11 +358,14 @@ const PrivacyPolicyScreen = () => {
       color: '#667eea',
       letterSpacing: 0.5,
       flex: 1,
+      lineHeight: moderateScale(isTablet ? 15 : 14),
+      includeFontPadding: true,
     },
     sectionContent: {
       fontSize: moderateScale(isTablet ? 8 : 7.5), // Fixed text size
-      lineHeight: moderateScale(isTablet ? 12 : 11),
+      lineHeight: moderateScale(isTablet ? 14 : 13),
       fontWeight: '400', // Explicitly set to normal weight for content
+      includeFontPadding: true,
       // marginBottom uses dynamic scaling in inline styles
     },
     bulletPoint: {
@@ -365,20 +373,25 @@ const PrivacyPolicyScreen = () => {
       backgroundColor: 'rgba(102, 126, 234, 0.08)',
       borderLeftWidth: 2,
       borderLeftColor: '#667eea',
+      alignItems: 'flex-start',
       // Dynamic spacing applied inline
     },
     bullet: {
       fontSize: moderateScale(isTablet ? 9 : 8), // Fixed text size
       color: '#667eea',
-      marginTop: 1,
+      marginTop: moderateScale(2),
       fontWeight: '600',
+      lineHeight: moderateScale(isTablet ? 14 : 13),
+      includeFontPadding: true,
       // Dynamic spacing applied inline
     },
     bulletText: {
       fontSize: moderateScale(isTablet ? 8 : 7.5), // Fixed text size
-      lineHeight: moderateScale(isTablet ? 12 : 11),
+      lineHeight: moderateScale(isTablet ? 14 : 13),
       fontWeight: '400', // Explicitly set to normal weight for content
       flex: 1,
+      includeFontPadding: true,
+      paddingBottom: moderateScale(1),
     },
     highlight: {
       fontWeight: '400', // Explicitly set to normal weight for content subheadings
@@ -399,13 +412,17 @@ const PrivacyPolicyScreen = () => {
       color: '#667eea',
       textAlign: 'center',
       letterSpacing: 0.5,
+      lineHeight: moderateScale(isTablet ? 18 : 16),
+      includeFontPadding: true,
       // Dynamic spacing applied inline
     },
     contactText: {
       fontSize: moderateScale(isTablet ? 8 : 7.5), // Fixed text size
       textAlign: 'center',
-      lineHeight: moderateScale(isTablet ? 12 : 11),
+      lineHeight: moderateScale(isTablet ? 14 : 13),
       fontWeight: '400', // Explicitly set to normal weight for content
+      includeFontPadding: true,
+      paddingBottom: moderateScale(1),
       // Dynamic spacing applied inline
     },
     emailLink: {
@@ -413,6 +430,8 @@ const PrivacyPolicyScreen = () => {
       textDecorationLine: 'underline',
       fontWeight: '700',
       fontSize: moderateScale(isTablet ? 10 : 9), // Fixed text size
+      lineHeight: moderateScale(isTablet ? 14 : 13),
+      includeFontPadding: true,
     },
     heroSection: {
       alignItems: 'center',
@@ -425,11 +444,15 @@ const PrivacyPolicyScreen = () => {
       textShadowOffset: { width: 0, height: 1 },
       textShadowRadius: 2,
       letterSpacing: isTablet ? 1 : 0.5,
+      lineHeight: moderateScale(isTablet ? 22 : 20),
+      includeFontPadding: true,
     },
     heroSubtitle: {
       textAlign: 'center',
       maxWidth: isTablet ? 700 : '100%',
       fontWeight: '400', // Explicitly set to normal weight for content
+      lineHeight: moderateScale(isTablet ? 16 : 15),
+      includeFontPadding: true,
     },
     divider: {
       backgroundColor: 'rgba(0, 0, 0, 0.1)',
@@ -488,12 +511,13 @@ const PrivacyPolicyScreen = () => {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[styles.content, {
             paddingVertical: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(8),
-            paddingBottom: dynamicModerateScale(20),
+            paddingBottom: isTabletDevice ? dynamicModerateScale(40) : dynamicModerateScale(60),
           }]}
         >
           {/* Hero Section */}
           <View style={[styles.heroSection, {
-            paddingVertical: dynamicModerateScale(12),
+            paddingTop: dynamicModerateScale(12),
+            paddingBottom: isTabletDevice ? dynamicModerateScale(16) : dynamicModerateScale(18),
             paddingHorizontal: dynamicModerateScale(8),
             marginBottom: dynamicModerateScale(8),
           }]}>
@@ -507,8 +531,9 @@ const PrivacyPolicyScreen = () => {
             }]}>Your Privacy Matters</Text>
             <Text style={[styles.heroSubtitle, {
               fontSize: isTabletDevice ? getFontSize(8) : getFontSize(7.5),
-              lineHeight: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(11),
+              lineHeight: isTabletDevice ? dynamicModerateScale(16) : dynamicModerateScale(15),
               paddingHorizontal: dynamicModerateScale(8),
+              paddingBottom: dynamicModerateScale(2),
               color: theme.colors.textSecondary,
             }]}>
               We're committed to protecting your personal information and being transparent about our data practices
@@ -544,8 +569,9 @@ const PrivacyPolicyScreen = () => {
             </View>
             <Text style={[styles.sectionContent, {
               fontSize: isTabletDevice ? getFontSize(8) : getFontSize(6.5),
-              lineHeight: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(11),
+              lineHeight: isTabletDevice ? dynamicModerateScale(14) : dynamicModerateScale(13),
               marginBottom: dynamicModerateScale(6),
+              paddingBottom: dynamicModerateScale(1),
               color: theme.colors.text,
             }]}>
               Welcome to MarketBrand.ai ("we," "our," or "us"). This Privacy Policy explains how we collect, 
@@ -554,8 +580,9 @@ const PrivacyPolicyScreen = () => {
             </Text>
             <Text style={[styles.sectionContent, {
               fontSize: isTabletDevice ? getFontSize(8) : getFontSize(6.5),
-              lineHeight: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(11),
+              lineHeight: isTabletDevice ? dynamicModerateScale(14) : dynamicModerateScale(13),
               marginBottom: dynamicModerateScale(6),
+              paddingBottom: dynamicModerateScale(1),
               color: theme.colors.text,
             }]}>
               By using our Service, you agree to the collection and use of information in accordance with this policy.
@@ -579,13 +606,14 @@ const PrivacyPolicyScreen = () => {
             
             <Text style={[styles.sectionContent, styles.highlight, {
               fontSize: isTabletDevice ? getFontSize(8) : getFontSize(6.5),
-              lineHeight: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(11),
+              lineHeight: isTabletDevice ? dynamicModerateScale(14) : dynamicModerateScale(13),
               marginBottom: dynamicModerateScale(4),
               color: theme.colors.text,
             }]}>Personal Information:</Text>
             <View style={[styles.bulletPoint, {
-              marginBottom: dynamicModerateScale(4),
-              paddingVertical: dynamicModerateScale(4),
+              marginBottom: dynamicModerateScale(6),
+              paddingTop: dynamicModerateScale(6),
+              paddingBottom: isTabletDevice ? dynamicModerateScale(8) : dynamicModerateScale(10),
               paddingHorizontal: dynamicModerateScale(6),
               borderRadius: dynamicModerateScale(6),
             }]}>
@@ -593,8 +621,9 @@ const PrivacyPolicyScreen = () => {
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>Name and email address</Text>
             </View>
             <View style={[styles.bulletPoint, {
-              marginBottom: dynamicModerateScale(4),
-              paddingVertical: dynamicModerateScale(4),
+              marginBottom: dynamicModerateScale(6),
+              paddingTop: dynamicModerateScale(6),
+              paddingBottom: isTabletDevice ? dynamicModerateScale(8) : dynamicModerateScale(10),
               paddingHorizontal: dynamicModerateScale(6),
               borderRadius: dynamicModerateScale(6),
             }]}>
@@ -602,8 +631,9 @@ const PrivacyPolicyScreen = () => {
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>Profile information and preferences</Text>
             </View>
             <View style={[styles.bulletPoint, {
-              marginBottom: dynamicModerateScale(4),
-              paddingVertical: dynamicModerateScale(4),
+              marginBottom: dynamicModerateScale(6),
+              paddingTop: dynamicModerateScale(6),
+              paddingBottom: isTabletDevice ? dynamicModerateScale(8) : dynamicModerateScale(10),
               paddingHorizontal: dynamicModerateScale(6),
               borderRadius: dynamicModerateScale(6),
             }]}>
@@ -613,7 +643,7 @@ const PrivacyPolicyScreen = () => {
 
             <Text style={[styles.sectionContent, styles.highlight, { 
               fontSize: isTabletDevice ? getFontSize(8) : getFontSize(6.5),
-              lineHeight: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(11),
+              lineHeight: isTabletDevice ? dynamicModerateScale(14) : dynamicModerateScale(13),
               marginTop: dynamicModerateScale(8),
               marginBottom: dynamicModerateScale(4),
               color: theme.colors.text,
@@ -621,8 +651,9 @@ const PrivacyPolicyScreen = () => {
               Usage Information:
             </Text>
             <View style={[styles.bulletPoint, {
-              marginBottom: dynamicModerateScale(4),
-              paddingVertical: dynamicModerateScale(4),
+              marginBottom: dynamicModerateScale(6),
+              paddingTop: dynamicModerateScale(6),
+              paddingBottom: isTabletDevice ? dynamicModerateScale(8) : dynamicModerateScale(10),
               paddingHorizontal: dynamicModerateScale(6),
               borderRadius: dynamicModerateScale(6),
             }]}>
@@ -630,8 +661,9 @@ const PrivacyPolicyScreen = () => {
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>App usage patterns and features accessed</Text>
             </View>
             <View style={[styles.bulletPoint, {
-              marginBottom: dynamicModerateScale(4),
-              paddingVertical: dynamicModerateScale(4),
+              marginBottom: dynamicModerateScale(6),
+              paddingTop: dynamicModerateScale(6),
+              paddingBottom: isTabletDevice ? dynamicModerateScale(8) : dynamicModerateScale(10),
               paddingHorizontal: dynamicModerateScale(6),
               borderRadius: dynamicModerateScale(6),
             }]}>
@@ -639,8 +671,9 @@ const PrivacyPolicyScreen = () => {
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>Device information (model, operating system, unique identifiers)</Text>
             </View>
             <View style={[styles.bulletPoint, {
-              marginBottom: dynamicModerateScale(4),
-              paddingVertical: dynamicModerateScale(4),
+              marginBottom: dynamicModerateScale(6),
+              paddingTop: dynamicModerateScale(6),
+              paddingBottom: isTabletDevice ? dynamicModerateScale(8) : dynamicModerateScale(10),
               paddingHorizontal: dynamicModerateScale(6),
               borderRadius: dynamicModerateScale(6),
             }]}>
@@ -650,7 +683,7 @@ const PrivacyPolicyScreen = () => {
 
             <Text style={[styles.sectionContent, styles.highlight, { 
               fontSize: isTabletDevice ? getFontSize(8) : getFontSize(6.5),
-              lineHeight: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(11),
+              lineHeight: isTabletDevice ? dynamicModerateScale(14) : dynamicModerateScale(13),
               marginTop: dynamicModerateScale(8),
               marginBottom: dynamicModerateScale(4),
               color: theme.colors.text,
@@ -658,8 +691,9 @@ const PrivacyPolicyScreen = () => {
               Content Information:
             </Text>
             <View style={[styles.bulletPoint, {
-              marginBottom: dynamicModerateScale(4),
-              paddingVertical: dynamicModerateScale(4),
+              marginBottom: dynamicModerateScale(6),
+              paddingTop: dynamicModerateScale(6),
+              paddingBottom: isTabletDevice ? dynamicModerateScale(8) : dynamicModerateScale(10),
               paddingHorizontal: dynamicModerateScale(6),
               borderRadius: dynamicModerateScale(6),
             }]}>
@@ -667,8 +701,9 @@ const PrivacyPolicyScreen = () => {
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>Business profiles and marketing content you create</Text>
             </View>
             <View style={[styles.bulletPoint, {
-              marginBottom: dynamicModerateScale(4),
-              paddingVertical: dynamicModerateScale(4),
+              marginBottom: dynamicModerateScale(6),
+              paddingTop: dynamicModerateScale(6),
+              paddingBottom: isTabletDevice ? dynamicModerateScale(8) : dynamicModerateScale(10),
               paddingHorizontal: dynamicModerateScale(6),
               borderRadius: dynamicModerateScale(6),
             }]}>
@@ -687,7 +722,7 @@ const PrivacyPolicyScreen = () => {
             </View>
             <Text style={[styles.sectionContent, getContentStyle(), { 
               fontSize: isTabletDevice ? getFontSize(8) : getFontSize(6.5),
-              lineHeight: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(11),
+              lineHeight: isTabletDevice ? dynamicModerateScale(14) : dynamicModerateScale(13),
               color: theme.colors.text 
             }]}>
               We use the information we collect to:
@@ -728,7 +763,7 @@ const PrivacyPolicyScreen = () => {
             </View>
             <Text style={[styles.sectionContent, getContentStyle(), { 
               fontSize: isTabletDevice ? getFontSize(8) : getFontSize(6.5),
-              lineHeight: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(11),
+              lineHeight: isTabletDevice ? dynamicModerateScale(14) : dynamicModerateScale(13),
               color: theme.colors.text 
             }]}>
               We do not sell, trade, or otherwise transfer your personal information to third parties, except:
@@ -761,7 +796,7 @@ const PrivacyPolicyScreen = () => {
             </View>
             <Text style={[styles.sectionContent, getContentStyle(), { 
               fontSize: isTabletDevice ? getFontSize(8) : getFontSize(6.5),
-              lineHeight: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(11),
+              lineHeight: isTabletDevice ? dynamicModerateScale(14) : dynamicModerateScale(13),
               color: theme.colors.text 
             }]}>
               We implement appropriate security measures to protect your personal information against unauthorized 
@@ -795,7 +830,7 @@ const PrivacyPolicyScreen = () => {
             </View>
             <Text style={[styles.sectionContent, getContentStyle(), { 
               fontSize: isTabletDevice ? getFontSize(8) : getFontSize(6.5),
-              lineHeight: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(11),
+              lineHeight: isTabletDevice ? dynamicModerateScale(14) : dynamicModerateScale(13),
               color: theme.colors.text 
             }]}>
               You have the right to:
@@ -832,7 +867,7 @@ const PrivacyPolicyScreen = () => {
             </View>
             <Text style={[styles.sectionContent, getContentStyle(), { 
               fontSize: isTabletDevice ? getFontSize(8) : getFontSize(6.5),
-              lineHeight: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(11),
+              lineHeight: isTabletDevice ? dynamicModerateScale(14) : dynamicModerateScale(13),
               color: theme.colors.text 
             }]}>
               We may use cookies and similar tracking technologies to enhance your experience, 
@@ -851,7 +886,7 @@ const PrivacyPolicyScreen = () => {
             </View>
             <Text style={[styles.sectionContent, getContentStyle(), { 
               fontSize: isTabletDevice ? getFontSize(8) : getFontSize(6.5), 
-              lineHeight: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(11),
+              lineHeight: isTabletDevice ? dynamicModerateScale(14) : dynamicModerateScale(13),
               color: theme.colors.text                      
             }]}>
               Our Service integrates with third-party services including:
@@ -868,7 +903,11 @@ const PrivacyPolicyScreen = () => {
               <Text style={[styles.bullet, getBulletStyle()]}>•</Text>
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>Cloud storage providers</Text>
             </View>
-            <Text style={[styles.sectionContent, getContentStyle(), { color: theme.colors.text }]}>
+            <Text style={[styles.sectionContent, getContentStyle(), { 
+              color: theme.colors.text,
+              lineHeight: isTabletDevice ? dynamicModerateScale(14) : dynamicModerateScale(13),
+              paddingBottom: dynamicModerateScale(1),
+            }]}>
               These services have their own privacy policies, which we encourage you to review.
             </Text>
           </HoverableCard>
@@ -883,7 +922,7 @@ const PrivacyPolicyScreen = () => {
             </View>
             <Text style={[styles.sectionContent, getContentStyle(), { 
               fontSize: isTabletDevice ? getFontSize(8) : getFontSize(6.5), 
-              lineHeight: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(11),
+              lineHeight: isTabletDevice ? dynamicModerateScale(14) : dynamicModerateScale(13),
               color: theme.colors.text 
             }]}>
               Our Service is not intended for children under 13 years of age. We do not knowingly 
@@ -902,7 +941,7 @@ const PrivacyPolicyScreen = () => {
             </View>
             <Text style={[styles.sectionContent, getContentStyle(), { 
               fontSize: isTabletDevice ? getFontSize(8) : getFontSize(6.5), 
-              lineHeight: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(11),
+              lineHeight: isTabletDevice ? dynamicModerateScale(14) : dynamicModerateScale(13),
               color: theme.colors.text 
             }]}>
               We may update this Privacy Policy from time to time. We will notify you of any changes 

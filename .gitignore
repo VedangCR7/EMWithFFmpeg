@@ -85,3 +85,6 @@ yarn-error.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# Backend folder (excluded from this repo)
+eventmarketersbackend-main/

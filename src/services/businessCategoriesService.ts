@@ -79,9 +79,8 @@ class BusinessCategoriesService {
     ).catch(error => {
       logger.error('❌ [CATEGORY API] Error:', error);
       
-      // Return mock data as fallback if cache also fails
-      logger.warn('⚠️ [CATEGORY API] Using mock business categories due to API error');
-      return this.getMockCategories();
+      // Re-throw the error instead of returning mock data
+      throw error;
     });
   }
 
@@ -145,63 +144,6 @@ class BusinessCategoriesService {
   clearCache(): void {
     cacheService.clear('business_categories');
     cacheService.clear('business_categories_v1');
-  }
-
-  // Get mock categories for fallback
-  private getMockCategories(): BusinessCategoriesResponse {
-    return {
-      success: true,
-      categories: [
-        {
-          id: '1',
-          name: 'Restaurant',
-          description: 'Food and dining business content',
-          icon: '🍽️'
-        },
-        {
-          id: '2',
-          name: 'Wedding Planning',
-          description: 'Wedding and event planning content',
-          icon: '💒'
-        },
-        {
-          id: '3',
-          name: 'Electronics',
-          description: 'Electronic products and gadgets',
-          icon: '📱'
-        },
-        {
-          id: '4',
-          name: 'Fashion',
-          description: 'Fashion and clothing business content',
-          icon: '👗'
-        },
-        {
-          id: '5',
-          name: 'Health & Fitness',
-          description: 'Health and fitness related content',
-          icon: '💪'
-        },
-        {
-          id: '6',
-          name: 'Education',
-          description: 'Educational institutions and services',
-          icon: '🎓'
-        },
-        {
-          id: '7',
-          name: 'Automotive',
-          description: 'Automotive and transportation services',
-          icon: '🚗'
-        },
-        {
-          id: '8',
-          name: 'Real Estate',
-          description: 'Real estate and property services',
-          icon: '🏠'
-        }
-      ]
-    };
   }
 }
 

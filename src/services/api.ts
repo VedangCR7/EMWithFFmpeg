@@ -125,9 +125,10 @@ const api = axios.create({
   //baseURL: 'http://192.168.0.106:3001', // Local development server (Android compatible)
   // baseURL: 'http://localhost:3001', // Local development server (Web only)
   baseURL: 'https://eventmarketersbackend.onrender.com', // Production backend server
-  timeout: 20000, // 20 seconds timeout for slower connections and server cold starts
+  timeout: 30000, // 30 seconds timeout for slower connections and server cold starts
   headers: {
     'Content-Type': 'application/json',
+    'Accept': 'application/json',
   },
 });
 
@@ -170,14 +171,18 @@ api.interceptors.response.use(
     return response;
   },
   async (error) => {
+    // Enhanced error logging for debugging
     console.log('❌ API Error occurred:', error.config?.url);
     console.log('📊 Error status:', error.response?.status);
     console.log('📋 Error response:', error.response?.data);
     console.log('🌐 Error URL:', error.config?.baseURL + error.config?.url);
+    console.log('🔍 Error code:', error.code);
+    console.log('🔍 Error message:', error.message);
+    console.log('🔍 Error name:', error.name);
     
-    // Handle timeout errors
-    if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-      console.log('API request timed out');
+    // Handle timeout errors first
+    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout') || error.message?.includes('TIMEOUT')) {
+      console.log('⏱️ API request timed out');
       return Promise.reject(new Error('TIMEOUT'));
     }
     
@@ -205,30 +210,78 @@ api.interceptors.response.use(
           DeviceEventEmitter.emit(TOKEN_EXPIRED_EVENT);
         }
       }
+      return Promise.reject(error);
     }
 
-    // Handle server errors
+    // Handle server errors (5xx)
     if (error.response?.status >= 500) {
-      console.error('Server error:', error.response?.data);
+      console.error('🔴 Server error:', error.response?.data);
       return Promise.reject(new Error('SERVER_ERROR'));
     }
 
-    // Handle network errors (no response means network issue)
+    // Handle client errors (4xx) - these are not network errors
+    if (error.response?.status >= 400 && error.response?.status < 500) {
+      console.log('⚠️ Client error (4xx):', error.response?.status, error.response?.data);
+      return Promise.reject(error);
+    }
+
+    // Handle errors without response - need to distinguish between actual network issues and other problems
     if (!error.response) {
-      // Check for specific network error codes
-      if (error.code === 'NETWORK_ERROR' || 
-          error.code === 'ERR_NETWORK' || 
-          error.code === 'ERR_INTERNET_DISCONNECTED' ||
-          error.message?.includes('Network Error') ||
-          error.message?.includes('network')) {
-        console.error('Network error:', error.message || error.code);
+      const errorCode = error.code || '';
+      const errorMessage = (error.message || '').toLowerCase();
+      
+      // Check for actual network connectivity issues
+      const isNetworkError = 
+        errorCode === 'NETWORK_ERROR' ||
+        errorCode === 'ERR_NETWORK' ||
+        errorCode === 'ERR_INTERNET_DISCONNECTED' ||
+        errorCode === 'ENOTFOUND' || // DNS resolution failed
+        errorCode === 'ECONNREFUSED' || // Connection refused (server down)
+        errorCode === 'ETIMEDOUT' || // Connection timeout
+        errorCode === 'ECONNRESET' || // Connection reset
+        errorMessage.includes('network request failed') ||
+        errorMessage.includes('networkerror') ||
+        errorMessage.includes('failed to connect') ||
+        errorMessage.includes('connection refused') ||
+        errorMessage.includes('dns') ||
+        errorMessage.includes('econnrefused') ||
+        errorMessage.includes('enotfound');
+      
+      // Check for SSL/certificate issues
+      const isSSLError = 
+        errorCode === 'CERT_HAS_EXPIRED' ||
+        errorCode === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' ||
+        errorCode === 'SELF_SIGNED_CERT_IN_CHAIN' ||
+        errorCode === 'ERR_CERT_AUTHORITY_INVALID' ||
+        errorMessage.includes('certificate') ||
+        errorMessage.includes('ssl') ||
+        errorMessage.includes('tls');
+      
+      if (isSSLError) {
+        console.error('🔒 SSL/Certificate error:', error.message || error.code);
+        return Promise.reject(new Error('SSL_ERROR'));
+      }
+      
+      if (isNetworkError) {
+        console.error('🌐 Network connectivity error:', error.message || error.code);
         return Promise.reject(new Error('NETWORK_ERROR'));
       }
-      // Generic no response error
-      console.error('Network error (no response):', error.message || error.code);
-      return Promise.reject(new Error('NETWORK_ERROR'));
+      
+      // For other errors without response, log more details and return original error
+      // This could be server down, DNS issues, or other configuration problems
+      console.error('⚠️ Request failed without response:', {
+        code: error.code,
+        message: error.message,
+        name: error.name,
+        url: error.config?.baseURL + error.config?.url,
+      });
+      
+      // Return original error instead of generic NETWORK_ERROR
+      // This allows callers to handle it appropriately
+      return Promise.reject(error);
     }
     
+    // For any other errors with response, return as-is
     return Promise.reject(error);
   }
 );

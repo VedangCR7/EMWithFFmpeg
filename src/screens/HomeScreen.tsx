@@ -627,7 +627,18 @@ const HomeScreen: React.FC = React.memo(() => {
 
   useEffect(() => {
     const unsubscribe = authService.onAuthStateChanged(user => {
+      console.log('🔄 [HOMESCREEN] Auth state changed, new user:', user?.id || 'null');
       setUserProfile(user);
+      
+      // Clear business profile selection when user changes
+      if (!user) {
+        console.log('🧹 [HOMESCREEN] User logged out, clearing business profile selection');
+        setSelectedBusinessProfileId(null);
+        setUserBusinessProfiles([]);
+        // Clear stored business profile ID
+        AsyncStorage.removeItem('selectedBusinessProfileId').catch(() => {});
+        AsyncStorage.removeItem('selectedBusinessProfileCategory').catch(() => {});
+      }
     });
     return unsubscribe;
   }, []);
@@ -637,29 +648,56 @@ const HomeScreen: React.FC = React.memo(() => {
     const loadBusinessProfiles = async () => {
       const currentUserId = userProfile?.id || authService.getCurrentUser()?.id;
       if (!currentUserId) {
+        console.log('⚠️ [HOMESCREEN] No user ID, skipping business profiles load');
+        setUserBusinessProfiles([]);
+        setSelectedBusinessProfileId(null);
         return;
       }
+      
+      console.log('📋 [HOMESCREEN] Loading business profiles for user:', currentUserId);
       setBusinessProfilesLoadingState(true);
       try {
         const profiles = await businessProfileService.getUserBusinessProfiles(currentUserId);
         if (!isMounted) {
           return;
         }
+        
+        console.log('✅ [HOMESCREEN] Loaded business profiles:', profiles.length);
         setUserBusinessProfiles(profiles);
+        
+        // Get stored profile ID, but verify it belongs to current user
         const storedProfileId = await AsyncStorage.getItem('selectedBusinessProfileId');
+        const storedUserId = await AsyncStorage.getItem('selectedBusinessProfileUserId');
+        
         let resolvedProfileId: string | null = null;
-        if (storedProfileId && profiles.some(profile => profile.id === storedProfileId)) {
+        
+        // Only use stored profile ID if it belongs to the current user
+        if (storedProfileId && storedUserId === currentUserId && profiles.some(profile => profile.id === storedProfileId)) {
           resolvedProfileId = storedProfileId;
+          console.log('✅ [HOMESCREEN] Using stored business profile:', resolvedProfileId);
         } else if (profiles.length > 0) {
+          // Use first profile if no valid stored profile
           resolvedProfileId = profiles[0].id;
+          console.log('✅ [HOMESCREEN] Using first business profile:', resolvedProfileId);
+          // Store the user ID with the profile ID
+          await AsyncStorage.setItem('selectedBusinessProfileUserId', currentUserId).catch(() => {});
+        } else {
+          // Clear stored profile if user has no profiles
+          await AsyncStorage.removeItem('selectedBusinessProfileId').catch(() => {});
+          await AsyncStorage.removeItem('selectedBusinessProfileUserId').catch(() => {});
         }
+        
         if (resolvedProfileId) {
           setSelectedBusinessProfileId(resolvedProfileId);
+        } else {
+          setSelectedBusinessProfileId(null);
         }
       } catch (error) {
         if (__DEV__) {
           devError('Error loading business profiles for dropdown:', error);
         }
+        setUserBusinessProfiles([]);
+        setSelectedBusinessProfileId(null);
       } finally {
         if (isMounted) {
           setBusinessProfilesLoadingState(false);
@@ -706,13 +744,16 @@ const HomeScreen: React.FC = React.memo(() => {
     );
   }, [userProfile]);
   useEffect(() => {
-    if (selectedBusinessProfileId) {
+    const currentUserId = userProfile?.id || authService.getCurrentUser()?.id;
+    if (selectedBusinessProfileId && currentUserId) {
+      // Store profile ID with user ID to prevent cross-user contamination
       AsyncStorage.setItem('selectedBusinessProfileId', selectedBusinessProfileId).catch(() => {});
+      AsyncStorage.setItem('selectedBusinessProfileUserId', currentUserId).catch(() => {});
     }
     if (selectedBusinessProfile?.category) {
       AsyncStorage.setItem('selectedBusinessProfileCategory', selectedBusinessProfile.category).catch(() => {});
     }
-  }, [selectedBusinessProfileId, selectedBusinessProfile?.category]);
+  }, [selectedBusinessProfileId, selectedBusinessProfile?.category, userProfile?.id]);
   
   // Dynamic dimensions for responsive layout
   const [dimensions, setDimensions] = useState(() => {
@@ -4327,7 +4368,8 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                       uri={userAvatarUri}
                       style={styles.userAvatarImage}
                       resizeMode="cover"
-                      cacheKey="user_avatar"
+                      cacheKey={`user_avatar_${userProfile?.id || 'default'}`}
+                      key={`avatar_${userProfile?.id || 'default'}`}
                     />
                   ) : (
                     <Text style={styles.userAvatarText}>{userInitials}</Text>

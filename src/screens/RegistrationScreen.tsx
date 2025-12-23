@@ -151,6 +151,8 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
   const [alternatePhoneValidationError, setAlternatePhoneValidationError] = useState<string>('');
   const [categories, setCategories] = useState<BusinessCategory[]>([]);
   const [isLoadingCategories, setIsLoadingCategories] = useState<boolean>(true);
+  const [showCategoryErrorModal, setShowCategoryErrorModal] = useState<boolean>(false);
+  const [categoryErrorModalAnimation] = useState(new Animated.Value(0));
   const inputRefs = useRef<Record<string, RNTextInput | null>>({});
 
   const registerInputRef = (field: string) => (ref: RNTextInput | null) => {
@@ -199,8 +201,41 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
           // Keep empty array, will show empty state in UI
           setCategories([]);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('❌ [REGISTRATION] Error fetching categories:', error);
+        console.error('❌ [REGISTRATION] Error type:', typeof error);
+        console.error('❌ [REGISTRATION] Error message:', error?.message);
+        console.error('❌ [REGISTRATION] Error code:', error?.code);
+        console.error('❌ [REGISTRATION] Error string:', String(error));
+        
+        // Check if it's a network error - handle both Error objects and string errors
+        const errorMessage = error?.message || String(error) || '';
+        const errorCode = error?.code || '';
+        const errorString = String(error).toLowerCase();
+        
+        const isNetworkError = 
+          errorMessage === 'NETWORK_ERROR' ||
+          errorMessage.includes('NETWORK_ERROR') ||
+          errorCode === 'NETWORK_ERROR' ||
+          errorCode === 'ERR_NETWORK' ||
+          errorCode === 'ERR_INTERNET_DISCONNECTED' ||
+          errorMessage.toLowerCase().includes('network error') ||
+          errorMessage.toLowerCase().includes('network') ||
+          errorString.includes('network_error') ||
+          errorCode === 'ENOTFOUND' ||
+          errorCode === 'ECONNREFUSED' ||
+          errorCode === 'ETIMEDOUT' ||
+          errorCode === 'ECONNRESET' ||
+          !error?.response; // No response usually means network issue
+        
+        console.log('🔍 [REGISTRATION] Is network error?', isNetworkError);
+        
+        if (isNetworkError) {
+          // Show network error modal
+          console.log('📱 [REGISTRATION] Showing network error modal');
+          setShowCategoryErrorModal(true);
+        }
+        
         // On error, keep empty array - user can still register but won't see categories
         setCategories([]);
       } finally {
@@ -465,6 +500,28 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
       showModal();
     }
   }, [showErrorModal]);
+
+  useEffect(() => {
+    if (showCategoryErrorModal) {
+      Animated.timing(categoryErrorModalAnimation, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      categoryErrorModalAnimation.setValue(0);
+    }
+  }, [showCategoryErrorModal]);
+
+  const hideCategoryErrorModal = () => {
+    Animated.timing(categoryErrorModalAnimation, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => {
+      setShowCategoryErrorModal(false);
+    });
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -1031,6 +1088,65 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
         onClose={handleCloseImagePicker}
         onImageSelected={handleImageSelected}
       />
+
+      {/* Category Network Error Modal */}
+      <Modal
+        visible={showCategoryErrorModal}
+        transparent={true}
+        animationType="none"
+        onRequestClose={hideCategoryErrorModal}
+      >
+        <View style={[
+          styles.modalOverlay,
+          modalDimensions.isLandscape && {
+            paddingHorizontal: modalDimensions.width * 0.15,
+            paddingVertical: modalDimensions.height * 0.05,
+          }
+        ]}>
+          <Animated.View 
+            style={[
+              styles.modalContainer,
+              { backgroundColor: theme.colors.surface },
+              modalDimensions.isLandscape && {
+                maxWidth: modalDimensions.width * 0.7,
+                maxHeight: modalDimensions.height * 0.9,
+              },
+              {
+                transform: [{
+                  scale: categoryErrorModalAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.8, 1],
+                  }),
+                }],
+                opacity: categoryErrorModalAnimation,
+              }
+            ]}
+          >
+            <View style={styles.modalHeader}>
+              <View style={[styles.modalIconContainer, { backgroundColor: theme.colors.error + '20' }]}>
+                <Icon name="wifi-off" size={Math.min(screenWidth * 0.08, 32)} color={theme.colors.error} />
+              </View>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Network Error</Text>
+            </View>
+
+            <View style={styles.modalContent}>
+              <Text style={[styles.modalMessage, { color: theme.colors.textSecondary }]}>
+                Unable to load business categories. Please check your internet connection and try again.
+              </Text>
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: theme.colors.primary }]}
+                onPress={hideCategoryErrorModal}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.modalButtonText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
       </SafeAreaView>
   );
 };

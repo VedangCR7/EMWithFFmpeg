@@ -196,7 +196,9 @@ const RelatedPosterItem: React.FC<RelatedPosterItemProps> = React.memo(({
   isSelected,
   overlayColors
 }) => {
-  const handlePress = useCallback(() => onPress(item), [item, onPress]);
+  const handlePress = useCallback(() => {
+    onPress(item);
+  }, [item, onPress]);
 
   // Final safety check to ensure valid dimensions before rendering
   const validCardWidth = (typeof cardWidth === 'number' && !isNaN(cardWidth) && isFinite(cardWidth) && cardWidth > 0) 
@@ -290,6 +292,7 @@ const PosterPlayerScreen: React.FC = () => {
   
   // Track previous initialPoster ID to detect when a different poster is selected
   const prevInitialPosterIdRef = useRef<string | null>(null);
+  const activeCategoryRef = useRef<{ type: 'business' | 'greeting' | 'calendar' | null; value: string | null }>({ type: null, value: null });
   const previewOverlayColors = useMemo(() => {
     const startColor = secondaryColor || primaryColor;
     const endColor = primaryColor;
@@ -367,7 +370,34 @@ const PosterPlayerScreen: React.FC = () => {
   }, [initialPoster]);
   
   const [currentPoster, setCurrentPoster] = useState<Template>(convertedInitialPoster);
-  const [allTemplates, setAllTemplates] = useState<Template[]>([]);
+  const [allTemplates, setAllTemplatesState] = useState<Template[]>([]);
+  const allTemplatesRef = useRef<Template[]>([]);
+  
+  // Wrapper to log all setAllTemplates calls
+  const setAllTemplates = useCallback((templates: Template[] | ((prev: Template[]) => Template[])) => {
+    const previousTemplates = allTemplatesRef.current;
+    const newTemplates = typeof templates === 'function' ? templates(previousTemplates) : templates;
+    allTemplatesRef.current = newTemplates;
+    
+    console.warn('🔴 [SET ALL TEMPLATES] Called:', {
+      newTemplatesCount: Array.isArray(newTemplates) ? newTemplates.length : 'unknown',
+      newTemplateIds: Array.isArray(newTemplates) ? newTemplates.map(t => t.id).slice(0, 10) : 'unknown',
+      previousCount: previousTemplates.length,
+      previousIds: previousTemplates.map(t => t.id).slice(0, 10),
+      businessCategory,
+      greetingCategory,
+      calendarDate,
+      activeCategoryRef: activeCategoryRef.current,
+      stackTrace: new Error().stack?.split('\n').slice(1, 6).join('\n')
+    });
+    setAllTemplatesState(newTemplates);
+  }, [businessCategory, greetingCategory, calendarDate]);
+  
+  // Update ref when state changes
+  useEffect(() => {
+    allTemplatesRef.current = allTemplates;
+  }, [allTemplates]);
+  
   const [selectedLanguage, setSelectedLanguage] = useState<string>('all');
   const lastAutoDetectedPosterIdRef = useRef<string | null>(null); // Track which poster triggered auto-detection to prevent duplicate detection
   const userSelectedPosterRef = useRef<string | null>(null); // Track user-selected poster (via swipe or click) to prevent reset
@@ -618,6 +648,12 @@ const PosterPlayerScreen: React.FC = () => {
     const initialPosterToUse = convertedInitialPoster;
     const initialPosterImage = initialPosterToUse.thumbnail || (initialPosterToUse as any).content?.background || '';
     
+    // CRITICAL: Don't reset if user has manually selected a poster (via swipe or click)
+    // Check this FIRST before any other logic that might reset the poster
+    if (userSelectedPosterRef.current !== null) {
+      return;
+    }
+    
     // Skip if we have a loading placeholder with no image
     // BUT allow loading placeholder if it has a thumbnail (for greeting category preview)
     if (initialPosterToUse.id === 'loading' && !initialPosterImage) {
@@ -653,7 +689,14 @@ const PosterPlayerScreen: React.FC = () => {
     }
     
     // If initialPoster ID changed, update immediately regardless of category type
+    // BUT: Don't override if user has manually selected a poster (unless navigating from different screen)
     if (prevId !== null && prevId !== initialPosterId) {
+      // Only update if user hasn't manually selected a poster, OR if navigating from different screen
+      // (When navigating from different screen, prevId !== initialPosterId means new navigation)
+      if (userSelectedPosterRef.current !== null && userSelectedPosterRef.current !== initialPosterId) {
+        return;
+      }
+      
       // Ensure thumbnail is set from content.background if needed
       let newPoster = mergeTemplateLanguages(initialPosterToUse);
       if (!newPoster.thumbnail && (newPoster as any).content?.background) {
@@ -661,7 +704,6 @@ const PosterPlayerScreen: React.FC = () => {
       }
       
       if (newPoster.thumbnail || (newPoster as any).content?.background) {
-        console.log('🔄 [POSTER PLAYER] New poster selected - updating immediately:', initialPosterId, 'from:', prevId);
         // Update poster immediately
         setCurrentPoster(newPoster);
         setImageDimensions(null); // Reset image dimensions when poster changes
@@ -684,10 +726,19 @@ const PosterPlayerScreen: React.FC = () => {
 
     // If currentPoster is still the loading placeholder or doesn't match, update it
     // BUT: Don't reset if user manually selected a poster (via swipe or click)
-    const isUserSelected = userSelectedPosterRef.current === currentPoster.id;
-    if (!isUserSelected && (currentPoster.id === 'loading' || 
+    // Check userSelectedPosterRef directly - don't compare to currentPoster.id which might be stale
+    const hasUserSelection = userSelectedPosterRef.current !== null;
+    
+    // Don't reset if user has manually selected a poster (check ref directly, not state)
+    // This prevents the useEffect from overriding user selections
+    if (hasUserSelection) {
+      return;
+    }
+    
+    // Only reset if currentPoster needs updating and user hasn't selected anything
+    if (currentPoster.id === 'loading' || 
         currentPoster.id !== initialPosterId ||
-        (!currentPoster.thumbnail && !(currentPoster as any).content?.background))) {
+        (!currentPoster.thumbnail && !(currentPoster as any).content?.background)) {
       // Ensure thumbnail is set from content.background if needed
       let newPoster = mergeTemplateLanguages(initialPosterToUse);
       if (!newPoster.thumbnail && (newPoster as any).content?.background) {
@@ -695,7 +746,6 @@ const PosterPlayerScreen: React.FC = () => {
       }
       
       if (newPoster.thumbnail || (newPoster as any).content?.background) {
-        console.log('🔄 [POSTER PLAYER] Updating currentPoster with loaded data:', newPoster.id);
         setCurrentPoster(newPoster);
         // Clear user selection ref when resetting to initial poster
         userSelectedPosterRef.current = null;
@@ -713,11 +763,12 @@ const PosterPlayerScreen: React.FC = () => {
     setAllTemplates([]);
     // Reset manual language selection when switching categories to allow auto-detection
     userManuallySelectedLanguageRef.current = false;
+    // Track active category to prevent other useEffects from overwriting templates
+    activeCategoryRef.current = { type: 'business', value: businessCategory };
 
     const fetchBusinessCategoryPosters = async () => {
       try {
         const limit = posterLimit || 5; // Default to 5 if not specified, use 200 for "My Business"
-        console.log('📡 [POSTER PLAYER] Fetching business category posters for:', businessCategory, 'with limit:', limit);
         const response = await businessCategoryPostersApi.getPostersByCategory(businessCategory, limit);
         
         if (response.success && response.data.posters) {
@@ -742,9 +793,6 @@ const PosterPlayerScreen: React.FC = () => {
               tags: normalizedTags,
             };
 
-            if (__DEV__ && normalizedTags.length > 0) {
-              console.log(`📋 [POSTER CONVERSION] Poster ${template.id} tags:`, normalizedTags);
-            }
 
             return template;
           });
@@ -752,6 +800,25 @@ const PosterPlayerScreen: React.FC = () => {
           if (convertedTemplates.length > 0) {
             // Set first poster as current poster and others as related
             const ensuredTemplates = convertedTemplates.map(t => mergeTemplateLanguages(t));
+            
+            console.log('🔍 [BUSINESS FETCH] Loaded templates:', {
+              category: businessCategory,
+              templateCount: ensuredTemplates.length,
+              templateIds: ensuredTemplates.map(t => t.id),
+              initialPosterId: initialPoster?.id,
+              initialPosterThumbnail: initialPoster?.thumbnail
+            });
+            
+            // Ensure we're still on the same category (prevent race conditions)
+            if (activeCategoryRef.current.type !== 'business' || activeCategoryRef.current.value !== businessCategory) {
+              console.warn('⚠️ [BUSINESS FETCH] Category changed, skipping setAllTemplates:', {
+                expectedCategory: businessCategory,
+                activeCategoryType: activeCategoryRef.current.type,
+                activeCategoryValue: activeCategoryRef.current.value
+              });
+              return;
+            }
+            
             setAllTemplates(ensuredTemplates);
             
             // Try to find the initialPoster (the one that was clicked) in the loaded templates
@@ -759,12 +826,41 @@ const PosterPlayerScreen: React.FC = () => {
             const ensuredInitialPoster = mergeTemplateLanguages(initialPoster);
             const matchingPoster = ensuredTemplates.find(t => t.id === ensuredInitialPoster.id && ensuredInitialPoster.thumbnail);
             const posterToSet = matchingPoster || ensuredTemplates[0];
+            
+            console.log('🔍 [BUSINESS FETCH] Poster selection:', {
+              matchingPosterFound: !!matchingPoster,
+              matchingPosterId: matchingPoster?.id,
+              posterToSetId: posterToSet.id,
+              posterToSetTags: posterToSet.tags,
+              posterToSetName: posterToSet.name
+            });
+            
             setCurrentPoster(posterToSet);
             
-            console.log('✅ [POSTER PLAYER] Loaded', ensuredTemplates.length, 'business category posters');
-            console.log('📌 [POSTER PLAYER] Using poster:', matchingPoster ? 'clicked poster found' : 'first poster (clicked not found)');
-            if (__DEV__ && posterToSet?.tags) {
-              console.log('📋 [POSTER PLAYER] Selected poster tags:', posterToSet.tags);
+            // Auto-detect language from the selected poster
+            if (!userManuallySelectedLanguageRef.current && 
+                lastAutoDetectedPosterIdRef.current !== posterToSet.id &&
+                posterToSet.tags && posterToSet.tags.length > 0) {
+              const languagesFromTags = extractLanguagesFromTags(posterToSet.tags);
+              const availableLanguageIds = ['hindi', 'english'];
+              const detectedLanguage = availableLanguageIds.find(langId => {
+                const normalizedLangId = langId.toLowerCase();
+                return languagesFromTags.some(detectedLang => detectedLang.toLowerCase() === normalizedLangId);
+              });
+              
+              console.log('🔍 [BUSINESS FETCH] Language detection:', {
+                posterId: posterToSet.id,
+                tags: posterToSet.tags,
+                languagesFromTags,
+                detectedLanguage,
+                currentLanguage: selectedLanguage
+              });
+              
+              if (detectedLanguage) {
+                console.log('✅ [BUSINESS FETCH] Setting language to:', detectedLanguage);
+                setSelectedLanguage(detectedLanguage);
+                lastAutoDetectedPosterIdRef.current = posterToSet.id;
+              }
             }
           }
         }
@@ -786,6 +882,8 @@ const PosterPlayerScreen: React.FC = () => {
     setAllTemplates([]);
     // Reset manual language selection when switching categories to allow auto-detection
     userManuallySelectedLanguageRef.current = false;
+    // Track active category to prevent other useEffects from overwriting templates
+    activeCategoryRef.current = { type: 'greeting', value: greetingCategory };
 
     const fetchGreetingCategoryTemplates = async () => {
       // Use convertedInitialPoster which has thumbnail properly set for GreetingTemplates
@@ -829,6 +927,77 @@ const PosterPlayerScreen: React.FC = () => {
         const searchResults = await Promise.all(searchPromises);
         const [categoryTemplates, searchTemplatesOriginal, searchTemplatesNormalized, ...variationResults] = searchResults;
         
+        // Log raw API responses for ALL greeting categories
+        const apiResponseData = {
+            getTemplatesResponse: {
+              count: categoryTemplates.length,
+              allTemplates: categoryTemplates.map((t: any) => ({
+                id: t.id,
+                name: t.name,
+                category: t.category,
+                tags: t.tags,
+                thumbnail: t.thumbnail || t.content?.background
+              })),
+              allCategories: [...new Set(categoryTemplates.map((t: any) => t.category).filter(Boolean))],
+              categoryBreakdown: [...new Set(categoryTemplates.map((t: any) => t.category).filter(Boolean))].map(cat => ({
+                category: cat,
+                count: categoryTemplates.filter((t: any) => t.category === cat).length,
+                templateIds: categoryTemplates.filter((t: any) => t.category === cat).map((t: any) => t.id)
+              }))
+            },
+            searchOriginalResponse: {
+              count: searchTemplatesOriginal.length,
+              allTemplates: searchTemplatesOriginal.map((t: any) => ({
+                id: t.id,
+                name: t.name,
+                category: t.category,
+                tags: t.tags,
+                thumbnail: t.thumbnail || t.content?.background
+              })),
+              allCategories: [...new Set(searchTemplatesOriginal.map((t: any) => t.category).filter(Boolean))],
+              categoryBreakdown: [...new Set(searchTemplatesOriginal.map((t: any) => t.category).filter(Boolean))].map(cat => ({
+                category: cat,
+                count: searchTemplatesOriginal.filter((t: any) => t.category === cat).length,
+                templateIds: searchTemplatesOriginal.filter((t: any) => t.category === cat).map((t: any) => t.id)
+              }))
+            },
+            searchNormalizedResponse: {
+              count: searchTemplatesNormalized.length,
+              allTemplates: searchTemplatesNormalized.map((t: any) => ({
+                id: t.id,
+                name: t.name,
+                category: t.category,
+                tags: t.tags,
+                thumbnail: t.thumbnail || t.content?.background
+              })),
+              allCategories: [...new Set(searchTemplatesNormalized.map((t: any) => t.category).filter(Boolean))],
+              categoryBreakdown: [...new Set(searchTemplatesNormalized.map((t: any) => t.category).filter(Boolean))].map(cat => ({
+                category: cat,
+                count: searchTemplatesNormalized.filter((t: any) => t.category === cat).length,
+                templateIds: searchTemplatesNormalized.filter((t: any) => t.category === cat).map((t: any) => t.id)
+              }))
+            },
+            variationResponses: variationResults.map((variationResults: any[], index: number) => ({
+              variation: searchVariations[index],
+              count: variationResults.length,
+              allTemplates: variationResults.map((t: any) => ({
+                id: t.id,
+                name: t.name,
+                category: t.category,
+                tags: t.tags,
+                thumbnail: t.thumbnail || t.content?.background
+              })),
+              allCategories: [...new Set(variationResults.map((t: any) => t.category).filter(Boolean))],
+              categoryBreakdown: [...new Set(variationResults.map((t: any) => t.category).filter(Boolean))].map(cat => ({
+                category: cat,
+                count: variationResults.filter((t: any) => t.category === cat).length,
+                templateIds: variationResults.filter((t: any) => t.category === cat).map((t: any) => t.id)
+              }))
+            }))
+          };
+        console.log('📡 [API RESPONSE] Raw API responses for category:', greetingCategory);
+        console.log('📡 [API RESPONSE] Full JSON:', JSON.stringify(apiResponseData, null, 2));
+        
         // Combine all search results and remove duplicates efficiently
         const allSearchResults = [
           ...searchTemplatesOriginal, 
@@ -845,6 +1014,30 @@ const PosterPlayerScreen: React.FC = () => {
           }
         });
         const allTemplates = Array.from(uniqueTemplatesMap.values());
+        
+        // Log combined results for ALL greeting categories
+        const combinedCategories = new Set(allTemplates.map((t: any) => t.category).filter(Boolean));
+        const combinedData = {
+            totalTemplates: allTemplates.length,
+            uniqueCategories: Array.from(combinedCategories),
+            categoryBreakdown: Array.from(combinedCategories).map(cat => ({
+              category: cat,
+              count: allTemplates.filter((t: any) => t.category === cat).length,
+              templateIds: allTemplates.filter((t: any) => t.category === cat).map((t: any) => t.id)
+            })),
+            allTemplates: allTemplates.map((t: any) => ({
+              id: t.id,
+              name: t.name,
+              category: t.category,
+              categoryLower: (t.category || '').toLowerCase().trim(),
+              expectedCategoryLower: greetingCategory.toLowerCase().trim(),
+              matches: (t.category || '').toLowerCase().trim() === greetingCategory.toLowerCase().trim(),
+              tags: t.tags,
+              thumbnail: t.thumbnail || t.content?.background
+            }))
+          };
+        console.log('📡 [API RESPONSE] Combined templates after deduplication (MAIN FETCH) for category:', greetingCategory);
+        console.log('📡 [API RESPONSE] Combined Full JSON:', JSON.stringify(combinedData, null, 2));
         
         // Pre-compute normalized category and variations for efficient filtering
         const normalizedCategoryLower = normalizedCategory.toLowerCase();
@@ -915,6 +1108,77 @@ const PosterPlayerScreen: React.FC = () => {
               const moreSearchResults = await Promise.all(moreSearchPromises);
               const [moreCategoryTemplates, moreSearchOriginal, moreSearchNormalized, ...moreVariationResults] = moreSearchResults;
               
+              // Log raw API responses for ALL categories
+              const backgroundApiResponseData = {
+                  getTemplatesResponse: {
+                    count: moreCategoryTemplates.length,
+                    allTemplates: moreCategoryTemplates.map((t: any) => ({
+                      id: t.id,
+                      name: t.name,
+                      category: t.category,
+                      tags: t.tags,
+                      thumbnail: t.thumbnail || t.content?.background
+                    })),
+                    allCategories: [...new Set(moreCategoryTemplates.map((t: any) => t.category).filter(Boolean))],
+                    categoryBreakdown: [...new Set(moreCategoryTemplates.map((t: any) => t.category).filter(Boolean))].map(cat => ({
+                      category: cat,
+                      count: moreCategoryTemplates.filter((t: any) => t.category === cat).length,
+                      templateIds: moreCategoryTemplates.filter((t: any) => t.category === cat).map((t: any) => t.id)
+                    }))
+                  },
+                  searchOriginalResponse: {
+                    count: moreSearchOriginal.length,
+                    allTemplates: moreSearchOriginal.map((t: any) => ({
+                      id: t.id,
+                      name: t.name,
+                      category: t.category,
+                      tags: t.tags,
+                      thumbnail: t.thumbnail || t.content?.background
+                    })),
+                    allCategories: [...new Set(moreSearchOriginal.map((t: any) => t.category).filter(Boolean))],
+                    categoryBreakdown: [...new Set(moreSearchOriginal.map((t: any) => t.category).filter(Boolean))].map(cat => ({
+                      category: cat,
+                      count: moreSearchOriginal.filter((t: any) => t.category === cat).length,
+                      templateIds: moreSearchOriginal.filter((t: any) => t.category === cat).map((t: any) => t.id)
+                    }))
+                  },
+                  searchNormalizedResponse: {
+                    count: moreSearchNormalized.length,
+                    allTemplates: moreSearchNormalized.map((t: any) => ({
+                      id: t.id,
+                      name: t.name,
+                      category: t.category,
+                      tags: t.tags,
+                      thumbnail: t.thumbnail || t.content?.background
+                    })),
+                    allCategories: [...new Set(moreSearchNormalized.map((t: any) => t.category).filter(Boolean))],
+                    categoryBreakdown: [...new Set(moreSearchNormalized.map((t: any) => t.category).filter(Boolean))].map(cat => ({
+                      category: cat,
+                      count: moreSearchNormalized.filter((t: any) => t.category === cat).length,
+                      templateIds: moreSearchNormalized.filter((t: any) => t.category === cat).map((t: any) => t.id)
+                    }))
+                  },
+                  variationResponses: moreVariationResults.map((variationResults: any[], index: number) => ({
+                    variation: currentVariations[index],
+                    count: variationResults.length,
+                    allTemplates: variationResults.map((t: any) => ({
+                      id: t.id,
+                      name: t.name,
+                      category: t.category,
+                      tags: t.tags,
+                      thumbnail: t.thumbnail || t.content?.background
+                    })),
+                    allCategories: [...new Set(variationResults.map((t: any) => t.category).filter(Boolean))],
+                    categoryBreakdown: [...new Set(variationResults.map((t: any) => t.category).filter(Boolean))].map(cat => ({
+                      category: cat,
+                      count: variationResults.filter((t: any) => t.category === cat).length,
+                      templateIds: variationResults.filter((t: any) => t.category === cat).map((t: any) => t.id)
+                    }))
+                  }))
+                };
+              console.log('📡 [API RESPONSE] Raw API responses (BACKGROUND LOAD) for category:', currentCategory);
+              console.log('📡 [API RESPONSE] Background Load Full JSON:', JSON.stringify(backgroundApiResponseData, null, 2));
+              
               const moreSearchTemplates = [
                 ...moreSearchOriginal, 
                 ...moreSearchNormalized,
@@ -931,37 +1195,116 @@ const PosterPlayerScreen: React.FC = () => {
               });
               
               const allMoreTemplates = Array.from(moreUniqueMap.values());
+              
+              // Log backend response to check for category issues
+              const categoriesFromBackend = new Set(allMoreTemplates.map((t: any) => t.category).filter(Boolean));
+              console.log('🔍 [GREETING BACKGROUND LOAD] Backend returned templates:', {
+                totalTemplates: allMoreTemplates.length,
+                uniqueCategories: Array.from(categoriesFromBackend),
+                expectedCategory: currentCategory,
+                categoryBreakdown: Array.from(categoriesFromBackend).map(cat => ({
+                  category: cat,
+                  count: allMoreTemplates.filter((t: any) => t.category === cat).length,
+                  sampleIds: allMoreTemplates.filter((t: any) => t.category === cat).slice(0, 3).map((t: any) => t.id)
+                })),
+                // Show sample templates with their categories
+                sampleTemplates: allMoreTemplates.slice(0, 10).map((t: any) => ({
+                  id: t.id,
+                  name: t.name,
+                  category: t.category,
+                  categoryLower: (t.category || '').toLowerCase().trim(),
+                  expectedCategoryLower: currentCategoryLower.trim(),
+                  matches: (t.category || '').toLowerCase().trim() === currentCategoryLower.trim()
+                }))
+              });
+              
+              // STRICT filtering: Only allow templates that EXACTLY match the category
+              // For templates with "GENERAL" or empty category, check tags to see if they match
               const moreFiltered = allMoreTemplates.filter(template => {
-                const templateAny = template as any;
-                const templateTags = Array.isArray(templateAny.tags) ? templateAny.tags : [];
+                const templateCategory = template.category || '';
+                const templateCategoryLower = templateCategory.toLowerCase().trim();
+                const currentCategoryLowerTrimmed = currentCategoryLower.trim();
+                const currentNormalizedLowerTrimmed = currentNormalizedLower.trim();
                 
-                if (template.category) {
-                  const templateCategoryLower = template.category.toLowerCase();
-                  // Check if category matches original, normalized, or any word
-                  if (templateCategoryLower.includes(currentCategoryLower) || 
-                      templateCategoryLower.includes(currentNormalizedLower) ||
-                      currentWords.some(word => templateCategoryLower.includes(word))) {
+                // STRICT: Only allow exact match or category that starts with current category + space
+                // This prevents "Political" or "Awareness" from matching "Political Awareness"
+                // Only "Political Awareness" or "Political Awareness English" will match
+                if (templateCategoryLower === currentCategoryLowerTrimmed) {
+                  return true; // Exact match: "Political Awareness" === "Political Awareness"
+                }
+                
+                // Allow if category starts with current category + space (e.g., "Political Awareness English")
+                // This allows variations like "Political Awareness Hindi" but NOT "Political" or "Awareness"
+                if (templateCategoryLower.startsWith(currentCategoryLowerTrimmed + ' ') || 
+                    templateCategoryLower.startsWith(currentNormalizedLowerTrimmed + ' ')) {
                     return true;
                   }
+                
+                // If category is "GENERAL" or empty, check tags to see if they match the expected category
+                // This handles cases where backend returns templates with category="GENERAL" but tags=["Political Awareness"]
+                if (!templateCategory || templateCategoryLower === 'general') {
+                  const templateTags = Array.isArray(template.tags) ? template.tags : [];
+                  const tagsLower = templateTags.map((tag: any) => String(tag).toLowerCase().trim());
+                  
+                  // Check if any tag exactly matches the expected category
+                  if (tagsLower.includes(currentCategoryLowerTrimmed) || 
+                      tagsLower.includes(currentNormalizedLowerTrimmed)) {
+                    // Set category to expected category so it passes later filter checks
+                    template.category = currentCategory;
+                    return true;
+                  }
+                  
+                  // Check if any tag contains the expected category (for tags like "Political Awareness English")
+                  if (tagsLower.some((tag: string) => tag === currentCategoryLowerTrimmed || tag.startsWith(currentCategoryLowerTrimmed + ' '))) {
+                    // Set category to expected category so it passes later filter checks
+                    template.category = currentCategory;
+                    return true;
+                  }
+                  
+                  // If tags don't match, exclude this template
+                  return false;
                 }
                 
-                if (templateTags.length > 0) {
-                  return templateTags.some((tag: string) => {
-                    if (typeof tag !== 'string') return false;
-                    const tagLower = tag.toLowerCase();
-                    // Check if tag matches original, normalized, or any word
-                    return tagLower.includes(currentCategoryLower) || 
-                           tagLower.includes(currentNormalizedLower) ||
-                           currentWords.some(word => tagLower.includes(word) || word.includes(tagLower));
-                  });
-                }
-                
+                // Exclude all other templates - they're from different categories
+                // This includes "Political", "Awareness", "Political Campaign", etc.
                 return false;
               });
               
+              // Debug: Log sample categories to see what we're comparing
+              if (allMoreTemplates.length > 0 && moreFiltered.length === 0) {
+                const sampleCategories = allMoreTemplates.slice(0, 10).map((t: any) => ({
+                  id: t.id,
+                  name: t.name,
+                  category: t.category,
+                  categoryLower: (t.category || '').toLowerCase().trim(),
+                  expected: currentCategoryLower.trim(),
+                  matches: (t.category || '').toLowerCase().trim() === currentCategoryLower.trim()
+                }));
+                const filterDebugData = {
+                  sampleCategories,
+                  currentCategoryLower: currentCategoryLower.trim(),
+                  currentNormalizedLower: currentNormalizedLower.trim(),
+                  allCategoriesFromBackend: [...new Set(allMoreTemplates.map((t: any) => t.category).filter(Boolean))]
+                };
+                console.log('🔍 [GREETING BACKGROUND LOAD] Filter debug - no matches found:');
+                console.log('🔍 [GREETING BACKGROUND LOAD] Filter debug Full JSON:', JSON.stringify(filterDebugData, null, 2));
+              }
+              
+              // Log filtering results
+              const categoriesAfterFilter = new Set(moreFiltered.map((t: any) => t.category).filter(Boolean));
+              console.log('🔍 [GREETING BACKGROUND LOAD] After filtering:', {
+                filteredCount: moreFiltered.length,
+                totalCount: allMoreTemplates.length,
+                filteredCategories: Array.from(categoriesAfterFilter),
+                willUseFiltered: moreFiltered.length > 0,
+                willUseAll: moreFiltered.length === 0
+              });
+              
+              // If filter filtered out everything, don't use all templates as fallback
+              // This means none of the templates match the category, so we shouldn't show them
               const finalTemplates = moreFiltered.length > 0 
                 ? moreFiltered.slice(0, 200)
-                : allMoreTemplates.slice(0, 200);
+                : []; // Don't use allMoreTemplates - if filter rejected everything, they're wrong category
               
               // Update templates if we got more results
               if (finalTemplates.length > initialLimit) {
@@ -984,15 +1327,89 @@ const PosterPlayerScreen: React.FC = () => {
                   };
                 });
                 
-                const ensuredFinal = convertedFinal.map(t => mergeTemplateLanguages(t));
+                const ensuredFinal = convertedFinal.map(t => {
+                  const merged = mergeTemplateLanguages(t);
+                  // Only normalize "GENERAL" or empty category if tags match the expected category
+                  if (!merged.category || merged.category.toUpperCase() === 'GENERAL') {
+                    const templateTags = Array.isArray(merged.tags) ? merged.tags : [];
+                    const tagsLower = templateTags.map((tag: any) => String(tag).toLowerCase().trim());
+                    const currentCategoryLowerTrimmed = currentCategoryLower.trim();
+                    const currentNormalizedLowerTrimmed = currentNormalizedLower.trim();
+                    
+                    // Check if tags match the expected category
+                    if (tagsLower.includes(currentCategoryLowerTrimmed) || 
+                        tagsLower.includes(currentNormalizedLowerTrimmed) ||
+                        tagsLower.some(tag => tag === currentCategoryLowerTrimmed || tag.startsWith(currentCategoryLowerTrimmed + ' '))) {
+                      merged.category = currentCategory;
+                    }
+                    // If tags don't match, keep category as "GENERAL" or empty - it will be filtered out
+                  }
+                  return merged;
+                });
+                
+                // Filter to only include templates that EXACTLY match the current category
+                // This is strict to prevent templates from other categories from showing up
+                const categoryFilteredFinal = ensuredFinal.filter((template: any) => {
+                  const templateCategory = template.category || '';
+                  const templateCategoryLower = templateCategory.toLowerCase().trim();
+                  const currentCategoryLowerTrimmed = currentCategoryLower.trim();
+                  const currentNormalizedLowerTrimmed = currentNormalizedLower.trim();
+                  
+                  // STRICT: Only allow exact match or category that starts with current category + space
+                  // This prevents "Political" or "Awareness" from matching "Political Awareness"
+                  // Only "Political Awareness" or "Political Awareness English" will match
+                  if (templateCategoryLower === currentCategoryLowerTrimmed) {
+                    return true; // Exact match: "Political Awareness" === "Political Awareness"
+                  }
+                  
+                  // Allow if category starts with current category + space (e.g., "Political Awareness English")
+                  // This allows variations like "Political Awareness Hindi" but NOT "Political" or "Awareness"
+                  if (templateCategoryLower.startsWith(currentCategoryLowerTrimmed + ' ') || 
+                      templateCategoryLower.startsWith(currentNormalizedLowerTrimmed + ' ')) {
+                    return true;
+                  }
+                  
+                  // Exclude all other templates - they're from different categories
+                  // This includes "Political", "Awareness", "Political Campaign", "GENERAL" without matching tags, etc.
+                  return false;
+                });
+                
                 const initialPosterWithLanguages = mergeTemplateLanguages(currentPoster);
-                const existingIndex = ensuredFinal.findIndex(t => t.id === initialPosterWithLanguages.id);
-                let nextTemplates = ensuredFinal;
+                // Ensure the initial poster's category matches the current category
+                if (initialPosterWithLanguages.category !== currentCategory) {
+                  initialPosterWithLanguages.category = currentCategory;
+                }
+                const existingIndex = categoryFilteredFinal.findIndex(t => t.id === initialPosterWithLanguages.id);
+                let nextTemplates = categoryFilteredFinal;
                 if (existingIndex === -1 && initialPosterWithLanguages.thumbnail) {
-                  nextTemplates = [initialPosterWithLanguages, ...ensuredFinal];
+                  nextTemplates = [initialPosterWithLanguages, ...categoryFilteredFinal];
                 }
                 
+                // Log what we're about to set
+                const categoriesToSet = new Set(nextTemplates.map((t: any) => t.category).filter(Boolean));
+                const categoriesBeforeFilter = new Set(ensuredFinal.map((t: any) => t.category).filter(Boolean));
+                console.log('🔍 [GREETING BACKGROUND LOAD] About to set templates:', {
+                  templateCountBeforeFilter: ensuredFinal.length,
+                  templateCountAfterFilter: categoryFilteredFinal.length,
+                  templateCountFinal: nextTemplates.length,
+                  categoriesBeforeFilter: Array.from(categoriesBeforeFilter),
+                  categoriesAfterFilter: Array.from(categoriesToSet),
+                  categoryBreakdown: Array.from(categoriesToSet).map(cat => ({
+                    category: cat,
+                    count: nextTemplates.filter((t: any) => t.category === cat).length
+                  })),
+                  filteredOutCount: ensuredFinal.length - categoryFilteredFinal.length,
+                  filteredOutCategories: Array.from(categoriesBeforeFilter).filter(cat => !categoriesToSet.has(cat)),
+                  currentCategory,
+                  activeCategoryRef: activeCategoryRef.current
+                });
+                
+                // Only set templates if this category is still active
+                if (activeCategoryRef.current.type === 'greeting' && activeCategoryRef.current.value === currentCategory) {
                 setAllTemplates(nextTemplates);
+                } else {
+                  console.log('⚠️ [GREETING BACKGROUND LOAD] Skipped setting allTemplates - category changed during background load.');
+                }
               }
             } catch (error) {
               // Silently fail background load - initial templates are already shown
@@ -1001,6 +1418,20 @@ const PosterPlayerScreen: React.FC = () => {
         }
         
         if (templatesToUse.length > 0) {
+          // Log what backend returned BEFORE conversion
+          const backendCategories = new Set(templatesToUse.map((t: any) => t.category).filter(Boolean));
+          console.log('🔍 [GREETING FETCH] Backend returned templates:', {
+            totalTemplates: templatesToUse.length,
+            uniqueCategories: Array.from(backendCategories),
+            expectedCategory: greetingCategory,
+            categoryBreakdown: Array.from(backendCategories).map(cat => ({
+              category: cat,
+              count: templatesToUse.filter((t: any) => t.category === cat).length,
+              sampleIds: templatesToUse.filter((t: any) => t.category === cat).map((t: any) => t.id).slice(0, 3)
+            })),
+            templatesWithoutCategory: templatesToUse.filter((t: any) => !t.category).length
+          });
+          
           // Convert GreetingTemplate to Template format
           const convertedTemplates: Template[] = templatesToUse.map((template: any) => {
             // Normalize tags to ensure they're in the correct format
@@ -1015,7 +1446,8 @@ const PosterPlayerScreen: React.FC = () => {
               id: template.id,
               name: template.name || 'Greeting Template',
               thumbnail: template.thumbnail || template.content?.background || '',
-              category: template.category || greetingCategory,
+              // Keep original category - don't default to greetingCategory as it might mask wrong categories
+              category: template.category || '',
               downloads: template.downloads || 0,
               isDownloaded: template.isDownloaded || false,
               tags: normalizedTags,
@@ -1028,27 +1460,63 @@ const PosterPlayerScreen: React.FC = () => {
           // Ensure all templates have languages extracted from tags
           const ensuredTemplates = convertedTemplates.map(t => mergeTemplateLanguages(t));
 
+          // Filter to only include templates that EXACTLY match the current category
+          // This is strict to prevent templates from other categories from showing up
+          const categoryFilteredTemplates = ensuredTemplates.filter((template: any) => {
+            const templateCategory = template.category || '';
+            const templateCategoryLower = templateCategory.toLowerCase().trim();
+            const greetingCategoryLowerTrimmed = greetingCategoryLower.trim();
+            const normalizedCategoryLowerTrimmed = normalizedCategoryLower.trim();
+            
+            // STRICT: Only allow exact match or category that starts with current category + space
+            // This prevents "Political" or "Awareness" from matching "Political Awareness"
+            // Only "Political Awareness" or "Political Awareness English" will match
+            if (templateCategoryLower === greetingCategoryLowerTrimmed) {
+              return true; // Exact match: "Political Awareness" === "Political Awareness"
+            }
+            
+            // Allow if category starts with current category + space (e.g., "Political Awareness English")
+            // This allows variations like "Political Awareness Hindi" but NOT "Political" or "Awareness"
+            if (templateCategoryLower.startsWith(greetingCategoryLowerTrimmed + ' ') || 
+                templateCategoryLower.startsWith(normalizedCategoryLowerTrimmed + ' ')) {
+              return true;
+            }
+            
+            // If category is "GENERAL" or empty, check tags to see if they match the expected category
+            // This handles cases where backend returns templates with category="GENERAL" but tags=["Political Awareness"]
+            if (!templateCategory || templateCategoryLower === 'general') {
+              const templateTags = Array.isArray(template.tags) ? template.tags : [];
+              const tagsLower = templateTags.map((tag: any) => String(tag).toLowerCase().trim());
+              
+              // Check if any tag exactly matches the expected category
+              if (tagsLower.includes(greetingCategoryLowerTrimmed) || 
+                  tagsLower.includes(normalizedCategoryLowerTrimmed)) {
+                // Set category to expected category for consistency
+                template.category = greetingCategory;
+                return true;
+              }
+              
+              // Check if any tag contains the expected category (for tags like "Political Awareness English")
+              if (tagsLower.some((tag: string) => tag === greetingCategoryLowerTrimmed || tag.startsWith(greetingCategoryLowerTrimmed + ' '))) {
+                template.category = greetingCategory;
+                return true;
+              }
+              
+              // If tags don't match, exclude this template
+              return false;
+            }
+            
+            // Exclude all other templates - they're from different categories
+            // This includes "Political", "Awareness", "Political Campaign", etc.
+            return false;
+          });
+          
           // Ensure the initially selected poster is present
           // Use convertedInitialPoster which has thumbnail properly set
           const initialPosterWithLanguages = mergeTemplateLanguages(posterToMatch);
-          
-          // Log for debugging
-          if (__DEV__) {
-            console.log('🔍 [POSTER PLAYER] Looking for clicked poster:', {
-              id: initialPosterWithLanguages.id,
-              thumbnail: initialPosterWithLanguages.thumbnail,
-              contentBackground: (initialPosterWithLanguages as any).content?.background,
-              totalTemplates: ensuredTemplates.length
-            });
-          }
-          
-          const existingIndex = ensuredTemplates.findIndex(t => t.id === initialPosterWithLanguages.id);
-          let nextTemplates = ensuredTemplates;
-          if (existingIndex === -1 && initialPosterWithLanguages.thumbnail) {
-            nextTemplates = [initialPosterWithLanguages, ...ensuredTemplates];
-            if (__DEV__) {
-              console.log('➕ [POSTER PLAYER] Added clicked poster to templates (not found in fetched templates)');
-            }
+          // Ensure initial poster's category matches
+          if (initialPosterWithLanguages.category !== greetingCategory) {
+            initialPosterWithLanguages.category = greetingCategory;
           }
 
           // Try to find the initialPoster (the one that was clicked) in the loaded templates
@@ -1057,7 +1525,7 @@ const PosterPlayerScreen: React.FC = () => {
           const initialPosterThumbnail = initialPosterWithLanguages.thumbnail || (initialPosterWithLanguages as any).content?.background || '';
           const initialPosterBackground = (initialPosterWithLanguages as any).content?.background || '';
           
-          const matchingPosterById = nextTemplates.find(t => {
+          const matchingPosterById = categoryFilteredTemplates.find(t => {
             if (t.id !== initialPosterWithLanguages.id) return false;
             // Must have a valid thumbnail/background
             const tThumbnail = t.thumbnail || (t as any).content?.background || '';
@@ -1065,7 +1533,7 @@ const PosterPlayerScreen: React.FC = () => {
           });
           
           const matchingPosterByThumbnail = !matchingPosterById && (initialPosterThumbnail || initialPosterBackground)
-            ? nextTemplates.find(t => {
+            ? categoryFilteredTemplates.find(t => {
                 const tThumbnail = t.thumbnail || (t as any).content?.background || '';
                 // Compare both thumbnail and background URLs
                 return (tThumbnail && initialPosterThumbnail && tThumbnail === initialPosterThumbnail) ||
@@ -1075,24 +1543,133 @@ const PosterPlayerScreen: React.FC = () => {
             : null;
           const matchingPoster = matchingPosterById || matchingPosterByThumbnail;
           
-          setAllTemplates(nextTemplates);
+          // Check if matching poster is already in the list
+          if (matchingPoster) {
+            const matchingPosterIndex = categoryFilteredTemplates.findIndex(t => t.id === matchingPoster.id);
+            console.log('🔍 [GREETING FETCH] Matching poster check:', {
+              matchingPosterId: matchingPoster.id,
+              matchingPosterIndex,
+              matchingPosterThumbnail: matchingPoster.thumbnail || (matchingPoster as any).content?.background,
+              initialPosterThumbnail,
+              initialPosterBackground,
+              matchType: matchingPosterById ? 'byId' : matchingPosterByThumbnail ? 'byThumbnail' : 'none'
+            });
+          }
+          
+          // Only add initial poster to list if it's not found in fetched templates AND no match found by thumbnail
+          // This prevents duplicates
+          let nextTemplates = categoryFilteredTemplates;
+          const existingIndex = categoryFilteredTemplates.findIndex(t => t.id === initialPosterWithLanguages.id);
+          
+          console.log('🔍 [GREETING FETCH] Duplicate check:', {
+            category: greetingCategory,
+            ensuredTemplatesCount: ensuredTemplates.length,
+            categoryFilteredTemplatesCount: categoryFilteredTemplates.length,
+            ensuredTemplateIds: ensuredTemplates.map(t => t.id).slice(0, 10),
+            categoryFilteredTemplateIds: categoryFilteredTemplates.map(t => t.id).slice(0, 10),
+            initialPosterId: initialPosterWithLanguages.id,
+            initialPosterThumbnail: initialPosterWithLanguages.thumbnail,
+            existingIndex,
+            matchingPosterFound: !!matchingPoster,
+            matchingPosterId: matchingPoster?.id,
+            willAddInitialPoster: existingIndex === -1 && !matchingPoster && initialPosterWithLanguages.thumbnail
+          });
+          
+          if (existingIndex === -1 && !matchingPoster && initialPosterWithLanguages.thumbnail) {
+            nextTemplates = [initialPosterWithLanguages, ...categoryFilteredTemplates];
+            console.log('⚠️ [GREETING FETCH] Adding initial poster to templates (not found in fetched):', {
+              initialPosterId: initialPosterWithLanguages.id,
+              finalTemplateCount: nextTemplates.length,
+              finalTemplateIds: nextTemplates.map(t => t.id)
+            });
+          }
+          
+          // Check for duplicates by ID
+          const duplicateIds = nextTemplates.filter((t, index, arr) => arr.findIndex(t2 => t2.id === t.id) !== index).map(t => t.id);
+          
+          // Also check for duplicates by thumbnail (same image, different IDs)
+          const thumbnailMap = new Map<string, Template[]>();
+          nextTemplates.forEach(t => {
+            const thumbnail = t.thumbnail || (t as any).content?.background || '';
+            if (thumbnail) {
+              if (!thumbnailMap.has(thumbnail)) {
+                thumbnailMap.set(thumbnail, []);
+              }
+              thumbnailMap.get(thumbnail)!.push(t);
+            }
+          });
+          
+          const duplicateThumbnails = Array.from(thumbnailMap.entries())
+            .filter(([thumb, templates]) => templates.length > 1)
+            .map(([thumb, templates]) => ({ thumbnail: thumb, ids: templates.map(t => t.id) }));
+          
+          console.log('🔍 [GREETING FETCH] Final templates:', {
+            templateCount: nextTemplates.length,
+            templateIds: nextTemplates.map(t => t.id),
+            templateThumbnails: nextTemplates.map(t => t.thumbnail || (t as any).content?.background || 'no-thumbnail'),
+            duplicateIds,
+            duplicateThumbnails,
+            matchingPosterId: matchingPoster?.id,
+            matchingPosterAppearsCount: matchingPoster ? nextTemplates.filter(t => t.id === matchingPoster.id).length : 0,
+            matchingPosterThumbnailAppearsCount: matchingPoster ? nextTemplates.filter(t => {
+              const tThumb = t.thumbnail || (t as any).content?.background || '';
+              const mThumb = matchingPoster.thumbnail || (matchingPoster as any).content?.background || '';
+              return tThumb && mThumb && tThumb === mThumb;
+            }).length : 0
+          });
+          
+          // Check for duplicates before setting
+          const uniqueTemplates = Array.from(new Map(nextTemplates.map(t => [t.id, t])).values());
+          if (uniqueTemplates.length !== nextTemplates.length) {
+            console.warn('⚠️ [GREETING FETCH] Duplicates by ID detected!', {
+              originalCount: nextTemplates.length,
+              uniqueCount: uniqueTemplates.length,
+              duplicateIds
+            });
+          }
+          
+          if (duplicateThumbnails.length > 0) {
+            console.warn('⚠️ [GREETING FETCH] Duplicates by thumbnail detected!', {
+              duplicateThumbnails
+            });
+          }
+          
+          // Ensure we're still on the same category (prevent race conditions)
+          if (activeCategoryRef.current.type !== 'greeting' || activeCategoryRef.current.value !== greetingCategory) {
+            console.warn('⚠️ [GREETING FETCH] Category changed, skipping setAllTemplates:', {
+              expectedCategory: greetingCategory,
+              activeCategoryType: activeCategoryRef.current.type,
+              activeCategoryValue: activeCategoryRef.current.value
+            });
+            return;
+          }
+          
+          console.log('🔍 [GREETING FETCH] About to set allTemplates:', {
+            uniqueTemplatesCount: uniqueTemplates.length,
+            uniqueTemplateIds: uniqueTemplates.map(t => t.id),
+            currentGreetingCategory: greetingCategory,
+            previousAllTemplatesCount: allTemplates.length,
+            previousAllTemplatesIds: allTemplates.map(t => t.id),
+            activeCategoryRef: activeCategoryRef.current
+          });
+          
+          // Completely replace allTemplates (don't merge)
+          setAllTemplates([...uniqueTemplates]);
           
           // Set current poster and trigger language detection
-          // Use the clicked poster if found, otherwise use the first one
-          // IMPORTANT: Always prefer the clicked poster (posterToMatch) if it has a valid image
-          // This ensures the exact clicked image is shown, even if matching fails
+          // Use the matching poster if found, otherwise use the first real template
+          // IMPORTANT: Don't use posterToMatch if it's the loading placeholder
           let posterToSet: Template | null = matchingPoster || null;
           
-          // If no match found OR if the matching poster is different from the clicked one,
-          // use the clicked poster if it has a valid image
-          if (!posterToSet || posterToSet.id !== posterToMatch.id) {
+          // If no match found, use the clicked poster ONLY if it's NOT the loading placeholder
+          if (!posterToSet) {
             const clickedPosterThumbnail = posterToMatch.thumbnail || (posterToMatch as any).content?.background || '';
-            if (clickedPosterThumbnail) {
+            // Only use clicked poster if it has a valid image AND is not the loading placeholder
+            if (clickedPosterThumbnail && posterToMatch.id !== 'loading') {
               // Use the clicked poster directly
               posterToSet = posterToMatch;
-              console.log('✅ [POSTER PLAYER] Using clicked poster directly (not found in fetched templates):', posterToMatch.id);
-            } else if (!posterToSet && nextTemplates.length > 0) {
-              // Fallback to first template only if clicked poster has no image
+            } else if (nextTemplates.length > 0) {
+              // Fallback to first template if clicked poster is loading placeholder or has no image
               posterToSet = nextTemplates[0];
             }
           }
@@ -1110,29 +1687,68 @@ const PosterPlayerScreen: React.FC = () => {
           
           const finalPoster = mergeTemplateLanguages(posterToSet);
           
+          console.log('🔍 [GREETING FETCH] Poster selection:', {
+            matchingPosterFound: !!matchingPoster,
+            matchingPosterId: matchingPoster?.id,
+            posterToSetId: posterToSet.id,
+            finalPosterId: finalPoster.id,
+            finalPosterTags: finalPoster.tags,
+            finalPosterName: finalPoster.name,
+            isLoadingPlaceholder: finalPoster.id === 'loading'
+          });
+          
           // Only update if the poster is actually different to avoid unnecessary re-renders
           setCurrentPoster(prevPoster => {
             if (prevPoster.id === finalPoster.id && 
                 prevPoster.thumbnail === finalPoster.thumbnail) {
               return prevPoster; // No change needed
             }
+            console.log('🔍 [GREETING FETCH] Setting currentPoster:', {
+              prevPosterId: prevPoster.id,
+              newPosterId: finalPoster.id,
+              newPosterName: finalPoster.name,
+              newPosterThumbnail: finalPoster.thumbnail
+            });
             return finalPoster;
           });
           
-          if (matchingPoster) {
-            console.log('✅ [POSTER PLAYER] Using clicked greeting poster:', matchingPoster.id);
-          } else if (initialPosterWithLanguages.thumbnail && posterToSet.id === initialPosterWithLanguages.id) {
-            console.log('✅ [POSTER PLAYER] Using clicked greeting poster (from initialPoster):', initialPosterWithLanguages.id);
-          } else {
-            console.log('⚠️ [POSTER PLAYER] Clicked greeting poster not found, using first:', nextTemplates[0]?.id, 'clicked was:', initialPosterWithLanguages.id);
-          }
+          // Auto-detect language from the first REAL loaded poster (not the loading placeholder)
+          // Use matching poster or first template if finalPoster is still the loading placeholder
+          const posterForLanguageDetection = finalPoster.id === 'loading' 
+            ? (matchingPoster || (nextTemplates.length > 0 ? nextTemplates[0] : null))
+            : finalPoster;
           
-          // Auto-detect language from the first poster's tags
-          // Only auto-detect if user hasn't manually selected a language
+          // Skip language detection if we don't have a real poster
+          if (!posterForLanguageDetection || posterForLanguageDetection.id === 'loading') {
+            console.log('🔍 [GREETING FETCH] Language detection skipped - no real poster available');
+          } else {
+            const posterForLangWithLanguages = mergeTemplateLanguages(posterForLanguageDetection);
+            
+            console.log('🔍 [GREETING FETCH] Language detection check:', {
+              category: greetingCategory,
+              userManuallySelected: userManuallySelectedLanguageRef.current,
+              lastAutoDetectedPosterId: lastAutoDetectedPosterIdRef.current,
+              posterId: posterForLangWithLanguages.id,
+              posterTags: posterForLangWithLanguages.tags,
+              posterName: posterForLangWithLanguages.name,
+              posterCategory: posterForLangWithLanguages.category,
+              hasTags: !!(posterForLangWithLanguages.tags && posterForLangWithLanguages.tags.length > 0),
+              finalPosterId: finalPoster.id,
+              usingRealPoster: posterForLanguageDetection.id !== 'loading',
+              willDetect: !userManuallySelectedLanguageRef.current && 
+                         lastAutoDetectedPosterIdRef.current !== posterForLangWithLanguages.id && 
+                         posterForLangWithLanguages.tags && posterForLangWithLanguages.tags.length > 0
+            });
+            
           if (!userManuallySelectedLanguageRef.current && 
-              lastAutoDetectedPosterIdRef.current !== finalPoster.id && 
-              finalPoster.tags && finalPoster.tags.length > 0) {
-            const languagesFromTags = extractLanguagesFromTags(finalPoster.tags);
+                lastAutoDetectedPosterIdRef.current !== posterForLangWithLanguages.id && 
+                posterForLangWithLanguages.tags && posterForLangWithLanguages.tags.length > 0) {
+              const languagesFromTags = extractLanguagesFromTags(posterForLangWithLanguages.tags);
+              
+              console.log('🔍 [GREETING FETCH] Languages from tags:', {
+                tags: posterForLangWithLanguages.tags,
+                languagesFromTags
+              });
             
             // Only auto-detect if we actually found language keywords
             if (languagesFromTags.length > 0) {
@@ -1141,19 +1757,35 @@ const PosterPlayerScreen: React.FC = () => {
                 const normalizedLangId = langId.toLowerCase();
                 return languagesFromTags.some(detectedLang => detectedLang.toLowerCase() === normalizedLangId);
               });
+                
+                console.log('🔍 [GREETING FETCH] Detection result:', {
+                  detectedLanguage,
+                  currentLanguage: selectedLanguage,
+                  willUpdate: detectedLanguage && detectedLanguage !== selectedLanguage
+                });
               
               if (detectedLanguage) {
+                  console.log('✅ [GREETING FETCH] Setting language to:', detectedLanguage);
                 setSelectedLanguage(detectedLanguage);
-                lastAutoDetectedPosterIdRef.current = finalPoster.id; // Track that we auto-detected for this poster
+                  lastAutoDetectedPosterIdRef.current = posterForLangWithLanguages.id; // Track that we auto-detected for this poster
               } else {
                 // If no matching language found, default to English for templates without language tags
+                  console.log('⚠️ [GREETING FETCH] No matching language found, defaulting to English');
                 setSelectedLanguage('english');
-                lastAutoDetectedPosterIdRef.current = finalPoster.id;
+                  lastAutoDetectedPosterIdRef.current = posterForLangWithLanguages.id;
               }
             } else {
               // No language keywords found in tags, default to English
+                console.log('⚠️ [GREETING FETCH] No language keywords in tags, defaulting to English');
               setSelectedLanguage('english');
-              lastAutoDetectedPosterIdRef.current = finalPoster.id;
+                lastAutoDetectedPosterIdRef.current = posterForLangWithLanguages.id;
+              }
+            } else {
+              console.log('🔍 [GREETING FETCH] Language detection skipped:', {
+                reason: userManuallySelectedLanguageRef.current ? 'user manually selected' : 
+                        lastAutoDetectedPosterIdRef.current === posterForLangWithLanguages.id ? 'already detected for this poster' :
+                        !(posterForLangWithLanguages.tags && posterForLangWithLanguages.tags.length > 0) ? 'no tags' : 'unknown'
+              });
             }
           }
         }
@@ -1175,35 +1807,14 @@ const PosterPlayerScreen: React.FC = () => {
     setAllTemplates([]);
     // Reset manual language selection when switching categories to allow auto-detection
     userManuallySelectedLanguageRef.current = false;
+    // Track active category to prevent other useEffects from overwriting templates
+    activeCategoryRef.current = { type: 'calendar', value: calendarDate };
 
     const fetchCalendarPosters = async () => {
       try {
-        console.log('📡 [POSTER PLAYER] Fetching calendar posters for date:', calendarDate);
         const response = await calendarApi.getPostersByDate(calendarDate);
         
-        // Print full JSON response
-        console.log('═══════════════════════════════════════════════════════');
-        console.log('📦 [CALENDAR API] FULL JSON RESPONSE');
-        console.log('═══════════════════════════════════════════════════════');
-        console.log(JSON.stringify(response, null, 2));
-        console.log('═══════════════════════════════════════════════════════');
-        
         if (response.success && response.data.posters.length > 0) {
-          console.log('📋 [CALENDAR POSTERS] Raw posters from API:', response.data.posters.length);
-          
-          // Log raw poster data before conversion
-          response.data.posters.forEach((poster: any, index: number) => {
-            console.log(`📋 [CALENDAR POSTER ${index + 1}] Raw data:`, JSON.stringify({
-              id: poster.id,
-              name: poster.name,
-              title: poster.title,
-              tags: poster.tags,
-              tagsType: typeof poster.tags,
-              tagsIsArray: Array.isArray(poster.tags),
-              category: poster.category,
-              languages: (poster as any).languages,
-            }, null, 2));
-          });
           
           // Convert CalendarPoster to Template format
           const convertedTemplates: Template[] = response.data.posters.map((poster: any) => {
@@ -1227,35 +1838,21 @@ const PosterPlayerScreen: React.FC = () => {
 
             return template;
           });
-          
-          console.log('📋 [CALENDAR POSTERS] Converted templates (before language merge):');
-          convertedTemplates.forEach((template, index) => {
-            console.log(`  Template ${index + 1}:`, JSON.stringify({
-              id: template.id,
-              name: template.name,
-                tags: template.tags || [],
-                tagsLength: (template.tags || []).length,
-            }, null, 2));
-          });
 
           if (convertedTemplates.length > 0) {
             // Set first poster as current poster and others as related
             // Ensure all templates have languages extracted from tags
             const ensuredTemplates = convertedTemplates.map(t => mergeTemplateLanguages(t));
             
-            console.log('📋 [CALENDAR POSTERS] After language merge:');
-            ensuredTemplates.forEach((template, index) => {
-              const languagesFromTags = extractLanguagesFromTags(template.tags);
-              console.log(`  Template ${index + 1}:`, JSON.stringify({
-                id: template.id,
-                name: template.name,
-                tags: template.tags,
-                languages: template.languages,
-                languagesFromTags: languagesFromTags,
-                willMatchEnglish: templateContainsLanguage(template, 'english'),
-                willMatchHindi: templateContainsLanguage(template, 'hindi'),
-              }, null, 2));
-            });
+            // Ensure we're still on the same category (prevent race conditions)
+            if (activeCategoryRef.current.type !== 'calendar' || activeCategoryRef.current.value !== calendarDate) {
+              console.warn('⚠️ [CALENDAR FETCH] Category changed, skipping setAllTemplates:', {
+                expectedDate: calendarDate,
+                activeCategoryType: activeCategoryRef.current.type,
+                activeCategoryValue: activeCategoryRef.current.value
+              });
+              return;
+            }
             
             setAllTemplates(ensuredTemplates);
             
@@ -1273,22 +1870,7 @@ const PosterPlayerScreen: React.FC = () => {
             // Ensure the selected poster has languages properly merged
             const finalPoster = mergeTemplateLanguages(posterToSet);
             setCurrentPoster(finalPoster);
-            
-            if (matchingPoster) {
-              console.log('📌 [POSTER PLAYER] Using clicked calendar poster:', matchingPoster.id);
-            } else {
-              console.log('📌 [POSTER PLAYER] Clicked calendar poster not found, using first:', ensuredTemplates[0]?.id);
-            }
-            
-            console.log('✅ [POSTER PLAYER] Loaded', ensuredTemplates.length, 'calendar posters for date:', calendarDate);
-            console.log('═══════════════════════════════════════════════════════');
           }
-        } else {
-          console.log('⚠️ [CALENDAR POSTERS] No posters found in response:', {
-            success: response.success,
-            hasData: !!response.data,
-            postersCount: response.data?.posters?.length || 0,
-          });
         }
       } catch (error) {
         console.error('❌ [POSTER PLAYER] Error fetching calendar posters:', error);
@@ -1305,9 +1887,32 @@ const PosterPlayerScreen: React.FC = () => {
   // Sync state when route params change (only if businessCategory, greetingCategory, or calendarDate is not provided)
   useEffect(() => {
     // Skip if business category, greeting category, or calendar date is provided (handled by separate useEffects above)
-    if (businessCategory || greetingCategory || calendarDate) {
+    // IMPORTANT: This check must be FIRST to prevent setting allTemplates when categories are active
+    // Also check activeCategoryRef to handle race conditions
+    const hasActiveCategory = !!(businessCategory || greetingCategory || calendarDate);
+    const hasActiveCategoryRef = activeCategoryRef.current.type !== null;
+    
+    if (hasActiveCategory || hasActiveCategoryRef) {
+      console.log('🔍 [INITIAL POSTER SYNC] Skipped - category/calendar provided:', {
+        businessCategory,
+        greetingCategory,
+        calendarDate,
+        hasActiveCategory,
+        activeCategoryRef: activeCategoryRef.current,
+        hasActiveCategoryRef,
+        initialPosterId: initialPoster.id,
+        initialRelatedPostersCount: initialRelatedPosters.length
+      });
       return;
     }
+    
+    console.log('🔍 [INITIAL POSTER SYNC] Running - no category/calendar:', {
+      initialPosterId: initialPoster.id,
+      initialRelatedPostersCount: initialRelatedPosters.length
+    });
+
+    // Clear active category ref since we're not in a category mode
+    activeCategoryRef.current = { type: null, value: null };
 
     // Clear allTemplates immediately when initialPoster changes to prevent showing old posters
     const initialPosterId = initialPoster.id;
@@ -1339,6 +1944,17 @@ const PosterPlayerScreen: React.FC = () => {
     templatesMap.set(initialPoster.id, ensuredInitialPoster);
 
     const updatedTemplates = Array.from(templatesMap.values());
+    
+    console.warn('⚠️ [INITIAL POSTER SYNC] About to set allTemplates - THIS SHOULD NOT HAPPEN WHEN CATEGORY IS ACTIVE!', {
+      updatedTemplatesCount: updatedTemplates.length,
+      updatedTemplateIds: updatedTemplates.map(t => t.id),
+      businessCategory,
+      greetingCategory,
+      calendarDate,
+      activeCategoryRef: activeCategoryRef.current,
+      stackTrace: new Error().stack?.split('\n').slice(1, 5).join('\n')
+    });
+    
     setAllTemplates(updatedTemplates);
 
     // Update currentPoster when new data arrives
@@ -1347,7 +1963,6 @@ const PosterPlayerScreen: React.FC = () => {
     setCurrentPoster(prevPoster => {
       // If initialPoster ID is different, it means a new poster was selected - update immediately
       if (prevPoster.id !== initialPoster.id && ensuredInitialPoster.thumbnail) {
-        console.log('🔄 [POSTER PLAYER] Route params changed - updating to new poster:', initialPoster.id, 'from:', prevPoster.id);
         setImageDimensions(null); // Reset image dimensions when poster changes
         // Update the ref to track the new poster ID
         if (prevInitialPosterIdRef.current !== initialPoster.id) {
@@ -1373,10 +1988,21 @@ const PosterPlayerScreen: React.FC = () => {
   useEffect(() => {
     // Don't auto-detect if user manually selected "All" or any language
     if (userManuallySelectedLanguageRef.current) {
+      console.log('🔍 [INITIAL LANG DETECT] Skipped - user manually selected language');
       return;
     }
     
     const initialPosterWithLanguages = mergeTemplateLanguages(initialPoster);
+    
+    console.log('🔍 [INITIAL LANG DETECT] Starting detection:', {
+      posterId: initialPosterWithLanguages.id,
+      posterName: initialPosterWithLanguages.name,
+      posterTags: initialPosterWithLanguages.tags,
+      category: initialPosterWithLanguages.category,
+      businessCategory,
+      greetingCategory,
+      calendarDate
+    });
     
     // Detect the primary language from the initial poster
     const posterLanguages = Array.isArray(initialPosterWithLanguages.languages)
@@ -1386,6 +2012,13 @@ const PosterPlayerScreen: React.FC = () => {
     const posterTags = Array.isArray(initialPosterWithLanguages.tags) ? initialPosterWithLanguages.tags : [];
     const languagesFromTags = extractLanguagesFromTags(posterTags);
     const allPosterLanguages = Array.from(new Set([...posterLanguages, ...languagesFromTags.map(l => l.toLowerCase())]));
+    
+    console.log('🔍 [INITIAL LANG DETECT] Detection data:', {
+      posterLanguages,
+      posterTags,
+      languagesFromTags,
+      allPosterLanguages
+    });
     
     // Available language IDs that we support
     const availableLanguageIds = ['english', 'hindi'];
@@ -1407,12 +2040,22 @@ const PosterPlayerScreen: React.FC = () => {
       );
     });
     
+    console.log('🔍 [INITIAL LANG DETECT] Detection result:', {
+      detectedLanguage,
+      currentLanguage: selectedLanguage,
+      lastAutoDetectedPosterId: lastAutoDetectedPosterIdRef.current,
+      willUpdate: detectedLanguage && lastAutoDetectedPosterIdRef.current !== initialPoster?.id
+    });
+    
     // If a language is detected, switch to it
     // Always auto-detect based on the current poster's language
     // Only skip if we've already detected for this poster to avoid duplicate detection
     if (detectedLanguage && lastAutoDetectedPosterIdRef.current !== initialPoster?.id) {
+      console.log('✅ [INITIAL LANG DETECT] Setting language to:', detectedLanguage);
       setSelectedLanguage(detectedLanguage);
       lastAutoDetectedPosterIdRef.current = initialPoster?.id || null;
+    } else if (!detectedLanguage) {
+      console.log('❌ [INITIAL LANG DETECT] No language detected - keeping current:', selectedLanguage);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialPoster?.id]); // Run when initial poster changes
@@ -1422,18 +2065,34 @@ const PosterPlayerScreen: React.FC = () => {
   useEffect(() => {
     // Don't auto-detect if user manually selected "All" or any language
     if (userManuallySelectedLanguageRef.current) {
+      console.log('🔍 [CURRENT LANG DETECT] Skipped - user manually selected language');
       return;
     }
     
     // Skip if no currentPoster or if it's a loading placeholder
     if (!currentPoster || currentPoster.id === 'loading' || (!currentPoster.thumbnail && !(currentPoster as any).content?.background)) {
+      console.log('🔍 [CURRENT LANG DETECT] Skipped - invalid currentPoster:', {
+        hasCurrentPoster: !!currentPoster,
+        posterId: currentPoster?.id,
+        hasThumbnail: !!currentPoster?.thumbnail
+      });
       return;
     }
 
     // Only run for business category, greeting category, or calendar posters
     if (!businessCategory && !greetingCategory && !calendarDate) {
+      console.log('🔍 [CURRENT LANG DETECT] Skipped - not a category/calendar poster');
       return;
     }
+
+    console.log('🔍 [CURRENT LANG DETECT] Starting detection:', {
+      posterId: currentPoster.id,
+      posterName: currentPoster.name,
+      category: currentPoster.category,
+      businessCategory,
+      greetingCategory,
+      calendarDate
+    });
 
     const posterWithLanguages = mergeTemplateLanguages(currentPoster);
     
@@ -1441,6 +2100,7 @@ const PosterPlayerScreen: React.FC = () => {
     const posterTags = Array.isArray(posterWithLanguages.tags) ? posterWithLanguages.tags : [];
     
     if (posterTags.length === 0) {
+      console.log('🔍 [CURRENT LANG DETECT] Skipped - no tags');
       return; // No tags to detect language from
     }
 
@@ -1455,6 +2115,13 @@ const PosterPlayerScreen: React.FC = () => {
     // Combine both sources
     const allDetectedLanguages = Array.from(new Set([...languagesFromTags, ...posterLanguages]));
     
+    console.log('🔍 [CURRENT LANG DETECT] Detection data:', {
+      posterTags,
+      languagesFromTags,
+      posterLanguages,
+      allDetectedLanguages
+    });
+    
     // Available language IDs that we support (priority order: hindi, english)
     const availableLanguageIds = ['hindi', 'english'];
     
@@ -1464,15 +2131,65 @@ const PosterPlayerScreen: React.FC = () => {
       return allDetectedLanguages.some(detectedLang => detectedLang.toLowerCase() === normalizedLangId);
     });
     
+    console.log('🔍 [CURRENT LANG DETECT] Detection result:', {
+      detectedLanguage,
+      currentLanguage: selectedLanguage,
+      lastAutoDetectedPosterId: lastAutoDetectedPosterIdRef.current,
+      willUpdate: detectedLanguage && lastAutoDetectedPosterIdRef.current !== currentPoster?.id
+    });
+    
     // If a language is detected and it's different from current selection, switch to it
     // Always auto-detect based on the current poster's language
     // Only skip if we've already detected for this poster to avoid duplicate detection
     if (detectedLanguage && lastAutoDetectedPosterIdRef.current !== currentPoster?.id) {
+      console.log('✅ [CURRENT LANG DETECT] Setting language to:', detectedLanguage);
       setSelectedLanguage(detectedLanguage);
       lastAutoDetectedPosterIdRef.current = currentPoster?.id || null;
+    } else if (!detectedLanguage) {
+      console.log('❌ [CURRENT LANG DETECT] No language detected');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPoster?.id, businessCategory, greetingCategory, calendarDate]); // Run when current poster changes for category or calendar
+
+  // Log whenever allTemplates changes to track duplicates
+  useEffect(() => {
+    if (allTemplates.length > 0) {
+      const duplicateIds = allTemplates.filter((t, index, arr) => arr.findIndex(t2 => t2.id === t.id) !== index).map(t => t.id);
+      const thumbnailMap = new Map<string, Template[]>();
+      allTemplates.forEach(t => {
+        const thumbnail = t.thumbnail || (t as any).content?.background || '';
+        if (thumbnail) {
+          if (!thumbnailMap.has(thumbnail)) {
+            thumbnailMap.set(thumbnail, []);
+          }
+          thumbnailMap.get(thumbnail)!.push(t);
+        }
+      });
+      const duplicateThumbnails = Array.from(thumbnailMap.entries())
+        .filter(([thumb, templates]) => templates.length > 1)
+        .map(([thumb, templates]) => ({ thumbnail: thumb, ids: templates.map(t => t.id) }));
+      
+      console.log('🔍 [ALL TEMPLATES CHANGED]', {
+        templateCount: allTemplates.length,
+        templateIds: allTemplates.map(t => t.id),
+        templateCategories: allTemplates.map(t => t.category),
+        templateNames: allTemplates.map(t => t.name).slice(0, 5), // First 5 names
+        duplicateIds,
+        duplicateThumbnails,
+        businessCategory,
+        greetingCategory,
+        calendarDate,
+        stackTrace: new Error().stack?.split('\n').slice(1, 4).join('\n') // First 3 stack frames
+      });
+      
+      if (duplicateIds.length > 0 || duplicateThumbnails.length > 0) {
+        console.warn('⚠️ [ALL TEMPLATES CHANGED] Duplicates detected!', {
+          duplicateIds,
+          duplicateThumbnails
+        });
+      }
+    }
+  }, [allTemplates]); // Only run when allTemplates changes, not when category changes
 
   // Ensure poster selection respects the active language filter
   // BUT: Don't override user-selected posters (via swipe or click)
@@ -1567,11 +2284,30 @@ const PosterPlayerScreen: React.FC = () => {
     // Merge template languages to ensure we have all language info
     const posterWithLanguages = mergeTemplateLanguages(poster);
     
+    console.log('🔍 [HANDLE POSTER SELECT] Poster selected:', {
+      posterId: posterWithLanguages.id,
+      posterName: posterWithLanguages.name,
+      posterTags: posterWithLanguages.tags,
+      category: posterWithLanguages.category,
+      businessCategory,
+      greetingCategory,
+      calendarDate
+    });
+    
+    // Skip update if it's the same poster to prevent unnecessary re-renders
+    setCurrentPoster(prevPoster => {
+      if (prevPoster?.id === posterWithLanguages.id) {
+        return prevPoster;
+      }
+      
+      return posterWithLanguages;
+    });
+    
     // Mark this as a user-selected poster (via swipe or click)
     userSelectedPosterRef.current = posterWithLanguages.id;
     
-    // Only auto-detect language if user hasn't manually selected a language (including "All")
-    if (!userManuallySelectedLanguageRef.current) {
+    // Always detect language from the selected poster and update filter to show matching posters in grid
+    // This ensures the preview grid shows posters matching the selected poster's language
       // Detect the primary language from the poster
       const posterLanguages = Array.isArray(posterWithLanguages.languages)
         ? posterWithLanguages.languages.map((lang: string) => lang.toLowerCase())
@@ -1580,6 +2316,13 @@ const PosterPlayerScreen: React.FC = () => {
       const posterTags = Array.isArray(posterWithLanguages.tags) ? posterWithLanguages.tags : [];
       const languagesFromTags = extractLanguagesFromTags(posterTags);
       const allPosterLanguages = Array.from(new Set([...posterLanguages, ...languagesFromTags.map(l => l.toLowerCase())]));
+    
+    console.log('🔍 [HANDLE POSTER SELECT] Language detection:', {
+      posterTags,
+      languagesFromTags,
+      posterLanguages,
+      allPosterLanguages
+    });
       
       // Available language IDs that we support
       const availableLanguageIds = ['english', 'hindi'];
@@ -1601,24 +2344,54 @@ const PosterPlayerScreen: React.FC = () => {
         );
       });
       
-      // If a language is detected and it's different from current selection, switch to it
-      // Always auto-detect based on the current poster's language
-      // Only skip if we've already detected for this poster to avoid duplicate detection
-      if (detectedLanguage && lastAutoDetectedPosterIdRef.current !== posterWithLanguages?.id) {
+    console.log('🔍 [HANDLE POSTER SELECT] Detection result:', {
+      detectedLanguage,
+      currentLanguage: selectedLanguage,
+      willUpdate: detectedLanguage && detectedLanguage !== selectedLanguage
+    });
+    
+    // Always update the language filter based on the selected poster's language
+    // This ensures the grid shows posters matching the selected poster's language
+    if (detectedLanguage) {
+      // Update filter to show posters matching the detected language
+      // This will filter the grid to show only posters with the same language
+      if (detectedLanguage !== selectedLanguage) {
+        console.log('✅ [HANDLE POSTER SELECT] Setting language to:', detectedLanguage);
         setSelectedLanguage(detectedLanguage);
+      } else {
+        console.log('ℹ️ [HANDLE POSTER SELECT] Language already set to:', detectedLanguage);
+      }
+      lastAutoDetectedPosterIdRef.current = posterWithLanguages?.id || null;
+      // Allow language to be updated when selecting different posters
+      // This ensures the filter updates based on each selected poster
+      userManuallySelectedLanguageRef.current = false;
+    } else {
+      // No language detected in poster - keep current filter
+      // If "All" is selected, keep it; otherwise keep current language filter
+      console.log('❌ [HANDLE POSTER SELECT] No language detected - keeping current:', selectedLanguage);
         lastAutoDetectedPosterIdRef.current = posterWithLanguages?.id || null;
+      }
+  }, [selectedLanguage, businessCategory, greetingCategory, calendarDate]);
+
+  const currentPosterIndex = useMemo(() => {
+    if (!currentPoster || !filteredPosters.length) {
+      return -1;
+    }
+    // Try to find by ID first
+    let index = filteredPosters.findIndex(template => template.id === currentPoster.id);
+    
+    // If not found by ID, try to find by thumbnail URL (for cases where IDs might differ)
+    if (index === -1) {
+      const currentThumbnail = currentPoster.thumbnail || (currentPoster as any).content?.background || '';
+      if (currentThumbnail) {
+        index = filteredPosters.findIndex(template => {
+          const templateThumbnail = template.thumbnail || (template as any).content?.background || '';
+          return templateThumbnail === currentThumbnail;
+        });
       }
     }
     
-    // Update the current poster
-    setCurrentPoster(posterWithLanguages);
-  }, [selectedLanguage]);
-
-  const currentPosterIndex = useMemo(() => {
-    if (!currentPoster) {
-      return -1;
-    }
-    return filteredPosters.findIndex(template => template.id === currentPoster.id);
+    return index;
   }, [filteredPosters, currentPoster]);
 
   const showPosterAtIndex = useCallback((index: number) => {
@@ -1635,6 +2408,15 @@ const PosterPlayerScreen: React.FC = () => {
 
   const goToNextPoster = useCallback(() => {
     if (currentPosterIndex === -1) {
+      // If current poster not found in filteredPosters, check if it matches the first poster
+      // If it does, treat it as index 0 and go to index 1
+      if (currentPoster && filteredPosters.length > 0 && filteredPosters[0].id === currentPoster.id) {
+        if (filteredPosters.length > 1) {
+          showPosterAtIndex(1);
+        }
+        return;
+      }
+      // Otherwise, go to first poster
       showPosterAtIndex(0);
       return;
     }
@@ -1642,10 +2424,16 @@ const PosterPlayerScreen: React.FC = () => {
     if (nextIndex < filteredPosters.length) {
       showPosterAtIndex(nextIndex);
     }
-  }, [currentPosterIndex, filteredPosters.length, showPosterAtIndex]);
+  }, [currentPosterIndex, filteredPosters.length, showPosterAtIndex, currentPoster, filteredPosters]);
 
   const goToPreviousPoster = useCallback(() => {
     if (currentPosterIndex === -1) {
+      // If current poster not found in filteredPosters, check if it matches the first poster
+      // If it does, we're already at the first, so don't go anywhere
+      if (currentPoster && filteredPosters.length > 0 && filteredPosters[0].id === currentPoster.id) {
+        return; // Already at first poster
+      }
+      // Otherwise, go to first poster
       showPosterAtIndex(0);
       return;
     }
@@ -1653,7 +2441,7 @@ const PosterPlayerScreen: React.FC = () => {
     if (previousIndex >= 0) {
       showPosterAtIndex(previousIndex);
     }
-  }, [currentPosterIndex, showPosterAtIndex]);
+  }, [currentPosterIndex, showPosterAtIndex, currentPoster, filteredPosters]);
 
   const swipeThreshold = 50;
 
@@ -1886,6 +2674,7 @@ const PosterPlayerScreen: React.FC = () => {
     );
   }, [currentPoster]);
 
+
   const handleBackPress = useCallback(() => {
     if (originScreen === 'GreetingTemplates') {
       navigation.navigate('GreetingTemplates');
@@ -1936,6 +2725,19 @@ const PosterPlayerScreen: React.FC = () => {
   // Memoize current poster ID to avoid recreating render function
   const currentPosterId = useMemo(() => currentPoster?.id, [currentPoster?.id]);
 
+  // Compute image props
+  const imageProps = useMemo(() => {
+    const thumbnailUri = currentPoster?.thumbnail || (currentPoster as any)?.content?.background || '';
+    const fullImageUri = getHighQualityImageUrl(currentPoster);
+    const imageKey = `poster-${currentPoster?.id || 'none'}-${fullImageUri || thumbnailUri || ''}`;
+    
+    return {
+      key: imageKey,
+      thumbnailUri,
+      fullImageUri
+    };
+  }, [currentPoster?.id, currentPoster, getHighQualityImageUrl]);
+
   // Pre-compute image URLs and language codes for all templates to avoid recalculation during render
   const templateMetadata = useMemo(() => {
     const metadataMap = new Map<string, { imageUrl: string }>();
@@ -1951,7 +2753,23 @@ const PosterPlayerScreen: React.FC = () => {
     // Prioritize thumbnailUrl for grid preview performance (smaller, optimized images)
     // Fallback to thumbnail, then imageUrl for compatibility
     const thumbnailUrl = (item as any).thumbnailUrl || item.thumbnail || '';
-    const isSelected = currentPosterId === item.id;
+    
+    // Check if this item is selected - compare by ID first, then by thumbnail URL as fallback
+    // Use currentPoster directly for more reliable comparison
+    let isSelected = false;
+    if (currentPoster) {
+      // First check by ID
+      isSelected = currentPoster.id === item.id;
+      
+      // If IDs don't match, check by thumbnail URL as fallback
+      if (!isSelected) {
+        const currentThumbnail = currentPoster.thumbnail || (currentPoster as any).content?.background || '';
+        const itemThumbnail = item.thumbnail || (item as any).content?.background || '';
+        if (currentThumbnail && itemThumbnail && currentThumbnail === itemThumbnail) {
+          isSelected = true;
+        }
+      }
+    }
     
     return (
       <RelatedPosterItem
@@ -1964,7 +2782,7 @@ const PosterPlayerScreen: React.FC = () => {
         overlayColors={previewOverlayColors}
       />
     );
-  }, [cardWidth, cardHeight, handlePosterSelect, currentPosterId, previewOverlayColors]);
+  }, [cardWidth, cardHeight, handlePosterSelect, currentPoster, previewOverlayColors]);
 
 
   const renderLanguageButton = useCallback((language: typeof languages[0]) => {
@@ -2070,9 +2888,9 @@ const PosterPlayerScreen: React.FC = () => {
            collapsable={false}
          >
          <LazyFullImage
-           key={`poster-${currentPoster.id}-${currentPoster.thumbnail || (currentPoster as any).content?.background || ''}`}
-           thumbnailUri={currentPoster.thumbnail || (currentPoster as any).content?.background || ''}
-           fullImageUri={getHighQualityImageUrl(currentPoster)}
+           key={imageProps.key}
+           thumbnailUri={imageProps.thumbnailUri}
+           fullImageUri={imageProps.fullImageUri}
            style={styles.posterImage}
            resizeMode="contain"
            loadOnMount={true}

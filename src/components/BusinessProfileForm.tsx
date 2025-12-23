@@ -325,8 +325,8 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
       errors.push('Company name is required');
     }
 
-    // Business category validation
-    if (!formData.category.trim()) {
+    // Business category validation (only required for new profiles, not when editing)
+    if (!profile && !formData.category.trim()) {
       errors.push('Business category is required');
     }
 
@@ -497,74 +497,100 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
 
               <View style={styles.inputContainer}>
                 <Text style={[styles.sectionTitle, { color: isDarkMode ? '#ffffff' : '#1a1a1a' }]}>
-                  Business Category *
+                  Business Category {profile ? '' : '*'}
                 </Text>
-                <View style={[
-                  styles.pickerContainer,
-                  { 
-                    backgroundColor: theme.colors.inputBackground,
-                    borderColor: theme.colors.border
-                  },
-                  focusedField === 'category' && [styles.inputFocused, { borderColor: theme.colors.primary }]
-                ]}>
-                  {loadingCategories ? (
-                    <View style={styles.categoryLoadingContainer}>
-                      <ActivityIndicator size="small" color={theme.colors.primary} />
-                      <Text style={[styles.pickerText, { color: theme.colors.textSecondary, marginLeft: 8 }]}>
-                        Loading categories...
-                      </Text>
-                    </View>
-                  ) : (
-                    <Text style={[styles.pickerText, { color: formData.category ? theme.colors.text : theme.colors.textSecondary }]}>
-                      {formData.category || 'Select business category'}
+                {profile ? (
+                  // Edit mode: Show category as read-only
+                  <View style={[
+                    styles.pickerContainer,
+                    styles.pickerContainerDisabled,
+                    { 
+                      backgroundColor: theme.colors.inputBackground,
+                      borderColor: theme.colors.border,
+                      opacity: 0.6
+                    }
+                  ]}>
+                    <Text style={[styles.pickerText, { color: theme.colors.textSecondary }]}>
+                      {formData.category || 'No category'}
                     </Text>
-                  )}
-                </View>
-                {loadingCategories ? (
-                  <View style={styles.categoryOptions}>
-                    <Text style={[styles.categoryLoadingText, { color: theme.colors.textSecondary }]}>
-                      Loading categories...
-                    </Text>
-                  </View>
-                ) : categories.length === 0 ? (
-                  <View style={styles.categoryOptions}>
-                    <Text style={[styles.categoryLoadingText, { color: theme.colors.textSecondary }]}>
-                      No categories available. Please try again later.
-                    </Text>
+                    <Icon name="lock" size={16} color={theme.colors.textSecondary} style={{ marginLeft: 8 }} />
                   </View>
                 ) : (
-                  <View style={styles.categoryOptions}>
-                    {categories.map((category) => (
-                      <TouchableOpacity
-                        key={category}
-                        style={[
-                          styles.categoryOption,
-                          { 
-                            backgroundColor: formData.category === category 
-                              ? theme.colors.primary 
-                              : (isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(102,126,234,0.1)'),
-                            borderWidth: 1,
-                            borderColor: formData.category === category 
-                              ? theme.colors.primary 
-                              : (isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(102,126,234,0.2)')
-                          }
-                        ]}
-                        onPress={() => handleInputChange('category', category)}
-                      >
-                        <Text style={[
-                          styles.categoryOptionText,
-                          { 
-                            color: formData.category === category 
-                              ? '#ffffff' 
-                              : (isDarkMode ? '#ffffff' : theme.colors.primary)
-                          },
-                          formData.category === category && styles.categoryOptionTextSelected
-                        ]}>
-                          {category}
+                  // New profile mode: Allow category selection
+                  <>
+                    <View style={[
+                      styles.pickerContainer,
+                      { 
+                        backgroundColor: theme.colors.inputBackground,
+                        borderColor: theme.colors.border
+                      },
+                      focusedField === 'category' && [styles.inputFocused, { borderColor: theme.colors.primary }]
+                    ]}>
+                      {loadingCategories ? (
+                        <View style={styles.categoryLoadingContainer}>
+                          <ActivityIndicator size="small" color={theme.colors.primary} />
+                          <Text style={[styles.pickerText, { color: theme.colors.textSecondary, marginLeft: 8 }]}>
+                            Loading categories...
+                          </Text>
+                        </View>
+                      ) : (
+                        <Text style={[styles.pickerText, { color: formData.category ? theme.colors.text : theme.colors.textSecondary }]}>
+                          {formData.category || 'Select business category'}
                         </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
+                      )}
+                    </View>
+                    {loadingCategories ? (
+                      <View style={styles.categoryOptions}>
+                        <Text style={[styles.categoryLoadingText, { color: theme.colors.textSecondary }]}>
+                          Loading categories...
+                        </Text>
+                      </View>
+                    ) : categories.length === 0 ? (
+                      <View style={styles.categoryOptions}>
+                        <Text style={[styles.categoryLoadingText, { color: theme.colors.textSecondary }]}>
+                          No categories available. Please try again later.
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={styles.categoryOptions}>
+                        {categories.map((category) => (
+                          <TouchableOpacity
+                            key={category}
+                            style={[
+                              styles.categoryOption,
+                              { 
+                                backgroundColor: formData.category === category 
+                                  ? theme.colors.primary 
+                                  : (isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(102,126,234,0.1)'),
+                                borderWidth: 1,
+                                borderColor: formData.category === category 
+                                  ? theme.colors.primary 
+                                  : (isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(102,126,234,0.2)')
+                              }
+                            ]}
+                            onPress={() => handleInputChange('category', category)}
+                          >
+                            <Text style={[
+                              styles.categoryOptionText,
+                              { 
+                                color: formData.category === category 
+                                  ? '#ffffff' 
+                                  : (isDarkMode ? '#ffffff' : theme.colors.primary)
+                              },
+                              formData.category === category && styles.categoryOptionTextSelected
+                            ]}>
+                              {category}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                  </>
+                )}
+                {profile && (
+                  <Text style={[styles.categoryDisabledHint, { color: theme.colors.textSecondary }]}>
+                    Business category cannot be changed after creation
+                  </Text>
                 )}
               </View>
             </View>
@@ -953,6 +979,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 4,
+  },
+  pickerContainerDisabled: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   pickerText: {
     fontSize: Math.min(screenWidth * 0.035, 14),
@@ -1461,6 +1492,11 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     textAlign: 'center',
     paddingVertical: Math.max(8, screenHeight * 0.01),
+  },
+  categoryDisabledHint: {
+    fontSize: Math.min(screenWidth * 0.028, 11),
+    marginTop: Math.max(4, screenHeight * 0.005),
+    fontStyle: 'italic',
   },
 });
 

@@ -124,11 +124,14 @@ const GreetingTemplatesScreen: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [categoryPreviewImages, setCategoryPreviewImages] = useState<Record<string, string | null>>({});
+  const [visibleCategoryIds, setVisibleCategoryIds] = useState<Set<string>>(new Set());
   const isMountedRef = useRef(true);
   const previewCacheRef = useRef<Record<string, string | null>>({});
   const previewRefreshKeyRef = useRef(0); // Force preview re-fetch on refresh
   const sectionAnimations = useRef<Map<string, Animated.Value>>(new Map()).current;
   const animatedSectionsRef = useRef<Set<string>>(new Set());
+  const previewFetchQueueRef = useRef<Set<string>>(new Set()); // Track categories queued for preview fetching
+  const previewFetchWorkersRef = useRef<Set<Promise<void>>>(new Set()); // Track active workers
 
   useEffect(() => {
     return () => {
@@ -340,15 +343,32 @@ const GreetingTemplatesScreen: React.FC = () => {
         const usedUris = usedPreviewUris || new Set<string>();
         let selectedTemplate: GreetingTemplate | Template | null = null;
 
+        // Generate search variations for better matching (handle special characters, spaces, etc.)
+        const categoryName = category.name || '';
+        const normalizedCategory = categoryName.toLowerCase()
+          .replace(/[&]/g, 'and')
+          .replace(/[^a-z0-9\s]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+        
+        const categoryWords = normalizedCategory.split(/\s+/).filter(word => word.length > 0);
+        const searchVariations = [
+          categoryName.toLowerCase(),
+          normalizedCategory,
+          ...categoryWords, // Individual words
+          categoryWords.join(' '), // Combined words
+        ].filter((v, i, arr) => arr.indexOf(v) === i && v.length > 0); // Remove duplicates and empty
+
         // Prefer a direct category query first (faster than search)
         try {
           const directTemplates =
             (await withTimeout(
-              greetingTemplatesService.getTemplates({ category: category.name, limit: 12 }),
+              greetingTemplatesService.getTemplates({ category: categoryName, limit: 12 }),
               PREVIEW_TIMEOUT_MS,
               [],
             )) || [];
 
+          const categoryNameLower = categoryName.toLowerCase();
           const matchingDirect = directTemplates.find(template => {
             const previewUri = extractTemplatePreview(template);
             if (!previewUri || usedUris.has(previewUri)) {
@@ -356,31 +376,48 @@ const GreetingTemplatesScreen: React.FC = () => {
             }
             const templateAny = template as any;
             const templateTags = Array.isArray(templateAny.tags) ? templateAny.tags : [];
-            const tagMatch = templateTags.some(
-              (tag: string) => typeof tag === 'string' && tag.toLowerCase().includes(category.name.toLowerCase()),
-            );
-            const categoryMatch = template.category?.toLowerCase().includes(category.name.toLowerCase());
-            return tagMatch || categoryMatch;
+            
+            // More lenient matching - check category and tags against variations
+            const templateCategoryLower = template.category?.toLowerCase() || '';
+            const categoryMatch = templateCategoryLower.includes(categoryNameLower) ||
+                                 templateCategoryLower.includes(normalizedCategory) ||
+                                 categoryWords.some(word => templateCategoryLower.includes(word));
+            
+            const tagMatch = templateTags.some((tag: string) => {
+              if (typeof tag !== 'string') return false;
+              const tagLower = tag.toLowerCase();
+              return tagLower.includes(categoryNameLower) ||
+                     tagLower.includes(normalizedCategory) ||
+                     categoryWords.some(word => tagLower.includes(word) || word.includes(tagLower));
+            });
+            
+            return categoryMatch || tagMatch;
           });
 
           selectedTemplate = matchingDirect || directTemplates?.[0] || null;
         } catch (error) {
           if (__DEV__) {
-            console.warn(`⚠️ Direct preview fetch failed for ${category.name}:`, error);
+            console.warn(`⚠️ Direct preview fetch failed for ${categoryName}:`, error);
           }
         }
 
-        // If direct fetch failed, fall back to fast search with timeout (limit 12 for faster response)
+        // If direct fetch failed, try search with multiple variations
         if (!selectedTemplate) {
-          try {
-            const templates =
-              (await withTimeout(
-                greetingTemplatesService.searchTemplates(category.name, undefined, 12),
-                PREVIEW_TIMEOUT_MS,
-                [],
-              )) || [];
+          // Try searches with different variations in parallel
+          const searchPromises = searchVariations.slice(0, 3).map(variation =>
+            withTimeout(
+              greetingTemplatesService.searchTemplates(variation, undefined, 12),
+              PREVIEW_TIMEOUT_MS,
+              []
+            )
+          );
 
-            const matchingTemplate = templates.find(template => {
+          try {
+            const searchResults = await Promise.all(searchPromises);
+            const allTemplates = searchResults.flat().filter(Boolean);
+
+            const categoryNameLower = categoryName.toLowerCase();
+            const matchingTemplate = allTemplates.find(template => {
               const previewUri = extractTemplatePreview(template);
               if (!previewUri || usedUris.has(previewUri)) {
                 return false;
@@ -388,21 +425,53 @@ const GreetingTemplatesScreen: React.FC = () => {
 
               const templateAny = template as any;
               const templateTags = Array.isArray(templateAny.tags) ? templateAny.tags : [];
+              
+              // More lenient matching
+              const templateCategoryLower = template.category?.toLowerCase() || '';
+              const categoryMatch = templateCategoryLower.includes(categoryNameLower) ||
+                                   templateCategoryLower.includes(normalizedCategory) ||
+                                   categoryWords.some(word => templateCategoryLower.includes(word));
 
-              const tagMatch = templateTags.some(
-                (tag: string) => typeof tag === 'string' && tag.toLowerCase().includes(category.name.toLowerCase()),
-              );
+              const tagMatch = templateTags.some((tag: string) => {
+                if (typeof tag !== 'string') return false;
+                const tagLower = tag.toLowerCase();
+                return tagLower.includes(categoryNameLower) ||
+                       tagLower.includes(normalizedCategory) ||
+                       categoryWords.some(word => tagLower.includes(word) || word.includes(tagLower));
+              });
 
-              const categoryMatch = template.category?.toLowerCase().includes(category.name.toLowerCase());
-
-              return tagMatch || categoryMatch;
+              return categoryMatch || tagMatch;
             });
 
-            selectedTemplate = matchingTemplate || templates?.[0] || null;
+            selectedTemplate = matchingTemplate || allTemplates?.[0] || null;
           } catch (error) {
             if (__DEV__) {
-              console.warn(`⚠️ Failed to fetch preview for greeting category ${category.name}:`, error);
+              console.warn(`⚠️ Failed to fetch preview for greeting category ${categoryName}:`, error);
             }
+          }
+        }
+
+        // Final fallback: if still no template, try a broader search with just the first word
+        if (!selectedTemplate && categoryWords.length > 0) {
+          try {
+            const firstWord = categoryWords[0];
+            if (firstWord.length >= 3) { // Only if word is meaningful
+              const fallbackTemplates = await withTimeout(
+                greetingTemplatesService.searchTemplates(firstWord, undefined, 20),
+                PREVIEW_TIMEOUT_MS,
+                []
+              );
+              
+              if (fallbackTemplates && fallbackTemplates.length > 0) {
+                // Find any template with a valid preview that's not already used
+                selectedTemplate = fallbackTemplates.find(template => {
+                  const previewUri = extractTemplatePreview(template);
+                  return previewUri && !usedUris.has(previewUri);
+                }) || fallbackTemplates[0] || null;
+              }
+            }
+          } catch (error) {
+            // Silently fail - we've tried our best
           }
         }
 
@@ -422,44 +491,25 @@ const GreetingTemplatesScreen: React.FC = () => {
     [extractTemplatePreview, withTimeout],
   );
 
-  useEffect(() => {
-    if (categories.length === 0) {
-      previewCacheRef.current = {};
-      setCategoryPreviewImages({});
-      return;
-    }
+  // Function to fetch previews for specific category IDs
+  const fetchPreviewsForCategories = useCallback(
+    async (categoryIds: string[], priority: 'high' | 'low' = 'low') => {
+      if (!isMountedRef.current || categoryIds.length === 0) return;
 
-    // Defer preview fetching until after initial render and interactions
-    const handle = InteractionManager.runAfterInteractions(() => {
-      if (!isMountedRef.current) return;
-
-      const activeIds = new Set(categories.map(category => category.id));
-      const currentRefreshKey = previewRefreshKeyRef.current;
-      
-      // Clean up preview cache to only include active category IDs
-      previewCacheRef.current = Object.fromEntries(
-        Object.entries(previewCacheRef.current).filter(([id]) => activeIds.has(id)),
-      );
-      setCategoryPreviewImages(prev => {
-        const nextEntries = Object.entries(prev).filter(([id]) => activeIds.has(id));
-        if (nextEntries.length === Object.keys(prev).length) {
-          return prev;
-        }
-        return Object.fromEntries(nextEntries);
-      });
-
-      // Find categories that need preview fetching
-      const pending = categories.filter(category => {
+      const categoriesToFetch = categories.filter(category => {
         const cached = previewCacheRef.current[category.id];
-        return cached === undefined;
+        const isQueued = previewFetchQueueRef.current.has(category.id);
+        return categoryIds.includes(category.id) && cached === undefined && !isQueued;
       });
-      
-      if (pending.length === 0) {
-        return;
-      }
 
-      let isActive = true;
-      const concurrency = 4; // Reduced concurrency for better performance
+      if (categoriesToFetch.length === 0) return;
+
+      // Mark as queued
+      categoriesToFetch.forEach(category => {
+        previewFetchQueueRef.current.add(category.id);
+      });
+
+      const concurrency = priority === 'high' ? 6 : 2; // Higher concurrency for visible items
       const usedPreviewUris = new Set<string>(
         Object.values(previewCacheRef.current).filter((uri): uri is string => uri !== null),
       );
@@ -472,7 +522,7 @@ const GreetingTemplatesScreen: React.FC = () => {
         if (Object.keys(batchedUpdates).length > 0 && isMountedRef.current) {
           const updates = { ...batchedUpdates };
           Object.keys(batchedUpdates).length = 0; // Clear batch
-          
+
           setCategoryPreviewImages(prev => {
             let changed = false;
             const next = { ...prev };
@@ -495,12 +545,12 @@ const GreetingTemplatesScreen: React.FC = () => {
         }
       };
 
-      const queue: GreetingCategory[] = [...pending];
+      const queue: GreetingCategory[] = [...categoriesToFetch];
       const worker = async () => {
-        while (isActive) {
+        while (queue.length > 0 && isMountedRef.current) {
           const category = queue.shift();
           if (!category) {
-            return;
+            break;
           }
 
           try {
@@ -513,41 +563,81 @@ const GreetingTemplatesScreen: React.FC = () => {
           } catch (error) {
             previewCacheRef.current[category.id] = null;
             scheduleBatchUpdate(category.id, null);
+          } finally {
+            previewFetchQueueRef.current.delete(category.id);
           }
         }
       };
 
       const workers = Array.from({ length: Math.min(concurrency, queue.length) }, () => worker());
-
-      Promise.all(workers)
-        .then(() => {
-          // Flush any remaining batched updates
-          if (batchTimer) {
-            clearTimeout(batchTimer);
-          }
-          flushBatch();
-        })
-        .catch(() => {
-          // swallow errors, state updates handled per-worker
-          if (batchTimer) {
-            clearTimeout(batchTimer);
-          }
-          flushBatch();
-        });
-
-      return () => {
-        isActive = false;
+      const workersPromise = Promise.all(workers).finally(() => {
         if (batchTimer) {
           clearTimeout(batchTimer);
         }
         flushBatch();
-      };
+      });
+
+      previewFetchWorkersRef.current.add(workersPromise);
+      workersPromise.finally(() => {
+        previewFetchWorkersRef.current.delete(workersPromise);
+      });
+    },
+    [categories, fetchCategoryPreview],
+  );
+
+  // Fetch previews for visible categories immediately
+  useEffect(() => {
+    if (visibleCategoryIds.size === 0 || categories.length === 0) return;
+
+    const visibleIds = Array.from(visibleCategoryIds);
+    fetchPreviewsForCategories(visibleIds, 'high');
+  }, [visibleCategoryIds, categories, fetchPreviewsForCategories]);
+
+  // Fetch previews for initially visible items after initial render
+  useEffect(() => {
+    if (initialLoading || categories.length === 0 || groupedCategories.length === 0) return;
+
+    // Calculate initial visible items (first 2-3 rows worth of categories)
+    // This ensures thumbnails for visible items load immediately
+    const initialVisibleCount = Math.min(categoryColumns * 3, categories.length);
+    const initialVisibleIds = categories.slice(0, initialVisibleCount).map(c => c.id);
+
+    // Fetch previews for initial visible items (onViewableItemsChanged will handle tracking)
+    if (initialVisibleIds.length > 0) {
+      fetchPreviewsForCategories(initialVisibleIds, 'high');
+    }
+  }, [initialLoading, categories, groupedCategories, categoryColumns, fetchPreviewsForCategories]);
+
+  // Initial cleanup and cache management
+  useEffect(() => {
+    if (categories.length === 0) {
+      previewCacheRef.current = {};
+      setCategoryPreviewImages({});
+      previewFetchQueueRef.current.clear();
+      return;
+    }
+
+    const activeIds = new Set(categories.map(category => category.id));
+
+    // Clean up preview cache to only include active category IDs
+    previewCacheRef.current = Object.fromEntries(
+      Object.entries(previewCacheRef.current).filter(([id]) => activeIds.has(id)),
+    );
+    setCategoryPreviewImages(prev => {
+      const nextEntries = Object.entries(prev).filter(([id]) => activeIds.has(id));
+      if (nextEntries.length === Object.keys(prev).length) {
+        return prev;
+      }
+      return Object.fromEntries(nextEntries);
     });
 
-    return () => {
-      handle.cancel();
-    };
-  }, [categories, fetchCategoryPreview]);
+    // Clean up queue
+    previewFetchQueueRef.current.forEach(id => {
+      if (!activeIds.has(id)) {
+        previewFetchQueueRef.current.delete(id);
+      }
+    });
+  }, [categories]);
 
   // Debounce AsyncStorage writes to avoid excessive I/O
   useEffect(() => {
@@ -1068,6 +1158,52 @@ const GreetingTemplatesScreen: React.FC = () => {
     );
   }, [categoryCardSize, categoryCardGap, categoryColumns, categoryPreviewImages, handleCategoryPress]);
 
+  // Track visible items for lazy loading
+  const onViewableItemsChanged = useCallback(
+    ({ viewableItems }: any) => {
+      if (!viewableItems || !Array.isArray(viewableItems) || viewableItems.length === 0) {
+        return;
+      }
+
+      const newVisibleIds = new Set<string>();
+
+      viewableItems.forEach((viewableItem: any) => {
+        // Safely check if viewableItem and item exist
+        if (!viewableItem || !viewableItem.item) {
+          return;
+        }
+
+        // item is a row (array of categories) in our SectionList structure
+        if (Array.isArray(viewableItem.item)) {
+          viewableItem.item.forEach((category: GreetingCategory) => {
+            if (category && category.id) {
+              newVisibleIds.add(category.id);
+            }
+          });
+        }
+      });
+
+      // Update visible category IDs and fetch previews for newly visible items
+      if (newVisibleIds.size > 0) {
+        setVisibleCategoryIds(prev => {
+          const newlyVisible = Array.from(newVisibleIds).filter(id => !prev.has(id));
+          if (newlyVisible.length > 0) {
+            // Fetch previews for newly visible items
+            fetchPreviewsForCategories(newlyVisible, 'high');
+          }
+          return newVisibleIds;
+        });
+      }
+    },
+    [fetchPreviewsForCategories],
+  );
+
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 30, // Item is considered visible when 30% is shown
+    minimumViewTime: 100,
+    waitForInteraction: false,
+  }).current;
+
 
   // Removed flatListPerfConfig - using inline props for better control
 
@@ -1207,7 +1343,10 @@ const GreetingTemplatesScreen: React.FC = () => {
           sections={groupedCategories}
           keyExtractor={(item, index) => {
             // item is a row (array of categories), create a unique key from all category IDs in the row
-            return `row-${index}-${item.map(c => c.id).join('-')}`;
+            if (!item || !Array.isArray(item)) {
+              return `row-${index}-empty`;
+            }
+            return `row-${index}-${item.map(c => c?.id || '').filter(Boolean).join('-')}`;
           }}
           key={`category-grid-${categoryColumns}`}
           renderItem={renderCategoryCard}
@@ -1239,6 +1378,9 @@ const GreetingTemplatesScreen: React.FC = () => {
           windowSize={5}
           initialNumToRender={Math.max(categoryColumns * 2, 8)}
           updateCellsBatchingPeriod={80}
+          // Lazy loading for thumbnails
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
         />
       </LinearGradient>
     </SafeAreaView>

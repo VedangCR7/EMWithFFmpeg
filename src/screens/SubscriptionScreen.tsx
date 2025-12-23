@@ -124,8 +124,8 @@ const SubscriptionScreen: React.FC = () => {
   const plans = {
     quarterly: {
       name: 'Quarterly Pro',
-      price: '₹499',
-      originalPrice: '₹1,497',
+      price: '₹599',
+      originalPrice: '₹1,815',
       savings: '67% OFF',
       period: '3 months',
       features: [
@@ -261,7 +261,7 @@ const SubscriptionScreen: React.FC = () => {
           ? (planPriceFromApi as number)
           : Number.isFinite(uiPriceCandidate) && (uiPriceCandidate as number) > 0
             ? (uiPriceCandidate as number)
-            : 499;
+            : 599;
 
       // Create payment order with backend to obtain order ID and amount
       const orderDetails = await subscriptionApi.createPaymentOrder({
@@ -839,7 +839,11 @@ const SubscriptionScreen: React.FC = () => {
               borderRadius: dynamicModerateScale(10),
               minHeight: isTabletDevice ? dynamicModerateScale(90) : dynamicModerateScale(70),
             }]}>
-              <Icon name="infinity" size={getIconSize(20)} color="#667eea" />
+              <Text style={[styles.infinityIcon, {
+                fontSize: getIconSize(20),
+                color: '#667eea',
+                marginBottom: dynamicModerateScale(4),
+              }]}>∞</Text>
               <Text style={[styles.benefitTitle, { 
                 color: theme.colors.text,
                 fontSize: dynamicModerateScale(10),
@@ -1191,6 +1195,10 @@ const styles = StyleSheet.create({
   benefitItem: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  infinityIcon: {
+    fontWeight: '400',
+    textAlign: 'center',
   },
   benefitTitle: {
     fontWeight: '600',
