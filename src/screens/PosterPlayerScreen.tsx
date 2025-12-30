@@ -1814,6 +1814,9 @@ const PosterPlayerScreen: React.FC = () => {
       try {
         const response = await calendarApi.getPostersByDate(calendarDate);
         
+        // Print full JSON response for today's date
+        console.log('📅 [CALENDAR API] Full JSON response for date:', calendarDate, JSON.stringify(response, null, 2));
+        
         if (response.success && response.data.posters.length > 0) {
           
           // Convert CalendarPoster to Template format

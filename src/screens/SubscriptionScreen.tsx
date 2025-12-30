@@ -142,16 +142,24 @@ const SubscriptionScreen: React.FC = () => {
   };
 
   // Use API plan data if available, otherwise fallback to hardcoded
+  // Always use ₹599 as the price regardless of API response
   const currentPlan = apiPlans.length > 0 && apiPlans[0] 
     ? {
         name: apiPlans[0].name,
-        price: `₹${apiPlans[0].price}`,
-        originalPrice: `₹${Math.round(apiPlans[0].price / 0.33)}`, // Calculate from savings
+        price: '₹599', // Always use ₹599
+        originalPrice: `₹${Math.round(599 / 0.33)}`, // Calculate from ₹599
         savings: '67% OFF',
         period: apiPlans[0].duration || '3 months',
-        features: apiPlans[0].features || plans[selectedPlan].features,
+        features: (apiPlans[0].features || plans[selectedPlan].features).filter(
+          (feature: string) => !feature.toLowerCase().includes('bulk download')
+        ),
       }
-    : plans[selectedPlan];
+    : {
+        ...plans[selectedPlan],
+        features: plans[selectedPlan].features.filter(
+          (feature: string) => !feature.toLowerCase().includes('bulk download')
+        ),
+      };
 
   const isStatusActive = (status: SubscriptionStatus | null) => {
     if (!status) {
@@ -256,12 +264,8 @@ const SubscriptionScreen: React.FC = () => {
       const uiPriceCandidate =
         Number.isFinite(uiPriceCandidateRaw) && uiPriceCandidateRaw > 0 ? uiPriceCandidateRaw : NaN;
 
-      const normalizedPlanAmountRupees =
-        Number.isFinite(planPriceFromApi) && (planPriceFromApi as number) > 0
-          ? (planPriceFromApi as number)
-          : Number.isFinite(uiPriceCandidate) && (uiPriceCandidate as number) > 0
-            ? (uiPriceCandidate as number)
-            : 599;
+      // Ensure payment amount is always 599
+      const normalizedPlanAmountRupees = 599;
 
       // Create payment order with backend to obtain order ID and amount
       const orderDetails = await subscriptionApi.createPaymentOrder({
@@ -827,14 +831,14 @@ const SubscriptionScreen: React.FC = () => {
             fontSize: dynamicModerateScale(12),
             marginBottom: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(10),
           }]}>Why Upgrade to Pro?</Text>
-          <View style={[styles.benefitsGrid, {
-            gap: dynamicModerateScale(8),
-          }]}>
+          <View style={[styles.benefitsGrid]}>
             <View style={[styles.benefitItem, { 
               backgroundColor: theme.colors.inputBackground,
-              flex: 1,
-              minWidth: currentScreenWidth < 400 ? '45%' : isTabletDevice ? '22%' : '45%',
-              maxWidth: isTabletDevice ? '22%' : '48%',
+              width: isTabletDevice 
+                ? `${(100 - 3 * 2.5) / 4}%` // 4 items with 3 gaps
+                : `${(100 - 1 * 2.5) / 2}%`, // 2 items with 1 gap
+              marginRight: isTabletDevice ? dynamicModerateScale(8) : dynamicModerateScale(8),
+              marginBottom: dynamicModerateScale(8),
               padding: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(10),
               borderRadius: dynamicModerateScale(10),
               minHeight: isTabletDevice ? dynamicModerateScale(90) : dynamicModerateScale(70),
@@ -863,9 +867,11 @@ const SubscriptionScreen: React.FC = () => {
             </View>
             <View style={[styles.benefitItem, { 
               backgroundColor: theme.colors.inputBackground,
-              flex: 1,
-              minWidth: currentScreenWidth < 400 ? '45%' : isTabletDevice ? '22%' : '45%',
-              maxWidth: isTabletDevice ? '22%' : '48%',
+              width: isTabletDevice 
+                ? `${(100 - 3 * 2.5) / 4}%`
+                : `${(100 - 1 * 2.5) / 2}%`,
+              marginRight: isTabletDevice ? dynamicModerateScale(8) : 0, // No right margin for 2nd item in phone row
+              marginBottom: dynamicModerateScale(8),
               padding: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(10),
               borderRadius: dynamicModerateScale(10),
               minHeight: isTabletDevice ? dynamicModerateScale(90) : dynamicModerateScale(70),
@@ -890,9 +896,11 @@ const SubscriptionScreen: React.FC = () => {
             </View>
             <View style={[styles.benefitItem, { 
               backgroundColor: theme.colors.inputBackground,
-              flex: 1,
-              minWidth: currentScreenWidth < 400 ? '45%' : isTabletDevice ? '22%' : '45%',
-              maxWidth: isTabletDevice ? '22%' : '48%',
+              width: isTabletDevice 
+                ? `${(100 - 3 * 2.5) / 4}%`
+                : `${(100 - 1 * 2.5) / 2}%`,
+              marginRight: isTabletDevice ? dynamicModerateScale(8) : dynamicModerateScale(8),
+              marginBottom: dynamicModerateScale(8),
               padding: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(10),
               borderRadius: dynamicModerateScale(10),
               minHeight: isTabletDevice ? dynamicModerateScale(90) : dynamicModerateScale(70),
@@ -917,9 +925,11 @@ const SubscriptionScreen: React.FC = () => {
             </View>
             <View style={[styles.benefitItem, { 
               backgroundColor: theme.colors.inputBackground,
-              flex: 1,
-              minWidth: currentScreenWidth < 400 ? '45%' : isTabletDevice ? '22%' : '45%',
-              maxWidth: isTabletDevice ? '22%' : '48%',
+              width: isTabletDevice 
+                ? `${(100 - 3 * 2.5) / 4}%`
+                : `${(100 - 1 * 2.5) / 2}%`,
+              marginRight: isTabletDevice ? dynamicModerateScale(8) : 0, // No right margin for last item in row
+              marginBottom: dynamicModerateScale(8),
               padding: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(10),
               borderRadius: dynamicModerateScale(10),
               minHeight: isTabletDevice ? dynamicModerateScale(90) : dynamicModerateScale(70),
