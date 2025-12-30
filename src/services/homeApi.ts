@@ -367,9 +367,32 @@ class HomeApiService {
         const url = `/api/mobile/home/featured${queryString ? `?${queryString}` : ''}`;
         
         const response = await api.get(url);
+        
+        // Debug: Log full response to understand what server is returning
+        if (__DEV__) {
+          console.log('[HOME API] Featured Content Response:', {
+            status: response.status,
+            statusText: response.statusText,
+            headers: response.headers,
+            dataType: typeof response.data,
+            dataKeys: typeof response.data === 'object' ? Object.keys(response.data) : 'not an object',
+            success: response.data?.success,
+            message: response.data?.message,
+            dataLength: Array.isArray(response.data?.data) ? response.data.data.length : 'not an array',
+          });
+        }
                 
-        // Validate response structure
+        // Validate response structure (same pattern as calendarApi)
         if (!response.data.success) {
+          // Log the actual response to help debug server-side issues
+          if (__DEV__) {
+            console.warn('[HOME API] Featured Content API returned unsuccessful response:', {
+              success: response.data.success,
+              message: response.data.message,
+              data: response.data.data,
+              fullResponse: response.data,
+            });
+          }
           return {
             success: false,
             data: [],
@@ -386,18 +409,21 @@ class HomeApiService {
           };
         }
         
-        // Extract featured content array from nested structure
+        // Backend returns data as array directly (same pattern as calendarApi)
+        // response.data.data is the array of FeaturedContent items
         let featuredData: FeaturedContent[];
         
         if (Array.isArray(response.data.data)) {
           featuredData = response.data.data;
-        } else if (response.data.data.featured && Array.isArray(response.data.data.featured)) {
-          featuredData = response.data.data.featured;
         } else {
+          // If data is not an array, return empty array (same as calendarApi pattern)
+          if (__DEV__) {
+            console.warn('[HOME API] Featured content data is not an array:', typeof response.data.data);
+          }
           return {
             success: false,
             data: [],
-            message: 'Invalid data format from API',
+            message: response.data.message || 'No featured content available',
           };
         }
         
@@ -664,13 +690,30 @@ class HomeApiService {
         
         const response = await api.get(url);
         
-        // Convert relative URLs to absolute URLs
-        if (response.data.success && response.data.data) {
+        // Backend returns: { success: true, data: [...], message: "..." }
+        // Same pattern as calendarApi - directly check response.data.success
+        if (response.data.success && Array.isArray(response.data.data)) {
+          // Convert relative URLs to absolute URLs
           response.data.data = this.convertVideoContentUrls(response.data.data);
           console.log(`✅ [HOME API] Fetched ${response.data.data.length} videos`);
+          return response.data;
+        } else {
+          // Backend returned unsuccessful response or no data
+          // Return empty array (same as calendarApi pattern)
+          if (__DEV__) {
+            console.warn('[HOME API] Video Content API returned unsuccessful response:', {
+              success: response.data?.success,
+              message: response.data?.message || response.data?.error,
+              dataType: typeof response.data?.data,
+              isArray: Array.isArray(response.data?.data),
+            });
+          }
+          return {
+            success: false,
+            data: [],
+            message: response.data?.message || response.data?.error || 'No video content available',
+          };
         }
-        
-        return response.data;
       },
       5 * 60 * 1000, // 5 minutes TTL
       true // Allow stale data

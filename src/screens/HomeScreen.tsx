@@ -1202,10 +1202,27 @@ const HomeScreen: React.FC = React.memo(() => {
             () => homeApi.getFeaturedContent({ limit: 1 })
           ).then(response => {
             // Update featured content immediately with first 3 items
-            if (response.success) {
+            if (__DEV__) {
+              console.log('[FEATURED CONTENT] API Response:', {
+                success: response.success,
+                dataType: typeof response.data,
+                isArray: Array.isArray(response.data),
+                dataLength: Array.isArray(response.data) ? response.data.length : 'not an array',
+                firstItem: Array.isArray(response.data) && response.data.length > 0 ? response.data[0] : null,
+              });
+            }
+            
+            if (response.success && response.data && Array.isArray(response.data)) {
               React.startTransition(() => {
                 // Filter out Diwali content before setting
                 const filteredData = filterDiwaliContent(response.data);
+                if (__DEV__) {
+                  console.log('[FEATURED CONTENT] After Diwali filter:', {
+                    original: response.data.length,
+                    filtered: filteredData.length,
+                    willSet: filteredData.length > 0,
+                  });
+                }
                 setFeaturedContent(filteredData);
                 const convertedBanners: Banner[] = filteredData.map(item => ({
                   id: item.id,
@@ -1216,7 +1233,18 @@ const HomeScreen: React.FC = React.memo(() => {
                 }));
                 setBanners(convertedBanners);
               });
+              if (__DEV__) {
+                console.log('[FEATURED CONTENT] ✅ Loaded:', response.data?.length || 0, 'items');
+              }
             } else {
+              if (__DEV__) {
+                console.warn('[FEATURED CONTENT] ⚠️ API returned unsuccessful response or invalid data:', {
+                  success: response.success,
+                  hasData: !!response.data,
+                  isArray: Array.isArray(response.data),
+                  response: response,
+                });
+              }
               React.startTransition(() => {
                 setFeaturedContent([]);
                 setBanners([]);
@@ -1224,6 +1252,16 @@ const HomeScreen: React.FC = React.memo(() => {
             }
             return { type: 'featured', response, success: response.success };
           }).catch(err => {
+            if (__DEV__) {
+              console.error('[FEATURED CONTENT] ❌ Error loading:', err?.message || err);
+              console.error('[FEATURED CONTENT] Error details:', {
+                message: err?.message,
+                code: err?.code,
+                response: err?.response?.data,
+                status: err?.response?.status,
+                url: err?.config?.url,
+              });
+            }
             if (err?.message === 'NETWORK_ERROR' || err?.message === 'TIMEOUT') {
               networkErrors.push('featured');
             }
@@ -1243,13 +1281,29 @@ const HomeScreen: React.FC = React.memo(() => {
               React.startTransition(() => {
                 setVideoContent(response.data);
               });
+              if (__DEV__) {
+                console.log('[VIDEO CONTENT] ✅ Loaded:', response.data?.length || 0, 'items');
+              }
             } else {
+              if (__DEV__) {
+                console.warn('[VIDEO CONTENT] ⚠️ API returned unsuccessful response:', response);
+              }
               React.startTransition(() => {
                 setVideoContent([]);
               });
             }
             return { type: 'videos', response, success: response.success };
           }).catch(err => {
+            if (__DEV__) {
+              console.error('[VIDEO CONTENT] ❌ Error loading:', err?.message || err);
+              console.error('[VIDEO CONTENT] Error details:', {
+                message: err?.message,
+                code: err?.code,
+                response: err?.response?.data,
+                status: err?.response?.status,
+                url: err?.config?.url,
+              });
+            }
             if (err?.message === 'NETWORK_ERROR' || err?.message === 'TIMEOUT') {
               networkErrors.push('videos');
             }
@@ -1367,6 +1421,27 @@ const HomeScreen: React.FC = React.memo(() => {
           businessMarketingTipsResponse,
           businessQuotesResponse
         ]) => {
+          // Debug: Log response statuses
+          if (__DEV__) {
+            console.log('[GREETING SECTIONS] API Response Status:', {
+              businessEthics: { status: businessEthicsResponse.status, length: businessEthicsResponse.status === 'fulfilled' ? businessEthicsResponse.value.length : 0 },
+              successMindset: { status: successMindsetResponse.status, length: successMindsetResponse.status === 'fulfilled' ? successMindsetResponse.value.length : 0 },
+              socialMediaGrowth: { status: socialMediaGrowthResponse.status, length: socialMediaGrowthResponse.status === 'fulfilled' ? socialMediaGrowthResponse.value.length : 0 },
+              moneyAndFinance: { status: moneyAndFinanceResponse.status, length: moneyAndFinanceResponse.status === 'fulfilled' ? moneyAndFinanceResponse.value.length : 0 },
+              businessLegendQuote: { status: businessLegendQuoteResponse.status, length: businessLegendQuoteResponse.status === 'fulfilled' ? businessLegendQuoteResponse.value.length : 0 },
+              businessMarketingTips: { status: businessMarketingTipsResponse.status, length: businessMarketingTipsResponse.status === 'fulfilled' ? businessMarketingTipsResponse.value.length : 0 },
+              businessQuotes: { status: businessQuotesResponse.status, length: businessQuotesResponse.status === 'fulfilled' ? businessQuotesResponse.value.length : 0 },
+            });
+            
+            // Log rejected reasons
+            if (businessEthicsResponse.status === 'rejected') {
+              console.error('[GREETING SECTIONS] Business Ethics error:', businessEthicsResponse.reason);
+            }
+            if (successMindsetResponse.status === 'rejected') {
+              console.error('[GREETING SECTIONS] Success Mindset error:', successMindsetResponse.reason);
+            }
+          }
+          
           // Handle greeting sections responses - Set first 3 items immediately
           const greetingUpdates = {
             businessEthics: businessEthicsResponse.status === 'fulfilled' && businessEthicsResponse.value.length > 0
@@ -1391,6 +1466,18 @@ const HomeScreen: React.FC = React.memo(() => {
               ? { display: businessQuotesResponse.value.slice(0, 3), raw: businessQuotesResponse.value }
               : { display: [], raw: [] },
           };
+          
+          if (__DEV__) {
+            console.log('[GREETING SECTIONS] Final Updates:', {
+              businessEthics: greetingUpdates.businessEthics.display.length,
+              successMindset: greetingUpdates.successMindset.display.length,
+              socialMediaGrowth: greetingUpdates.socialMediaGrowth.display.length,
+              moneyAndFinance: greetingUpdates.moneyAndFinance.display.length,
+              businessLegendQuote: greetingUpdates.businessLegendQuote.display.length,
+              businessMarketingTips: greetingUpdates.businessMarketingTips.display.length,
+              businessQuotes: greetingUpdates.businessQuotes.display.length,
+            });
+          }
 
           // Batch all state updates together using React.startTransition for non-urgent updates
           React.startTransition(() => {

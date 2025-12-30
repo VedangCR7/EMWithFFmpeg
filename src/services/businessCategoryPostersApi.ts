@@ -124,9 +124,23 @@ class BusinessCategoryPostersApiService {
           }
         };
       } else {
-        logger.warn('⚠️ [CATEGORY POSTERS API] Response Success = false');
-        logger.warn('⚠️ Error from API:', response.data.error);
-        throw new Error(response.data.error || 'Failed to fetch posters');
+        // API returned unsuccessful response - might be no posters for this category
+        // This is normal, return empty array instead of throwing error
+        const errorMessage = response.data.message || response.data.error || 'No posters available for this category';
+        if (__DEV__) {
+          logger.log(`ℹ️ [CATEGORY POSTERS API] No posters found for category: ${category} - ${errorMessage}`);
+        }
+        
+        // Return empty response instead of throwing error
+        return {
+          success: false,
+          data: {
+            posters: [],
+            category,
+            total: 0
+          },
+          message: errorMessage
+        } as BusinessCategoryPostersResponse;
       }
     } catch (error: any) {
       logger.error('❌ [CATEGORY POSTERS API] Error fetching posters:', error.message);

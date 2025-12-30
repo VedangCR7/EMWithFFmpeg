@@ -208,7 +208,8 @@ class GreetingTemplatesService {
           
           return mappedCategories;
         } else {
-          throw new Error('API returned unsuccessful response');
+          // API returned unsuccessful response - might be no categories, return empty array (same as calendarApi pattern)
+          return [];
         }
       },
       5 * 60 * 1000, // 5 minutes TTL
@@ -296,10 +297,15 @@ class GreetingTemplatesService {
         
         return mappedTemplates;
       } else {
-        throw new Error('API returned unsuccessful response');
+        // API returned unsuccessful response - might be no templates for this category, return empty array (same as calendarApi pattern)
+        return [];
       }
     } catch (error) {
-      console.error('Error fetching greeting templates by category:', error);
+      // Only log actual errors (network issues, etc.), not "no templates" scenarios
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (!errorMessage.includes('No templates') && !errorMessage.includes('No results')) {
+        console.error('Error fetching greeting templates by category:', error);
+      }
       return []; // Return empty array instead of mock data
     }
   }
@@ -388,7 +394,8 @@ class GreetingTemplatesService {
           
           return mappedTemplates;
         } else {
-          throw new Error('API returned unsuccessful response');
+          // API returned unsuccessful response - might be no templates, return empty array (same as calendarApi pattern)
+          return [];
         }
       },
       5 * 60 * 1000, // 5 minutes TTL
@@ -466,13 +473,18 @@ class GreetingTemplatesService {
           
           return mappedTemplates;
         } else {
-          throw new Error('API returned unsuccessful response');
+          // API returned unsuccessful response - might be no results, return empty array
+          return [];
         }
       },
       SEARCH_CACHE_TTL,
       true // Allow stale data
     ).catch((error) => {
-      console.error('Error searching greeting templates (fast):', error);
+      // Only log actual errors (network issues, etc.), not "no results" scenarios
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (!errorMessage.includes('No templates') && !errorMessage.includes('No results')) {
+        console.error('Error searching greeting templates (fast):', error);
+      }
       return []; // Return empty array instead of mock data
     });
   }
@@ -549,13 +561,18 @@ class GreetingTemplatesService {
           
           return mappedTemplates;
         } else {
-          throw new Error('API returned unsuccessful response');
+          // API returned unsuccessful response - might be no results, return empty array (same as calendarApi pattern)
+          return [];
         }
       },
       SEARCH_CACHE_TTL,
       true // Allow stale data
     ).catch((error) => {
-      console.error('Error searching greeting templates:', error);
+      // Only log actual errors (network issues, etc.), not "no results" scenarios
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (!errorMessage.includes('No templates') && !errorMessage.includes('No results')) {
+        console.error('Error searching greeting templates:', error);
+      }
       return []; // Return empty array instead of mock data
     });
   }

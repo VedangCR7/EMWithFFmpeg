@@ -129,6 +129,9 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
+    // Let axios handle compression automatically - it should decompress gzip responses
+    // Removing Accept-Encoding: identity to allow server to send compressed data
+    // Axios should automatically decompress if Content-Encoding header is present
   },
 });
 
@@ -154,6 +157,7 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   async (response) => {
     // Removed verbose response logging - use logger for essential logs only
+    // Let axios handle response parsing automatically (same as calendarApi pattern)
     
     // Cache successful GET responses
     if (response.config.method?.toLowerCase() === 'get' && response.status === 200) {
