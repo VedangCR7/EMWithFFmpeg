@@ -4,10 +4,10 @@
   "description": "Test suite for EMWithFFmpeg CI/CD and API validation",
   "main": "index.js",
   "scripts": {
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:ci": "jest --ci --coverage --watchAll=false",
-    "test:coverage": "jest --coverage",
+    "test": "jest --config jest.ci.config.js",
+    "test:watch": "jest --config jest.ci.config.js --watch",
+    "test:ci": "jest --config jest.ci.config.js --ci --coverage --watchAll=false",
+    "test:coverage": "jest --config jest.ci.config.js --coverage",
     "lint": "eslint tests/ --ext .js",
     "lint:fix": "eslint tests/ --ext .js --fix"
   },
@@ -35,6 +35,9 @@
       "text",
       "lcov",
       "html"
+    ],
+    "transformIgnorePatterns": [
+      "node_modules/(?!(supertest)/)"
     ]
   },
   "engines": {
