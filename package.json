@@ -1,0 +1,43 @@
+{
+  "name": "em-with-ffmpeg-tests",
+  "version": "1.0.0",
+  "description": "Test suite for EMWithFFmpeg CI/CD and API validation",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:ci": "jest --ci --coverage --watchAll=false",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint tests/ --ext .js",
+    "lint:fix": "eslint tests/ --ext .js --fix"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^6.3.3",
+    "@prisma/client": "^5.7.1",
+    "js-yaml": "^4.1.0",
+    "json-schema": "^0.4.0",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/__tests__/**/*.test.js",
+      "**/?(*.)+(spec|test).js"
+    ],
+    "collectCoverageFrom": [
+      "tests/**/*.js",
+      "!tests/**/*.test.js"
+    ],
+    "coverageDirectory": "coverage",
+    "coverageReporters": [
+      "text",
+      "lcov",
+      "html"
+    ]
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
