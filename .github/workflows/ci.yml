@@ -127,7 +127,6 @@ jobs:
       with:
         node-version: '18'
         cache: 'npm'
-        cache-dependency-path: package-lock.json
 
     - name: Install CI/CD test dependencies
       run: npm ci
