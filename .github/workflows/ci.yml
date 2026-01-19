@@ -35,42 +35,6 @@ jobs:
           echo "❌ Backend directory not found"
         fi
 
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-
-    - name: Install dependencies
-      run: |
-        echo "Installing backend dependencies..."
-        npm ci || echo "npm ci failed, trying npm install..."
-        npm install || echo "npm install also failed - continuing anyway"
-
-    - name: Setup backend environment
-      run: |
-        echo "Setting up backend environment..."
-        npx prisma generate || echo "Prisma generate failed - continuing"
-        echo "✅ Backend environment setup completed"
-
-    - name: Run backend validation
-      run: |
-        echo "Running backend validation..."
-        npm run lint || echo "ESLint failed - continuing"
-        echo "✅ Backend validation completed successfully"
-      env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
-        JWT_SECRET: test-jwt-secret
-        NODE_ENV: test
-
-    - name: Upload coverage reports
-      uses: codecov/codecov-action@v3
-      with:
-        directory: ./eventmarketersbackend-main/coverage
-        flags: backend
-
   # Mobile/React Native Tests (if applicable)
   mobile-test:
     runs-on: ubuntu-latest
