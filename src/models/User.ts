@@ -2,6 +2,18 @@ export interface UserPreferences {
   theme: 'light' | 'dark';
   notifications: boolean;
   language: string;
+  timezone?: string;
+  emailFrequency: 'daily' | 'weekly' | 'monthly' | 'never';
+}
+
+export interface UserStats {
+  totalVideos: number;
+  totalGreetings: number;
+  totalViews: number;
+  totalLikes: number;
+  totalDownloads: number;
+  joinedDate: string;
+  lastLoginDate?: string;
 }
 
 export interface User {
@@ -12,9 +24,22 @@ export interface User {
   businessId?: string;
   planId?: string;
   avatar?: string;
+  banner?: string;
+  bio?: string;
+  website?: string;
+  socialLinks: {
+    twitter?: string;
+    linkedin?: string;
+    instagram?: string;
+    youtube?: string;
+  };
   isActive: boolean;
-  role: 'user' | 'admin' | 'business';
+  isVerified: boolean;
+  role: 'user' | 'admin' | 'business' | 'creator';
   preferences: UserPreferences;
+  stats: UserStats;
+  badges: string[];
+  achievements: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -27,9 +52,22 @@ export class UserModel implements User {
   businessId?: string;
   planId?: string;
   avatar?: string;
+  banner?: string;
+  bio?: string;
+  website?: string;
+  socialLinks: {
+    twitter?: string;
+    linkedin?: string;
+    instagram?: string;
+    youtube?: string;
+  };
   isActive: boolean;
-  role: 'user' | 'admin' | 'business';
+  isVerified: boolean;
+  role: 'user' | 'admin' | 'business' | 'creator';
   preferences: UserPreferences;
+  stats: UserStats;
+  badges: string[];
+  achievements: string[];
   createdAt: string;
   updatedAt: string;
 
@@ -41,9 +79,17 @@ export class UserModel implements User {
     businessId?: string,
     planId?: string,
     avatar?: string,
+    banner?: string,
+    bio?: string,
+    website?: string,
+    socialLinks: { twitter?: string; linkedin?: string; instagram?: string; youtube?: string } = {},
     isActive: boolean = true,
-    role: 'user' | 'admin' | 'business' = 'user',
-    preferences: UserPreferences = { theme: 'light', notifications: true, language: 'en' },
+    isVerified: boolean = false,
+    role: 'user' | 'admin' | 'business' | 'creator' = 'user',
+    preferences: UserPreferences = { theme: 'light', notifications: true, language: 'en', emailFrequency: 'weekly' },
+    stats?: Partial<UserStats>,
+    badges: string[] = [],
+    achievements: string[] = [],
     createdAt?: string,
     updatedAt?: string
   ) {
@@ -54,9 +100,26 @@ export class UserModel implements User {
     this.businessId = businessId;
     this.planId = planId;
     this.avatar = avatar;
+    this.banner = banner;
+    this.bio = bio;
+    this.website = website;
+    this.socialLinks = socialLinks;
     this.isActive = isActive;
+    this.isVerified = isVerified;
     this.role = role;
     this.preferences = preferences;
+    this.stats = {
+      totalVideos: 0,
+      totalGreetings: 0,
+      totalViews: 0,
+      totalLikes: 0,
+      totalDownloads: 0,
+      joinedDate: new Date().toISOString(),
+      lastLoginDate: undefined,
+      ...stats
+    };
+    this.badges = badges;
+    this.achievements = achievements;
     this.createdAt = createdAt || new Date().toISOString();
     this.updatedAt = updatedAt || new Date().toISOString();
   }
@@ -71,26 +134,107 @@ export class UserModel implements User {
     return this.name || this.email;
   }
 
-  // Check if user has admin role
+  // Check user roles
   isAdmin(): boolean {
     return this.role === 'admin';
   }
 
-  // Update user preferences
+  isCreator(): boolean {
+    return this.role === 'creator';
+  }
+
+  isBusiness(): boolean {
+    return this.role === 'business';
+  }
+
+  // Profile management
+  updateProfile(updates: Partial<Pick<User, 'name' | 'bio' | 'website' | 'avatar' | 'banner'>>): void {
+    if (updates.name) this.name = updates.name;
+    if (updates.bio !== undefined) this.bio = updates.bio;
+    if (updates.website !== undefined) this.website = updates.website;
+    if (updates.avatar !== undefined) this.avatar = updates.avatar;
+    if (updates.banner !== undefined) this.banner = updates.banner;
+    this.updatedAt = new Date().toISOString();
+  }
+
+  // Social links management
+  updateSocialLinks(links: Partial<User['socialLinks']>): void {
+    this.socialLinks = { ...this.socialLinks, ...links };
+    this.updatedAt = new Date().toISOString();
+  }
+
+  // Preferences management
   updatePreferences(newPreferences: Partial<UserPreferences>): void {
     this.preferences = { ...this.preferences, ...newPreferences };
     this.updatedAt = new Date().toISOString();
   }
 
-  // Deactivate user
+  // Status management
   deactivate(): void {
     this.isActive = false;
     this.updatedAt = new Date().toISOString();
   }
 
-  // Activate user
   activate(): void {
     this.isActive = true;
     this.updatedAt = new Date().toISOString();
+  }
+
+  verify(): void {
+    this.isVerified = true;
+    this.updatedAt = new Date().toISOString();
+  }
+
+  // Statistics tracking
+  incrementStats(updates: Partial<Pick<UserStats, 'totalVideos' | 'totalGreetings' | 'totalViews' | 'totalLikes' | 'totalDownloads'>>): void {
+    if (updates.totalVideos) this.stats.totalVideos += updates.totalVideos;
+    if (updates.totalGreetings) this.stats.totalGreetings += updates.totalGreetings;
+    if (updates.totalViews) this.stats.totalViews += updates.totalViews;
+    if (updates.totalLikes) this.stats.totalLikes += updates.totalLikes;
+    if (updates.totalDownloads) this.stats.totalDownloads += updates.totalDownloads;
+    this.updatedAt = new Date().toISOString();
+  }
+
+  updateLastLogin(): void {
+    this.stats.lastLoginDate = new Date().toISOString();
+    this.updatedAt = new Date().toISOString();
+  }
+
+  // Badge and achievement system
+  addBadge(badge: string): void {
+    if (!this.badges.includes(badge)) {
+      this.badges.push(badge);
+      this.updatedAt = new Date().toISOString();
+    }
+  }
+
+  addAchievement(achievement: string): void {
+    if (!this.achievements.includes(achievement)) {
+      this.achievements.push(achievement);
+      this.updatedAt = new Date().toISOString();
+    }
+  }
+
+  // Utility methods
+  getProfileCompletion(): number {
+    let completed = 0;
+    let total = 0;
+
+    const fields = ['avatar', 'banner', 'bio', 'website'];
+    fields.forEach(field => {
+      total++;
+      if (this[field as keyof User]) completed++;
+    });
+
+    // Social links count
+    total++;
+    if (Object.values(this.socialLinks).some(link => link)) completed++;
+
+    return Math.round((completed / total) * 100);
+  }
+
+  getEngagementScore(): number {
+    const { totalViews, totalLikes, totalDownloads } = this.stats;
+    return totalViews * 1 + totalLikes * 2 + totalDownloads * 3;
   }
 }
