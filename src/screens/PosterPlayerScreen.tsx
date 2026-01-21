@@ -9,6 +9,8 @@ import {
   StatusBar,
   FlatList,
   ScrollView,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
@@ -67,6 +69,9 @@ const PosterPlayerScreen: React.FC = () => {
   
   const { selectedPoster, relatedPosters } = route.params;
   const [selectedLanguage, setSelectedLanguage] = useState<string>('english');
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [imageLoadErrors, setImageLoadErrors] = useState<string[]>([]);
+  const [isNavigating, setIsNavigating] = useState<boolean>(false);
 
   // Language options
   const languages = useMemo(() => [
@@ -85,53 +90,101 @@ const PosterPlayerScreen: React.FC = () => {
     });
   }, [relatedPosters, selectedLanguage]);
 
+  // Debounced navigation to prevent multiple rapid clicks
+  const debouncedNavigate = useCallback((callback: () => void, delay: number = 300) => {
+    if (isNavigating) return;
+    
+    setIsNavigating(true);
+    setTimeout(() => {
+      callback();
+      setIsNavigating(false);
+    }, delay);
+  }, [isNavigating]);
+
   const handleBackPress = useCallback(() => {
-    navigation.goBack();
-  }, [navigation]);
+    debouncedNavigate(() => navigation.goBack());
+  }, [navigation, debouncedNavigate]);
 
   const handlePosterSelect = useCallback((poster: Template) => {
-    navigation.replace('PosterPlayer', {
-      selectedPoster: poster,
-      relatedPosters: relatedPosters.filter(p => p.id !== poster.id),
+    if (isNavigating) return;
+    
+    debouncedNavigate(() => {
+      navigation.replace('PosterPlayer', {
+        selectedPoster: poster,
+        relatedPosters: relatedPosters.filter(p => p.id !== poster.id),
+      });
     });
-  }, [navigation, relatedPosters]);
+  }, [navigation, relatedPosters, debouncedNavigate, isNavigating]);
 
   const handleLanguageChange = useCallback((languageId: string) => {
     setSelectedLanguage(languageId);
   }, []);
 
   const handleNextPress = useCallback(() => {
-    navigation.navigate('PosterEditor', {
-      selectedImage: {
-        uri: selectedPoster.thumbnail,
-        title: selectedPoster.name,
-        description: selectedPoster.category,
-      },
-      selectedLanguage: selectedLanguage,
-      selectedTemplateId: selectedPoster.id,
-    });
-  }, [navigation, selectedPoster, selectedLanguage]);
+    if (isNavigating) return;
+    
+    setIsLoading(true);
+    
+    // Simulate validation and preparation
+    setTimeout(() => {
+      debouncedNavigate(() => {
+        navigation.navigate('PosterEditor', {
+          selectedImage: {
+            uri: selectedPoster.thumbnail,
+            title: selectedPoster.name,
+            description: selectedPoster.category,
+          },
+          selectedLanguage: selectedLanguage,
+          selectedTemplateId: selectedPoster.id,
+        });
+      });
+      setIsLoading(false);
+    }, 500);
+  }, [navigation, selectedPoster, selectedLanguage, debouncedNavigate, isNavigating]);
 
-  const renderRelatedPoster = useCallback(({ item }: { item: Template }) => (
-    <TouchableOpacity
-      style={styles.relatedPosterCard}
-      onPress={() => handlePosterSelect(item)}
-      activeOpacity={0.8}
-    >
-      <Image
-        source={{ uri: item.thumbnail }}
-        style={styles.relatedPosterImage}
-        resizeMode="cover"
-      />
-      
-      
-      <View style={styles.relatedPosterLanguageBadge}>
-        <Text style={styles.relatedPosterLanguageText}>
-          {languages.find(lang => lang.id === selectedLanguage)?.code || 'EN'}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  ), [handlePosterSelect, selectedLanguage, languages]);
+  // Handle image load errors
+  const handleImageError = useCallback((imageId: string) => {
+    setImageLoadErrors(prev => prev.includes(imageId) ? prev : [...prev, imageId]);
+  }, []);
+
+  const handleImageLoad = useCallback((imageId: string) => {
+    setImageLoadErrors(prev => prev.filter(id => id !== imageId));
+  }, []);
+
+  const renderRelatedPoster = useCallback(({ item }: { item: Template }) => {
+    const hasError = imageLoadErrors.includes(item.id);
+    
+    return (
+      <TouchableOpacity
+        style={styles.relatedPosterCard}
+        onPress={() => handlePosterSelect(item)}
+        activeOpacity={0.8}
+        testID={`related-poster-${item.id}`}
+        accessibilityLabel={`Related poster: ${item.name}`}
+      >
+        {hasError ? (
+          <View style={[styles.relatedPosterImage, styles.imageErrorPlaceholder]}>
+            <Icon name="image-not-supported" size={32} color="rgba(255,255,255,0.5)" />
+            <Text style={styles.imageErrorText}>Image not available</Text>
+          </View>
+        ) : (
+          <Image
+            source={{ uri: item.thumbnail }}
+            style={styles.relatedPosterImage}
+            resizeMode="cover"
+            onError={() => handleImageError(item.id)}
+            onLoad={() => handleImageLoad(item.id)}
+          />
+        )}
+        
+        <View style={styles.relatedPosterLanguageBadge}>
+          <Text style={styles.relatedPosterLanguageText}>
+            {languages.find(lang => lang.id === selectedLanguage)?.code || 'EN'}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  }, [handlePosterSelect, selectedLanguage, languages, imageLoadErrors, handleImageError, handleImageLoad]);
 
   const renderLanguageButton = useCallback((language: typeof languages[0]) => (
     <TouchableOpacity
@@ -142,6 +195,10 @@ const PosterPlayerScreen: React.FC = () => {
       ]}
       onPress={() => handleLanguageChange(language.id)}
       activeOpacity={0.7}
+      testID={`language-button-${language.id}`}
+      accessibilityLabel={`Select ${language.name} language`}
+      accessibilityRole="button"
+      accessibilityState={{ selected: selectedLanguage === language.id }}
     >
       <View style={styles.languageButtonContent}>
         <Text style={[
@@ -180,12 +237,15 @@ const PosterPlayerScreen: React.FC = () => {
              style={styles.backButton}
              onPress={handleBackPress}
              activeOpacity={0.7}
+             testID="back-button"
+             accessibilityLabel="Go back"
+             accessibilityRole="button"
            >
              <Icon name="arrow-back" size={isSmallScreen ? 20 : 24} color="#ffffff" />
            </TouchableOpacity>
            <View style={styles.headerContent}>
-             <Text style={styles.headerTitle}>{selectedPoster.name}</Text>
-             <Text style={styles.headerSubtitle}>{selectedPoster.category}</Text>
+             <Text style={styles.headerTitle} testID="poster-title">{selectedPoster.name}</Text>
+             <Text style={styles.headerSubtitle} testID="poster-category">{selectedPoster.category}</Text>
              <View style={styles.headerMeta}>
                <View style={styles.headerMetaItem}>
                  <Icon name="high-quality" size={isSmallScreen ? 12 : 14} color="rgba(255,255,255,0.7)" />
@@ -201,27 +261,38 @@ const PosterPlayerScreen: React.FC = () => {
 
          {/* Enhanced Poster Section */}
          <View style={styles.posterContainer}>
-           <Image
-             source={{ uri: selectedPoster.thumbnail }}
-             style={styles.posterImage}
-             resizeMode="contain"
-           />
-                        <View style={styles.posterOverlay}>
-               <View style={styles.languageBadge}>
-                 <Text style={styles.languageBadgeText}>
-                   {selectedLanguage.toUpperCase()}
-                 </Text>
-               </View>
+           {imageLoadErrors.includes(selectedPoster.id) ? (
+             <View style={[styles.posterImage, styles.imageErrorPlaceholder]}>
+               <Icon name="image-not-supported" size={48} color="rgba(255,255,255,0.5)" />
+               <Text style={styles.imageErrorText}>Poster image not available</Text>
              </View>
+           ) : (
+             <Image
+               source={{ uri: selectedPoster.thumbnail }}
+               style={styles.posterImage}
+               resizeMode="contain"
+               testID="main-poster-image"
+               accessibilityLabel={`Poster: ${selectedPoster.name}`}
+               onError={() => handleImageError(selectedPoster.id)}
+               onLoad={() => handleImageLoad(selectedPoster.id)}
+             />
+           )}
+           <View style={styles.posterOverlay}>
+             <View style={styles.languageBadge}>
+               <Text style={styles.languageBadgeText}>
+                 {selectedLanguage.toUpperCase()}
+               </Text>
+             </View>
+           </View>
          </View>
 
          {/* Enhanced Language Selection Section */}
          <View style={styles.languageSection}>
            <View style={styles.languageSectionHeader}>
-             <Text style={styles.languageTitle}>
+             <Text style={styles.languageTitle} testID="language-selection-title">
                Select Language
              </Text>
-             <Text style={styles.languageSubtitle}>
+             <Text style={styles.languageSubtitle} testID="language-selection-subtitle">
                Select language variant for poster content
              </Text>
            </View>
@@ -230,6 +301,7 @@ const PosterPlayerScreen: React.FC = () => {
              horizontal 
              showsHorizontalScrollIndicator={false}
              contentContainerStyle={styles.languageButtonsContainer}
+             testID="language-scroll-view"
            >
              {languages.map(renderLanguageButton)}
            </ScrollView>
@@ -238,13 +310,24 @@ const PosterPlayerScreen: React.FC = () => {
          {/* Next Button Section */}
          <View style={styles.nextButtonSection}>
            <TouchableOpacity
-             style={styles.nextButton}
+             style={[styles.nextButton, isLoading && styles.nextButtonDisabled]}
              onPress={handleNextPress}
              activeOpacity={0.8}
+             disabled={isLoading || isNavigating}
+             testID="continue-to-editor-button"
+             accessibilityLabel="Continue to editor"
+             accessibilityRole="button"
+             accessibilityState={{ disabled: isLoading || isNavigating }}
            >
              <View style={styles.nextButtonContent}>
-               <Text style={styles.nextButtonText}>Continue to Editor</Text>
-               <Icon name="arrow-forward" size={isSmallScreen ? 18 : 20} color="#ffffff" />
+               {isLoading ? (
+                 <ActivityIndicator size="small" color="#ffffff" testID="next-button-loading" />
+               ) : (
+                 <>
+                   <Text style={styles.nextButtonText}>Continue to Editor</Text>
+                   <Icon name="arrow-forward" size={isSmallScreen ? 18 : 20} color="#ffffff" />
+                 </>
+               )}
              </View>
            </TouchableOpacity>
          </View>
@@ -253,15 +336,15 @@ const PosterPlayerScreen: React.FC = () => {
          <View style={styles.relatedSection}>
            <View style={styles.relatedHeader}>
              <View style={styles.relatedHeaderLeft}>
-               <Text style={styles.relatedTitle}>
+               <Text style={styles.relatedTitle} testID="related-posters-title">
                  Related Templates
                </Text>
-               <Text style={styles.relatedSubtitle}>
+               <Text style={styles.relatedSubtitle} testID="related-posters-subtitle">
                  In {languages.find(lang => lang.id === selectedLanguage)?.name}
                </Text>
              </View>
              <View style={styles.relatedCountBadge}>
-               <Text style={styles.relatedCountText}>
+               <Text style={styles.relatedCountText} testID="related-posters-count">
                  {filteredPosters.length} ITEMS
                </Text>
              </View>
@@ -277,10 +360,11 @@ const PosterPlayerScreen: React.FC = () => {
                showsVerticalScrollIndicator={true}
                contentContainerStyle={styles.relatedList}
                style={styles.relatedFlatList}
+               testID="related-posters-list"
              />
            ) : (
-             <View style={styles.noPostersContainer}>
-
+             <View style={styles.noPostersContainer} testID="no-posters-container">
+               <Icon name="image-not-supported" size={48} color="rgba(255,255,255,0.3)" />
                <Text style={styles.noPostersText}>
                  No templates available in {languages.find(lang => lang.id === selectedLanguage)?.name}
                </Text>
@@ -675,6 +759,23 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#ffffff',
     letterSpacing: 0.5,
+  },
+  nextButtonDisabled: {
+    opacity: 0.6,
+    backgroundColor: '#a0a0a0',
+    borderColor: '#808080',
+  },
+  imageErrorPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  imageErrorText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: responsiveFontSize.sm,
+    fontWeight: '500',
+    marginTop: responsiveSpacing.xs,
+    textAlign: 'center',
   },
 });
 

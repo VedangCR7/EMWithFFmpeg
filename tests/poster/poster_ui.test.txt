@@ -1,0 +1,269 @@
+POSTER PLAYER SCREEN - UI TEST CASES
+====================================
+
+Test Case ID: POSTER-UI-001
+Test Case Title: Poster image visibility and display
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- Selected poster data is available
+- Network connection is available
+Test Steps:
+1. Navigate to PosterPlayerScreen
+2. Verify main poster container is visible
+3. Verify poster image loads and displays (testID: main-poster-image)
+4. Verify image aspect ratio is maintained
+5. Verify image fits within container bounds
+Test Data:
+- Selected poster with valid thumbnail URL
+- Poster dimensions: standard size
+Expected Result:
+- Poster image is visible and properly displayed
+- Image loads without errors
+- Image maintains proper aspect ratio
+- Image is centered within container
+- No image distortion or cropping issues
+
+Test Case ID: POSTER-UI-002
+Test Case Title: Poster title and metadata display
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- Selected poster data contains title and category
+Test Steps:
+1. Navigate to PosterPlayerScreen
+2. Verify poster title is displayed (testID: poster-title)
+3. Verify poster category is displayed (testID: poster-category)
+4. Verify title text is properly formatted and readable
+5. Verify category text is properly formatted
+6. Verify text colors contrast with background
+Test Data:
+- Poster title: "Festival Celebration Poster"
+- Poster category: "Festival"
+Expected Result:
+- Title text is visible and readable
+- Category text is visible and readable
+- Text formatting is consistent
+- Text colors provide good contrast
+- Text truncation handles long titles properly
+
+Test Case ID: POSTER-UI-003
+Test Case Title: Header elements visibility and alignment
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+Test Steps:
+1. Navigate to PosterPlayerScreen
+2. Verify back button is visible (testID: back-button)
+3. Verify back button is properly positioned
+4. Verify header content area is aligned
+5. Verify high quality badge is visible
+6. Verify customizable badge is visible
+7. Verify all header elements are properly aligned
+Test Data:
+- Standard header layout
+Expected Result:
+- Back button is visible and accessible
+- Header content is properly aligned
+- Badges are visible and readable
+- All elements maintain proper spacing
+- Header layout is responsive to screen size
+
+Test Case ID: POSTER-UI-004
+Test Case Title: Language selection section display
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- Language options are available
+Test Steps:
+1. Navigate to PosterPlayerScreen
+2. Verify language selection title is displayed (testID: language-selection-title)
+3. Verify language selection subtitle is displayed (testID: language-selection-subtitle)
+4. Verify language buttons are visible
+5. Verify language buttons are horizontally scrollable (testID: language-scroll-view)
+6. Verify selected language button is highlighted
+Test Data:
+- Languages: English, Marathi, Hindi
+- Selected language: English
+Expected Result:
+- Language selection section is properly displayed
+- All language buttons are visible and accessible
+- Horizontal scrolling works smoothly
+- Selected language is visually indicated
+- Text is readable and properly formatted
+
+Test Case ID: POSTER-UI-005
+Test Case Title: Continue to Editor button display
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- User has selected a language
+Test Steps:
+1. Navigate to PosterPlayerScreen
+2. Verify continue button is visible (testID: continue-to-editor-button)
+3. Verify button text is readable
+4. Verify button styling is consistent
+5. Verify button is properly sized and positioned
+6. Verify button icon is visible and aligned
+Test Data:
+- Button text: "Continue to Editor"
+- Button color: Primary theme color
+Expected Result:
+- Continue button is visible and accessible
+- Button text is readable and properly formatted
+- Button styling matches app theme
+- Button maintains proper size and position
+- Icon is properly aligned with text
+
+Test Case ID: POSTER-UI-006
+Test Case Title: Related posters section visibility
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- Related posters data is available
+Test Steps:
+1. Navigate to PosterPlayerScreen
+2. Verify related posters title is displayed (testID: related-posters-title)
+3. Verify related posters subtitle is displayed (testID: related-posters-subtitle)
+4. Verify posters count badge is displayed (testID: related-posters-count)
+5. Verify related posters list is visible (testID: related-posters-list)
+6. Verify poster cards are displayed in grid layout
+Test Data:
+- Related posters: 4 items
+- Grid layout: 2 columns
+Expected Result:
+- Related posters section is properly displayed
+- All text elements are visible and readable
+- Posters count shows correct number
+- Grid layout is properly formatted
+- Poster cards are evenly spaced
+
+Test Case ID: POSTER-UI-007
+Test Case Title: Language badge overlay on poster
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- Language is selected
+Test Steps:
+1. Navigate to PosterPlayerScreen
+2. Verify language badge is visible on main poster
+3. Verify badge shows correct language code
+4. Verify badge is properly positioned (top-right)
+5. Verify badge text is readable
+6. Verify badge styling is consistent
+Test Data:
+- Selected language: English
+- Expected badge text: "EN"
+Expected Result:
+- Language badge is visible and properly positioned
+- Badge displays correct language code
+- Badge text is readable against background
+- Badge styling matches design specifications
+- Badge doesn't obstruct poster content
+
+Test Case ID: POSTER-UI-008
+Test Case Title: Responsive design on different screen sizes
+Preconditions:
+- App is launched on different device sizes
+- PosterPlayerScreen is displayed
+Test Steps:
+1. Test on small screen (< 375px width)
+2. Verify all elements are visible and properly sized
+3. Test on medium screen (375px - 414px width)
+4. Verify layout adapts properly
+5. Test on tablet screen (>= 768px width)
+6. Verify layout utilizes extra space effectively
+7. Test landscape orientation
+8. Verify layout adapts to landscape mode
+Test Data:
+- Various screen sizes and orientations
+Expected Result:
+- Layout adapts properly to all screen sizes
+- Elements remain visible and accessible
+- Text remains readable on all sizes
+- No overflow or layout breaks
+- Responsive behavior is smooth and consistent
+
+Test Case ID: POSTER-UI-009
+Test Case Title: Loading states and placeholders
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- Images may take time to load
+Test Steps:
+1. Navigate to PosterPlayerScreen with slow network
+2. Verify loading behavior for poster images
+3. Verify placeholder content during image loading
+4. Verify smooth transition from loading to loaded state
+5. Test continue button loading state
+6. Verify loading indicator appears (testID: next-button-loading)
+Test Data:
+- Slow network conditions
+- Large image files
+Expected Result:
+- Loading states are properly displayed
+- Placeholders provide good user feedback
+- Transitions are smooth and not jarring
+- Loading indicators are visible and informative
+- No blank screens during loading
+
+Test Case ID: POSTER-UI-010
+Test Case Title: Dark mode theme compatibility
+Preconditions:
+- App supports dark/light theme switching
+- PosterPlayerScreen is displayed
+Test Steps:
+1. Switch to dark mode theme
+2. Verify all text is readable in dark mode
+3. Verify buttons and interactive elements are visible
+4. Verify backgrounds provide good contrast
+5. Switch to light mode theme
+6. Verify all elements remain visible and readable
+7. Verify theme transitions are smooth
+Test Data:
+- Dark and light theme configurations
+Expected Result:
+- All UI elements work properly in both themes
+- Text contrast meets accessibility standards
+- Interactive elements remain visible in both themes
+- Theme switching doesn't break layout
+- Visual hierarchy is maintained in both themes
+
+Test Case ID: POSTER-UI-011
+Test Case Title: Safe area and notch handling
+Preconditions:
+- App is running on device with notch/safe area
+- PosterPlayerScreen is displayed
+Test Steps:
+1. Test on device with notch (iPhone X style)
+2. Verify content doesn't overlap with notch
+3. Verify safe area insets are respected
+4. Test on device without notch
+5. Verify full screen utilization
+6. Test in landscape orientation with notch
+7. Verify proper adaptation
+Test Data:
+- Devices with and without notches
+- Portrait and landscape orientations
+Expected Result:
+- Content respects safe area boundaries
+- No content is obscured by notch or system UI
+- Layout adapts properly to different device types
+- Safe area handling is consistent across orientations
+- Full screen space is utilized when available
+
+Test Case ID: POSTER-UI-012
+Test Case Title: Typography and font rendering
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- Various text elements are present
+Test Steps:
+1. Verify title text rendering and font weight
+2. Verify subtitle text rendering
+3. Verify button text rendering
+4. Verify language button text
+5. Verify related poster text
+6. Test with system font size changes
+7. Verify text scales properly
+8. Verify text remains readable at different sizes
+Test Data:
+- Various text elements and font sizes
+Expected Result:
+- All text renders properly and consistently
+- Font weights and styles are applied correctly
+- Text scales properly with system settings
+- Text remains readable at all sizes
+- No text overflow or truncation issues
+- Typography follows design guidelines
