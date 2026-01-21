@@ -1,0 +1,444 @@
+LOGIN SCREEN - EDGE CASE TEST SCENARIOS
+=======================================
+
+Test Case ID: LOGIN-EDGE-001
+Test Case Title: SQL Injection attempt in email field
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is available
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter SQL injection string in email field (testID: email-input)
+4. Enter valid password in password field (testID: password-input)
+5. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- Email: ' OR '1'='1' --
+- Password: Password123
+Expected Result:
+- Input sanitization removes dangerous characters
+- Sanitized input is safe for API call
+- Loading indicator appears (testID: loading-indicator)
+- Server rejects malicious input
+- Error modal appears with appropriate error message
+- No SQL injection vulnerability is exploited
+
+Test Case ID: LOGIN-EDGE-002
+Test Case Title: SQL Injection attempt in password field
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is available
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter valid email in email field (testID: email-input)
+4. Enter SQL injection string in password field (testID: password-input)
+5. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- Email: user@example.com
+- Password: ' OR '1'='1' --
+Expected Result:
+- Input sanitization removes dangerous characters
+- Sanitized input is safe for API call
+- Loading indicator appears (testID: loading-indicator)
+- Server rejects malicious input
+- Error modal appears with appropriate error message
+- No SQL injection vulnerability is exploited
+
+Test Case ID: LOGIN-EDGE-003
+Test Case Title: XSS attempt in email field
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is available
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter XSS script in email field (testID: email-input)
+4. Enter valid password in password field (testID: password-input)
+5. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- Email: <script>alert('XSS')</script>@example.com
+- Password: Password123
+Expected Result:
+- Input sanitization removes HTML/JS tags
+- Sanitized input is safe for API call
+- Loading indicator appears (testID: loading-indicator)
+- Server rejects malicious input
+- Error modal appears with appropriate error message
+- No XSS vulnerability is exploited
+- No script execution occurs
+
+Test Case ID: LOGIN-EDGE-004
+Test Case Title: XSS attempt in password field
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is available
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter valid email in email field (testID: email-input)
+4. Enter XSS script in password field (testID: password-input)
+5. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- Email: user@example.com
+- Password: <script>alert('XSS')</script>
+Expected Result:
+- Input sanitization removes HTML/JS tags
+- Sanitized input is safe for API call
+- Loading indicator appears (testID: loading-indicator)
+- Server rejects malicious input
+- Error modal appears with appropriate error message
+- No XSS vulnerability is exploited
+
+Test Case ID: LOGIN-EDGE-005
+Test Case Title: Very long email address
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is available
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter very long email in email field (testID: email-input)
+4. Enter valid password in password field (testID: password-input)
+5. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- Email: verylongemailaddressabcdefghijklmnopqrstuvwxyz123456789@example.com
+- Password: Password123
+Expected Result:
+- Email validation accepts long but valid format
+- Loading indicator appears (testID: loading-indicator)
+- API call is made with long email
+- Server handles long email appropriately
+- Appropriate success or error response
+- UI properly displays long email without overflow
+
+Test Case ID: LOGIN-EDGE-006
+Test Case Title: Very long password
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is available
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter valid email in email field (testID: email-input)
+4. Enter very long password in password field (testID: password-input)
+5. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- Email: user@example.com
+- Password: ThisIsAVeryLongPasswordThatExceedsNormalLengthLimitsAndShouldBeHandledProperly1234567890
+Expected Result:
+- Password validation accepts long password (meets minimum length)
+- Loading indicator appears (testID: loading-indicator)
+- API call is made with long password
+- Server handles long password appropriately
+- Appropriate success or error response
+- UI properly handles password input and display
+
+Test Case ID: LOGIN-EDGE-007
+Test Case Title: Maximum length email address
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is available
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter maximum length email (254 characters) in email field (testID: email-input)
+4. Enter valid password in password field (testID: password-input)
+5. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- Email: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.com
+- Password: Password123
+Expected Result:
+- Email validation accepts maximum length
+- Loading indicator appears (testID: loading-indicator)
+- API call is made with maximum length email
+- Server handles maximum length appropriately
+- Appropriate success or error response
+- No truncation or corruption of email data
+
+Test Case ID: LOGIN-EDGE-008
+Test Case Title: Unicode characters in email
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is available
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter email with Unicode characters in email field (testID: email-input)
+4. Enter valid password in password field (testID: password-input)
+5. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- Email: üsér@éxample.com
+- Password: Password123
+Expected Result:
+- Email validation handles Unicode appropriately
+- Loading indicator appears (testID: loading-indicator)
+- API call preserves Unicode characters
+- Server handles Unicode email appropriately
+- Appropriate success or error response
+- No character encoding issues
+
+Test Case ID: LOGIN-EDGE-009
+Test Case Title: Unicode characters in password
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is available
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter valid email in email field (testID: email-input)
+4. Enter password with Unicode characters in password field (testID: password-input)
+5. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- Email: user@example.com
+- Password: Pásswörd123
+Expected Result:
+- Password validation accepts Unicode characters
+- Loading indicator appears (testID: loading-indicator)
+- API call preserves Unicode characters
+- Server handles Unicode password appropriately
+- Appropriate success or error response
+- No character encoding issues
+
+Test Case ID: LOGIN-EDGE-010
+Test Case Title: Email with international domain
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is available
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter email with international domain in email field (testID: email-input)
+4. Enter valid password in password field (testID: password-input)
+5. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- Email: user@xn--exmple-cua.com (punycode for international domain)
+- Password: Password123
+Expected Result:
+- Email validation accepts punycode domains
+- Loading indicator appears (testID: loading-indicator)
+- API call handles international domain appropriately
+- Server handles international domain appropriately
+- Appropriate success or error response
+
+Test Case ID: LOGIN-EDGE-011
+Test Case Title: Multiple rapid login attempts
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is available
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter invalid credentials and tap sign in (testID: sign-in-button)
+4. Wait for error response
+5. Immediately enter different invalid credentials and tap sign in
+6. Repeat for 5-10 attempts rapidly
+Test Data:
+- Various invalid email/password combinations
+Expected Result:
+- Each attempt shows loading indicator (testID: loading-indicator)
+- Each attempt results in error modal
+- Server may implement rate limiting after multiple attempts
+- App handles rapid requests without crashing
+- UI remains responsive during rapid attempts
+- Error messages are consistent
+- No memory leaks or performance degradation
+
+Test Case ID: LOGIN-EDGE-012
+Test Case Title: Login during slow network connection
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is very slow
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter valid credentials
+4. Tap "Sign In" button (testID: sign-in-button)
+5. Observe loading behavior during slow response
+Test Data:
+- Email: user@example.com
+- Password: Password123
+Expected Result:
+- Loading indicator appears immediately (testID: loading-indicator)
+- Sign in button is disabled during loading
+- UI remains responsive during long wait
+- App doesn't timeout prematurely
+- When response arrives, appropriate action is taken
+- User can cancel if needed (if cancel functionality exists)
+
+Test Case ID: LOGIN-EDGE-013
+Test Case Title: Login with special characters in email local part
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is available
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter email with special characters in local part (testID: email-input)
+4. Enter valid password in password field (testID: password-input)
+5. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- Email: user.name+tag@example.com
+- Password: Password123
+Expected Result:
+- Email validation accepts special characters in local part
+- Loading indicator appears (testID: loading-indicator)
+- API call preserves special characters
+- Server handles special characters appropriately
+- Appropriate success or error response
+
+Test Case ID: LOGIN-EDGE-014
+Test Case Title: Login with newline characters in input fields
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is available
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter email with newline characters (testID: email-input)
+4. Enter password with newline characters (testID: password-input)
+5. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- Email: user\n@example.com
+- Password: Pass\nword123
+Expected Result:
+- Input sanitization removes or escapes newline characters
+- Sanitized input is safe for API call
+- Loading indicator appears (testID: loading-indicator)
+- Server handles sanitized input appropriately
+- Appropriate success or error response
+- No injection vulnerabilities
+
+Test Case ID: LOGIN-EDGE-015
+Test Case Title: Login with tab characters in input fields
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is available
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter email with tab characters (testID: email-input)
+4. Enter password with tab characters (testID: password-input)
+5. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- Email: user\t@example.com
+- Password: Pass\tword123
+Expected Result:
+- Input sanitization removes or escapes tab characters
+- Sanitized input is safe for API call
+- Loading indicator appears (testID: loading-indicator)
+- Server handles sanitized input appropriately
+- Appropriate success or error response
+- No injection vulnerabilities
+
+Test Case ID: LOGIN-EDGE-016
+Test Case Title: Login with null bytes in input fields
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is available
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Attempt to enter email with null bytes (testID: email-input)
+4. Attempt to enter password with null bytes (testID: password-input)
+5. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- Email: user\0@example.com
+- Password: Pass\0word123
+Expected Result:
+- Input sanitization removes null bytes
+- Sanitized input is safe for API call
+- Loading indicator appears (testID: loading-indicator)
+- Server handles sanitized input appropriately
+- Appropriate success or error response
+- No null byte injection vulnerabilities
+
+Test Case ID: LOGIN-EDGE-017
+Test Case Title: Login with emoji characters
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is available
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter email with emoji characters (testID: email-input)
+4. Enter password with emoji characters (testID: password-input)
+5. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- Email: user😊@example.com
+- Password: Password😀123
+Expected Result:
+- Email validation handles emoji appropriately
+- Password validation handles emoji appropriately
+- Loading indicator appears (testID: loading-indicator)
+- API call preserves emoji characters
+- Server handles emoji appropriately
+- Appropriate success or error response
+- No character encoding issues
+
+Test Case ID: LOGIN-EDGE-018
+Test Case Title: Login with mixed script characters
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is available
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter email with mixed scripts (testID: email-input)
+4. Enter password with mixed scripts (testID: password-input)
+5. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- Email: user@example.com (Latin) + 用户@example.com (Chinese mix attempt)
+- Password: Password123
+Expected Result:
+- Input validation handles mixed scripts appropriately
+- Loading indicator appears (testID: loading-indicator)
+- Server handles mixed scripts appropriately
+- Security measures against homograph attacks
+- Appropriate success or error response
+
+Test Case ID: LOGIN-EDGE-019
+Test Case Title: Login with device rotation during authentication
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is available
+- Device supports rotation
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter valid credentials
+4. Tap "Sign In" button (testID: sign-in-button)
+5. Rotate device while loading (testID: loading-indicator)
+Test Data:
+- Email: user@example.com
+- Password: Password123
+Expected Result:
+- UI adapts properly to rotation
+- Loading indicator remains visible
+- Authentication process continues uninterrupted
+- Form state is preserved during rotation
+- Successful login redirects properly in any orientation
+- No crashes or layout issues
+
+Test Case ID: LOGIN-EDGE-020
+Test Case Title: Login with memory pressure conditions
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is available
+- Device is under memory pressure
+Test Steps:
+1. Launch the application under memory pressure
+2. Navigate to login screen
+3. Enter valid credentials
+4. Tap "Sign In" button (testID: sign-in-button)
+5. Observe behavior under memory constraints
+Test Data:
+- Email: user@example.com
+- Password: Password123
+Expected Result:
+- App remains functional under memory pressure
+- Loading indicator appears (testID: loading-indicator)
+- Authentication completes successfully
+- No crashes or unexpected terminations
+- UI remains responsive
+- Memory usage stays within acceptable limits

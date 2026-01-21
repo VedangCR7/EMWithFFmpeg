@@ -12,6 +12,7 @@ import {
   Alert,
   Image,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -36,6 +37,24 @@ import responsiveUtils, {
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
+// Email validation regex
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Password validation rules
+const PASSWORD_MIN_LENGTH = 8;
+const PASSWORD_REQUIREMENTS = {
+  minLength: PASSWORD_MIN_LENGTH,
+  hasUpperCase: /[A-Z]/,
+  hasLowerCase: /[a-z]/,
+  hasNumber: /\d/,
+  hasSpecialChar: /[!@#$%^&*(),.?":{}|<>]/
+};
+
+// Input sanitization function
+const sanitizeInput = (input: string): string => {
+  return input.trim().replace(/[<>"'&]/g, '');
+};
+
 // Create a stable FloatingInput component outside the main component
 const FloatingInput = React.memo(({ 
   label, 
@@ -47,13 +66,16 @@ const FloatingInput = React.memo(({
   theme,
   secureTextEntry = false,
   keyboardType = 'default',
-  autoCapitalize = 'none'
+  autoCapitalize = 'none',
+  testID,
+  error = false
 }: any) => (
   <View style={styles.inputContainer}>
          <Text style={[
        styles.floatingLabel, 
        { color: (isFocused || value) ? theme.colors.primary : theme.colors.textSecondary },
-       (isFocused || value) && styles.floatingLabelFocused
+       (isFocused || value) && styles.floatingLabelFocused,
+       error && styles.floatingLabelError
      ]}>
        {label}
      </Text>
@@ -61,7 +83,7 @@ const FloatingInput = React.memo(({
          style={[
            styles.input, 
            { 
-             borderColor: (isFocused || value) ? theme.colors.primary : theme.colors.border,
+             borderColor: error ? theme.colors.error : (isFocused || value) ? theme.colors.primary : theme.colors.border,
              backgroundColor: theme.colors.inputBackground,
              color: theme.colors.text
            },
@@ -80,6 +102,8 @@ const FloatingInput = React.memo(({
         autoCorrect={false}
         spellCheck={false}
         textContentType="none"
+        testID={testID}
+        accessibilityLabel={label}
     />
   </View>
 ));
@@ -94,10 +118,51 @@ const LoginScreen: React.FC = ({ navigation }: any) => {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+
+  // Email validation function
+  const validateEmail = useCallback((email: string): boolean => {
+    const sanitizedEmail = sanitizeInput(email);
+    if (!sanitizedEmail) {
+      setEmailError('Email is required');
+      return false;
+    }
+    if (!EMAIL_REGEX.test(sanitizedEmail)) {
+      setEmailError('Please enter a valid email address');
+      return false;
+    }
+    setEmailError('');
+    return true;
+  }, []);
+
+  // Password validation function
+  const validatePassword = useCallback((password: string): boolean => {
+    const sanitizedPassword = sanitizeInput(password);
+    if (!sanitizedPassword) {
+      setPasswordError('Password is required');
+      return false;
+    }
+    if (sanitizedPassword.length < PASSWORD_MIN_LENGTH) {
+      setPasswordError(`Password must be at least ${PASSWORD_MIN_LENGTH} characters`);
+      return false;
+    }
+    setPasswordError('');
+    return true;
+  }, []);
 
   const handleSignIn = useCallback(async () => {
-    if (!email || !password) {
-      setErrorMessage('Please fill in all fields');
+    // Clear previous errors
+    setEmailError('');
+    setPasswordError('');
+    
+    // Validate inputs
+    const isEmailValid = validateEmail(email);
+    const isPasswordValid = validatePassword(password);
+    
+    if (!isEmailValid || !isPasswordValid) {
+      setErrorMessage('Please fix the validation errors');
       setShowErrorModal(true);
       return;
     }
@@ -106,8 +171,9 @@ const LoginScreen: React.FC = ({ navigation }: any) => {
     setIsLoading(true);
     try {
       const result = await loginAPIs.loginUser({
-        email: email.trim(),
-        password: password.trim(),
+        email: sanitizeInput(email.trim()),
+        password: sanitizeInput(password.trim()),
+        rememberMe,
       });
       
       console.log('✅ Login successful:', result);
@@ -123,12 +189,7 @@ const LoginScreen: React.FC = ({ navigation }: any) => {
     } finally {
       setIsLoading(false);
     }
-  }, [email, password]);
-
-
-
-
-
+  }, [email, password, rememberMe]);
 
   return (
     <SafeAreaView 
@@ -170,11 +231,21 @@ const LoginScreen: React.FC = ({ navigation }: any) => {
                 value={email}
                 onChangeText={setEmail}
                 onFocus={() => setEmailFocused(true)}
-                onBlur={() => setEmailFocused(false)}
+                onBlur={() => {
+                  setEmailFocused(false);
+                  validateEmail(email);
+                }}
                 isFocused={emailFocused}
                 theme={theme}
                 keyboardType="email-address"
+                testID="email-input"
+                error={!!emailError}
               />
+              {emailError ? (
+                <Text style={[styles.errorText, { color: theme.colors.error }]}>
+                  {emailError}
+                </Text>
+              ) : null}
 
               {/* Password Input with Eye Button */}
               <View style={styles.inputContainer}>
@@ -190,7 +261,7 @@ const LoginScreen: React.FC = ({ navigation }: any) => {
                     style={[
                       styles.passwordInput, 
                       { 
-                        borderColor: (passwordFocused || password) ? theme.colors.primary : theme.colors.border,
+                        borderColor: passwordError ? theme.colors.error : (passwordFocused || password) ? theme.colors.primary : theme.colors.border,
                         backgroundColor: theme.colors.inputBackground,
                         color: theme.colors.text
                       },
@@ -199,17 +270,24 @@ const LoginScreen: React.FC = ({ navigation }: any) => {
                     value={password}
                     onChangeText={setPassword}
                     onFocus={() => setPasswordFocused(true)}
-                    onBlur={() => setPasswordFocused(false)}
+                    onBlur={() => {
+                      setPasswordFocused(false);
+                      validatePassword(password);
+                    }}
                     secureTextEntry={!showPassword}
                     placeholderTextColor={theme.colors.textSecondary}
                     blurOnSubmit={false}
                     returnKeyType="next"
                     autoCorrect={false}
                     autoCapitalize="none"
+                    testID="password-input"
+                    accessibilityLabel="Password"
                   />
                   <TouchableOpacity 
                     style={styles.eyeButton}
                     onPress={() => setShowPassword(!showPassword)}
+                    testID="password-visibility-toggle"
+                    accessibilityLabel={showPassword ? "Hide password" : "Show password"}
                   >
                     <Icon 
                       name={showPassword ? "visibility" : "visibility-off"} 
@@ -219,6 +297,33 @@ const LoginScreen: React.FC = ({ navigation }: any) => {
                   </TouchableOpacity>
                 </View>
               </View>
+              {passwordError ? (
+                <Text style={[styles.errorText, { color: theme.colors.error }]}>
+                  {passwordError}
+                </Text>
+              ) : null}
+
+              {/* Remember Me Checkbox */}
+              <TouchableOpacity 
+                style={styles.rememberMeContainer}
+                onPress={() => setRememberMe(!rememberMe)}
+                testID="remember-me-checkbox"
+              >
+                <View style={[
+                  styles.checkbox,
+                  { 
+                    borderColor: theme.colors.border,
+                    backgroundColor: rememberMe ? theme.colors.primary : theme.colors.inputBackground
+                  }
+                ]}>
+                  {rememberMe && (
+                    <Icon name="check" size={16} color="#ffffff" />
+                  )}
+                </View>
+                <Text style={[styles.rememberMeText, { color: theme.colors.text }]}>
+                  Remember me
+                </Text>
+              </TouchableOpacity>
 
               <TouchableOpacity 
                 style={[
@@ -228,17 +333,27 @@ const LoginScreen: React.FC = ({ navigation }: any) => {
                 ]} 
                 onPress={handleSignIn}
                 disabled={isLoading}
+                testID="sign-in-button"
+                accessibilityLabel="Sign in button"
               >
-                <Text style={[styles.signInButtonText, { color: '#ffffff' }]}>
-                  {isLoading ? 'SIGNING IN...' : 'SIGN IN'}
-                </Text>
+                {isLoading ? (
+                  <ActivityIndicator size="small" color="#ffffff" testID="loading-indicator" />
+                ) : (
+                  <Text style={[styles.signInButtonText, { color: '#ffffff' }]}>
+                    SIGN IN
+                  </Text>
+                )}
               </TouchableOpacity>
 
               <View style={styles.footer}>
                 <Text style={[styles.footerText, { color: theme.colors.textSecondary }]}>
                   Don't have an account?{' '}
                 </Text>
-                <TouchableOpacity onPress={() => navigation.navigate('Registration')}>
+                <TouchableOpacity 
+                  onPress={() => navigation.navigate('Registration')}
+                  testID="sign-up-link"
+                  accessibilityLabel="Sign up"
+                >
                   <Text style={[styles.footerLink, { color: theme.colors.primary }]}>
                     Sign Up
                   </Text>
@@ -250,7 +365,11 @@ const LoginScreen: React.FC = ({ navigation }: any) => {
                 <Text style={[styles.privacyFooterText, { color: theme.colors.textSecondary }]}>
                   By signing in, you agree to our{' '}
                 </Text>
-                <TouchableOpacity onPress={() => navigation.navigate('PrivacyPolicy')}>
+                <TouchableOpacity 
+                  onPress={() => navigation.navigate('PrivacyPolicy')}
+                  testID="privacy-policy-link"
+                  accessibilityLabel="Privacy policy"
+                >
                   <Text style={[styles.privacyFooterLink, { color: theme.colors.primary }]}>
                     Privacy Policy
                   </Text>
@@ -273,6 +392,7 @@ const LoginScreen: React.FC = ({ navigation }: any) => {
           style={styles.modalOverlay}
           activeOpacity={1}
           onPress={() => setShowErrorModal(false)}
+          testID="error-modal-overlay"
         >
           <TouchableOpacity 
             activeOpacity={1}
@@ -292,6 +412,8 @@ const LoginScreen: React.FC = ({ navigation }: any) => {
                   style={[styles.closeModalButton, { backgroundColor: theme.colors.inputBackground }]}
                   onPress={() => setShowErrorModal(false)}
                   activeOpacity={0.7}
+                  testID="close-error-modal"
+                  accessibilityLabel="Close error modal"
                 >
                   <Icon name="close" size={Math.min(screenWidth * 0.06, 24)} color={theme.colors.textSecondary} />
                 </TouchableOpacity>
@@ -306,6 +428,8 @@ const LoginScreen: React.FC = ({ navigation }: any) => {
               <TouchableOpacity 
                 style={[styles.errorModalButton, { backgroundColor: '#ff4444' }]}
                 onPress={() => setShowErrorModal(false)}
+                testID="error-modal-ok-button"
+                accessibilityLabel="OK"
               >
                 <Text style={styles.errorModalButtonText}>OK</Text>
               </TouchableOpacity>
@@ -381,6 +505,31 @@ const styles = StyleSheet.create({
     top: screenHeight * 0.005,
     fontSize: Math.min(screenWidth * 0.03, 12),
     fontWeight: '600',
+  },
+  floatingLabelError: {
+    color: '#ff4444',
+  },
+  errorText: {
+    fontSize: Math.min(screenWidth * 0.03, 12),
+    marginTop: screenHeight * 0.005,
+    marginLeft: screenWidth * 0.02,
+  },
+  rememberMeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: screenHeight * 0.02,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 1,
+    marginRight: screenWidth * 0.02,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  rememberMeText: {
+    fontSize: Math.min(screenWidth * 0.035, 14),
   },
   input: {
     borderWidth: 1,

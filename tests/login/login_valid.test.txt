@@ -1,0 +1,204 @@
+LOGIN SCREEN - VALID LOGIN TEST CASES
+=====================================
+
+Test Case ID: LOGIN-VALID-001
+Test Case Title: Successful login with valid credentials
+Preconditions:
+- User has valid registered account
+- App is launched and login screen is displayed
+- Network connection is available
+Test Steps:
+1. Launch the application
+2. Navigate to login screen (if not already there)
+3. Enter valid email address in email input field (testID: email-input)
+4. Enter valid password in password input field (testID: password-input)
+5. Verify "Remember me" checkbox is unchecked (testID: remember-me-checkbox)
+6. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- Email: user@example.com
+- Password: Password123
+Expected Result:
+- Loading indicator appears (testID: loading-indicator)
+- User is successfully authenticated
+- User is redirected to home/dashboard screen
+- No error modal is displayed
+- User session is established
+
+Test Case ID: LOGIN-VALID-002
+Test Case Title: Successful login with Remember Me enabled
+Preconditions:
+- User has valid registered account
+- App is launched and login screen is displayed
+- Network connection is available
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter valid email address in email input field (testID: email-input)
+4. Enter valid password in password input field (testID: password-input)
+5. Tap "Remember me" checkbox to enable it (testID: remember-me-checkbox)
+6. Verify checkbox shows checkmark
+7. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- Email: user@example.com
+- Password: Password123
+- Remember Me: Enabled
+Expected Result:
+- Loading indicator appears (testID: loading-indicator)
+- User is successfully authenticated
+- User is redirected to home/dashboard screen
+- User session is persisted (remember me functionality works)
+- Next app launch should auto-login or keep user logged in
+
+Test Case ID: LOGIN-VALID-003
+Test Case Title: Successful login with password visibility toggle
+Preconditions:
+- User has valid registered account
+- App is launched and login screen is displayed
+- Network connection is available
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter valid email address in email input field (testID: email-input)
+4. Enter valid password in password input field (testID: password-input)
+5. Tap eye icon to show password (testID: password-visibility-toggle)
+6. Verify password is visible in plain text
+7. Tap eye icon again to hide password
+8. Verify password is masked again
+9. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- Email: user@example.com
+- Password: Password123
+Expected Result:
+- Password visibility toggle works correctly
+- Loading indicator appears (testID: loading-indicator)
+- User is successfully authenticated
+- User is redirected to home/dashboard screen
+
+Test Case ID: LOGIN-VALID-004
+Test Case Title: Successful login with email auto-focus behavior
+Preconditions:
+- User has valid registered account
+- App is launched and login screen is displayed
+- Network connection is available
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Tap on email input field (testID: email-input)
+4. Verify floating label animates up
+5. Verify input border changes color to indicate focus
+6. Enter valid email address
+7. Tap on password input field (testID: password-input)
+8. Verify email floating label stays in focused position
+9. Verify password floating label animates up
+10. Enter valid password
+11. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- Email: test.user@company.com
+- Password: SecurePass456
+Expected Result:
+- Floating label animations work correctly
+- Focus states are properly indicated
+- Loading indicator appears (testID: loading-indicator)
+- User is successfully authenticated
+- User is redirected to home/dashboard screen
+
+Test Case ID: LOGIN-VALID-005
+Test Case Title: Successful login after previous failed attempt
+Preconditions:
+- User has valid registered account
+- App is launched and login screen is displayed
+- Network connection is available
+- Previous failed login attempt was made
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter invalid credentials and attempt login (to trigger error state)
+4. Verify error modal appears (testID: error-modal-overlay)
+5. Close error modal (testID: error-modal-ok-button)
+6. Clear email and password fields
+7. Enter valid email address in email input field (testID: email-input)
+8. Enter valid password in password input field (testID: password-input)
+9. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- First attempt: invalid@example.com / wrongpass
+- Second attempt: user@example.com / Password123
+Expected Result:
+- Error modal from first attempt closes properly
+- Input fields are cleared and ready for new input
+- Loading indicator appears for second attempt (testID: loading-indicator)
+- User is successfully authenticated on second attempt
+- User is redirected to home/dashboard screen
+
+Test Case ID: LOGIN-VALID-006
+Test Case Title: Successful login with different valid email formats
+Preconditions:
+- User has valid registered account
+- App is launched and login screen is displayed
+- Network connection is available
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter valid email with subdomain in email input field (testID: email-input)
+4. Enter valid password in password input field (testID: password-input)
+5. Tap "Sign In" button (testID: sign-in-button)
+6. Repeat with different valid email formats
+Test Data:
+- Email 1: user.name@example.com
+- Email 2: user+tag@example.com
+- Email 3: user123@sub.example.com
+- Password: ValidPassword123
+Expected Result:
+- All valid email formats are accepted
+- Loading indicator appears (testID: loading-indicator)
+- User is successfully authenticated
+- User is redirected to home/dashboard screen
+
+Test Case ID: LOGIN-VALID-007
+Test Case Title: Successful login navigation flow verification
+Preconditions:
+- User has valid registered account
+- App is launched and login screen is displayed
+- Network connection is available
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter valid email address in email input field (testID: email-input)
+4. Enter valid password in password input field (testID: password-input)
+5. Tap "Sign In" button (testID: sign-in-button)
+6. Monitor navigation behavior
+Test Data:
+- Email: user@example.com
+- Password: Password123
+Expected Result:
+- Loading indicator appears (testID: loading-indicator)
+- Authentication is successful
+- User is automatically redirected to appropriate screen (home/dashboard)
+- Login screen is no longer visible
+- Navigation stack is properly updated
+
+Test Case ID: LOGIN-VALID-008
+Test Case Title: Successful login with accessibility features
+Preconditions:
+- User has valid registered account
+- App is launched and login screen is displayed
+- Network connection is available
+- Screen reader or accessibility tools are enabled
+Test Steps:
+1. Launch the application with accessibility tools enabled
+2. Navigate to login screen
+3. Use screen reader to focus email input field (accessibilityLabel: "Email Address")
+4. Enter valid email address
+5. Navigate to password input field (accessibilityLabel: "Password")
+6. Enter valid password
+7. Navigate to sign in button (accessibilityLabel: "Sign in button")
+8. Activate sign in button
+Test Data:
+- Email: user@example.com
+- Password: Password123
+Expected Result:
+- All elements have proper accessibility labels
+- Screen reader announces all interactive elements
+- Focus management works correctly
+- Loading indicator is announced (testID: loading-indicator)
+- User is successfully authenticated
+- User is redirected to home/dashboard screen

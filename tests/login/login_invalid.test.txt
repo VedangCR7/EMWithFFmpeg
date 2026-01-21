@@ -1,0 +1,326 @@
+LOGIN SCREEN - INVALID LOGIN TEST CASES
+======================================
+
+Test Case ID: LOGIN-INVALID-001
+Test Case Title: Login with empty email and password fields
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is available
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Leave email field empty (testID: email-input)
+4. Leave password field empty (testID: password-input)
+5. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- Email: (empty)
+- Password: (empty)
+Expected Result:
+- Validation error appears for email field: "Email is required"
+- Validation error appears for password field: "Password is required"
+- Error modal appears with message: "Please fix the validation errors"
+- No API call is made to server
+- User remains on login screen
+
+Test Case ID: LOGIN-INVALID-002
+Test Case Title: Login with empty email field only
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is available
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Leave email field empty (testID: email-input)
+4. Enter valid password in password field (testID: password-input)
+5. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- Email: (empty)
+- Password: Password123
+Expected Result:
+- Validation error appears for email field: "Email is required"
+- No validation error for password field
+- Error modal appears with message: "Please fix the validation errors"
+- No API call is made to server
+- User remains on login screen
+
+Test Case ID: LOGIN-INVALID-003
+Test Case Title: Login with empty password field only
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is available
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter valid email in email field (testID: email-input)
+4. Leave password field empty (testID: password-input)
+5. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- Email: user@example.com
+- Password: (empty)
+Expected Result:
+- No validation error for email field
+- Validation error appears for password field: "Password is required"
+- Error modal appears with message: "Please fix the validation errors"
+- No API call is made to server
+- User remains on login screen
+
+Test Case ID: LOGIN-INVALID-004
+Test Case Title: Login with invalid email format
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is available
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter invalid email format in email field (testID: email-input)
+4. Enter valid password in password field (testID: password-input)
+5. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- Email: invalid-email
+- Password: Password123
+Expected Result:
+- Validation error appears for email field: "Please enter a valid email address"
+- Email input border shows error state (red color)
+- Email label shows error state (red color)
+- No API call is made to server
+- User remains on login screen
+
+Test Case ID: LOGIN-INVALID-005
+Test Case Title: Login with multiple invalid email formats
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is available
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter first invalid email format and attempt login
+4. Clear email field
+5. Enter second invalid email format and attempt login
+6. Clear email field
+7. Enter third invalid email format and attempt login
+Test Data:
+- Email 1: user@ (missing domain)
+- Email 2: @example.com (missing username)
+- Email 3: user.example.com (missing @)
+- Password: Password123
+Expected Result:
+- All invalid email formats show validation error: "Please enter a valid email address"
+- Input border shows error state for each attempt
+- No API calls are made to server
+- User remains on login screen
+
+Test Case ID: LOGIN-INVALID-006
+Test Case Title: Login with password too short
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is available
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter valid email in email field (testID: email-input)
+4. Enter short password in password field (testID: password-input)
+5. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- Email: user@example.com
+- Password: 123
+Expected Result:
+- Validation error appears for password field: "Password must be at least 8 characters"
+- Password input border shows error state (red color)
+- Password label shows error state (red color)
+- No API call is made to server
+- User remains on login screen
+
+Test Case ID: LOGIN-INVALID-007
+Test Case Title: Login with unregistered email address
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is available
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter unregistered email in email field (testID: email-input)
+4. Enter valid password in password field (testID: password-input)
+5. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- Email: nonexistent@example.com
+- Password: Password123
+Expected Result:
+- Loading indicator appears (testID: loading-indicator)
+- API call is made to server
+- Error modal appears with server error message
+- Error message indicates invalid credentials or user not found
+- User remains on login screen
+- Loading indicator disappears
+
+Test Case ID: LOGIN-INVALID-008
+Test Case Title: Login with incorrect password for registered user
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is available
+- User has valid registered account
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter registered email in email field (testID: email-input)
+4. Enter incorrect password in password field (testID: password-input)
+5. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- Email: user@example.com (registered)
+- Password: WrongPassword123
+Expected Result:
+- Loading indicator appears (testID: loading-indicator)
+- API call is made to server
+- Error modal appears with server error message
+- Error message indicates invalid credentials
+- User remains on login screen
+- Loading indicator disappears
+
+Test Case ID: LOGIN-INVALID-009
+Test Case Title: Login with email containing leading/trailing spaces
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is available
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter email with leading/trailing spaces in email field (testID: email-input)
+4. Enter valid password in password field (testID: password-input)
+5. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- Email: "  user@example.com  " (with spaces)
+- Password: Password123
+Expected Result:
+- Input sanitization removes leading/trailing spaces
+- Loading indicator appears (testID: loading-indicator)
+- API call is made with sanitized email: "user@example.com"
+- If user exists, login succeeds; if not, appropriate error is shown
+- No validation errors for spaces (they are trimmed)
+
+Test Case ID: LOGIN-INVALID-010
+Test Case Title: Login with password containing leading/trailing spaces
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is available
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter valid email in email field (testID: email-input)
+4. Enter password with leading/trailing spaces in password field (testID: password-input)
+5. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- Email: user@example.com
+- Password: "  Password123  " (with spaces)
+Expected Result:
+- Input sanitization removes leading/trailing spaces
+- Loading indicator appears (testID: loading-indicator)
+- API call is made with sanitized password: "Password123"
+- If credentials match, login succeeds; otherwise appropriate error is shown
+
+Test Case ID: LOGIN-INVALID-011
+Test Case Title: Login with case-sensitive email
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is available
+- User has registered email in lowercase
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter email in different case in email field (testID: email-input)
+4. Enter correct password in password field (testID: password-input)
+5. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- Registered Email: user@example.com
+- Test Email: USER@EXAMPLE.COM (uppercase)
+- Password: Password123
+Expected Result:
+- Loading indicator appears (testID: loading-indicator)
+- API call is made with exact input (no case conversion)
+- Server handles email case sensitivity
+- Appropriate success or error response based on server implementation
+
+Test Case ID: LOGIN-INVALID-012
+Test Case Title: Login with case-sensitive password
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is available
+- User has registered password
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter valid email in email field (testID: email-input)
+4. Enter password in different case in password field (testID: password-input)
+5. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- Email: user@example.com
+- Registered Password: Password123
+- Test Password: password123 (lowercase)
+Expected Result:
+- Loading indicator appears (testID: loading-indicator)
+- API call is made with exact input
+- Server rejects login due to case sensitivity
+- Error modal appears with invalid credentials message
+- User remains on login screen
+
+Test Case ID: LOGIN-INVALID-013
+Test Case Title: Login with special characters in email
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is available
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter email with special characters in email field (testID: email-input)
+4. Enter valid password in password field (testID: password-input)
+5. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- Email: user<>@example.com
+- Password: Password123
+Expected Result:
+- Input sanitization removes dangerous characters (< > " ' &)
+- Sanitized email: user@example.com
+- Loading indicator appears (testID: loading-indicator)
+- API call is made with sanitized email
+- Appropriate response based on whether sanitized email exists
+
+Test Case ID: LOGIN-INVALID-014
+Test Case Title: Login with special characters in password
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is available
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter valid email in email field (testID: email-input)
+4. Enter password with special characters in password field (testID: password-input)
+5. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- Email: user@example.com
+- Password: Password<123>
+Expected Result:
+- Input sanitization removes dangerous characters (< > " ' &)
+- Sanitized password: Password123
+- Loading indicator appears (testID: loading-indicator)
+- API call is made with sanitized password
+- Appropriate response based on whether sanitized credentials match
+
+Test Case ID: LOGIN-INVALID-015
+Test Case Title: Login with network connectivity issues
+Preconditions:
+- App is launched and login screen is displayed
+- Network connection is unavailable or very slow
+Test Steps:
+1. Launch the application
+2. Navigate to login screen
+3. Enter valid email in email field (testID: email-input)
+4. Enter valid password in password field (testID: password-input)
+5. Tap "Sign In" button (testID: sign-in-button)
+Test Data:
+- Email: user@example.com
+- Password: Password123
+Expected Result:
+- Loading indicator appears (testID: loading-indicator)
+- After timeout, error modal appears with network error message
+- Error message indicates connectivity issues
+- User remains on login screen
+- Loading indicator disappears
+- User can retry when connection is restored
