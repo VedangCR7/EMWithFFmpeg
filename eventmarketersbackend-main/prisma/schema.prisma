@@ -229,15 +229,18 @@ model AuditLog {
 }
 
 model User {
-  id        String             @id @default(cuid())
-  email     String             @unique
-  name      String
-  password  String
-  role      String             @default("USER")
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
-  campaigns Campaign[]
-  metrics   MarketingMetrics[]
+  id          String             @id @default(cuid())
+  email       String             @unique
+  name        String
+  password    String
+  companyName String?
+  phone       String?
+  role        String             @default("USER")
+  isVerified  Boolean            @default(false)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  campaigns   Campaign[]
+  metrics     MarketingMetrics[]
 
   @@map("users")
 }
