@@ -1,0 +1,339 @@
+POSTER PLAYER SCREEN - FUNCTIONAL TEST CASES
+============================================
+
+Test Case ID: POSTER-FUNC-001
+Test Case Title: Back button navigation functionality
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- User came from previous screen
+Test Steps:
+1. Navigate to PosterPlayerScreen
+2. Locate and tap back button (testID: back-button)
+3. Verify navigation occurs
+4. Verify previous screen is displayed
+5. Verify navigation stack is properly maintained
+Test Data:
+- Previous screen: Home/Dashboard
+- Navigation method: React Navigation
+Expected Result:
+- Back button tap triggers navigation.goBack()
+- User is returned to previous screen
+- Navigation stack is properly maintained
+- No navigation errors or crashes
+- Transition is smooth and expected
+
+Test Case ID: POSTER-FUNC-002
+Test Case Title: Language selection functionality
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- Multiple language options are available
+Test Steps:
+1. Navigate to PosterPlayerScreen
+2. Verify default language is selected (English)
+3. Tap Marathi language button (testID: language-button-marathi)
+4. Verify Marathi button becomes selected
+5. Verify English button becomes unselected
+6. Verify related posters filter updates
+7. Tap Hindi language button (testID: language-button-hindi)
+8. Verify Hindi button becomes selected
+9. Verify other buttons become unselected
+Test Data:
+- Available languages: English, Marathi, Hindi
+- Default selection: English
+Expected Result:
+- Language selection works properly
+- Visual feedback shows selected state
+- Related posters filter updates based on selection
+- Only one language can be selected at a time
+- Selection persists until changed
+
+Test Case ID: POSTER-FUNC-003
+Test Case Title: Continue to Editor navigation
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- User has selected a language
+Test Steps:
+1. Navigate to PosterPlayerScreen
+2. Select a language if not already selected
+3. Tap "Continue to Editor" button (testID: continue-to-editor-button)
+4. Verify loading indicator appears (testID: next-button-loading)
+5. Verify navigation to PosterEditor screen
+6. Verify correct data is passed to PosterEditor
+7. Verify selected poster data is transferred
+8. Verify selected language is transferred
+Test Data:
+- Selected poster: Valid poster object
+- Selected language: English/Marathi/Hindi
+Expected Result:
+- Continue button triggers navigation to PosterEditor
+- Loading state shows during preparation
+- Navigation includes all required data
+- Selected poster data is properly passed
+- Selected language is properly passed
+- No data loss or corruption during navigation
+
+Test Case ID: POSTER-FUNC-004
+Test Case Title: Related poster selection and navigation
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- Related posters are available
+Test Steps:
+1. Navigate to PosterPlayerScreen
+2. Scroll to related posters section
+3. Tap on first related poster (testID: related-poster-{id})
+4. Verify navigation to new PosterPlayer screen
+5. Verify new poster is displayed as main poster
+6. Verify related posters list updates
+7. Verify previous poster is removed from related list
+8. Verify navigation replaces current screen
+Test Data:
+- Related posters: Multiple poster objects
+- Selected poster: First related poster
+Expected Result:
+- Tapping related poster navigates to new PosterPlayer
+- Selected poster becomes main poster
+- Related posters list updates appropriately
+- Previous poster is filtered out from related list
+- Navigation uses replace instead of push
+- No navigation stack buildup
+
+Test Case ID: POSTER-FUNC-005
+Test Case Title: API success handling for poster images
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- Network connection is available
+- Poster image URLs are valid
+Test Steps:
+1. Navigate to PosterPlayerScreen with valid poster data
+2. Verify main poster image loads successfully (testID: main-poster-image)
+3. Verify related poster images load successfully
+4. Verify no error states are displayed
+5. Verify all images display properly
+6. Verify image loading completes without timeouts
+Test Data:
+- Valid poster thumbnail URLs
+- Network connection: Stable
+Expected Result:
+- All poster images load successfully
+- No error placeholders are shown
+- Images display in reasonable time
+- No loading timeouts occur
+- Image quality is maintained
+
+Test Case ID: POSTER-FUNC-006
+Test Case Title: API error handling for failed image loads
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- Network connection may be unstable
+- Some image URLs may be invalid
+Test Steps:
+1. Navigate to PosterPlayerScreen with mixed valid/invalid URLs
+2. Verify valid images load successfully
+3. Verify invalid images show error placeholders
+4. Verify error message is displayed for failed images
+5. Verify app doesn't crash on image load failures
+6. Verify user can still interact with other elements
+Test Data:
+- Mix of valid and invalid image URLs
+- Network conditions: Unstable
+Expected Result:
+- Valid images load successfully
+- Invalid images show appropriate error states
+- Error placeholders are user-friendly
+- App remains stable despite image failures
+- User can continue using other features
+
+Test Case ID: POSTER-FUNC-007
+Test Case Title: Debounced navigation prevention
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- User may tap buttons rapidly
+Test Steps:
+1. Navigate to PosterPlayerScreen
+2. Rapidly tap continue button multiple times
+3. Verify only one navigation occurs
+4. Verify loading state prevents multiple taps
+5. Rapidly tap back button multiple times
+6. Verify only one navigation occurs
+7. Rapidly tap related posters
+8. Verify only one selection processes
+Test Data:
+- Rapid tap frequency: Multiple taps per second
+Expected Result:
+- Rapid taps are debounced and prevented
+- Only one action processes after rapid taps
+- Loading states prevent multiple actions
+- No navigation errors from rapid taps
+- User experience remains stable
+
+Test Case ID: POSTER-FUNC-008
+Test Case Title: Language filtering functionality
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- Related posters have language metadata
+Test Steps:
+1. Navigate to PosterPlayerScreen
+2. Verify all related posters are shown initially
+3. Select Marathi language
+4. Verify only Marathi posters are shown
+5. Verify posters count updates
+6. Select Hindi language
+7. Verify only Hindi posters are shown
+8. Select English language
+9. Verify only English posters are shown
+10. Verify no posters state for languages with no content
+Test Data:
+- Related posters with different language tags
+- Language filtering logic
+Expected Result:
+- Language filtering works correctly
+- Only posters matching selected language are shown
+- Posters count updates to reflect filtered results
+- No posters state shows when appropriate
+- Filtering is instant and smooth
+
+Test Case ID: POSTER-FUNC-009
+Test Case Title: Data persistence during language changes
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- User changes languages multiple times
+Test Steps:
+1. Navigate to PosterPlayerScreen
+2. Select Marathi language
+3. Select Hindi language
+4. Select English language
+5. Verify main poster remains unchanged
+6. Verify poster data persists across language changes
+7. Verify selected language state is maintained
+8. Continue to editor and verify correct language is passed
+Test Data:
+- Multiple language selections
+- Main poster data
+Expected Result:
+- Main poster data persists across language changes
+- Selected language state is properly maintained
+- No data loss during language switching
+- Correct language is passed to next screen
+- User selections are preserved
+
+Test Case ID: POSTER-FUNC-010
+Test Case Title: Accessibility functionality
+Preconditions:
+- App is launched with accessibility tools enabled
+- Screen reader or voice control is active
+Test Steps:
+1. Enable screen reader
+2. Navigate to PosterPlayerScreen
+3. Verify all elements have proper accessibility labels
+4. Verify back button is accessible (testID: back-button)
+5. Verify language buttons are accessible
+6. Verify continue button is accessible (testID: continue-to-editor-button)
+7. Verify related posters are accessible
+8. Test voice control commands
+9. Verify all interactive elements respond to voice commands
+Test Data:
+- Screen reader enabled
+- Voice control enabled
+Expected Result:
+- All elements have proper accessibility labels
+- Screen reader announces all interactive elements
+- Voice control can operate all functions
+- Focus management works properly
+- App meets accessibility standards
+
+Test Case ID: POSTER-FUNC-011
+Test Case Title: Memory management and performance
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- Large number of related posters may be loaded
+Test Steps:
+1. Navigate to PosterPlayerScreen with many related posters
+2. Scroll through all related posters
+3. Verify smooth scrolling performance
+4. Verify no memory leaks during navigation
+5. Navigate between multiple posters
+6. Verify memory usage remains stable
+7. Test rapid language switching
+8. Verify performance remains acceptable
+Test Data:
+- Large number of related posters (20+)
+- Memory monitoring tools
+Expected Result:
+- Scrolling remains smooth with many items
+- No memory leaks detected
+- Performance remains acceptable
+- App doesn't slow down with usage
+- Memory usage stays within limits
+
+Test Case ID: POSTER-FUNC-012
+Test Case Title: State management during configuration changes
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- Device configuration may change
+Test Steps:
+1. Navigate to PosterPlayerScreen
+2. Select a non-default language
+3. Rotate device to landscape
+4. Verify selected language persists
+5. Verify poster data persists
+6. Rotate device back to portrait
+7. Verify all state is maintained
+8. Test background/foreground app switching
+9. Verify state persists after app resume
+Test Data:
+- Device rotation
+- App backgrounding/foregrounding
+Expected Result:
+- All state persists during configuration changes
+- Selected language remains selected
+- Poster data remains available
+- No state loss during rotation
+- No state loss during app lifecycle events
+
+Test Case ID: POSTER-FUNC-013
+Test Case Title: Error recovery and retry mechanisms
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- Network or API errors may occur
+Test Steps:
+1. Navigate to PosterPlayerScreen with network disabled
+2. Verify error handling for failed image loads
+3. Re-enable network connection
+4. Verify images load successfully after retry
+5. Test with slow network connection
+6. Verify timeout handling works properly
+7. Test with server errors
+8. Verify graceful error handling
+Test Data:
+- Network connectivity changes
+- Simulated server errors
+Expected Result:
+- App handles network errors gracefully
+- Retry mechanisms work properly
+- User can recover from error states
+- Error messages are user-friendly
+- App remains stable during error conditions
+
+Test Case ID: POSTER-FUNC-014
+Test Case Title: Data validation and sanitization
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- Poster data may contain unexpected values
+Test Steps:
+1. Navigate to PosterPlayerScreen with malformed poster data
+2. Verify app handles missing title gracefully
+3. Verify app handles missing category gracefully
+4. Verify app handles invalid image URLs gracefully
+5. Test with extremely long titles
+6. Verify text truncation works properly
+7. Test with special characters in data
+8. Verify sanitization prevents issues
+Test Data:
+- Malformed poster objects
+- Edge case data values
+Expected Result:
+- App handles malformed data gracefully
+- Missing fields don't cause crashes
+- Text truncation prevents overflow issues
+- Special characters are handled properly
+- Data sanitization prevents security issues

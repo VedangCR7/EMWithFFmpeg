@@ -1,0 +1,518 @@
+POSTER PLAYER SCREEN - EDGE CASE TEST SCENARIOS
+=============================================
+
+Test Case ID: POSTER-EDGE-001
+Test Case Title: Missing poster image URL
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- Selected poster has invalid or missing image URL
+Test Steps:
+1. Navigate to PosterPlayerScreen with poster missing image URL
+2. Verify error placeholder is displayed
+3. Verify "Poster image not available" message
+4. Verify error icon is displayed
+5. Verify user can still interact with other elements
+6. Verify language selection still works
+7. Verify continue button still functions
+Test Data:
+- Poster with null/undefined thumbnail URL
+- Poster with invalid URL format
+Expected Result:
+- Error placeholder displays instead of broken image
+- User-friendly error message is shown
+- App doesn't crash or freeze
+- Other functionality remains available
+- Error state is visually distinct
+
+Test Case ID: POSTER-EDGE-002
+Test Case Title: Slow or failed API response
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- Network connection is very slow or unavailable
+Test Steps:
+1. Navigate to PosterPlayerScreen with slow network
+2. Verify loading behavior for poster images
+3. Simulate network timeout during image load
+4. Verify timeout handling works properly
+5. Verify error state appears after timeout
+6. Test with completely failed network
+7. Verify appropriate error handling
+8. Verify user can retry when network restores
+Test Data:
+- Network timeout: 30+ seconds
+- Failed network conditions
+Expected Result:
+- Loading states show during slow responses
+- Timeouts are handled gracefully
+- Error states appear after appropriate timeout
+- App remains responsive during network issues
+- User can recover when network restores
+
+Test Case ID: POSTER-EDGE-003
+Test Case Title: Very long poster title or description
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- Poster data contains extremely long text
+Test Steps:
+1. Navigate to PosterPlayerScreen with very long title (100+ characters)
+2. Verify title truncation works properly
+3. Verify title remains readable
+4. Test with extremely long category name
+5. Verify category truncation works
+6. Test with special characters in long text
+7. Verify text displays correctly
+8. Verify no layout overflow occurs
+Test Data:
+- Title: 200+ characters
+- Category: 100+ characters
+- Special characters: Unicode, emojis
+Expected Result:
+- Long text is properly truncated
+- No layout overflow or breaking
+- Text remains readable
+- Special characters display correctly
+- UI layout remains stable
+
+Test Case ID: POSTER-EDGE-004
+Test Case Title: Multiple rapid clicks on poster elements
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- User may tap elements rapidly
+Test Steps:
+1. Navigate to PosterPlayerScreen
+2. Rapidly tap continue button 10+ times in 2 seconds
+3. Verify only one action processes
+4. Rapidly tap back button 10+ times in 2 seconds
+5. Verify only one navigation occurs
+6. Rapidly tap language buttons
+7. Verify only one selection processes
+8. Rapidly tap multiple related posters
+9. Verify only one navigation processes
+Test Data:
+- Tap frequency: 5+ taps per second
+- Multiple rapid interactions
+Expected Result:
+- Rapid taps are debounced and prevented
+- Only one action processes after rapid taps
+- No navigation errors or crashes
+- Loading states prevent multiple actions
+- App remains stable during rapid interactions
+
+Test Case ID: POSTER-EDGE-005
+Test Case Title: Empty related posters array
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- No related posters are available
+Test Steps:
+1. Navigate to PosterPlayerScreen with empty relatedPosters array
+2. Verify "No templates available" message appears
+3. Verify message shows correct language name
+4. Verify "Try selecting different language" suggestion
+5. Verify error icon is displayed
+6. Verify no-posters container is visible (testID: no-posters-container)
+7. Test language switching with no posters
+8. Verify message updates with language name
+Test Data:
+- Related posters: Empty array []
+- All language selections
+Expected Result:
+- Appropriate no-data message is displayed
+- Message includes current language name
+- Helpful suggestion is provided
+- Visual icon indicates no data state
+- Message updates with language changes
+
+Test Case ID: POSTER-EDGE-006
+Test Case Title: Corrupted or malformed poster data
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- Poster data may be corrupted or incomplete
+Test Steps:
+1. Navigate with poster missing required fields (id, name)
+2. Verify app handles missing fields gracefully
+3. Navigate with poster containing null values
+4. Verify null values don't cause crashes
+5. Navigate with poster having wrong data types
+6. Verify type errors are handled
+7. Navigate with poster having circular references
+8. Verify no infinite loops occur
+Test Data:
+- Missing required fields
+- Null/undefined values
+- Incorrect data types
+Expected Result:
+- App handles malformed data gracefully
+- Missing fields don't cause crashes
+- Default values are used where appropriate
+- No infinite loops or performance issues
+- User sees meaningful error messages
+
+Test Case ID: POSTER-EDGE-007
+Test Case Title: Memory pressure with large poster collections
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- Very large number of related posters
+Test Steps:
+1. Navigate with 100+ related posters
+2. Verify scrolling performance remains smooth
+3. Monitor memory usage during scrolling
+4. Navigate between multiple posters rapidly
+5. Verify no memory leaks occur
+6. Test with very high resolution images
+7. Verify memory usage stays within limits
+8. Test rapid language switching with many posters
+Test Data:
+- Related posters: 100+ items
+- High resolution images: 4K+
+- Memory monitoring enabled
+Expected Result:
+- Scrolling remains smooth with many items
+- Memory usage stays within acceptable limits
+- No memory leaks detected
+- Performance remains acceptable
+- App doesn't crash under memory pressure
+
+Test Case ID: POSTER-EDGE-008
+Test Case Title: Invalid image URLs and formats
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- Poster images may have invalid URLs or formats
+Test Steps:
+1. Navigate with poster having non-image URL
+2. Verify error placeholder appears
+3. Navigate with poster having 404 image URL
+4. Verify error handling works
+5. Navigate with poster having extremely large image
+6. Verify loading timeout works
+7. Navigate with poster having unsupported format
+8. Verify graceful fallback
+9. Test with malformed URLs (special characters)
+Test Data:
+- Invalid URLs: 404, non-image, malformed
+- Large images: 10MB+
+- Unsupported formats: SVG, PDF
+Expected Result:
+- Invalid URLs show error placeholders
+- 404 errors are handled gracefully
+- Large images timeout appropriately
+- Unsupported formats show fallback
+- No crashes from invalid images
+
+Test Case ID: POSTER-EDGE-009
+Test Case Title: Concurrent navigation attempts
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- User may trigger multiple navigations simultaneously
+Test Steps:
+1. Tap continue button and immediately tap back button
+2. Verify navigation conflicts are resolved
+3. Tap related poster and immediately tap continue
+4. Verify only one navigation processes
+5. Rapid language switching during navigation
+6. Verify state consistency is maintained
+7. Test navigation during image loading
+8. Verify loading states prevent conflicts
+Test Data:
+- Simultaneous navigation triggers
+- Rapid state changes
+Expected Result:
+- Navigation conflicts are resolved properly
+- Only one navigation processes at a time
+- State remains consistent during conflicts
+- Loading states prevent race conditions
+- No navigation errors or crashes
+
+Test Case ID: POSTER-EDGE-010
+Test Case Title: Device rotation during critical operations
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- Device orientation may change during operations
+Test Steps:
+1. Start image loading and rotate device
+2. Verify loading continues properly
+3. Begin navigation and rotate device
+4. Verify navigation completes successfully
+5. Rotate during language switching
+6. Verify language selection persists
+7. Rotate while scrolling related posters
+8. Verify scroll position is maintained
+9. Test rapid orientation changes
+Test Data:
+- Device rotation during various operations
+- Rapid orientation changes
+Expected Result:
+- Operations continue properly during rotation
+- State persists across orientation changes
+- Scroll position is maintained
+- No crashes or navigation errors
+- UI adapts properly to new orientation
+
+Test Case ID: POSTER-EDGE-011
+Test Case Title: Background/foreground app lifecycle events
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- App may be backgrounded during operations
+Test Steps:
+1. Start image loading and background app
+2. Return to app and verify loading continues
+3. Background app during navigation
+4. Return and verify navigation state
+5. Background with selected language
+6. Return and verify language persists
+7. Background during scrolling
+8. Return and verify scroll position
+9. Test memory cleanup during backgrounding
+Test Data:
+- App lifecycle events
+- Background time: 30+ seconds
+Expected Result:
+- Operations resume properly after foregrounding
+- State persists across app lifecycle
+- Scroll position is maintained
+- Memory is properly managed
+- No crashes or state loss
+
+Test Case ID: POSTER-EDGE-012
+Test Case Title: Network connectivity changes during operations
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- Network connection may change during use
+Test Steps:
+1. Start with good network, then disconnect
+2. Verify offline behavior is handled
+3. Reconnect network during image loading
+4. Verify loading resumes properly
+5. Change from WiFi to cellular during navigation
+6. Verify navigation completes successfully
+7. Test with very slow network edge case
+8. Verify timeout handling works
+9. Test network flapping (connect/disconnect rapidly)
+Test Data:
+- Network connectivity changes
+- Slow network conditions
+Expected Result:
+- Offline state is handled gracefully
+- Operations resume when network restores
+- Network type changes don't break functionality
+- Slow networks timeout appropriately
+- Network flapping doesn't cause crashes
+
+Test Case ID: POSTER-EDGE-013
+Test Case Title: Unicode and international character handling
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- Poster data may contain international characters
+Test Steps:
+1. Navigate with poster title in Chinese characters
+2. Verify Chinese text displays correctly
+3. Navigate with poster title in Arabic (RTL)
+4. Verify RTL text displays properly
+5. Test with emoji characters in titles
+6. Verify emojis display correctly
+7. Test with mixed language content
+8. Verify all characters display properly
+9. Test with zero-width characters
+10. Verify no display issues occur
+Test Data:
+- Unicode characters: Chinese, Arabic, Hindi
+- Emojis: Various emoji sets
+- RTL languages: Arabic, Hebrew
+Expected Result:
+- All Unicode characters display correctly
+- RTL text renders properly
+- Emojis display as expected
+- Mixed language content works
+- No rendering or layout issues
+
+Test Case ID: POSTER-EDGE-014
+Test Case Title: Extreme screen sizes and densities
+Preconditions:
+- App is launched on various device configurations
+- Screen sizes may be extremely small or large
+Test Steps:
+1. Test on very small screen (320px width)
+2. Verify all elements remain visible
+3. Test on very large screen (tablet landscape)
+4. Verify layout scales properly
+5. Test with very high pixel density
+6. Verify text and images remain sharp
+7. Test with very low pixel density
+8. Verify content remains readable
+9. Test with unusual aspect ratios
+10. Verify layout adapts properly
+Test Data:
+- Screen sizes: 320px - 2000px width
+- Pixel densities: 1x - 4x
+- Aspect ratios: 4:3, 16:9, 21:9
+Expected Result:
+- Layout adapts to all screen sizes
+- Content remains readable on all densities
+- No overflow or layout breaking
+- Touch targets remain accessible
+- Performance remains acceptable
+
+Test Case ID: POSTER-EDGE-015
+Test Case Title: System resource exhaustion scenarios
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- System resources may be limited
+Test Steps:
+1. Test with very low memory conditions
+2. Verify app doesn't crash
+3. Test with high CPU usage
+4. Verify scrolling remains responsive
+5. Test with storage space full
+6. Verify caching behavior works
+7. Test with multiple apps running
+8. Verify performance remains acceptable
+9. Test with battery saver mode
+10. Verify functionality is maintained
+Test Data:
+- Low memory: < 100MB available
+- High CPU: > 80% usage
+- Storage full: < 10MB available
+Expected Result:
+- App remains functional with limited resources
+- Performance degrades gracefully
+- No crashes under resource pressure
+- User can still access core functionality
+- App recovers when resources are available
+
+Test Case ID: POSTER-EDGE-016
+Test Case Title: Accessibility edge cases
+Preconditions:
+- App is launched with various accessibility settings
+- Accessibility tools may be enabled
+Test Steps:
+1. Test with very large font sizes (200%+)
+2. Verify text remains readable
+3. Test with high contrast mode
+4. Verify UI remains usable
+5. Test with reduced motion settings
+6. Verify animations are reduced
+7. Test with screen reader at high speed
+8. Verify announcements are clear
+9. Test with switch control
+10. Verify all elements are accessible
+Test Data:
+- Font sizes: 100% - 300%
+- High contrast mode
+- Reduced motion settings
+Expected Result:
+- Accessibility settings are respected
+- UI remains usable with all settings
+- Text remains readable at large sizes
+- High contrast provides sufficient contrast
+- Reduced motion preferences are honored
+- All accessibility tools work properly
+
+Test Case ID: POSTER-EDGE-017
+Test Case Title: Data corruption during transmission
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- Data may be corrupted during network transmission
+Test Steps:
+1. Simulate corrupted JSON response
+2. Verify error handling works
+3. Test with truncated image data
+4. Verify partial images don't break UI
+5. Test with corrupted metadata
+6. Verify fallback values are used
+7. Test with mixed valid/invalid data
+8. Verify partial functionality works
+9. Test with data encoding issues
+10. Verify encoding problems are handled
+Test Data:
+- Corrupted JSON responses
+- Truncated image files
+- Invalid character encoding
+Expected Result:
+- Corrupted data is handled gracefully
+- Error states are user-friendly
+- Partial functionality remains available
+- No crashes from data corruption
+- Recovery mechanisms work properly
+
+Test Case ID: POSTER-EDGE-018
+Test Case Title: Time and timezone edge cases
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- Time-related functionality may be affected
+Test Steps:
+1. Test with device time in past
+2. Verify no timestamp issues
+3. Test with device time in future
+4. Verify no validation errors
+5. Test with timezone changes
+6. Verify no time-related bugs
+7. Test during daylight saving time changes
+8. Verify no time calculation errors
+9. Test with invalid timezone settings
+10. Verify app remains functional
+Test Data:
+- Time zones: UTC, PST, EST, IST
+- Daylight saving time transitions
+- Invalid time settings
+Expected Result:
+- Time-related features work correctly
+- Timezone changes don't break functionality
+- Daylight saving time is handled properly
+- No timestamp validation errors
+- App remains functional with time changes
+
+Test Case ID: POSTER-EDGE-019
+Test Case Title: Security and input validation edge cases
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- Malicious inputs may be present in data
+Test Steps:
+1. Test with XSS payload in poster title
+2. Verify script tags are sanitized
+3. Test with SQL injection in metadata
+4. Verify injection attempts are blocked
+4. Test with extremely long URLs
+5. Verify URL length limits are enforced
+6. Test with malicious image URLs
+7. Verify security checks are in place
+8. Test with protocol-relative URLs
+9. Verify security policies are enforced
+10. Test with encoded malicious content
+Test Data:
+- XSS payloads: <script>alert('xss')</script>
+- SQL injection: ' OR '1'='1' --
+- Malicious URLs: javascript:, data:
+Expected Result:
+- Malicious inputs are properly sanitized
+- XSS attempts are blocked
+- SQL injection is prevented
+- URL length limits are enforced
+- Security policies are consistently applied
+- No security vulnerabilities are exploited
+
+Test Case ID: POSTER-EDGE-020
+Test Case Title: Performance degradation scenarios
+Preconditions:
+- App is launched and PosterPlayerScreen is displayed
+- Various factors may cause performance issues
+Test Steps:
+1. Test with thousands of related posters
+2. Verify virtualization works if implemented
+3. Test with very large images
+4. Verify memory usage stays reasonable
+5. Test with complex animations
+6. Verify frame rate remains acceptable
+7. Test during low battery mode
+8. Verify performance throttling works
+9. Test with thermal throttling
+10. Verify app remains responsive
+Test Data:
+- Large datasets: 1000+ items
+- Large images: 50MB+
+- Performance monitoring tools
+Expected Result:
+- Performance remains acceptable
+- Memory usage stays within limits
+- Frame rate remains smooth
+- App remains responsive
+- No performance crashes or freezes
+- Graceful degradation under stress
