@@ -22,6 +22,14 @@ export interface VideoAnalytics {
   trafficSources: Record<string, number>;
   deviceStats: Record<string, number>;
   geographicViews: Record<string, number>;
+  hourlyViews: number[];
+  dailyViews: number[];
+  peakViewingHours: number[];
+  bounceRate: number;
+  averageViewDuration: number;
+  clickThroughRate: number;
+  shareRate: number;
+  saveRate: number;
 }
 
 export interface Video {
@@ -154,6 +162,14 @@ export class VideoModel implements Video {
       trafficSources: {},
       deviceStats: {},
       geographicViews: {},
+      hourlyViews: new Array(24).fill(0),
+      dailyViews: new Array(7).fill(0),
+      peakViewingHours: [],
+      bounceRate: 0,
+      averageViewDuration: 0,
+      clickThroughRate: 0,
+      shareRate: 0,
+      saveRate: 0,
       ...analytics
     };
     this.createdAt = createdAt || new Date().toISOString();
@@ -293,9 +309,10 @@ export class VideoModel implements Video {
     this.updatedAt = new Date().toISOString();
   }
 
-  recordView(deviceType?: string, country?: string, source?: string): void {
+  recordView(deviceType?: string, country?: string, source?: string, watchDuration?: number, currentHour?: number, currentDay?: number): void {
     this.incrementViews();
 
+    // Update basic stats
     if (deviceType) {
       this.analytics.deviceStats[deviceType] = (this.analytics.deviceStats[deviceType] || 0) + 1;
     }
@@ -307,6 +324,43 @@ export class VideoModel implements Video {
     if (source) {
       this.analytics.trafficSources[source] = (this.analytics.trafficSources[source] || 0) + 1;
     }
+
+    // Update time-based analytics
+    if (currentHour !== undefined && currentHour >= 0 && currentHour < 24) {
+      this.analytics.hourlyViews[currentHour] += 1;
+    }
+
+    if (currentDay !== undefined && currentDay >= 0 && currentDay < 7) {
+      this.analytics.dailyViews[currentDay] += 1;
+    }
+
+    // Update watch time analytics
+    if (watchDuration !== undefined) {
+      this.analytics.watchTime += watchDuration;
+      this.analytics.averageViewDuration = this.analytics.watchTime / this.views;
+
+      // Calculate completion rate
+      const completedViews = Math.floor((this.analytics.watchTime / this.duration) / this.views);
+      this.analytics.completionRate = Math.min(100, completedViews * 100);
+    }
+  }
+
+  calculatePeakHours(): void {
+    const threshold = Math.max(...this.analytics.hourlyViews) * 0.8; // Top 20% of max views
+    this.analytics.peakViewingHours = this.analytics.hourlyViews
+      .map((views, hour) => ({ views, hour }))
+      .filter(item => item.views >= threshold)
+      .sort((a, b) => b.views - a.views)
+      .slice(0, 3)
+      .map(item => item.hour);
+  }
+
+  updateEngagementRates(): void {
+    if (this.views === 0) return;
+
+    this.analytics.shareRate = (this.shares / this.views) * 100;
+    this.analytics.saveRate = (this.saves / this.views) * 100;
+    this.analytics.bounceRate = ((this.views - (this.likes + this.shares + this.comments + this.saves)) / this.views) * 100;
   }
 
   // Utility methods
@@ -329,5 +383,52 @@ export class VideoModel implements Video {
     const minutes = Math.floor(this.duration / 60);
     const seconds = this.duration % 60;
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  }
+
+  // Performance metrics
+  getVideoScore(): number {
+    // Calculate overall video performance score (0-100)
+    const engagementScore = Math.min(this.getEngagementRate() * 2, 40);
+    const completionScore = Math.min(this.analytics.completionRate * 0.6, 30);
+    const retentionScore = this.analytics.audienceRetention.length > 0
+      ? (this.analytics.audienceRetention.reduce((a, b) => a + b, 0) / this.analytics.audienceRetention.length) * 0.3
+      : 0;
+
+    return Math.round(engagementScore + completionScore + retentionScore);
+  }
+
+  getTrendingScore(): number {
+    // Calculate trending potential based on recent engagement velocity
+    const recentViews = this.views; // In a real app, this would be recent views
+    const engagementVelocity = this.getEngagementRate();
+    const shareVelocity = this.analytics.shareRate;
+
+    return recentViews * 0.001 + engagementVelocity * 0.5 + shareVelocity * 2;
+  }
+
+  getMonetizationPotential(): 'high' | 'medium' | 'low' {
+    const score = this.getVideoScore();
+    const views = this.views;
+
+    if (score >= 70 && views >= 10000) return 'high';
+    if (score >= 50 && views >= 1000) return 'medium';
+    return 'low';
+  }
+
+  predictViewGrowth(days: number = 30): number {
+    // Simple linear regression based on current growth patterns
+    if (this.views < 100) return this.views * 1.1; // Conservative growth for new videos
+
+    const dailyGrowthRate = Math.max(0.001, this.getEngagementRate() / 10000); // Convert to decimal
+    return Math.round(this.views * Math.pow(1 + dailyGrowthRate, days));
+  }
+
+  getOptimalPostingTime(): number {
+    // Return the hour with highest average views
+    if (this.analytics.peakViewingHours.length === 0) {
+      this.calculatePeakHours();
+    }
+
+    return this.analytics.peakViewingHours[0] || 12; // Default to noon if no data
   }
 }

@@ -11,9 +11,18 @@ export interface UserStats {
   totalGreetings: number;
   totalViews: number;
   totalLikes: number;
+  totalDislikes: number;
+  totalShares: number;
   totalDownloads: number;
+  totalComments: number;
+  totalSaves: number;
   joinedDate: string;
   lastLoginDate?: string;
+  lastActivityDate?: string;
+  contentQualityScore: number;
+  followerCount: number;
+  followingCount: number;
+  reputationScore: number;
 }
 
 export interface User {
@@ -113,9 +122,18 @@ export class UserModel implements User {
       totalGreetings: 0,
       totalViews: 0,
       totalLikes: 0,
+      totalDislikes: 0,
+      totalShares: 0,
       totalDownloads: 0,
+      totalComments: 0,
+      totalSaves: 0,
       joinedDate: new Date().toISOString(),
       lastLoginDate: undefined,
+      lastActivityDate: undefined,
+      contentQualityScore: 0,
+      followerCount: 0,
+      followingCount: 0,
+      reputationScore: 0,
       ...stats
     };
     this.badges = badges;
@@ -186,17 +204,53 @@ export class UserModel implements User {
   }
 
   // Statistics tracking
-  incrementStats(updates: Partial<Pick<UserStats, 'totalVideos' | 'totalGreetings' | 'totalViews' | 'totalLikes' | 'totalDownloads'>>): void {
+  incrementStats(updates: Partial<Pick<UserStats, 'totalVideos' | 'totalGreetings' | 'totalViews' | 'totalLikes' | 'totalDislikes' | 'totalShares' | 'totalDownloads' | 'totalComments' | 'totalSaves'>>): void {
     if (updates.totalVideos) this.stats.totalVideos += updates.totalVideos;
     if (updates.totalGreetings) this.stats.totalGreetings += updates.totalGreetings;
     if (updates.totalViews) this.stats.totalViews += updates.totalViews;
     if (updates.totalLikes) this.stats.totalLikes += updates.totalLikes;
+    if (updates.totalDislikes) this.stats.totalDislikes += updates.totalDislikes;
+    if (updates.totalShares) this.stats.totalShares += updates.totalShares;
     if (updates.totalDownloads) this.stats.totalDownloads += updates.totalDownloads;
+    if (updates.totalComments) this.stats.totalComments += updates.totalComments;
+    if (updates.totalSaves) this.stats.totalSaves += updates.totalSaves;
+    this.stats.lastActivityDate = new Date().toISOString();
     this.updatedAt = new Date().toISOString();
   }
 
   updateLastLogin(): void {
     this.stats.lastLoginDate = new Date().toISOString();
+    this.stats.lastActivityDate = new Date().toISOString();
+    this.updatedAt = new Date().toISOString();
+  }
+
+  updateContentQualityScore(score: number): void {
+    this.stats.contentQualityScore = Math.max(0, Math.min(100, score));
+    this.updatedAt = new Date().toISOString();
+  }
+
+  updateReputationScore(score: number): void {
+    this.stats.reputationScore = Math.max(0, Math.min(1000, score));
+    this.updatedAt = new Date().toISOString();
+  }
+
+  incrementFollowers(): void {
+    this.stats.followerCount += 1;
+    this.updatedAt = new Date().toISOString();
+  }
+
+  decrementFollowers(): void {
+    this.stats.followerCount = Math.max(0, this.stats.followerCount - 1);
+    this.updatedAt = new Date().toISOString();
+  }
+
+  incrementFollowing(): void {
+    this.stats.followingCount += 1;
+    this.updatedAt = new Date().toISOString();
+  }
+
+  decrementFollowing(): void {
+    this.stats.followingCount = Math.max(0, this.stats.followingCount - 1);
     this.updatedAt = new Date().toISOString();
   }
 
@@ -234,7 +288,51 @@ export class UserModel implements User {
   }
 
   getEngagementScore(): number {
-    const { totalViews, totalLikes, totalDownloads } = this.stats;
-    return totalViews * 1 + totalLikes * 2 + totalDownloads * 3;
+    const { totalViews, totalLikes, totalShares, totalComments, totalSaves, totalDownloads } = this.stats;
+    return totalViews * 1 + totalLikes * 2 + totalShares * 3 + totalComments * 1.5 + totalSaves * 2.5 + totalDownloads * 4;
+  }
+
+  getEngagementRate(): number {
+    const totalContent = this.stats.totalVideos + this.stats.totalGreetings;
+    if (totalContent === 0) return 0;
+    return (this.getEngagementScore() / totalContent) / 100; // Average engagement per content
+  }
+
+  getLikeRatio(): number {
+    const { totalLikes, totalDislikes } = this.stats;
+    const totalVotes = totalLikes + totalDislikes;
+    if (totalVotes === 0) return 0;
+    return (totalLikes / totalVotes) * 100;
+  }
+
+  getContentQualityScore(): number {
+    // Calculate based on engagement, reputation, and content volume
+    const engagementFactor = Math.min(this.getEngagementRate() * 10, 40);
+    const reputationFactor = (this.stats.reputationScore / 1000) * 30;
+    const volumeFactor = Math.min((this.stats.totalVideos + this.stats.totalGreetings) / 10, 30);
+
+    return Math.round(engagementFactor + reputationFactor + volumeFactor);
+  }
+
+  getInfluencerLevel(): string {
+    const followers = this.stats.followerCount;
+    const engagement = this.getEngagementRate();
+
+    if (followers >= 100000 && engagement >= 5) return 'Mega Influencer';
+    if (followers >= 10000 && engagement >= 3) return 'Macro Influencer';
+    if (followers >= 1000 && engagement >= 2) return 'Micro Influencer';
+    if (followers >= 100 && engagement >= 1) return 'Nano Influencer';
+    if (followers >= 10) return 'Emerging Creator';
+    return 'Content Creator';
+  }
+
+  isActiveUser(): boolean {
+    if (!this.stats.lastActivityDate) return false;
+    const daysSinceLastActivity = (Date.now() - new Date(this.stats.lastActivityDate).getTime()) / (1000 * 60 * 60 * 24);
+    return daysSinceLastActivity <= 30; // Active if activity within 30 days
+  }
+
+  getAccountAgeInDays(): number {
+    return Math.floor((Date.now() - new Date(this.stats.joinedDate).getTime()) / (1000 * 60 * 60 * 24));
   }
 }
