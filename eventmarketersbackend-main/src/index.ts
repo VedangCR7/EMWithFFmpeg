@@ -23,6 +23,7 @@ import analyticsRoutes from './routes/analytics';
 import searchRoutes from './routes/search';
 import fileManagementRoutes from './routes/fileManagement';
 import contentSyncRoutes from './routes/contentSync';
+import userRoutes from './routes/user';
 
 // Import mobile app routes
 import mobileHomeRoutes from './routes/mobile/home';
@@ -59,7 +60,7 @@ const corsOptions = {
   origin: function (origin: string | undefined, callback: Function) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    
+
     const allowedOrigins = [
       'http://localhost:3000',
       'http://localhost:3001',
@@ -68,7 +69,7 @@ const corsOptions = {
       'https://your-frontend-domain.com',
       process.env.CORS_ORIGIN
     ].filter(Boolean); // Remove undefined values
-    
+
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -141,32 +142,35 @@ app.use('/api/mobile/subscription', mobileSubscriptionRoutes);
 app.use('/api/installed-users', installedUsersRoutes);
 app.use('/api/business-profile', businessProfileRoutes);
 
-    // Analytics routes
-    app.use('/api/analytics', analyticsRoutes);
+// Analytics routes
+app.use('/api/analytics', analyticsRoutes);
 
-    // Search routes
-    app.use('/api/search', searchRoutes);
+// Search routes
+app.use('/api/search', searchRoutes);
 
-    // File management routes
-    app.use('/api/file-management', fileManagementRoutes);
+// File management routes
+app.use('/api/file-management', fileManagementRoutes);
 
-    // Content sync routes
-    app.use('/api/content-sync', contentSyncRoutes);
+// Content sync routes
+app.use('/api/content-sync', contentSyncRoutes);
 
-    // Mobile app routes
-    app.use('/api/mobile/home', mobileHomeRoutes);
-    app.use('/api/mobile/auth', mobileAuthRoutesNew);
-    app.use('/api/mobile/templates', mobileTemplatesRoutes);
-    app.use('/api/mobile/greetings', mobileGreetingsRoutes);
-    app.use('/api/mobile/subscriptions', mobileSubscriptionsRoutes);
-    app.use('/api/mobile/business-profile', mobileBusinessProfileRoutes);
-    app.use('/api/mobile/business-profiles', mobileBusinessProfileRoutes); // Alias for plural form
-    app.use('/api/mobile/content', mobileContentRoutes);
-    app.use('/api/mobile/users', mobileUsersRoutes);
-    app.use('/api/mobile/transactions', mobileTransactionsRoutes);
-    app.use('/api/mobile/downloads', mobileDownloadsRoutes);
-    app.use('/api/mobile/likes', mobileLikesRoutes); // Added likes route
-    app.use('/api/mobile/posters', mobilePostersRoutes); // Added posters route
+// User routes
+app.use('/api/user', userRoutes);
+
+// Mobile app routes
+app.use('/api/mobile/home', mobileHomeRoutes);
+app.use('/api/mobile/auth', mobileAuthRoutesNew);
+app.use('/api/mobile/templates', mobileTemplatesRoutes);
+app.use('/api/mobile/greetings', mobileGreetingsRoutes);
+app.use('/api/mobile/subscriptions', mobileSubscriptionsRoutes);
+app.use('/api/mobile/business-profile', mobileBusinessProfileRoutes);
+app.use('/api/mobile/business-profiles', mobileBusinessProfileRoutes); // Alias for plural form
+app.use('/api/mobile/content', mobileContentRoutes);
+app.use('/api/mobile/users', mobileUsersRoutes);
+app.use('/api/mobile/transactions', mobileTransactionsRoutes);
+app.use('/api/mobile/downloads', mobileDownloadsRoutes);
+app.use('/api/mobile/likes', mobileLikesRoutes); // Added likes route
+app.use('/api/mobile/posters', mobilePostersRoutes); // Added posters route
 
 // Mobile API aliases (cleaner paths for mobile app)
 app.use('/api/v1', mobileApiAliases);
@@ -239,7 +243,7 @@ app.get('/api/dashboard/metrics', (req, res) => {
 app.get('/api/analytics', (req, res) => {
   const { range } = req.query;
   const days = range === '7d' ? 7 : range === '30d' ? 30 : 90;
-  
+
   const analytics = {
     impressions: [] as number[],
     clicks: [] as number[],
@@ -277,7 +281,7 @@ app.use('*', (req, res) => {
 // Global error handler
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('Global error handler:', err);
-  
+
   res.status(500).json({
     error: 'Internal server error',
     message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong',
@@ -297,7 +301,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`🔗 API base URL: http://localhost:${PORT}/api`);
   console.log(`📱 Android access: http://192.168.0.106:${PORT}/api`);
   console.log(`📁 Static files: http://localhost:${PORT}/uploads`);
-  
+
   if (process.env.NODE_ENV === 'development') {
     console.log(`\n🔐 Admin Login: POST /api/auth/admin/login`);
     console.log(`👥 Subadmin Login: POST /api/auth/subadmin/login`);
