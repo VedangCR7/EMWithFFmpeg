@@ -26,6 +26,7 @@ import StickerEmojiPicker from '../components/StickerEmojiPicker';
 import { useTheme } from '../context/ThemeContext';
 import { useSubscription } from '../contexts/SubscriptionContext';
 
+// Updated: Enhanced responsive design
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 // Responsive design helpers
@@ -33,13 +34,14 @@ const isSmallScreen = screenWidth < 375;
 const isMediumScreen = screenWidth >= 375 && screenWidth < 414;
 const isLargeScreen = screenWidth >= 414;
 
-// Calculate responsive dimensions
+// Calculate responsive dimensions - Enhanced for better device compatibility
 const getResponsiveDimensions = (insets: any) => {
   const availableWidth = screenWidth - (insets.left + insets.right);
   const availableHeight = screenHeight - (insets.top + insets.bottom);
   
-  const canvasWidth = Math.min(availableWidth * 0.95, screenWidth * 0.95);
-  const canvasHeight = Math.min(availableHeight * 0.6, screenHeight * 0.6);
+  // Enhanced canvas sizing for better device compatibility
+  const canvasWidth = Math.min(availableWidth * 0.92, screenWidth * 0.92);
+  const canvasHeight = Math.min(availableHeight * 0.65, screenHeight * 0.65);
   
   return {
     canvasWidth,
