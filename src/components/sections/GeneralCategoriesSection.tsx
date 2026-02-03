@@ -123,6 +123,8 @@ interface GeneralCategoriesSectionProps {
   onCategoryPress: (category: GeneralCategory) => void;
   onViewAllPress: () => void;
   renderBrowseAllButton: (onPress: () => void) => React.ReactNode;
+  onLoadMore?: () => void;
+  hasMore?: boolean;
 }
 
 const GeneralCategoriesSection: React.FC<GeneralCategoriesSectionProps> = React.memo(({
@@ -134,6 +136,8 @@ const GeneralCategoriesSection: React.FC<GeneralCategoriesSectionProps> = React.
   onCategoryPress,
   onViewAllPress,
   renderBrowseAllButton,
+  onLoadMore,
+  hasMore = false,
 }) => {
   // Memoize category images lookup to prevent unnecessary re-renders
   const categoryImagesMap = useMemo(() => {
@@ -155,6 +159,27 @@ const GeneralCategoriesSection: React.FC<GeneralCategoriesSectionProps> = React.
   }, [categoryImagesMap, cardWidth, theme, onCategoryPress]);
 
   const keyExtractor = useCallback((item: GeneralCategory) => item.id, []);
+
+  // Handle scroll to detect when user is near the end and load more
+  const handleViewableItemsChanged = useCallback(({ viewableItems }: any) => {
+    if (!onLoadMore || !hasMore) return;
+    
+    // Check if user has scrolled to near the end (within last 2 items)
+    if (viewableItems.length > 0) {
+      const lastVisibleIndex = Math.max(...viewableItems.map((item: any) => item.index || 0));
+      const totalItems = greetingCategoriesList.length;
+      
+      // Load more when user scrolls to within 2 items of the end
+      if (lastVisibleIndex >= totalItems - 2) {
+        onLoadMore();
+      }
+    }
+  }, [onLoadMore, hasMore, greetingCategoriesList.length]);
+
+  const viewabilityConfig = useMemo(() => ({
+    itemVisiblePercentThreshold: 50,
+    minimumViewTime: 100,
+  }), []);
 
   if (greetingCategoriesList.length === 0) {
     return null;
@@ -178,11 +203,13 @@ const GeneralCategoriesSection: React.FC<GeneralCategoriesSectionProps> = React.
         removeClippedSubviews={true}
         maxToRenderPerBatch={6}
         windowSize={3}
-        initialNumToRender={6}
+        initialNumToRender={5}
         updateCellsBatchingPeriod={100}
         getItemLayout={getItemLayout}
         maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
         contentContainerStyle={styles.horizontalList}
+        onViewableItemsChanged={handleViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
       />
     </View>
   );
@@ -206,6 +233,9 @@ const GeneralCategoriesSection: React.FC<GeneralCategoriesSectionProps> = React.
     const nextKeys = Object.keys(nextProps.greetingCategoryImages).sort().join(',');
     if (prevKeys !== nextKeys) return false;
   }
+  // Check new props for lazy loading
+  if (prevProps.hasMore !== nextProps.hasMore) return false;
+  if (prevProps.onLoadMore !== nextProps.onLoadMore) return false;
   return true;
 });
 

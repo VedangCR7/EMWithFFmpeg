@@ -900,21 +900,19 @@ const HomeScreen: React.FC = React.memo(() => {
 
   // Greeting categories state
   const [greetingCategoriesList, setGreetingCategoriesList] = useState<Array<{ id: string; name: string; icon: string; color?: string; imageUrl?: string }>>([]);
+  const [allGreetingCategories, setAllGreetingCategories] = useState<Array<{ id: string; name: string; icon: string; color?: string; imageUrl?: string }>>([]);
+  const [displayedCategoriesCount, setDisplayedCategoriesCount] = useState(5); // Start with 5 categories
   const [greetingCategoriesLoading, setGreetingCategoriesLoading] = useState(false);
   const [greetingCategoryImages, setGreetingCategoryImages] = useState<Record<string, string>>({});
   const memoizedGreetingCategoryImages = useMemo(() => greetingCategoryImages, [greetingCategoryImages]);
   
-  // Filter greeting categories to only show those with images
+  // Show all categories with placeholders (don't filter by image availability)
+  // Limit to displayed count for lazy loading
   const filteredGreetingCategoriesList = useMemo(() => {
-    return greetingCategoriesList.filter(category => {
-      // Check if category has an image in greetingCategoryImages
-      const hasMemoizedImage = Boolean(memoizedGreetingCategoryImages[category.id]);
-      // Check if category has an inline imageUrl
-      const hasInlineImage = Boolean(category.imageUrl);
-      // Only include categories that have at least one image
-      return hasMemoizedImage || hasInlineImage;
-    });
-  }, [greetingCategoriesList, memoizedGreetingCategoryImages]);
+    // Return only the first displayedCategoriesCount items for lazy loading
+    // Show placeholders for categories without images - images will load progressively
+    return greetingCategoriesList.slice(0, displayedCategoriesCount);
+  }, [greetingCategoriesList, displayedCategoriesCount]);
   
   const generalCategoryModalColumns = modalColumns;
   const {
@@ -962,6 +960,8 @@ const HomeScreen: React.FC = React.memo(() => {
   // Refs to prevent duplicate API calls
   const apiDataLoadedRef = useRef(false);
   const greetingCategoriesLoadedRef = useRef(false);
+  // Track if greeting sections have been loaded to prevent them from disappearing
+  const greetingSectionsLoadedRef = useRef(false);
   const greetingModalPrefetchInProgressRef = useRef(false);
   const businessCategoriesLoadedRef = useRef(false);
 
@@ -1083,6 +1083,155 @@ const HomeScreen: React.FC = React.memo(() => {
   const [businessQuotesTemplatesRaw, setBusinessQuotesTemplatesRaw] = useState<any[]>([]);
   const [businessQuotesLoading, setBusinessQuotesLoading] = useState(false);
   
+  // Track image preloading progress - must be defined before startProgressiveImagePreloading
+  const imagePreloadRef = useRef({ critical: false, high: false, medium: false, low: false });
+  
+  // Progressive image preloading system
+  // Loads images in batches: Critical → High → Medium → Low priority
+  // IMPORTANT: Defined before loadApiData so it can be called from within it
+  const startProgressiveImagePreloading = useCallback(() => {
+    if (imagePreloadRef.current.critical) {
+      return; // Already started
+    }
+    imagePreloadRef.current.critical = true;
+
+    // Phase 1: CRITICAL - Featured content carousel images (visible immediately)
+    const preloadCriticalImages = async () => {
+      try {
+        const criticalImages: string[] = [];
+        
+        // Featured content images (first 3 for carousel)
+        featuredContent.slice(0, 3).forEach(item => {
+          if (item.imageUrl) criticalImages.push(item.imageUrl);
+          if (item.thumbnailUrl) criticalImages.push(item.thumbnailUrl);
+        });
+        
+        // Preload critical images immediately
+        if (criticalImages.length > 0) {
+          await Promise.allSettled(
+            criticalImages.map(url => Image.prefetch(url).catch(() => {}))
+          );
+          if (__DEV__) {
+            console.log(`[IMAGE PRELOAD] ✅ Critical: ${criticalImages.length} images preloaded`);
+          }
+        }
+        
+        // Phase 2: HIGH PRIORITY - Greeting template thumbnails (visible sections)
+        setTimeout(() => {
+          if (imagePreloadRef.current.high) return;
+          imagePreloadRef.current.high = true;
+          
+          const highPriorityImages: string[] = [];
+          
+          // Greeting template thumbnails (first 3 from each section)
+          [
+            ...businessEthicsTemplates.slice(0, 3),
+            ...successMindsetTemplates.slice(0, 3),
+            ...socialMediaGrowthTemplates.slice(0, 3),
+            ...moneyAndFinanceTemplates.slice(0, 3),
+            ...businessLegendQuoteTemplates.slice(0, 3),
+            ...businessMarketingTipsTemplates.slice(0, 3),
+            ...businessQuotesTemplates.slice(0, 3),
+          ].forEach(template => {
+            if (template?.thumbnail) highPriorityImages.push(template.thumbnail);
+          });
+          
+          // Video content thumbnails (first 3) - commented out, not in use for now
+          // videoContent.slice(0, 3).forEach(video => {
+          //   if (video.thumbnail) highPriorityImages.push(video.thumbnail);
+          // });
+          
+          if (highPriorityImages.length > 0) {
+            Promise.allSettled(
+              highPriorityImages.map(url => Image.prefetch(url).catch(() => {}))
+            ).then(() => {
+              if (__DEV__) {
+                console.log(`[IMAGE PRELOAD] ✅ High Priority: ${highPriorityImages.length} images preloaded`);
+              }
+            });
+          }
+        }, 500); // Start after 500ms
+        
+        // Phase 3: MEDIUM PRIORITY - Business category previews and more greeting templates
+        setTimeout(() => {
+          if (imagePreloadRef.current.medium) return;
+          imagePreloadRef.current.medium = true;
+          
+          const mediumPriorityImages: string[] = [];
+          
+          // Business category preview images (first image from each category)
+          Object.values(businessCategoryPreviews).forEach(templates => {
+            if (templates?.[0]?.thumbnail) {
+              mediumPriorityImages.push(templates[0].thumbnail);
+            }
+          });
+          
+          // More greeting templates (next 3 from each section)
+          [
+            ...businessEthicsTemplates.slice(3, 6),
+            ...successMindsetTemplates.slice(3, 6),
+            ...socialMediaGrowthTemplates.slice(3, 6),
+            ...moneyAndFinanceTemplates.slice(3, 6),
+            ...businessLegendQuoteTemplates.slice(3, 6),
+            ...businessMarketingTipsTemplates.slice(3, 6),
+            ...businessQuotesTemplates.slice(3, 6),
+          ].forEach(template => {
+            if (template?.thumbnail) mediumPriorityImages.push(template.thumbnail);
+          });
+          
+          // More video content - commented out, not in use for now
+          // videoContent.slice(3, 6).forEach(video => {
+          //   if (video.thumbnail) mediumPriorityImages.push(video.thumbnail);
+          // });
+          
+          if (mediumPriorityImages.length > 0) {
+            Promise.allSettled(
+              mediumPriorityImages.map(url => Image.prefetch(url).catch(() => {}))
+            ).then(() => {
+              if (__DEV__) {
+                console.log(`[IMAGE PRELOAD] ✅ Medium Priority: ${mediumPriorityImages.length} images preloaded`);
+              }
+            });
+          }
+        }, 1500); // Start after 1.5s
+        
+        // Phase 4: LOW PRIORITY - Calendar posters and remaining images
+        setTimeout(() => {
+          if (imagePreloadRef.current.low) return;
+          imagePreloadRef.current.low = true;
+          
+          const lowPriorityImages: string[] = [];
+          
+          // Calendar poster thumbnails
+          calendarPosters.slice(0, 5).forEach(poster => {
+            if (poster.thumbnail) lowPriorityImages.push(poster.thumbnail);
+          });
+          
+          // Remaining featured content
+          featuredContent.slice(3).forEach(item => {
+            if (item.imageUrl) lowPriorityImages.push(item.imageUrl);
+          });
+          
+          if (lowPriorityImages.length > 0) {
+            Promise.allSettled(
+              lowPriorityImages.map(url => Image.prefetch(url).catch(() => {}))
+            ).then(() => {
+              if (__DEV__) {
+                console.log(`[IMAGE PRELOAD] ✅ Low Priority: ${lowPriorityImages.length} images preloaded`);
+              }
+            });
+          }
+        }, 3000); // Start after 3s
+      } catch (error) {
+        if (__DEV__) {
+          devError('Error in critical image preloading:', error);
+        }
+      }
+    };
+    
+    preloadCriticalImages();
+  }, [featuredContent, businessEthicsTemplates, successMindsetTemplates, socialMediaGrowthTemplates, moneyAndFinanceTemplates, businessLegendQuoteTemplates, businessMarketingTipsTemplates, businessQuotesTemplates, /* videoContent, */ businessCategoryPreviews, calendarPosters]);
+
   // Load data from APIs with caching for instant loads and request deduplication
   const loadApiData = useCallback(async (isRefresh: boolean = false) => {
     // Don't block rendering - load cached data first, then fetch fresh
@@ -1094,7 +1243,8 @@ const HomeScreen: React.FC = React.memo(() => {
       try {
         const cacheService = (await import('../services/cacheService')).default;
         const featuredCacheKey = 'home_featured_' + JSON.stringify({ limit: 1 });
-        const videoCacheKey = 'home_videos_' + JSON.stringify({ limit: 1 });
+        // Video API commented out - not in use for now
+        // const videoCacheKey = 'home_videos_' + JSON.stringify({ limit: 1 });
         
         // Cache keys for greeting sections (format: greeting_search_${query}_all)
         const greetingCacheKeys = [
@@ -1107,9 +1257,9 @@ const HomeScreen: React.FC = React.memo(() => {
           'greeting_search_business quotes_all',
         ];
         
-        const [cachedFeatured, cachedVideos, ...cachedGreetings] = await Promise.all([
+        const [cachedFeatured, /* cachedVideos, */ ...cachedGreetings] = await Promise.all([
           cacheService.get(featuredCacheKey),
-          cacheService.get(videoCacheKey),
+          // cacheService.get(videoCacheKey), // Video API commented out
           ...greetingCacheKeys.map(key => cacheService.get(key)),
         ]);
         
@@ -1125,57 +1275,74 @@ const HomeScreen: React.FC = React.memo(() => {
               link: item.link,
             }));
             setBanners(convertedBanners);
+            
+            // Trigger progressive preloading when cached featured content loads
+            if (filteredData.length > 0) {
+              setTimeout(() => {
+                startProgressiveImagePreloading();
+              }, 150);
+            }
           });
         }
         
-        if (cachedVideos && (cachedVideos as any).data) {
-          React.startTransition(() => {
-            setVideoContent((cachedVideos as any).data || []);
-          });
-        }
+        // Video API commented out - not in use for now
+        // if (cachedVideos && (cachedVideos as any).data) {
+        //   React.startTransition(() => {
+        //     setVideoContent((cachedVideos as any).data || []);
+        //   });
+        // }
         
         // Load cached greeting sections immediately
+        // IMPORTANT: Update state directly (not in startTransition) to ensure sections appear immediately
+        // This prevents sections from disappearing when general categories load
         if (cachedGreetings && cachedGreetings.length > 0) {
-          React.startTransition(() => {
-            const greetingUpdates: any = {
-              businessEthics: cachedGreetings[0] && Array.isArray(cachedGreetings[0]) && cachedGreetings[0].length > 0
-                ? { display: cachedGreetings[0].slice(0, 3), raw: cachedGreetings[0] }
-                : { display: [], raw: [] },
-              successMindset: cachedGreetings[1] && Array.isArray(cachedGreetings[1]) && cachedGreetings[1].length > 0
-                ? { display: cachedGreetings[1].slice(0, 3), raw: cachedGreetings[1] }
-                : { display: [], raw: [] },
-              socialMediaGrowth: cachedGreetings[2] && Array.isArray(cachedGreetings[2]) && cachedGreetings[2].length > 0
-                ? { display: cachedGreetings[2].slice(0, 3), raw: cachedGreetings[2] }
-                : { display: [], raw: [] },
-              moneyAndFinance: cachedGreetings[3] && Array.isArray(cachedGreetings[3]) && cachedGreetings[3].length > 0
-                ? { display: cachedGreetings[3].slice(0, 3), raw: cachedGreetings[3] }
-                : { display: [], raw: [] },
-              businessLegendQuote: cachedGreetings[4] && Array.isArray(cachedGreetings[4]) && cachedGreetings[4].length > 0
-                ? { display: cachedGreetings[4].slice(0, 3), raw: cachedGreetings[4] }
-                : { display: [], raw: [] },
-              businessMarketingTips: cachedGreetings[5] && Array.isArray(cachedGreetings[5]) && cachedGreetings[5].length > 0
-                ? { display: cachedGreetings[5].slice(0, 3), raw: cachedGreetings[5] }
-                : { display: [], raw: [] },
-              businessQuotes: cachedGreetings[6] && Array.isArray(cachedGreetings[6]) && cachedGreetings[6].length > 0
-                ? { display: cachedGreetings[6].slice(0, 3), raw: cachedGreetings[6] }
-                : { display: [], raw: [] },
-            };
-            
-            setBusinessEthicsTemplates(greetingUpdates.businessEthics.display);
-            setBusinessEthicsTemplatesRaw(greetingUpdates.businessEthics.raw);
-            setSuccessMindsetTemplates(greetingUpdates.successMindset.display);
-            setSuccessMindsetTemplatesRaw(greetingUpdates.successMindset.raw);
-            setSocialMediaGrowthTemplates(greetingUpdates.socialMediaGrowth.display);
-            setSocialMediaGrowthTemplatesRaw(greetingUpdates.socialMediaGrowth.raw);
-            setMoneyAndFinanceTemplates(greetingUpdates.moneyAndFinance.display);
-            setMoneyAndFinanceTemplatesRaw(greetingUpdates.moneyAndFinance.raw);
-            setBusinessLegendQuoteTemplates(greetingUpdates.businessLegendQuote.display);
-            setBusinessLegendQuoteTemplatesRaw(greetingUpdates.businessLegendQuote.raw);
-            setBusinessMarketingTipsTemplates(greetingUpdates.businessMarketingTips.display);
-            setBusinessMarketingTipsTemplatesRaw(greetingUpdates.businessMarketingTips.raw);
-            setBusinessQuotesTemplates(greetingUpdates.businessQuotes.display);
-            setBusinessQuotesTemplatesRaw(greetingUpdates.businessQuotes.raw);
-          });
+          const greetingUpdates: any = {
+            businessEthics: cachedGreetings[0] && Array.isArray(cachedGreetings[0]) && cachedGreetings[0].length > 0
+              ? { display: cachedGreetings[0].slice(0, 3), raw: cachedGreetings[0] }
+              : { display: [], raw: [] },
+            successMindset: cachedGreetings[1] && Array.isArray(cachedGreetings[1]) && cachedGreetings[1].length > 0
+              ? { display: cachedGreetings[1].slice(0, 3), raw: cachedGreetings[1] }
+              : { display: [], raw: [] },
+            socialMediaGrowth: cachedGreetings[2] && Array.isArray(cachedGreetings[2]) && cachedGreetings[2].length > 0
+              ? { display: cachedGreetings[2].slice(0, 3), raw: cachedGreetings[2] }
+              : { display: [], raw: [] },
+            moneyAndFinance: cachedGreetings[3] && Array.isArray(cachedGreetings[3]) && cachedGreetings[3].length > 0
+              ? { display: cachedGreetings[3].slice(0, 3), raw: cachedGreetings[3] }
+              : { display: [], raw: [] },
+            businessLegendQuote: cachedGreetings[4] && Array.isArray(cachedGreetings[4]) && cachedGreetings[4].length > 0
+              ? { display: cachedGreetings[4].slice(0, 3), raw: cachedGreetings[4] }
+              : { display: [], raw: [] },
+            businessMarketingTips: cachedGreetings[5] && Array.isArray(cachedGreetings[5]) && cachedGreetings[5].length > 0
+              ? { display: cachedGreetings[5].slice(0, 3), raw: cachedGreetings[5] }
+              : { display: [], raw: [] },
+            businessQuotes: cachedGreetings[6] && Array.isArray(cachedGreetings[6]) && cachedGreetings[6].length > 0
+              ? { display: cachedGreetings[6].slice(0, 3), raw: cachedGreetings[6] }
+              : { display: [], raw: [] },
+          };
+          
+          // Update state directly to prevent sections from disappearing
+          setBusinessEthicsTemplates(greetingUpdates.businessEthics.display);
+          setBusinessEthicsTemplatesRaw(greetingUpdates.businessEthics.raw);
+          setSuccessMindsetTemplates(greetingUpdates.successMindset.display);
+          setSuccessMindsetTemplatesRaw(greetingUpdates.successMindset.raw);
+          setSocialMediaGrowthTemplates(greetingUpdates.socialMediaGrowth.display);
+          setSocialMediaGrowthTemplatesRaw(greetingUpdates.socialMediaGrowth.raw);
+          setMoneyAndFinanceTemplates(greetingUpdates.moneyAndFinance.display);
+          setMoneyAndFinanceTemplatesRaw(greetingUpdates.moneyAndFinance.raw);
+          setBusinessLegendQuoteTemplates(greetingUpdates.businessLegendQuote.display);
+          setBusinessLegendQuoteTemplatesRaw(greetingUpdates.businessLegendQuote.raw);
+          setBusinessMarketingTipsTemplates(greetingUpdates.businessMarketingTips.display);
+          setBusinessMarketingTipsTemplatesRaw(greetingUpdates.businessMarketingTips.raw);
+          setBusinessQuotesTemplates(greetingUpdates.businessQuotes.display);
+          setBusinessQuotesTemplatesRaw(greetingUpdates.businessQuotes.raw);
+          
+          // Mark greeting sections as loaded to prevent them from disappearing
+          greetingSectionsLoadedRef.current = true;
+          
+          // Trigger progressive preloading when cached greeting templates load
+          setTimeout(() => {
+            startProgressiveImagePreloading();
+          }, 200);
         }
       } catch (error) {
         // Ignore cache errors, continue with API calls
@@ -1232,6 +1399,13 @@ const HomeScreen: React.FC = React.memo(() => {
                   link: item.link,
                 }));
                 setBanners(convertedBanners);
+                
+                // Trigger progressive preloading when featured content loads
+                if (filteredData.length > 0) {
+                  setTimeout(() => {
+                    startProgressiveImagePreloading();
+                  }, 100);
+                }
               });
               if (__DEV__) {
                 console.log('[FEATURED CONTENT] ✅ Loaded:', response.data?.length || 0, 'items');
@@ -1272,46 +1446,50 @@ const HomeScreen: React.FC = React.memo(() => {
             return { type: 'featured', response: null, success: false };
           }),
           
-          requestDeduplication.deduplicate(
-            RequestDeduplication.generateKey('videoContent', { limit: 1 }),
-            () => homeApi.getVideoContent({ limit: 1 })
-          ).then(response => {
-            // Update videos immediately with first 1 item for instant loading
-            if (response.success) {
-              React.startTransition(() => {
-                setVideoContent(response.data);
-              });
-              if (__DEV__) {
-                console.log('[VIDEO CONTENT] ✅ Loaded:', response.data?.length || 0, 'items');
-              }
-            } else {
-              if (__DEV__) {
-                console.warn('[VIDEO CONTENT] ⚠️ API returned unsuccessful response:', response);
-              }
-              React.startTransition(() => {
-                setVideoContent([]);
-              });
-            }
-            return { type: 'videos', response, success: response.success };
-          }).catch(err => {
-            if (__DEV__) {
-              console.error('[VIDEO CONTENT] ❌ Error loading:', err?.message || err);
-              console.error('[VIDEO CONTENT] Error details:', {
-                message: err?.message,
-                code: err?.code,
-                response: err?.response?.data,
-                status: err?.response?.status,
-                url: err?.config?.url,
-              });
-            }
-            if (err?.message === 'NETWORK_ERROR' || err?.message === 'TIMEOUT') {
-              networkErrors.push('videos');
-            }
-            React.startTransition(() => {
-              setVideoContent([]);
-            });
-            return { type: 'videos', response: null, success: false };
-          }),
+          // Video API commented out - not in use for now
+          // requestDeduplication.deduplicate(
+          //   RequestDeduplication.generateKey('videoContent', { limit: 1 }),
+          //   () => homeApi.getVideoContent({ limit: 1 })
+          // ).then(response => {
+          //   // Update videos immediately with first 1 item for instant loading
+          //   if (response.success) {
+          //     React.startTransition(() => {
+          //       setVideoContent(response.data);
+          //     });
+          //     if (__DEV__) {
+          //       console.log('[VIDEO CONTENT] ✅ Loaded:', response.data?.length || 0, 'items');
+          //     }
+          //   } else {
+          //     if (__DEV__) {
+          //       console.warn('[VIDEO CONTENT] ⚠️ API returned unsuccessful response:', response);
+          //     }
+          //     React.startTransition(() => {
+          //       setVideoContent([]);
+          //     });
+          //   }
+          //   return { type: 'videos', response, success: response.success };
+          // }).catch(err => {
+          //   if (__DEV__) {
+          //     console.error('[VIDEO CONTENT] ❌ Error loading:', err?.message || err);
+          //     console.error('[VIDEO CONTENT] Error details:', {
+          //       message: err?.message,
+          //       code: err?.code,
+          //       response: err?.response?.data,
+          //       status: err?.response?.status,
+          //       url: err?.config?.url,
+          //     });
+          //   }
+          //   if (err?.message === 'NETWORK_ERROR' || err?.message === 'TIMEOUT') {
+          //     networkErrors.push('videos');
+          //   }
+          //   React.startTransition(() => {
+          //     setVideoContent([]);
+          //   });
+          //   return { type: 'videos', response: null, success: false };
+          // }),
+          
+          // Return a resolved promise to maintain promise array structure
+          Promise.resolve({ type: 'videos', response: null, success: false }),
         ];
 
         // Don't wait - let promises resolve in background and update UI as they complete
@@ -1382,16 +1560,16 @@ const HomeScreen: React.FC = React.memo(() => {
               });
             }
             
-            // Load full video content (20 items)
-            const fullVideosResponse = await requestDeduplication.deduplicate(
-              RequestDeduplication.generateKey('videoContent', { limit: 20 }),
-              () => homeApi.getVideoContent({ limit: 20 })
-            );
-            if (fullVideosResponse.success && fullVideosResponse.data.length > 1) {
-              React.startTransition(() => {
-                setVideoContent(fullVideosResponse.data);
-              });
-            }
+            // Load full video content (20 items) - commented out, not in use for now
+            // const fullVideosResponse = await requestDeduplication.deduplicate(
+            //   RequestDeduplication.generateKey('videoContent', { limit: 20 }),
+            //   () => homeApi.getVideoContent({ limit: 20 })
+            // );
+            // if (fullVideosResponse.success && fullVideosResponse.data.length > 1) {
+            //   React.startTransition(() => {
+            //     setVideoContent(fullVideosResponse.data);
+            //   });
+            // }
           } catch (error) {
             if (__DEV__) {
               devError('Error loading remaining content in background:', error);
@@ -1403,84 +1581,89 @@ const HomeScreen: React.FC = React.memo(() => {
         // Start loading immediately, don't wait for other promises
         // This ensures greeting sections load as fast as the carousel
         // Fetch full results but only display 3 items initially (pagination will load more on scroll)
+        // IMPORTANT: Update state immediately without startTransition to ensure sections appear right away
         (async () => {
-          Promise.allSettled([
-          greetingTemplatesService.searchTemplates('business ethics').catch(() => []),
-          greetingTemplatesService.searchTemplates('success mindset').catch(() => []),
-          greetingTemplatesService.searchTemplates('social media growth').catch(() => []),
-          greetingTemplatesService.searchTemplates('money and finance').catch(() => []),
-          greetingTemplatesService.searchTemplates('business legend quote').catch(() => []),
-          greetingTemplatesService.searchTemplates('business marketing tips').catch(() => []),
-          greetingTemplatesService.searchTemplates('business quotes').catch(() => [])
-        ]).then(([
-          businessEthicsResponse,
-          successMindsetResponse,
-          socialMediaGrowthResponse,
-          moneyAndFinanceResponse,
-          businessLegendQuoteResponse,
-          businessMarketingTipsResponse,
-          businessQuotesResponse
-        ]) => {
-          // Debug: Log response statuses
-          if (__DEV__) {
-            console.log('[GREETING SECTIONS] API Response Status:', {
-              businessEthics: { status: businessEthicsResponse.status, length: businessEthicsResponse.status === 'fulfilled' ? businessEthicsResponse.value.length : 0 },
-              successMindset: { status: successMindsetResponse.status, length: successMindsetResponse.status === 'fulfilled' ? successMindsetResponse.value.length : 0 },
-              socialMediaGrowth: { status: socialMediaGrowthResponse.status, length: socialMediaGrowthResponse.status === 'fulfilled' ? socialMediaGrowthResponse.value.length : 0 },
-              moneyAndFinance: { status: moneyAndFinanceResponse.status, length: moneyAndFinanceResponse.status === 'fulfilled' ? moneyAndFinanceResponse.value.length : 0 },
-              businessLegendQuote: { status: businessLegendQuoteResponse.status, length: businessLegendQuoteResponse.status === 'fulfilled' ? businessLegendQuoteResponse.value.length : 0 },
-              businessMarketingTips: { status: businessMarketingTipsResponse.status, length: businessMarketingTipsResponse.status === 'fulfilled' ? businessMarketingTipsResponse.value.length : 0 },
-              businessQuotes: { status: businessQuotesResponse.status, length: businessQuotesResponse.status === 'fulfilled' ? businessQuotesResponse.value.length : 0 },
-            });
+          try {
+            const greetingPromises = await Promise.allSettled([
+              greetingTemplatesService.searchTemplates('business ethics').catch(() => []),
+              greetingTemplatesService.searchTemplates('success mindset').catch(() => []),
+              greetingTemplatesService.searchTemplates('social media growth').catch(() => []),
+              greetingTemplatesService.searchTemplates('money and finance').catch(() => []),
+              greetingTemplatesService.searchTemplates('business legend quote').catch(() => []),
+              greetingTemplatesService.searchTemplates('business marketing tips').catch(() => []),
+              greetingTemplatesService.searchTemplates('business quotes').catch(() => [])
+            ]);
             
-            // Log rejected reasons
-            if (businessEthicsResponse.status === 'rejected') {
-              console.error('[GREETING SECTIONS] Business Ethics error:', businessEthicsResponse.reason);
+            const [
+              businessEthicsResponse,
+              successMindsetResponse,
+              socialMediaGrowthResponse,
+              moneyAndFinanceResponse,
+              businessLegendQuoteResponse,
+              businessMarketingTipsResponse,
+              businessQuotesResponse
+            ] = greetingPromises;
+            
+            // Debug: Log response statuses
+            if (__DEV__) {
+              console.log('[GREETING SECTIONS] API Response Status:', {
+                businessEthics: { status: businessEthicsResponse.status, length: businessEthicsResponse.status === 'fulfilled' ? businessEthicsResponse.value.length : 0 },
+                successMindset: { status: successMindsetResponse.status, length: successMindsetResponse.status === 'fulfilled' ? successMindsetResponse.value.length : 0 },
+                socialMediaGrowth: { status: socialMediaGrowthResponse.status, length: socialMediaGrowthResponse.status === 'fulfilled' ? socialMediaGrowthResponse.value.length : 0 },
+                moneyAndFinance: { status: moneyAndFinanceResponse.status, length: moneyAndFinanceResponse.status === 'fulfilled' ? moneyAndFinanceResponse.value.length : 0 },
+                businessLegendQuote: { status: businessLegendQuoteResponse.status, length: businessLegendQuoteResponse.status === 'fulfilled' ? businessLegendQuoteResponse.value.length : 0 },
+                businessMarketingTips: { status: businessMarketingTipsResponse.status, length: businessMarketingTipsResponse.status === 'fulfilled' ? businessMarketingTipsResponse.value.length : 0 },
+                businessQuotes: { status: businessQuotesResponse.status, length: businessQuotesResponse.status === 'fulfilled' ? businessQuotesResponse.value.length : 0 },
+              });
+              
+              // Log rejected reasons
+              if (businessEthicsResponse.status === 'rejected') {
+                console.error('[GREETING SECTIONS] Business Ethics error:', businessEthicsResponse.reason);
+              }
+              if (successMindsetResponse.status === 'rejected') {
+                console.error('[GREETING SECTIONS] Success Mindset error:', successMindsetResponse.reason);
+              }
             }
-            if (successMindsetResponse.status === 'rejected') {
-              console.error('[GREETING SECTIONS] Success Mindset error:', successMindsetResponse.reason);
+            
+            // Handle greeting sections responses - Set first 3 items immediately
+            const greetingUpdates = {
+              businessEthics: businessEthicsResponse.status === 'fulfilled' && businessEthicsResponse.value.length > 0
+                ? { display: businessEthicsResponse.value.slice(0, 3), raw: businessEthicsResponse.value }
+                : { display: [], raw: [] },
+              successMindset: successMindsetResponse.status === 'fulfilled' && successMindsetResponse.value.length > 0
+                ? { display: successMindsetResponse.value.slice(0, 3), raw: successMindsetResponse.value }
+                : { display: [], raw: [] },
+              socialMediaGrowth: socialMediaGrowthResponse.status === 'fulfilled' && socialMediaGrowthResponse.value.length > 0
+                ? { display: socialMediaGrowthResponse.value.slice(0, 3), raw: socialMediaGrowthResponse.value }
+                : { display: [], raw: [] },
+              moneyAndFinance: moneyAndFinanceResponse.status === 'fulfilled' && moneyAndFinanceResponse.value.length > 0
+                ? { display: moneyAndFinanceResponse.value.slice(0, 3), raw: moneyAndFinanceResponse.value }
+                : { display: [], raw: [] },
+              businessLegendQuote: businessLegendQuoteResponse.status === 'fulfilled' && businessLegendQuoteResponse.value.length > 0
+                ? { display: businessLegendQuoteResponse.value.slice(0, 3), raw: businessLegendQuoteResponse.value }
+                : { display: [], raw: [] },
+              businessMarketingTips: businessMarketingTipsResponse.status === 'fulfilled' && businessMarketingTipsResponse.value.length > 0
+                ? { display: businessMarketingTipsResponse.value.slice(0, 3), raw: businessMarketingTipsResponse.value }
+                : { display: [], raw: [] },
+              businessQuotes: businessQuotesResponse.status === 'fulfilled' && businessQuotesResponse.value.length > 0
+                ? { display: businessQuotesResponse.value.slice(0, 3), raw: businessQuotesResponse.value }
+                : { display: [], raw: [] },
+            };
+            
+            if (__DEV__) {
+              console.log('[GREETING SECTIONS] Final Updates:', {
+                businessEthics: greetingUpdates.businessEthics.display.length,
+                successMindset: greetingUpdates.successMindset.display.length,
+                socialMediaGrowth: greetingUpdates.socialMediaGrowth.display.length,
+                moneyAndFinance: greetingUpdates.moneyAndFinance.display.length,
+                businessLegendQuote: greetingUpdates.businessLegendQuote.display.length,
+                businessMarketingTips: greetingUpdates.businessMarketingTips.display.length,
+                businessQuotes: greetingUpdates.businessQuotes.display.length,
+              });
             }
-          }
-          
-          // Handle greeting sections responses - Set first 3 items immediately
-          const greetingUpdates = {
-            businessEthics: businessEthicsResponse.status === 'fulfilled' && businessEthicsResponse.value.length > 0
-              ? { display: businessEthicsResponse.value.slice(0, 3), raw: businessEthicsResponse.value }
-              : { display: [], raw: [] },
-            successMindset: successMindsetResponse.status === 'fulfilled' && successMindsetResponse.value.length > 0
-              ? { display: successMindsetResponse.value.slice(0, 3), raw: successMindsetResponse.value }
-              : { display: [], raw: [] },
-            socialMediaGrowth: socialMediaGrowthResponse.status === 'fulfilled' && socialMediaGrowthResponse.value.length > 0
-              ? { display: socialMediaGrowthResponse.value.slice(0, 3), raw: socialMediaGrowthResponse.value }
-              : { display: [], raw: [] },
-            moneyAndFinance: moneyAndFinanceResponse.status === 'fulfilled' && moneyAndFinanceResponse.value.length > 0
-              ? { display: moneyAndFinanceResponse.value.slice(0, 3), raw: moneyAndFinanceResponse.value }
-              : { display: [], raw: [] },
-            businessLegendQuote: businessLegendQuoteResponse.status === 'fulfilled' && businessLegendQuoteResponse.value.length > 0
-              ? { display: businessLegendQuoteResponse.value.slice(0, 3), raw: businessLegendQuoteResponse.value }
-              : { display: [], raw: [] },
-            businessMarketingTips: businessMarketingTipsResponse.status === 'fulfilled' && businessMarketingTipsResponse.value.length > 0
-              ? { display: businessMarketingTipsResponse.value.slice(0, 3), raw: businessMarketingTipsResponse.value }
-              : { display: [], raw: [] },
-            businessQuotes: businessQuotesResponse.status === 'fulfilled' && businessQuotesResponse.value.length > 0
-              ? { display: businessQuotesResponse.value.slice(0, 3), raw: businessQuotesResponse.value }
-              : { display: [], raw: [] },
-          };
-          
-          if (__DEV__) {
-            console.log('[GREETING SECTIONS] Final Updates:', {
-              businessEthics: greetingUpdates.businessEthics.display.length,
-              successMindset: greetingUpdates.successMindset.display.length,
-              socialMediaGrowth: greetingUpdates.socialMediaGrowth.display.length,
-              moneyAndFinance: greetingUpdates.moneyAndFinance.display.length,
-              businessLegendQuote: greetingUpdates.businessLegendQuote.display.length,
-              businessMarketingTips: greetingUpdates.businessMarketingTips.display.length,
-              businessQuotes: greetingUpdates.businessQuotes.display.length,
-            });
-          }
 
-          // Batch all state updates together using React.startTransition for non-urgent updates
-          React.startTransition(() => {
+            // Update state immediately (without startTransition) to ensure sections appear right away
+            // This prevents the issue where sections don't show until app refresh
             setBusinessEthicsTemplates(greetingUpdates.businessEthics.display);
             setBusinessEthicsTemplatesRaw(greetingUpdates.businessEthics.raw);
             setSuccessMindsetTemplates(greetingUpdates.successMindset.display);
@@ -1495,67 +1678,23 @@ const HomeScreen: React.FC = React.memo(() => {
             setBusinessMarketingTipsTemplatesRaw(greetingUpdates.businessMarketingTips.raw);
             setBusinessQuotesTemplates(greetingUpdates.businessQuotes.display);
             setBusinessQuotesTemplatesRaw(greetingUpdates.businessQuotes.raw);
-          });
-          
-          // Store full results in raw arrays for pagination (load all at once for better performance)
-          // Users will see 3 items initially, and more will load on scroll
-          setTimeout(async () => {
-            try {
-              const fullGreetingPromises = await Promise.allSettled([
-                greetingTemplatesService.searchTemplates('business ethics').catch(() => []),
-                greetingTemplatesService.searchTemplates('success mindset').catch(() => []),
-                greetingTemplatesService.searchTemplates('social media growth').catch(() => []),
-                greetingTemplatesService.searchTemplates('money and finance').catch(() => []),
-                greetingTemplatesService.searchTemplates('business legend quote').catch(() => []),
-                greetingTemplatesService.searchTemplates('business marketing tips').catch(() => []),
-                greetingTemplatesService.searchTemplates('business quotes').catch(() => [])
-              ]);
-              
-              const [
-                fullBusinessEthicsResponse,
-                fullSuccessMindsetResponse,
-                fullSocialMediaGrowthResponse,
-                fullMoneyAndFinanceResponse,
-                fullBusinessLegendQuoteResponse,
-                fullBusinessMarketingTipsResponse,
-                fullBusinessQuotesResponse
-              ] = fullGreetingPromises;
-              
-              // Store full results in raw arrays for pagination (don't update display arrays)
-              React.startTransition(() => {
-                if (fullBusinessEthicsResponse.status === 'fulfilled' && fullBusinessEthicsResponse.value.length > 0) {
-                  setBusinessEthicsTemplatesRaw(fullBusinessEthicsResponse.value);
-                }
-                if (fullSuccessMindsetResponse.status === 'fulfilled' && fullSuccessMindsetResponse.value.length > 0) {
-                  setSuccessMindsetTemplatesRaw(fullSuccessMindsetResponse.value);
-                }
-                if (fullSocialMediaGrowthResponse.status === 'fulfilled' && fullSocialMediaGrowthResponse.value.length > 0) {
-                  setSocialMediaGrowthTemplatesRaw(fullSocialMediaGrowthResponse.value);
-                }
-                if (fullMoneyAndFinanceResponse.status === 'fulfilled' && fullMoneyAndFinanceResponse.value.length > 0) {
-                  setMoneyAndFinanceTemplatesRaw(fullMoneyAndFinanceResponse.value);
-                }
-                if (fullBusinessLegendQuoteResponse.status === 'fulfilled' && fullBusinessLegendQuoteResponse.value.length > 0) {
-                  setBusinessLegendQuoteTemplatesRaw(fullBusinessLegendQuoteResponse.value);
-                }
-                if (fullBusinessMarketingTipsResponse.status === 'fulfilled' && fullBusinessMarketingTipsResponse.value.length > 0) {
-                  setBusinessMarketingTipsTemplatesRaw(fullBusinessMarketingTipsResponse.value);
-                }
-                if (fullBusinessQuotesResponse.status === 'fulfilled' && fullBusinessQuotesResponse.value.length > 0) {
-                  setBusinessQuotesTemplatesRaw(fullBusinessQuotesResponse.value);
-                }
-              });
-            } catch (error) {
-              if (__DEV__) {
-                devError('Error loading full greeting sections in background:', error);
-              }
+            
+            // Mark greeting sections as loaded to prevent them from disappearing
+            greetingSectionsLoadedRef.current = true;
+            
+            // Trigger progressive preloading when greeting templates load
+            setTimeout(() => {
+              startProgressiveImagePreloading();
+            }, 200);
+            
+            if (__DEV__) {
+              console.log('[GREETING SECTIONS] ✅ State updated immediately - sections should be visible now');
             }
-          }, 0); // Execute in next event loop tick
-        }).catch((error) => {
-          if (__DEV__) {
-            devError('Error loading greeting sections:', error);
+          } catch (error) {
+            if (__DEV__) {
+              devError('Error loading greeting sections:', error);
+            }
           }
-        });
         })(); // Execute immediately, don't await
     } catch (error) {
       // Only catch unexpected errors (like state setting errors or promise.allSettled issues)
@@ -1699,56 +1838,76 @@ const HomeScreen: React.FC = React.memo(() => {
       }, 500);
     };
     
-    // Use InteractionManager to ensure UI renders first
-    InteractionManager.runAfterInteractions(() => {
+    // Load initial data immediately for faster startup (reduced delay)
+    // Use small timeout to ensure UI renders first, but don't wait for all interactions
+    setTimeout(() => {
       loadInitialData();
-    });
+    }, 100); // Reduced delay for faster initial load
+    
+    // Start progressive image preloading after initial render
+    // This runs in parallel with data loading for optimal performance
+    setTimeout(() => {
+      startProgressiveImagePreloading();
+    }, 200); // Start preloading 200ms after initial render
     
     return () => {
       isMounted = false;
     };
-  }, [loadApiData, loadCalendarPosters]); // Include loadCalendarPosters in dependencies
+  }, [loadApiData, loadCalendarPosters, startProgressiveImagePreloading]); // Include startProgressiveImagePreloading in dependencies
 
   // Load greeting categories - consolidated with greetingCategoriesList loading below
 
 
-  const fetchBusinessCategoryPreviewImages = useCallback(async (categories: BusinessCategory[]) => {
+  const fetchBusinessCategoryPreviewImages = useCallback(async (categories: BusinessCategory[], batchSize: number = 3) => {
     if (!categories || categories.length === 0) {
       return;
     }
 
-    // Defer loading preview images - load only when categories are visible or after initial load
-    const loadPreviews = async () => {
+    // Process in batches for faster initial display
+    const processBatch = async (batch: BusinessCategory[]) => {
       try {
-        const imageEntries = await Promise.all(
-          categories.map(async category => {
+        // Use Promise.allSettled to continue even if some fail
+        const imageEntries = await Promise.allSettled(
+          batch.map(async (category: BusinessCategory) => {
             try {
-              const response = await businessCategoryPostersApi.getPostersByCategory(category.name, 6);
+              const response = await businessCategoryPostersApi.getPostersByCategory(category.name, 3); // Reduced from 6 to 3 for faster loading
               const posters = response.data?.posters || [];
               const templates = posters
                 .map((poster: any) => convertBusinessPosterToTemplate(poster, category.name))
                 .filter((template: Template) => !!template.thumbnail)
-                .slice(0, 6);
+                .slice(0, 3); // Only need first 3 for preview
+              
               if (templates.length > 0) {
-                return [category.id, templates] as const;
+                // Prefetch first thumbnail immediately for instant display
+                const firstThumbnail = templates[0]?.thumbnail;
+                if (firstThumbnail) {
+                  Image.prefetch(firstThumbnail).catch(() => {});
+                }
+                
+                return { categoryId: category.id, templates, success: true };
               }
             } catch (error) {
               if (__DEV__) {
                 devWarn(`⚠️ Failed to fetch preview for category ${category.name}:`, error);
               }
             }
-            return [category.id, undefined] as const;
+            return { categoryId: category.id, templates: undefined, success: false };
           })
         );
 
         const nextPreviews: Record<string, Template[]> = {};
-        imageEntries.forEach(([categoryId, templates]) => {
-          if (templates && templates.length > 0) {
-            nextPreviews[categoryId] = templates;
+        imageEntries.forEach((result: PromiseSettledResult<{ categoryId: string; templates?: Template[]; success: boolean }>) => {
+          if (result.status === 'fulfilled' && result.value.success && result.value.templates) {
+            nextPreviews[result.value.categoryId] = result.value.templates;
           }
         });
 
-        setBusinessCategoryPreviews(prev => ({ ...prev, ...nextPreviews }));
+        // Update state immediately for each batch (non-blocking)
+        if (Object.keys(nextPreviews).length > 0) {
+          React.startTransition(() => {
+            setBusinessCategoryPreviews(prev => ({ ...prev, ...nextPreviews }));
+          });
+        }
       } catch (error) {
         if (__DEV__) {
           devError('Error fetching business category preview images:', error);
@@ -1756,71 +1915,105 @@ const HomeScreen: React.FC = React.memo(() => {
       }
     };
 
-    // Load previews in background after critical content
-    setTimeout(loadPreviews, 1500);
+    // Process first batch immediately (no delay)
+    const firstBatch = categories.slice(0, batchSize);
+    if (firstBatch.length > 0) {
+      processBatch(firstBatch);
+    }
+
+    // Process remaining batches progressively
+    if (categories.length > batchSize) {
+      const remainingBatches = [];
+      for (let i = batchSize; i < categories.length; i += batchSize) {
+        remainingBatches.push(categories.slice(i, i + batchSize));
+      }
+
+      remainingBatches.forEach((batch, index) => {
+        setTimeout(() => {
+          processBatch(batch);
+        }, (index + 1) * 150); // 150ms delay between batches
+      });
+    }
   }, []);
 
-  const fetchGreetingCategoryPreviewImages = useCallback(async (categories: Array<{ id: string; name: string; icon?: string; imageUrl?: string }>) => {
+  const fetchGreetingCategoryPreviewImages = useCallback(async (categories: Array<{ id: string; name: string; icon?: string; imageUrl?: string }>, isInitialLoad: boolean = false) => {
     if (!categories || categories.length === 0) {
       return;
     }
 
-    try {
-      const imageEntries = await Promise.all(
-        categories.map(async category => {
-          try {
-            // Use searchTemplates to search by category name in tags
-            // This ensures we get templates that have the category name in their tags
-            const templates = await greetingTemplatesService.searchTemplates(category.name);
-            
-            // Filter to find templates that have the category name in their tags
-            // The search already filters by tags, but we'll verify the match
-            const matchingTemplate = templates.find(template => {
-              // Access tags from the template (tags may not be in interface but exist in API response)
-              const templateAny = template as any;
-              const templateTags = Array.isArray(templateAny.tags) ? templateAny.tags : [];
-              
-              // Check if any tag contains the category name (case-insensitive)
-              const tagMatch = templateTags.some((tag: string) => 
-                typeof tag === 'string' && tag.toLowerCase().includes(category.name.toLowerCase())
-              );
-              
-              // Also check if category name matches
-              const categoryMatch = template.category?.toLowerCase().includes(category.name.toLowerCase());
-              
-              return tagMatch || categoryMatch;
+    // Process categories with immediate state updates for instant display
+    const processCategories = async (cats: Array<{ id: string; name: string; icon?: string; imageUrl?: string }>) => {
+      // Process all categories in parallel, but update state immediately as each completes
+      // This allows images to appear progressively instead of waiting for all to complete
+      const promises = cats.map(async category => {
+        try {
+          // Check for direct image first (fastest - instant, no API call)
+          const directImage = category.imageUrl;
+          if (directImage) {
+            // Prefetch and update state immediately
+            Image.prefetch(directImage).catch(() => {});
+            React.startTransition(() => {
+              setGreetingCategoryImages(prev => ({ ...prev, [category.id]: directImage }));
             });
-            
-            // Use the matching template or fall back to first result (search already filters by tags)
-            const selectedTemplate = matchingTemplate || templates?.[0];
-            const previewUrl = selectedTemplate?.thumbnail || selectedTemplate?.content?.background;
-            
-            if (previewUrl) {
-              if (__DEV__) {
-                const templateAny = selectedTemplate as any;
-              }
-              return [category.id, previewUrl] as const;
-            }
-          } catch (error) {
-            if (__DEV__) {
-              devWarn(`⚠️ Failed to fetch preview for greeting category ${category.name}:`, error);
-            }
+            return { categoryId: category.id, imageUrl: directImage, success: true };
           }
-          return [category.id, category.imageUrl] as const;
-        })
-      );
 
-      const nextImages: Record<string, string> = {};
-      imageEntries.forEach(([categoryId, imageUrl]) => {
-        if (imageUrl) {
-          nextImages[categoryId] = imageUrl;
+          // Use searchTemplatesFast directly (optimized for small limits, has caching)
+          // Limit to 1 for fastest response - we only need one thumbnail
+          const templates = await greetingTemplatesService.searchTemplatesFast(category.name, undefined, 1);
+          
+          // Use first template (fast search already filters by tags)
+          const selectedTemplate = templates?.[0];
+          const previewUrl = selectedTemplate?.thumbnail || selectedTemplate?.content?.background;
+          
+          if (previewUrl) {
+            // Prefetch image immediately
+            Image.prefetch(previewUrl).catch(() => {});
+            // Update state immediately for this category (progressive display)
+            React.startTransition(() => {
+              setGreetingCategoryImages(prev => ({ ...prev, [category.id]: previewUrl }));
+            });
+            return { categoryId: category.id, imageUrl: previewUrl, success: true };
+          }
+        } catch (error) {
+          if (__DEV__) {
+            devWarn(`⚠️ Failed to fetch preview for greeting category ${category.name}:`, error);
+          }
         }
+        return { categoryId: category.id, imageUrl: undefined, success: false };
       });
 
-      setGreetingCategoryImages(prev => ({ ...prev, ...nextImages }));
-    } catch (error) {
-      if (__DEV__) {
-        devError('Error fetching greeting category preview images:', error);
+      // Run all promises in parallel - state updates happen immediately as each completes
+      // We don't need to wait for all, but Promise.allSettled ensures all run
+      Promise.allSettled(promises).catch(() => {
+        // Ignore errors - individual promises handle their own errors
+      });
+    };
+
+    if (isInitialLoad) {
+      // For initial load, process ALL categories in parallel instantly (no batching, no waiting)
+      // Each category updates state independently as soon as its image is found
+      processCategories(categories);
+    } else {
+      // For subsequent loads, process in batches
+      const batchSize = 3;
+      const firstBatch = categories.slice(0, batchSize);
+      if (firstBatch.length > 0) {
+        processCategories(firstBatch);
+      }
+
+      // Process remaining batches progressively
+      if (categories.length > batchSize) {
+        const remainingBatches = [];
+        for (let i = batchSize; i < categories.length; i += batchSize) {
+          remainingBatches.push(categories.slice(i, i + batchSize));
+        }
+
+        remainingBatches.forEach((batch, index) => {
+          setTimeout(() => {
+            processCategories(batch);
+          }, (index + 1) * 100);
+        });
       }
     }
   }, []);
@@ -1849,22 +2042,32 @@ const HomeScreen: React.FC = React.memo(() => {
             parentCategoryName: (category as any).parentCategoryName // Include parentCategoryName
           }));
 
+          // Store all categories for lazy loading
+          setAllGreetingCategories(mappedCategories);
+          
           // Set both states from single API call
-          setGreetingCategoriesList(mappedCategories);
-          const newGreetingCategories = mappedCategories.map(({ id, name, icon }) => ({ id, name, icon }));
-          setGreetingCategories(newGreetingCategories); // Also set for rotating categories
+          // Use startTransition to prevent blocking other sections from rendering
+          React.startTransition(() => {
+            // Initially show only first 5 categories
+            setGreetingCategoriesList(mappedCategories);
+            const newGreetingCategories = mappedCategories.map(({ id, name, icon }) => ({ id, name, icon }));
+            setGreetingCategories(newGreetingCategories); // Also set for rotating categories
+            
+            // Trigger initial animation when categories are first loaded (faster)
+            if (newGreetingCategories.length > 0) {
+              // Use small timeout instead of InteractionManager for faster animation start
+              setTimeout(() => {
+                animateCategoryChange();
+              }, 50); // Small delay to ensure UI is ready
+            }
+          });
           
-          // Trigger initial animation when categories are first loaded
-          if (newGreetingCategories.length > 0) {
-            InteractionManager.runAfterInteractions(() => {
-              animateCategoryChange();
-            });
-          }
-          
-          // Defer greeting category preview images - load in background
-          setTimeout(() => {
-            fetchGreetingCategoryPreviewImages(mappedCategories);
-          }, 800);
+          // Load greeting category preview images INSTANTLY - all first 5 in parallel
+          // Start immediately without any delay - images will appear progressively
+          const initialCategories = mappedCategories.slice(0, 5);
+          // Process all 5 categories in parallel immediately (no batching, no delay)
+          // Each category updates state independently as soon as its image is found
+          fetchGreetingCategoryPreviewImages(initialCategories, true); // true = isInitialLoad
           
           if (__DEV__) {
           }
@@ -1907,7 +2110,7 @@ const HomeScreen: React.FC = React.memo(() => {
     }
 
     greetingModalPrefetchInProgressRef.current = true;
-    fetchGreetingCategoryPreviewImages(missingCategories)
+    fetchGreetingCategoryPreviewImages(missingCategories, false)
       .catch(error => {
         if (__DEV__) {
           devWarn('⚠️ [GENERAL CATEGORIES MODAL] Failed to preload thumbnails:', error);
@@ -1996,7 +2199,9 @@ const HomeScreen: React.FC = React.memo(() => {
             }
           }
           
-          fetchBusinessCategoryPreviewImages(filteredCategories);
+          // Load business category preview images immediately (no delay)
+          // First batch loads instantly, remaining load progressively
+          fetchBusinessCategoryPreviewImages(filteredCategories, 3); // Process 3 at a time
           
           if (__DEV__) {
           }
@@ -2035,8 +2240,10 @@ const HomeScreen: React.FC = React.memo(() => {
     );
 
     if (categoriesWithoutPreviews.length > 0) {
-      // Fetch preview images for missing categories
-      fetchBusinessCategoryPreviewImages(categoriesWithoutPreviews);
+      // Fetch preview images for missing categories (non-blocking)
+      React.startTransition(() => {
+        fetchBusinessCategoryPreviewImages(categoriesWithoutPreviews, 3);
+      });
     }
   }, [isBusinessCategoriesModalVisible, businessCategories, businessCategoryPreviews, fetchBusinessCategoryPreviewImages]);
 
@@ -3523,7 +3730,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
         activeOpacity={0.8}
         style={[
           styles.upcomingEventModalCard,
-          { width: modalCardWidth },
+          { width: modalCardWidth, backgroundColor: theme.colors.cardBackground },
           !isLastInRow && { marginRight: modalCardGap }
         ]}
         onPress={onPress}
@@ -4707,7 +4914,8 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
           )}
 
           {/* General Categories Section */}
-          {!isSearching && searchQuery.trim() === '' && filteredGreetingCategoriesList.length > 0 && (
+          {/* Show section immediately with placeholders - images load progressively */}
+          {!isSearching && searchQuery.trim() === '' && greetingCategoriesList.length > 0 && (
             <GeneralCategoriesSection
               greetingCategoriesList={filteredGreetingCategoriesList}
               greetingCategoryImages={memoizedGreetingCategoryImages}
@@ -4720,6 +4928,20 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
               }}
               onViewAllPress={handleViewAllGeneralCategories}
               renderBrowseAllButton={renderBrowseAllButton}
+              onLoadMore={() => {
+                // Load more categories when user scrolls near the end
+                if (displayedCategoriesCount < allGreetingCategories.length) {
+                  const nextCount = Math.min(displayedCategoriesCount + 5, allGreetingCategories.length);
+                  setDisplayedCategoriesCount(nextCount);
+                  
+                  // Load preview images for newly displayed categories (batched for non-initial)
+                  const newCategories = allGreetingCategories.slice(displayedCategoriesCount, nextCount);
+                  if (newCategories.length > 0) {
+                    fetchGreetingCategoryPreviewImages(newCategories, false); // false = not initial load
+                  }
+                }
+              }}
+              hasMore={displayedCategoriesCount < allGreetingCategories.length}
             />
           )}
 
@@ -4903,7 +5125,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
           )}
 
           {/* Success Mindset Section - Hidden when searching */}
-          {!isSearching && searchQuery.trim() === '' && successMindsetTemplates.length > 0 && (
+          {!isSearching && searchQuery.trim() === '' && (successMindsetTemplates.length > 0 || greetingSectionsLoadedRef.current) && successMindsetTemplates.length > 0 && (
             <View style={styles.templatesSection}>
             <View style={styles.sectionHeader}>
               <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
@@ -5150,26 +5372,26 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
               activeOpacity={1}
               onPress={closeBusinessCategoriesModal}
             />
-            <View style={styles.upcomingEventsModalContent}>
+            <View style={[styles.upcomingEventsModalContent, { backgroundColor: theme.colors.surface }]}>
               <LinearGradient
-                colors={['#f5f5f5', '#ffffff']}
+                colors={theme.colors.gradient}
                 style={styles.upcomingEventsModalGradient}
               >
                 <View style={styles.upcomingEventsModalHeader}>
                   <View style={styles.upcomingEventsModalTitleContainer}>
-                    <Text style={styles.upcomingEventsModalTitle}>Business Categories</Text>
+                    <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>Business Categories</Text>
                   </View>
                   <TouchableOpacity 
                     style={styles.upcomingEventsCloseButton}
                     onPress={closeBusinessCategoriesModal}
                     activeOpacity={0.7}
                   >
-                    <Text style={styles.upcomingEventsCloseButtonText}>✕</Text>
+                    <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>✕</Text>
                   </TouchableOpacity>
                 </View>
               </LinearGradient>
               {!isBusinessCategoriesModalClosing && (
-                <View style={styles.upcomingEventsModalBody}>
+                <View style={[styles.upcomingEventsModalBody, { backgroundColor: theme.colors.background }]}>
                   <SectionList
                     key={`business-categories-modal-${businessCategories.length}`}
                     sections={groupedBusinessCategories}
@@ -6532,7 +6754,7 @@ const styles = StyleSheet.create({
     width: SCREEN_WIDTH >= 768 ? SCREEN_WIDTH * 0.90 : SCREEN_WIDTH * 0.96,
     maxWidth: SCREEN_WIDTH >= 768 ? 900 : SCREEN_WIDTH * 0.96,
       height: SCREEN_HEIGHT * 0.85, // Reduced from 0.9
-      backgroundColor: '#ffffff',
+      backgroundColor: '#ffffff', // This will be overridden by theme in the component
      borderRadius: moderateScale(8),
       overflow: 'hidden',
       position: 'relative',
@@ -6562,7 +6784,7 @@ const styles = StyleSheet.create({
     upcomingEventsModalTitle: {
       fontSize: SCREEN_WIDTH >= 768 ? moderateScale(15) : moderateScale(13), // Further reduced from 18/16
       fontWeight: 'bold',
-      color: '#333333',
+      color: '#333333', // This will be overridden by theme in the component
       marginBottom: 0, // No margin needed without subtitle
       textShadowColor: 'rgba(255,255,255,0.5)',
       textShadowOffset: { width: 0, height: 0.5 },
@@ -6591,7 +6813,7 @@ const styles = StyleSheet.create({
     },
     upcomingEventsModalBody: {
       flex: 1,
-      backgroundColor: '#f8f9fa',
+      backgroundColor: '#f8f9fa', // This will be overridden by theme in the component
     },
     upcomingEventsModalScroll: {
       paddingHorizontal: 0, // Remove padding from container, add to rows instead
@@ -6609,7 +6831,7 @@ const styles = StyleSheet.create({
     upcomingEventModalCard: {
       // Width is set dynamically via inline styles based on modalColumns
       // Note: marginRight is applied conditionally in renderItem to avoid extra space on last card
-      backgroundColor: '#ffffff',
+      backgroundColor: '#ffffff', // This will be overridden by theme in the component
       borderRadius: moderateScale(8),
       ...responsiveShadow.small,
       overflow: 'hidden',

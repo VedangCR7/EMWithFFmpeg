@@ -15,11 +15,12 @@ import {
   Animated,
   Easing,
   InteractionManager,
+  Image,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets, Edge } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { MainStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../context/ThemeContext';
@@ -71,7 +72,7 @@ const addOpacityToColor = (color: string = '#667eea', opacity: number): string =
 const CATEGORIES_CACHE_KEY = 'greeting_categories_cache_v1';
 const CATEGORY_PREVIEWS_CACHE_KEY = 'greeting_category_previews_cache_v1';
 const MIN_GENERAL_CATEGORY_COUNT = 8;
-const PREVIEW_TIMEOUT_MS = 6500;
+const PREVIEW_TIMEOUT_MS = 3000; // Reduced from 6500ms for faster loading
 
 const createPlaceholderPoster = (category: GreetingCategory): Template => ({
   id: `loading-${category.id}`,
@@ -132,6 +133,10 @@ const GreetingTemplatesScreen: React.FC = () => {
   const animatedSectionsRef = useRef<Set<string>>(new Set());
   const previewFetchQueueRef = useRef<Set<string>>(new Set()); // Track categories queued for preview fetching
   const previewFetchWorkersRef = useRef<Set<Promise<void>>>(new Set()); // Track active workers
+  const prefetchedImagesRef = useRef<Set<string>>(new Set()); // Track prefetched image URLs to avoid duplicates
+  const imagePreloadRef = useRef({ critical: false, high: false, medium: false }); // Track progressive preloading phases
+  const progressiveLoadingStartedRef = useRef(false); // Track if progressive loading has been started
+  const hasNavigatedAwayRef = useRef(false); // Track if user has navigated away
 
   useEffect(() => {
     return () => {
@@ -153,10 +158,55 @@ const GreetingTemplatesScreen: React.FC = () => {
           if (Array.isArray(parsedCategories) && parsedCategories.length > 0) {
             setCategories(parsedCategories);
             setInitialLoading(false);
+            
+            // IMMEDIATE: Prefetch cached preview images for visible categories
+            // Calculate initial visible count (first 2-3 rows)
+            const initialVisibleCount = Math.min(
+              (screenWidth >= 768 ? 4 : 2) * 3, // categoryColumns * 3 rows
+              parsedCategories.length
+            );
+            const initialVisibleCategories = parsedCategories.slice(0, initialVisibleCount);
+            
+            // Prefetch cached preview images immediately
+            if (cachedPreviews && isActive) {
+              const parsedPreviews: Record<string, string | null> = JSON.parse(cachedPreviews);
+              if (parsedPreviews && typeof parsedPreviews === 'object') {
+                previewCacheRef.current = parsedPreviews;
+                setCategoryPreviewImages(parsedPreviews);
+                
+                // IMMEDIATE: Prefetch images for visible categories from cache
+                const imagesToPrefetch: string[] = [];
+                initialVisibleCategories.forEach(category => {
+                  const cachedUri = parsedPreviews[category.id];
+                  if (cachedUri && !prefetchedImagesRef.current.has(cachedUri)) {
+                    imagesToPrefetch.push(cachedUri);
+                    prefetchedImagesRef.current.add(cachedUri);
+                  }
+                });
+                
+                // Prefetch immediately (non-blocking)
+                if (imagesToPrefetch.length > 0) {
+                  Promise.allSettled(
+                    imagesToPrefetch.map(url => Image.prefetch(url).catch(() => {}))
+                  ).then(() => {
+                    if (__DEV__) {
+                      console.log(`[GREETING] ✅ Prefetched ${imagesToPrefetch.length} cached thumbnails immediately`);
+                    }
+                  });
+                }
+              }
+            }
+            
+            // IMMEDIATE: Start fetching previews for visible categories (even if not cached)
+            setTimeout(() => {
+              if (isActive && initialVisibleCategories.length > 0) {
+                const visibleIds = initialVisibleCategories.map(c => c.id);
+                fetchPreviewsForCategories(visibleIds, 'high');
+              }
+            }, 50); // Start fetching after 50ms (very fast)
           }
-        }
-
-        if (cachedPreviews && isActive) {
+        } else if (cachedPreviews && isActive) {
+          // If only previews are cached but no categories yet
           const parsedPreviews: Record<string, string | null> = JSON.parse(cachedPreviews);
           if (parsedPreviews && typeof parsedPreviews === 'object') {
             previewCacheRef.current = parsedPreviews;
@@ -173,7 +223,7 @@ const GreetingTemplatesScreen: React.FC = () => {
     return () => {
       isActive = false;
     };
-  }, []);
+  }, [screenWidth, fetchPreviewsForCategories]);
 
   const ensureAllGeneralCategories = useCallback(async (initialCategories: GreetingCategory[] = [], deferFallback: boolean = false) => {
     // Build a map so we can merge primary and fallback results without duplicates
@@ -482,6 +532,14 @@ const GreetingTemplatesScreen: React.FC = () => {
           usedPreviewUris.add(previewUri);
         }
         
+        // Prefetch image immediately when preview URI is found (non-blocking)
+        if (previewUri && !prefetchedImagesRef.current.has(previewUri)) {
+          prefetchedImagesRef.current.add(previewUri);
+          Image.prefetch(previewUri).catch(() => {
+            // Silently fail - prefetch is best effort
+          });
+        }
+        
         return previewUri;
       } catch (error) {
         console.warn(`Error fetching preview for category ${category.name}:`, error);
@@ -499,17 +557,35 @@ const GreetingTemplatesScreen: React.FC = () => {
       const categoriesToFetch = categories.filter(category => {
         const cached = previewCacheRef.current[category.id];
         const isQueued = previewFetchQueueRef.current.has(category.id);
-        return categoryIds.includes(category.id) && cached === undefined && !isQueued;
+        const inState = categoryPreviewImages[category.id] !== undefined;
+        // Fetch if: in the requested IDs, not queued, and (no cache OR not in state)
+        // This ensures we fetch even if cached but not in state, or if cache is stale
+        return categoryIds.includes(category.id) && !isQueued && (!cached || !inState);
       });
 
-      if (categoriesToFetch.length === 0) return;
+      if (categoriesToFetch.length === 0) {
+        // Even if no fetching needed, ensure cached previews are in state
+        const cachedToAdd: Record<string, string | null> = {};
+        categoryIds.forEach(categoryId => {
+          const cached = previewCacheRef.current[categoryId];
+          const inState = categoryPreviewImages[categoryId] !== undefined;
+          if (cached !== undefined && !inState) {
+            cachedToAdd[categoryId] = cached;
+          }
+        });
+        
+        if (Object.keys(cachedToAdd).length > 0) {
+          setCategoryPreviewImages(prev => ({ ...prev, ...cachedToAdd }));
+        }
+        return;
+      }
 
       // Mark as queued
       categoriesToFetch.forEach(category => {
         previewFetchQueueRef.current.add(category.id);
       });
 
-      const concurrency = priority === 'high' ? 6 : 2; // Higher concurrency for visible items
+      const concurrency = priority === 'high' ? 8 : 3; // Increased concurrency for faster loading
       const usedPreviewUris = new Set<string>(
         Object.values(previewCacheRef.current).filter((uri): uri is string => uri !== null),
       );
@@ -527,9 +603,13 @@ const GreetingTemplatesScreen: React.FC = () => {
             let changed = false;
             const next = { ...prev };
             Object.entries(updates).forEach(([id, uri]) => {
+              // Only update if the value actually changed, and don't overwrite with null if we have a valid URI
               if (next[id] !== uri) {
-                next[id] = uri;
-                changed = true;
+                // Don't overwrite existing valid previews with null
+                if (uri !== null || next[id] === undefined) {
+                  next[id] = uri;
+                  changed = true;
+                }
               }
             });
             return changed ? next : prev;
@@ -540,8 +620,15 @@ const GreetingTemplatesScreen: React.FC = () => {
 
       const scheduleBatchUpdate = (id: string, uri: string | null) => {
         batchedUpdates[id] = uri;
+        // Prefetch image immediately when URI is available
+        if (uri && !prefetchedImagesRef.current.has(uri)) {
+          prefetchedImagesRef.current.add(uri);
+          Image.prefetch(uri).catch(() => {
+            // Silently fail - prefetch is best effort
+          });
+        }
         if (!batchTimer) {
-          batchTimer = setTimeout(flushBatch, 100); // Batch updates every 100ms
+          batchTimer = setTimeout(flushBatch, 50); // Reduced from 100ms for faster updates
         }
       };
 
@@ -558,11 +645,18 @@ const GreetingTemplatesScreen: React.FC = () => {
             if (uri) {
               usedPreviewUris.add(uri);
             }
-            previewCacheRef.current[category.id] = uri;
-            scheduleBatchUpdate(category.id, uri);
+            // Only update cache and state if we got a valid URI, or if we don't have one yet
+            // This prevents overwriting valid previews with null
+            if (uri || previewCacheRef.current[category.id] === undefined) {
+              previewCacheRef.current[category.id] = uri;
+              scheduleBatchUpdate(category.id, uri);
+            }
           } catch (error) {
-            previewCacheRef.current[category.id] = null;
-            scheduleBatchUpdate(category.id, null);
+            // Only set to null if we don't have a cached value
+            if (previewCacheRef.current[category.id] === undefined) {
+              previewCacheRef.current[category.id] = null;
+              scheduleBatchUpdate(category.id, null);
+            }
           } finally {
             previewFetchQueueRef.current.delete(category.id);
           }
@@ -582,56 +676,285 @@ const GreetingTemplatesScreen: React.FC = () => {
         previewFetchWorkersRef.current.delete(workersPromise);
       });
     },
-    [categories, fetchCategoryPreview],
+    [categories, fetchCategoryPreview, categoryPreviewImages],
   );
 
-  // Fetch previews for visible categories immediately
+  // IMMEDIATE: Fetch previews and prefetch images for visible categories
   useEffect(() => {
     if (visibleCategoryIds.size === 0 || categories.length === 0) return;
 
     const visibleIds = Array.from(visibleCategoryIds);
+    
+    // IMMEDIATE: Fetch previews for visible categories
     fetchPreviewsForCategories(visibleIds, 'high');
-  }, [visibleCategoryIds, categories, fetchPreviewsForCategories]);
+    
+    // IMMEDIATE: Prefetch images for visible categories that already have preview URIs
+    const imagesToPrefetch: string[] = [];
+    visibleIds.forEach(categoryId => {
+      const previewUri = categoryPreviewImages[categoryId] || previewCacheRef.current[categoryId];
+      if (previewUri && !prefetchedImagesRef.current.has(previewUri)) {
+        imagesToPrefetch.push(previewUri);
+        prefetchedImagesRef.current.add(previewUri);
+      }
+    });
+    
+    // Prefetch immediately (non-blocking)
+    if (imagesToPrefetch.length > 0) {
+      Promise.allSettled(
+        imagesToPrefetch.map(url => Image.prefetch(url).catch(() => {}))
+      ).then(() => {
+        if (__DEV__) {
+          console.log(`[GREETING] ✅ Prefetched ${imagesToPrefetch.length} visible thumbnails`);
+        }
+      });
+    }
+  }, [visibleCategoryIds, categories, fetchPreviewsForCategories, categoryPreviewImages]);
 
-  // Fetch previews for initially visible items after initial render
+  // Progressive image preloading system for category thumbnails
+  const startProgressiveImagePreloading = useCallback(() => {
+    if (imagePreloadRef.current.critical) {
+      return; // Already started
+    }
+    imagePreloadRef.current.critical = true;
+
+    // Phase 1: CRITICAL - Preload cached preview images immediately
+    const preloadCriticalImages = async () => {
+      try {
+        const criticalImages: string[] = [];
+        
+        // Get cached preview images for initial visible categories
+        const initialVisibleCount = Math.min(categoryColumns * 3, categories.length);
+        const initialVisibleCategories = categories.slice(0, initialVisibleCount);
+        
+        initialVisibleCategories.forEach(category => {
+          const cachedUri = previewCacheRef.current[category.id];
+          if (cachedUri && !prefetchedImagesRef.current.has(cachedUri)) {
+            criticalImages.push(cachedUri);
+          }
+        });
+        
+        // Preload critical images immediately
+        if (criticalImages.length > 0) {
+          await Promise.allSettled(
+            criticalImages.map(url => {
+              prefetchedImagesRef.current.add(url);
+              return Image.prefetch(url).catch(() => {});
+            })
+          );
+          if (__DEV__) {
+            console.log(`[GREETING PRELOAD] ✅ Critical: ${criticalImages.length} cached images preloaded`);
+          }
+        }
+        
+        // Phase 2: HIGH PRIORITY - Preload newly fetched preview images
+        setTimeout(() => {
+          if (imagePreloadRef.current.high) return;
+          imagePreloadRef.current.high = true;
+          
+          const highPriorityImages: string[] = [];
+          Object.values(categoryPreviewImages).forEach(uri => {
+            if (uri && !prefetchedImagesRef.current.has(uri)) {
+              highPriorityImages.push(uri);
+            }
+          });
+          
+          if (highPriorityImages.length > 0) {
+            Promise.allSettled(
+              highPriorityImages.map(url => {
+                prefetchedImagesRef.current.add(url);
+                return Image.prefetch(url).catch(() => {});
+              })
+            ).then(() => {
+              if (__DEV__) {
+                console.log(`[GREETING PRELOAD] ✅ High Priority: ${highPriorityImages.length} images preloaded`);
+              }
+            });
+          }
+        }, 300); // Start after 300ms
+        
+        // Phase 3: MEDIUM PRIORITY - Preload remaining preview images
+        setTimeout(() => {
+          if (imagePreloadRef.current.medium) return;
+          imagePreloadRef.current.medium = true;
+          
+          const mediumPriorityImages: string[] = [];
+          Object.values(categoryPreviewImages).forEach(uri => {
+            if (uri && !prefetchedImagesRef.current.has(uri)) {
+              mediumPriorityImages.push(uri);
+            }
+          });
+          
+          if (mediumPriorityImages.length > 0) {
+            Promise.allSettled(
+              mediumPriorityImages.map(url => {
+                prefetchedImagesRef.current.add(url);
+                return Image.prefetch(url).catch(() => {});
+              })
+            ).then(() => {
+              if (__DEV__) {
+                console.log(`[GREETING PRELOAD] ✅ Medium Priority: ${mediumPriorityImages.length} images preloaded`);
+              }
+            });
+          }
+        }, 1000); // Start after 1s
+      } catch (error) {
+        if (__DEV__) {
+          console.warn('[GREETING PRELOAD] Error in critical image preloading:', error);
+        }
+      }
+    };
+    
+    preloadCriticalImages();
+  }, [categories, categoryColumns, categoryPreviewImages]);
+
+  // IMMEDIATE: Fetch previews for initially visible items on screen mount
   useEffect(() => {
     if (initialLoading || categories.length === 0 || groupedCategories.length === 0) return;
 
-    // Calculate initial visible items (first 2-3 rows worth of categories)
-    // This ensures thumbnails for visible items load immediately
-    const initialVisibleCount = Math.min(categoryColumns * 3, categories.length);
+    // Calculate initial visible items (first 3-4 rows worth of categories for better coverage)
+    const initialVisibleCount = Math.min(categoryColumns * 4, categories.length);
     const initialVisibleIds = categories.slice(0, initialVisibleCount).map(c => c.id);
 
-    // Fetch previews for initial visible items (onViewableItemsChanged will handle tracking)
+    // IMMEDIATE: Fetch previews for initial visible items with highest priority
     if (initialVisibleIds.length > 0) {
+      // Start fetching immediately (no delay)
       fetchPreviewsForCategories(initialVisibleIds, 'high');
+      
+      // IMMEDIATE: Prefetch cached preview images for visible categories
+      const cachedImagesToPrefetch: string[] = [];
+      initialVisibleIds.forEach(categoryId => {
+        const cachedUri = previewCacheRef.current[categoryId];
+        if (cachedUri && !prefetchedImagesRef.current.has(cachedUri)) {
+          cachedImagesToPrefetch.push(cachedUri);
+          prefetchedImagesRef.current.add(cachedUri);
+        }
+      });
+      
+      // Prefetch cached images immediately (non-blocking)
+      if (cachedImagesToPrefetch.length > 0) {
+        Promise.allSettled(
+          cachedImagesToPrefetch.map(url => Image.prefetch(url).catch(() => {}))
+        ).then(() => {
+          if (__DEV__) {
+            console.log(`[GREETING] ✅ IMMEDIATE: Prefetched ${cachedImagesToPrefetch.length} cached thumbnails`);
+          }
+        });
+      }
     }
-  }, [initialLoading, categories, groupedCategories, categoryColumns, fetchPreviewsForCategories]);
+    
+    // PROGRESSIVE: Fetch previews for ALL remaining categories in batches
+    // Only start if not already started and user hasn't navigated away
+    if (!progressiveLoadingStartedRef.current && !hasNavigatedAwayRef.current) {
+      progressiveLoadingStartedRef.current = true;
+      
+      setTimeout(() => {
+        const remainingCategories = categories.slice(initialVisibleCount);
+        if (remainingCategories.length > 0 && !hasNavigatedAwayRef.current) {
+          // Fetch in batches to avoid overwhelming the network
+          const batchSize = 20;
+          let batchIndex = 0;
+          
+          const fetchNextBatch = () => {
+            if (batchIndex >= remainingCategories.length || !isMountedRef.current || hasNavigatedAwayRef.current) return;
+            
+            const batch = remainingCategories.slice(batchIndex, batchIndex + batchSize);
+            const batchIds = batch.map(c => c.id);
+            
+            // Fetch with low priority to not block visible items
+            fetchPreviewsForCategories(batchIds, 'low');
+            
+            batchIndex += batchSize;
+            
+            // Schedule next batch after a delay
+            if (batchIndex < remainingCategories.length) {
+              setTimeout(fetchNextBatch, 500); // 500ms delay between batches
+            }
+          };
+          
+          // Start fetching remaining batches after initial visible items
+          setTimeout(fetchNextBatch, 1000); // Start after 1 second
+        }
+      }, 500);
+      
+      // Start progressive image preloading for remaining categories
+      setTimeout(() => {
+        if (!hasNavigatedAwayRef.current) {
+          startProgressiveImagePreloading();
+        }
+      }, 300);
+    }
+  }, [initialLoading, categories, groupedCategories, categoryColumns, fetchPreviewsForCategories, startProgressiveImagePreloading]);
+  
+  // Track navigation away/back to prevent re-triggering progressive loading
+  useFocusEffect(
+    useCallback(() => {
+      // Screen is focused - reset navigation away flag
+      hasNavigatedAwayRef.current = false;
+      
+      return () => {
+        // Screen is blurred (user navigated away)
+        hasNavigatedAwayRef.current = true;
+      };
+    }, [])
+  );
 
   // Initial cleanup and cache management
+  // Use a ref to track previous category IDs to avoid unnecessary cleanup
+  const previousCategoryIdsRef = useRef<Set<string>>(new Set());
+  
   useEffect(() => {
     if (categories.length === 0) {
       previewCacheRef.current = {};
       setCategoryPreviewImages({});
       previewFetchQueueRef.current.clear();
+      previousCategoryIdsRef.current.clear();
       return;
     }
 
     const activeIds = new Set(categories.map(category => category.id));
-
-    // Clean up preview cache to only include active category IDs
-    previewCacheRef.current = Object.fromEntries(
-      Object.entries(previewCacheRef.current).filter(([id]) => activeIds.has(id)),
-    );
-    setCategoryPreviewImages(prev => {
-      const nextEntries = Object.entries(prev).filter(([id]) => activeIds.has(id));
-      if (nextEntries.length === Object.keys(prev).length) {
-        return prev;
+    const previousIds = previousCategoryIdsRef.current;
+    
+    // Initialize on first run
+    if (previousIds.size === 0) {
+      previousCategoryIdsRef.current = new Set(activeIds);
+      return; // Don't clean up on first run
+    }
+    
+    // Only clean up if categories actually changed (not just reference change)
+    const idsChanged = 
+      activeIds.size !== previousIds.size ||
+      Array.from(activeIds).some(id => !previousIds.has(id)) ||
+      Array.from(previousIds).some(id => !activeIds.has(id));
+    
+    if (idsChanged) {
+      // Clean up preview cache to only include active category IDs
+      // But preserve existing previews - only remove ones for categories that no longer exist
+      const removedIds = Array.from(previousIds).filter(id => !activeIds.has(id));
+      
+      if (removedIds.length > 0) {
+        // Only clean up removed category IDs
+        removedIds.forEach(id => {
+          delete previewCacheRef.current[id];
+        });
+        
+        setCategoryPreviewImages(prev => {
+          const next = { ...prev };
+          let changed = false;
+          removedIds.forEach(id => {
+            if (next[id] !== undefined) {
+              delete next[id];
+              changed = true;
+            }
+          });
+          return changed ? next : prev;
+        });
       }
-      return Object.fromEntries(nextEntries);
-    });
+      
+      // Update previous IDs
+      previousCategoryIdsRef.current = new Set(activeIds);
+    }
 
-    // Clean up queue
+    // Clean up queue for removed categories only
     previewFetchQueueRef.current.forEach(id => {
       if (!activeIds.has(id)) {
         previewFetchQueueRef.current.delete(id);
@@ -651,6 +974,60 @@ const GreetingTemplatesScreen: React.FC = () => {
 
     return () => clearTimeout(timer);
   }, [categoryPreviewImages]);
+  
+  // Preload images when categoryPreviewImages updates
+  useEffect(() => {
+    if (Object.keys(categoryPreviewImages).length === 0) return;
+    
+    // Prefetch newly added preview images in batches
+    const newImagesToPrefetch: string[] = [];
+    Object.values(categoryPreviewImages).forEach(uri => {
+      if (uri && !prefetchedImagesRef.current.has(uri)) {
+        newImagesToPrefetch.push(uri);
+        prefetchedImagesRef.current.add(uri);
+      }
+    });
+    
+    // Prefetch in batches to avoid overwhelming
+    if (newImagesToPrefetch.length > 0) {
+      const batchSize = 10;
+      for (let i = 0; i < newImagesToPrefetch.length; i += batchSize) {
+        const batch = newImagesToPrefetch.slice(i, i + batchSize);
+        setTimeout(() => {
+          Promise.allSettled(
+            batch.map(url => Image.prefetch(url).catch(() => {}))
+          );
+        }, i * 50); // Stagger batches by 50ms
+      }
+    }
+  }, [categoryPreviewImages]);
+  
+  // Ensure ALL categories eventually get their previews fetched
+  // This is a fallback to ensure no categories are missed
+  useEffect(() => {
+    if (initialLoading || categories.length === 0) return;
+    
+    // After 3 seconds, check if any categories are missing previews
+    const checkMissingPreviews = setTimeout(() => {
+      const missingCategories = categories.filter(category => {
+        const hasCache = previewCacheRef.current[category.id] !== undefined;
+        const hasState = categoryPreviewImages[category.id] !== undefined;
+        const isQueued = previewFetchQueueRef.current.has(category.id);
+        return !hasCache && !hasState && !isQueued;
+      });
+      
+      if (missingCategories.length > 0 && isMountedRef.current) {
+        const missingIds = missingCategories.map(c => c.id);
+        if (__DEV__) {
+          console.log(`[GREETING] 🔄 Fetching ${missingIds.length} missing category previews`);
+        }
+        // Fetch missing previews with low priority
+        fetchPreviewsForCategories(missingIds, 'low');
+      }
+    }, 3000);
+    
+    return () => clearTimeout(checkMissingPreviews);
+  }, [categories, initialLoading, categoryPreviewImages, fetchPreviewsForCategories]);
 
   const normalizedSearchQuery = useMemo(() => searchQuery.trim().toLowerCase(), [searchQuery]);
 
@@ -854,91 +1231,25 @@ const GreetingTemplatesScreen: React.FC = () => {
     }
   }, [ensureAllGeneralCategories]);
 
-  const handleCategoryPress = useCallback(async (category: GreetingCategory) => {
+  const handleCategoryPress = useCallback((category: GreetingCategory) => {
     // Get the preview image for this category if available
     const previewUri = categoryPreviewImages[category.id] || null;
     
-    let selectedPoster: Template = createPlaceholderPoster(category);
-    
-    // If we have a preview image, try to find the actual template that matches it
-    if (previewUri) {
-      try {
-        const normalizedName = category.name?.trim();
-        if (normalizedName) {
-          // Search for templates in this category
-          const searchResults = await greetingTemplatesService.searchTemplates(normalizedName);
-          if (Array.isArray(searchResults) && searchResults.length > 0) {
-            // Try to find a template that matches the preview image URL
-            const matchingTemplate = searchResults.find(template => {
-              const templatePreview = extractTemplatePreview(template);
-              return templatePreview === previewUri;
-            });
-            
-            if (matchingTemplate) {
-              // Convert GreetingTemplate to Template format
-              const templateAny = matchingTemplate as any;
-              selectedPoster = {
-                id: matchingTemplate.id,
-                name: matchingTemplate.name || category.name,
-                thumbnail: matchingTemplate.thumbnail || templateAny.content?.background || previewUri,
-                category: matchingTemplate.category || category.name,
-                downloads: matchingTemplate.downloads || 0,
-                isDownloaded: matchingTemplate.isDownloaded || false,
-                tags: Array.isArray(templateAny.tags) ? templateAny.tags : [category.name],
-              };
-            } else {
-              // If no exact match, use the preview image with the first template's ID
-              const firstTemplate = searchResults[0];
-              const templateAny = firstTemplate as any;
-              selectedPoster = {
-                id: firstTemplate.id,
-                name: firstTemplate.name || category.name,
-                thumbnail: previewUri,
-                category: firstTemplate.category || category.name,
-                downloads: firstTemplate.downloads || 0,
-                isDownloaded: firstTemplate.isDownloaded || false,
-                tags: Array.isArray(templateAny.tags) ? templateAny.tags : [category.name],
-              };
-            }
-          } else {
-            // No search results, create poster with preview image
-            selectedPoster = {
-              id: `preview-${category.id}`,
-              name: category.name,
-              thumbnail: previewUri,
-              category: category.name,
-              downloads: 0,
-              isDownloaded: false,
-              tags: [category.name],
-            };
-          }
-        } else {
-          // No category name, create poster with preview image
-          selectedPoster = {
-            id: `preview-${category.id}`,
-            name: category.name,
-            thumbnail: previewUri,
-            category: category.name,
-            downloads: 0,
-            isDownloaded: false,
-            tags: [category.name],
-          };
-        }
-      } catch (error) {
-        console.warn('[GreetingTemplatesScreen] Error finding template for preview:', error);
-        // Fallback to preview image poster
-        selectedPoster = {
-          id: `preview-${category.id}`,
-          name: category.name,
-          thumbnail: previewUri,
-          category: category.name,
-          downloads: 0,
-          isDownloaded: false,
-          tags: [category.name],
-        };
-      }
-    }
+    // Create placeholder poster with preview image (if available)
+    // PosterPlayerScreen will fetch the actual templates when greetingCategory is provided
+    // No need to block navigation with API calls - navigate immediately for better UX
+    const selectedPoster: Template = {
+      id: 'loading', // Use 'loading' placeholder - PosterPlayerScreen will replace it with actual template
+      name: category.name,
+      thumbnail: previewUri || '', // Use preview image if available, otherwise empty (PosterPlayerScreen will handle)
+      category: category.name,
+      downloads: 0,
+      isDownloaded: false,
+      tags: [category.name],
+    };
 
+    // Navigate immediately without blocking on API calls
+    // PosterPlayerScreen will fetch templates based on greetingCategory parameter
     navigation.navigate('PosterPlayer', {
       selectedPoster: selectedPoster,
       relatedPosters: [],
@@ -946,7 +1257,7 @@ const GreetingTemplatesScreen: React.FC = () => {
       originScreen: 'GreetingTemplates',
       posterLimit: 200,
     });
-  }, [navigation, categoryPreviewImages, extractTemplatePreview]);
+  }, [navigation, categoryPreviewImages]);
 
   const categoryColumns = useMemo(() => {
     // Tablets and bigger screens: 4 columns
@@ -1158,7 +1469,7 @@ const GreetingTemplatesScreen: React.FC = () => {
     );
   }, [categoryCardSize, categoryCardGap, categoryColumns, categoryPreviewImages, handleCategoryPress]);
 
-  // Track visible items for lazy loading
+  // Track visible items for lazy loading with prefetching ahead
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: any) => {
       if (!viewableItems || !Array.isArray(viewableItems) || viewableItems.length === 0) {
@@ -1166,11 +1477,17 @@ const GreetingTemplatesScreen: React.FC = () => {
       }
 
       const newVisibleIds = new Set<string>();
+      const allVisibleIndices: number[] = [];
 
       viewableItems.forEach((viewableItem: any) => {
         // Safely check if viewableItem and item exist
         if (!viewableItem || !viewableItem.item) {
           return;
+        }
+
+        // Track visible indices for prefetching ahead
+        if (viewableItem.index !== undefined && viewableItem.index !== null) {
+          allVisibleIndices.push(viewableItem.index);
         }
 
         // item is a row (array of categories) in our SectionList structure
@@ -1188,19 +1505,57 @@ const GreetingTemplatesScreen: React.FC = () => {
         setVisibleCategoryIds(prev => {
           const newlyVisible = Array.from(newVisibleIds).filter(id => !prev.has(id));
           if (newlyVisible.length > 0) {
-            // Fetch previews for newly visible items
+            // IMMEDIATE: Fetch previews for newly visible items with high priority
             fetchPreviewsForCategories(newlyVisible, 'high');
+            
+            // IMMEDIATE: Prefetch images for newly visible categories that already have preview URIs
+            newlyVisible.forEach(categoryId => {
+              const previewUri = categoryPreviewImages[categoryId] || previewCacheRef.current[categoryId];
+              if (previewUri && !prefetchedImagesRef.current.has(previewUri)) {
+                prefetchedImagesRef.current.add(previewUri);
+                Image.prefetch(previewUri).catch(() => {});
+              }
+            });
           }
           return newVisibleIds;
         });
       }
+
+      // LAZY LOADING: Prefetch ahead of scroll position
+      if (allVisibleIndices.length > 0 && groupedCategories.length > 0) {
+        const maxVisibleIndex = Math.max(...allVisibleIndices);
+        const prefetchAheadRows = 2; // Prefetch 2 rows ahead
+        const categoriesPerRow = categoryColumns;
+        const prefetchAheadCount = prefetchAheadRows * categoriesPerRow;
+        
+        // Calculate which categories are ahead of visible area
+        const allCategories: GreetingCategory[] = [];
+        groupedCategories.forEach(section => {
+          section.data.forEach(row => {
+            row.forEach(category => {
+              allCategories.push(category);
+            });
+          });
+        });
+        
+        // Get categories ahead of current scroll position
+        const startIndex = maxVisibleIndex + 1;
+        const endIndex = Math.min(startIndex + prefetchAheadCount, allCategories.length);
+        const aheadCategories = allCategories.slice(startIndex, endIndex);
+        
+        if (aheadCategories.length > 0) {
+          const aheadIds = aheadCategories.map(c => c.id);
+          // Fetch previews for ahead categories with lower priority (non-blocking)
+          fetchPreviewsForCategories(aheadIds, 'low');
+        }
+      }
     },
-    [fetchPreviewsForCategories],
+    [fetchPreviewsForCategories, categoryPreviewImages, groupedCategories, categoryColumns],
   );
 
   const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 30, // Item is considered visible when 30% is shown
-    minimumViewTime: 100,
+    itemVisiblePercentThreshold: 20, // Reduced from 30% for earlier detection
+    minimumViewTime: 50, // Reduced from 100ms for faster response
     waitForInteraction: false,
   }).current;
 
@@ -1372,12 +1727,12 @@ const GreetingTemplatesScreen: React.FC = () => {
             />
           }
           stickySectionHeadersEnabled={false}
-          // Enhanced performance optimizations
+          // Enhanced performance optimizations for faster initial render
           removeClippedSubviews={true}
-          maxToRenderPerBatch={Math.max(categoryColumns * 2, 8)}
-          windowSize={5}
-          initialNumToRender={Math.max(categoryColumns * 2, 8)}
-          updateCellsBatchingPeriod={80}
+          maxToRenderPerBatch={Math.max(categoryColumns * 3, 12)} // Increased for better initial coverage
+          windowSize={3} // Reduced from 5 for faster initial render
+          initialNumToRender={Math.max(categoryColumns * 4, 16)} // Increased for immediate visibility
+          updateCellsBatchingPeriod={50} // Reduced from 80ms for faster updates
           // Lazy loading for thumbnails
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}

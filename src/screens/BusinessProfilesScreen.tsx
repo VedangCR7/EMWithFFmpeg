@@ -1126,6 +1126,12 @@ const BusinessProfilesScreen: React.FC = () => {
       >
         {/* Header */}
         <View style={[styles.header, { paddingTop: insets.top + responsiveSpacing.sm }]}>
+          <TouchableOpacity 
+            style={[styles.backButton, { backgroundColor: theme.colors.cardBackground }]}
+            onPress={() => navigation.goBack()}
+          >
+            <Icon name="arrow-back" size={24} color={theme.colors.text} />
+          </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: isDarkMode ? '#ffffff' : '#1a1a1a' }]}>Business Profiles</Text>
           <TouchableOpacity
             style={[styles.addButton, { backgroundColor: theme.colors.cardBackground }]}
@@ -1505,6 +1511,17 @@ const styles = StyleSheet.create({
     fontSize: Math.min(responsiveText.heading * 0.8, 16),
     fontWeight: 'bold',
     color: '#ffffff',
+    flex: 1,
+    textAlign: 'center',
+  },
+  backButton: {
+    width: Math.min(40, screenWidth * 0.09),
+    height: Math.min(40, screenWidth * 0.09),
+    borderRadius: Math.min(20, screenWidth * 0.045),
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: Math.min(12, screenWidth * 0.03),
+    ...responsiveShadow.small,
   },
   addButton: {
     width: Math.max(32, screenWidth * 0.08),
