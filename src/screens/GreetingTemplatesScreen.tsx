@@ -239,9 +239,6 @@ const GreetingTemplatesScreen: React.FC = () => {
               return Image.prefetch(url).catch(() => {});
             })
           );
-          if (__DEV__) {
-            console.log(`[GREETING PRELOAD] ✅ Critical: ${criticalImages.length} cached images preloaded`);
-          }
         }
         
         // Phase 2: HIGH PRIORITY - Preload newly fetched preview images
@@ -262,11 +259,7 @@ const GreetingTemplatesScreen: React.FC = () => {
                 prefetchedImagesRef.current.add(url);
                 return Image.prefetch(url).catch(() => {});
               })
-            ).then(() => {
-              if (__DEV__) {
-                console.log(`[GREETING PRELOAD] ✅ High Priority: ${highPriorityImages.length} images preloaded`);
-              }
-            });
+            );
           }
         }, 300); // Start after 300ms
         
@@ -288,17 +281,11 @@ const GreetingTemplatesScreen: React.FC = () => {
                 prefetchedImagesRef.current.add(url);
                 return Image.prefetch(url).catch(() => {});
               })
-            ).then(() => {
-              if (__DEV__) {
-                console.log(`[GREETING PRELOAD] ✅ Medium Priority: ${mediumPriorityImages.length} images preloaded`);
-              }
-            });
+            );
           }
         }, 1000); // Start after 1s
       } catch (error) {
-        if (__DEV__) {
-          console.warn('[GREETING PRELOAD] Error in critical image preloading:', error);
-        }
+        // Error in critical image preloading - silently continue
       }
     };
     
@@ -391,9 +378,7 @@ const GreetingTemplatesScreen: React.FC = () => {
 
           selectedTemplate = matchingDirect || directTemplates?.[0] || null;
         } catch (error) {
-          if (__DEV__) {
-            console.warn(`⚠️ Direct preview fetch failed for ${categoryName}:`, error);
-          }
+          // Direct preview fetch failed - continue with search
         }
 
         // If direct fetch failed, try search with multiple variations
@@ -440,9 +425,7 @@ const GreetingTemplatesScreen: React.FC = () => {
 
             selectedTemplate = matchingTemplate || allTemplates?.[0] || null;
           } catch (error) {
-            if (__DEV__) {
-              console.warn(`⚠️ Failed to fetch preview for greeting category ${categoryName}:`, error);
-            }
+            // Search failed - continue with fallback
           }
         }
 
@@ -487,7 +470,7 @@ const GreetingTemplatesScreen: React.FC = () => {
         
         return previewUri;
       } catch (error) {
-        console.warn(`Error fetching preview for category ${category.name}:`, error);
+        // Error fetching preview for category - return null
         return null;
       }
     },
@@ -676,11 +659,7 @@ const GreetingTemplatesScreen: React.FC = () => {
                 if (imagesToPrefetch.length > 0) {
                   Promise.allSettled(
                     imagesToPrefetch.map(url => Image.prefetch(url).catch(() => {}))
-                  ).then(() => {
-                    if (__DEV__) {
-                      console.log(`[GREETING] ✅ Prefetched ${imagesToPrefetch.length} cached thumbnails immediately`);
-                    }
-                  });
+                  );
                 }
               }
             }
@@ -801,9 +780,6 @@ const GreetingTemplatesScreen: React.FC = () => {
       }
     } catch (error) {
       logger.error('Error fetching greeting categories:', error);
-      if (__DEV__) {
-        console.error('[GreetingTemplatesScreen] Error details:', error);
-      }
       if (!isRefresh) {
         Alert.alert('Error', 'Failed to load greeting categories. Please try again.');
       }
@@ -874,11 +850,7 @@ const GreetingTemplatesScreen: React.FC = () => {
     if (imagesToPrefetch.length > 0) {
       Promise.allSettled(
         imagesToPrefetch.map(url => Image.prefetch(url).catch(() => {}))
-      ).then(() => {
-        if (__DEV__) {
-          console.log(`[GREETING] ✅ Prefetched ${imagesToPrefetch.length} visible thumbnails`);
-        }
-      });
+      );
     }
   }, [visibleCategoryIds, categories, fetchPreviewsForCategories, categoryPreviewImages]);
 
@@ -910,11 +882,7 @@ const GreetingTemplatesScreen: React.FC = () => {
       if (cachedImagesToPrefetch.length > 0) {
         Promise.allSettled(
           cachedImagesToPrefetch.map(url => Image.prefetch(url).catch(() => {}))
-        ).then(() => {
-          if (__DEV__) {
-            console.log(`[GREETING] ✅ IMMEDIATE: Prefetched ${cachedImagesToPrefetch.length} cached thumbnails`);
-          }
-        });
+        );
       }
     }
     
@@ -1094,9 +1062,6 @@ const GreetingTemplatesScreen: React.FC = () => {
       
       if (missingCategories.length > 0 && isMountedRef.current) {
         const missingIds = missingCategories.map(c => c.id);
-        if (__DEV__) {
-          console.log(`[GREETING] 🔄 Fetching ${missingIds.length} missing category previews`);
-        }
         // Fetch missing previews with low priority
         fetchPreviewsForCategories(missingIds, 'low');
       }
@@ -1237,7 +1202,7 @@ const GreetingTemplatesScreen: React.FC = () => {
         }
       }
     } catch (error) {
-      console.error('Error refreshing greeting categories:', error);
+      // Error refreshing greeting categories
       Alert.alert('Error', 'Unable to refresh categories right now.');
     } finally {
       if (isMountedRef.current) {
@@ -1438,15 +1403,6 @@ const GreetingTemplatesScreen: React.FC = () => {
   const renderCategoryCard = useCallback(({ item, index, section }: { item: GreetingCategory[]; index: number; section: { title: string; data: GreetingCategory[][] } }) => {
     // item is now a row (array of categories)
     // Each row should only contain up to categoryColumns items
-    if (__DEV__ && index === 0) {
-      console.log('[GreetingTemplatesScreen] renderCategoryCard:', {
-        sectionTitle: section.title,
-        rowIndex: index,
-        categoriesInRow: item.length,
-        categoryIds: item.map(c => c.id),
-      });
-    }
-    
     if (!item || item.length === 0) {
       return null;
     }
