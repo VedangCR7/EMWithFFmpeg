@@ -127,6 +127,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
     name: '',
     description: '',
     category: '',
+    subcategory: '',
     address: '',
     phone: '',
     alternatePhone: '',
@@ -150,7 +151,9 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
   const [phoneValidationError, setPhoneValidationError] = useState<string>('');
   const [alternatePhoneValidationError, setAlternatePhoneValidationError] = useState<string>('');
   const [categories, setCategories] = useState<BusinessCategory[]>([]);
+  const [subcategories, setSubcategories] = useState<BusinessCategory[]>([]);
   const [isLoadingCategories, setIsLoadingCategories] = useState<boolean>(true);
+  const [isLoadingSubcategories, setIsLoadingSubcategories] = useState<boolean>(false);
   const [showCategoryErrorModal, setShowCategoryErrorModal] = useState<boolean>(false);
   const [categoryErrorModalAnimation] = useState(new Animated.Value(0));
   const inputRefs = useRef<Record<string, RNTextInput | null>>({});
@@ -196,32 +199,17 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
         if (response.success && response.categories && response.categories.length > 0) {
           console.log('✅ [REGISTRATION] Categories fetched successfully:', response.categories.length);
           
-          // Filter to show only business categories (exclude greeting categories)
-          const businessCategoriesOnly = response.categories.filter((category: any) => {
-            // Exclude categories that are clearly greeting categories
-            const greetingKeywords = [
-              'birthday', 'wedding', 'anniversary', 'congratulations', 'thank you',
-              'get well', 'sympathy', 'holiday', 'christmas', 'new year', 'valentine',
-              'mother\'s day', 'father\'s day', 'easter', 'diwali', 'eid', 'halloween',
-              'greeting', 'card', 'invitation', 'celebration', 'festival', 'party'
-            ];
-            
-            const categoryName = category.name?.toLowerCase() || '';
-            const isGreetingCategory = greetingKeywords.some(keyword => 
-              categoryName.includes(keyword) || categoryName === keyword
-            );
-            
-            // Also check if it has parentCategoryName that indicates it's a greeting category
-            const parentCategoryName = category.parentCategoryName?.toLowerCase() || '';
-            const isGreetingParent = greetingKeywords.some(keyword => 
-              parentCategoryName.includes(keyword) || parentCategoryName === keyword
-            );
-            
-            return !isGreetingCategory && !isGreetingParent;
+          // Print each category details
+          response.categories.forEach((category: any, index: number) => {
+            console.log(`📋 [REGISTRATION] Category ${index + 1}:`, {
+              id: category.id,
+              name: category.name,
+              parentCategoryName: category.parentCategoryName
+            });
           });
           
-          console.log('✅ [REGISTRATION] Filtered business categories:', businessCategoriesOnly.length);
-          setCategories(businessCategoriesOnly);
+          // Show all categories without filtering
+          setCategories(response.categories);
         } else {
           console.warn('⚠️ [REGISTRATION] No categories received from API');
           // Keep empty array, will show empty state in UI
@@ -271,6 +259,51 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
 
     fetchCategories();
   }, []);
+
+  // Fetch subcategories for a selected category
+  const fetchSubcategories = async (selectedCategory: string) => {
+    try {
+      setIsLoadingSubcategories(true);
+      console.log('📡 [REGISTRATION] Fetching subcategories for category:', selectedCategory);
+      
+      // Use the same API endpoint but filter by parent category
+      const response = await businessCategoriesService.getBusinessCategories();
+      
+      if (response.success && response.categories && response.categories.length > 0) {
+        // Filter categories that have the selected category as parent
+        const categorySubcategories = response.categories.filter((category: any) => {
+          const parentCategoryName = category.parentCategoryName?.toLowerCase() || '';
+          const selectedCategoryLower = selectedCategory.toLowerCase();
+          
+          // Match if parentCategoryName matches the selected category
+          return parentCategoryName === selectedCategoryLower || 
+                 parentCategoryName.includes(selectedCategoryLower) ||
+                 selectedCategoryLower.includes(parentCategoryName);
+        });
+        
+        console.log('✅ [REGISTRATION] Subcategories fetched:', categorySubcategories.length);
+        
+        // Print subcategory details
+        categorySubcategories.forEach((subcategory: any, index: number) => {
+          console.log(`📋 [REGISTRATION] Subcategory ${index + 1}:`, {
+            id: subcategory.id,
+            name: subcategory.name,
+            parentCategoryName: subcategory.parentCategoryName
+          });
+        });
+        
+        setSubcategories(categorySubcategories);
+      } else {
+        console.warn('⚠️ [REGISTRATION] No subcategories found for category:', selectedCategory);
+        setSubcategories([]);
+      }
+    } catch (error: any) {
+      console.error('❌ [REGISTRATION] Error fetching subcategories:', error);
+      setSubcategories([]);
+    } finally {
+      setIsLoadingSubcategories(false);
+    }
+  };
 
   // Validate phone with real-time digit count feedback (exactly 10 digits)
   const validatePhone = (phone: string): string => {
@@ -332,11 +365,27 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
       }
       return;
     }
-
-    setFormData(prev => ({
-      ...prev,
-      [field]: value,
-    }));
+    
+    // Handle category selection - fetch subcategories
+    if (field === 'category') {
+      setFormData(prev => ({
+        ...prev,
+        [field]: value,
+        subcategory: '', // Reset subcategory when category changes
+      }));
+      
+      // Fetch subcategories for the selected category
+      if (value) {
+        fetchSubcategories(value);
+      } else {
+        setSubcategories([]); // Clear subcategories if no category selected
+      }
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [field]: value,
+      }));
+    }
 
     // Clear validation error when user starts typing
     if (validationErrors[field]) {
@@ -410,6 +459,11 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
       errors.category = 'Business category is required to help us serve you better';
     }
 
+    // Subcategory validation (only if subcategories exist for the selected category)
+    if (formData.category && subcategories.length > 0 && !formData.subcategory.trim()) {
+      errors.subcategory = 'Business subcategory is required to help us serve you better';
+    }
+
     // Confirm Password validation
     if (!formData.confirmPassword.trim()) {
       errors.confirmPassword = 'Please confirm your password';
@@ -460,7 +514,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
         companyName: formData.name.trim(),
         phoneNumber: formData.phone.trim(),
         description: formData.description.trim(),
-        category: formData.category.trim(),
+        category: formData.subcategory.trim() || formData.category.trim(), // Use subcategory if available, otherwise use category
         address: formData.address.trim(),
         alternatePhone: formData.alternatePhone.trim(),
         website: formData.website.trim(),
@@ -761,6 +815,101 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                     </ScrollView>
                   )}
               </View>
+              
+              {/* Subcategory Field - Only show if category is selected and subcategories exist */}
+              {formData.category && subcategories.length > 0 && (
+                <View style={styles.categorySection}>
+                  <Text style={[styles.categoryLabel, { color: theme.colors.text }]}>Subcategory *</Text>
+                  
+                  {/* Selected Subcategory Display */}
+                  <View style={styles.selectedCategoryContainer}>
+                    <TextInput
+                      style={[
+                        styles.selectedCategoryInput,
+                        { 
+                          color: theme.colors.text,
+                          borderColor: validationErrors.subcategory ? theme.colors.error : (formData.subcategory ? theme.colors.primary : theme.colors.border),
+                          backgroundColor: theme.colors.inputBackground,
+                        }
+                      ]}
+                      value={formData.subcategory}
+                      placeholder="Select your business subcategory *"
+                      placeholderTextColor={theme.colors.textSecondary}
+                      editable={false}
+                      pointerEvents="none"
+                    />
+                  </View>
+                  
+                  {/* Subcategory Validation Error */}
+                  {validationErrors.subcategory && (
+                    <View style={styles.errorContainer}>
+                      <Icon name="error" size={16} color={theme.colors.error} />
+                      <Text style={[styles.errorText, { color: theme.colors.error }]}>
+                        {validationErrors.subcategory}
+                      </Text>
+                    </View>
+                  )}
+                  
+                  {/* Subcategory Options */}
+                  {isLoadingSubcategories ? (
+                    <View style={styles.categoryLoadingContainer}>
+                      <ActivityIndicator size="small" color={theme.colors.primary} />
+                      <Text style={[styles.categoryLoadingText, { color: theme.colors.textSecondary }]}>
+                        Loading subcategories...
+                      </Text>
+                    </View>
+                  ) : subcategories.length === 0 ? (
+                    <View style={styles.categoryEmptyContainer}>
+                      <Icon name="info-outline" size={20} color={theme.colors.textSecondary} />
+                      <Text style={[styles.categoryEmptyText, { color: theme.colors.textSecondary }]}>
+                        No subcategories available for this category.
+                      </Text>
+                    </View>
+                  ) : (
+                    <ScrollView 
+                      horizontal 
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.categoryScrollContent}
+                    >
+                      {subcategories.map((subcategory) => (
+                        <TouchableOpacity
+                          key={subcategory.id || subcategory.name}
+                          style={[
+                            styles.categoryOption,
+                            { 
+                              backgroundColor: formData.subcategory === subcategory.name 
+                                ? theme.colors.primary 
+                                : (isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(102,126,234,0.1)'),
+                              borderColor: formData.subcategory === subcategory.name 
+                                ? theme.colors.primary 
+                                : (isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(102,126,234,0.3)'),
+                            },
+                            formData.subcategory === subcategory.name && {
+                              shadowColor: theme.colors.primary,
+                              shadowOffset: { width: 0, height: 2 },
+                              shadowOpacity: 0.3,
+                              shadowRadius: 4,
+                              elevation: 5,
+                            }
+                          ]}
+                          onPress={() => handleInputChange('subcategory', subcategory.name)}
+                        >
+                          <Text style={[
+                            styles.categoryOptionText,
+                            { 
+                              color: formData.subcategory === subcategory.name 
+                                ? '#ffffff' 
+                                : (isDarkMode ? '#ffffff' : theme.colors.primary)
+                            }
+                          ]}>
+                            {subcategory.name}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  )}
+                </View>
+              )}
               
               {/* Phone Number with Real-time Validation */}
               <View style={styles.inputWrapper}>
