@@ -378,18 +378,6 @@ const PosterPlayerScreen: React.FC = () => {
     const previousTemplates = allTemplatesRef.current;
     const newTemplates = typeof templates === 'function' ? templates(previousTemplates) : templates;
     allTemplatesRef.current = newTemplates;
-    
-    console.warn('🔴 [SET ALL TEMPLATES] Called:', {
-      newTemplatesCount: Array.isArray(newTemplates) ? newTemplates.length : 'unknown',
-      newTemplateIds: Array.isArray(newTemplates) ? newTemplates.map(t => t.id).slice(0, 10) : 'unknown',
-      previousCount: previousTemplates.length,
-      previousIds: previousTemplates.map(t => t.id).slice(0, 10),
-      businessCategory,
-      greetingCategory,
-      calendarDate,
-      activeCategoryRef: activeCategoryRef.current,
-      stackTrace: new Error().stack?.split('\n').slice(1, 6).join('\n')
-    });
     setAllTemplatesState(newTemplates);
   }, [businessCategory, greetingCategory, calendarDate]);
   
