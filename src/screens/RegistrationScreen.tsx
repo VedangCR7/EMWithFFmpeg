@@ -195,7 +195,33 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
         
         if (response.success && response.categories && response.categories.length > 0) {
           console.log('✅ [REGISTRATION] Categories fetched successfully:', response.categories.length);
-          setCategories(response.categories);
+          
+          // Filter to show only business categories (exclude greeting categories)
+          const businessCategoriesOnly = response.categories.filter((category: any) => {
+            // Exclude categories that are clearly greeting categories
+            const greetingKeywords = [
+              'birthday', 'wedding', 'anniversary', 'congratulations', 'thank you',
+              'get well', 'sympathy', 'holiday', 'christmas', 'new year', 'valentine',
+              'mother\'s day', 'father\'s day', 'easter', 'diwali', 'eid', 'halloween',
+              'greeting', 'card', 'invitation', 'celebration', 'festival', 'party'
+            ];
+            
+            const categoryName = category.name?.toLowerCase() || '';
+            const isGreetingCategory = greetingKeywords.some(keyword => 
+              categoryName.includes(keyword) || categoryName === keyword
+            );
+            
+            // Also check if it has parentCategoryName that indicates it's a greeting category
+            const parentCategoryName = category.parentCategoryName?.toLowerCase() || '';
+            const isGreetingParent = greetingKeywords.some(keyword => 
+              parentCategoryName.includes(keyword) || parentCategoryName === keyword
+            );
+            
+            return !isGreetingCategory && !isGreetingParent;
+          });
+          
+          console.log('✅ [REGISTRATION] Filtered business categories:', businessCategoriesOnly.length);
+          setCategories(businessCategoriesOnly);
         } else {
           console.warn('⚠️ [REGISTRATION] No categories received from API');
           // Keep empty array, will show empty state in UI
