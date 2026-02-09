@@ -8,6 +8,8 @@ export interface BusinessProfile {
   name: string;
   description: string;
   category: string;
+  subCategory?: string; // User's selected subcategory during registration
+  subcategory?: string; // Alternative field name for consistency
   address: string;
   phone: string;
   alternatePhone?: string;
@@ -25,12 +27,15 @@ export interface CreateBusinessProfileData {
   name: string;                    // Company Name (required)
   description?: string;            // Company Description (optional)
   category: string;                // Business Category (required) - Event Planners, Decorators, Sound Suppliers, Light Suppliers, Video Services
+  subCategory?: string;            // User's selected subcategory during registration
+  subcategory?: string;            // Alternative field name for consistency
   address: string;                 // Company Address (required)
   phone: string;                   // Mobile Number (required)
   alternatePhone?: string;         // Alternative Mobile Number (optional)
   email: string;                   // Email ID (required)
   website?: string;                // Company Website URL (optional)
   companyLogo?: string;           // Company Logo (optional)
+  logo?: string;                   // Alternative logo field name
 }
 
 class BusinessProfileService {
@@ -84,6 +89,8 @@ class BusinessProfileService {
               name: profile.name || profile.businessName,
               description: profile.description || '',
               category: profile.category,
+              subCategory: profile.subCategory || profile.subcategory,
+              subcategory: profile.subCategory || profile.subcategory,
               address: profile.address || '',
               phone: profile.phone || '',
               alternatePhone: profile.alternatePhone || '',
@@ -140,6 +147,8 @@ class BusinessProfileService {
             name: profile.businessName,
             description: profile.description || '',
             category: profile.category,
+            subCategory: profile.subCategory || profile.subcategory,
+            subcategory: profile.subCategory || profile.subcategory,
             address: profile.address || '',
             phone: profile.phone || '',
             alternatePhone: profile.alternatePhone || '',
@@ -184,6 +193,8 @@ class BusinessProfileService {
             name: profile.businessName,
             description: profile.description || '',
             category: profile.category,
+            subCategory: profile.subCategory || profile.subcategory,
+            subcategory: profile.subCategory || profile.subcategory,
             address: profile.address || '',
             phone: profile.phone || '',
             alternatePhone: profile.alternatePhone || '',
@@ -258,6 +269,7 @@ class BusinessProfileService {
         phone,
         address,
         category,
+        subCategory: data.subCategory || data.subcategory,
         logo: logoUrl,
         description: data.description || '',
         website: data.website || ''
@@ -271,7 +283,8 @@ class BusinessProfileService {
       if (response.data.success) {
         console.log('✅ Business profile created via API:', response.data.data.id);
         // Clear cache to force refresh
-        this.clearCache(userId);
+        const currentUser = authService.getCurrentUser();
+        this.clearCache(currentUser?.id);
         
         // Map backend response to frontend format
         const backendProfile = response.data.data;
@@ -283,6 +296,8 @@ class BusinessProfileService {
           name: backendProfile.businessName,
           description: backendProfile.description || '',
           category: backendProfile.category,
+          subCategory: backendProfile.subCategory || backendProfile.subcategory,
+          subcategory: backendProfile.subCategory || backendProfile.subcategory,
           address: backendProfile.address || '',
           phone: backendProfile.phone || '',
           alternatePhone: backendProfile.alternatePhone || '',
@@ -334,6 +349,8 @@ class BusinessProfileService {
       if (data.phone !== undefined) backendData.phone = data.phone;
       if (data.address !== undefined) backendData.address = data.address;
       if (data.category !== undefined) backendData.category = data.category;
+      if (data.subCategory !== undefined) backendData.subCategory = data.subCategory;
+      if (data.subcategory !== undefined) backendData.subCategory = data.subcategory;
       // Use 'logo' field if provided, otherwise use 'companyLogo'
       if (data.logo !== undefined) backendData.logo = data.logo;
       else if (data.companyLogo !== undefined) backendData.logo = data.companyLogo;
@@ -380,6 +397,8 @@ class BusinessProfileService {
           name: backendProfile.businessName,
           description: backendProfile.description || '',
           category: backendProfile.category,
+          subCategory: backendProfile.subCategory || backendProfile.subcategory,
+          subcategory: backendProfile.subCategory || backendProfile.subcategory,
           address: backendProfile.address || '',
           phone: backendProfile.phone || '',
           alternatePhone: backendProfile.alternatePhone || '',
@@ -592,6 +611,8 @@ class BusinessProfileService {
           name: profile.businessName,
           description: profile.description || '',
           category: profile.category,
+          subCategory: profile.subCategory || profile.subcategory,
+          subcategory: profile.subCategory || profile.subcategory,
           address: profile.address || '',
           phone: profile.phone || '',
           alternatePhone: profile.alternatePhone || '',

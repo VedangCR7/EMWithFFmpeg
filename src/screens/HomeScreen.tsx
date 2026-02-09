@@ -1870,7 +1870,7 @@ const HomeScreen: React.FC = React.memo(() => {
         const imageEntries = await Promise.allSettled(
           batch.map(async (category: BusinessCategory) => {
             try {
-              const response = await businessCategoryPostersApi.getPostersByCategory(category.name, 3); // Reduced from 6 to 3 for faster loading
+              const response = await businessCategoryPostersApi.getPostersByCategory(category.name, 200); // Request all posters to show complete collection
               const posters = response.data?.posters || [];
               const templates = posters
                 .map((poster: any) => convertBusinessPosterToTemplate(poster, category.name))
@@ -2139,11 +2139,11 @@ const HomeScreen: React.FC = React.memo(() => {
     const loadBusinessCategories = async () => {
       setBusinessCategoriesLoading(true);
       try {
-        const response = await businessCategoriesService.getBusinessCategories();
+        const response = await businessCategoriesService.getHomeBusinessCategories();
         // Print the full response (only in dev mode, and limit size)
         if (__DEV__ && response && response.success) {
           const categories = response.categories || (response as any).data?.categories || [];
-          console.log(`📋 [BUSINESS CATEGORIES] Loaded ${categories.length} categories`);
+          console.log(`📋 [HOME BUSINESS CATEGORIES] Loaded ${categories.length} categories`);
         }
         if (isMounted && response && response.success) {
           // Get all categories from response (for rotation)
@@ -3935,13 +3935,13 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
       searchQuery: '',
       templateSource: 'professional',
       businessCategory: category.name,
-      posterLimit: 6, // Limit 6 for business categories from HomeScreen
+      posterLimit: 200, // Request all posters for business categories from HomeScreen
     });
 
     // Load data in background after navigation
     InteractionManager.runAfterInteractions(async () => {
       try {
-        const response = await businessCategoryPostersApi.getPostersByCategory(category.name, 6);
+        const response = await businessCategoryPostersApi.getPostersByCategory(category.name, 200);
 
         if (response?.success && Array.isArray(response.data?.posters) && response.data.posters.length > 0) {
           const templates = response.data.posters

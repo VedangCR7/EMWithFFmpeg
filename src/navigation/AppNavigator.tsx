@@ -313,7 +313,7 @@ const CustomTabBar = (props: any) => {
     setIsLoadingPosters(true);
 
     try {
-      // Get user's business category and fetch posters
+      // Get user's business category and fetch posters with higher limit to work around backend limitation
       const response = await businessCategoryPostersApi.getUserCategoryPosters();
 
       if (response?.success && response.data?.posters && response.data.posters.length > 0) {
@@ -332,12 +332,14 @@ const CustomTabBar = (props: any) => {
         const selectedPoster = mapPosterToTemplate(response.data.posters[0]);
         const relatedPosters = response.data.posters.slice(1).map(mapPosterToTemplate);
 
-        // Navigate to PosterPlayerScreen with the posters
+        // Navigate to PosterPlayerScreen with posters
         const navigationParams = {
           selectedPoster,
           relatedPosters,
           searchQuery: '',
           templateSource: 'professional' as const,
+          businessCategory: response.data.category, // Pass the business category to PosterPlayerScreen
+          posterLimit: 200, // Add high limit to ensure more posters are loaded
         };
 
         if (navigationRef.isReady()) {

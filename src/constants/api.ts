@@ -92,6 +92,17 @@ export interface BusinessCategory {
   imageUrl?: string;
   image?: string;
   parentCategoryName?: string; // Backend returns this field name
+  subCategories?: any[]; // Array of subcategory objects
+  slug?: string;
+  color?: string;
+  posterCount?: number;
+  videoCount?: number;
+  totalContent?: number;
+  mainCategory?: string;
+  childCategoryNames?: any;
+  sortOrder?: number;
+  createdAt?: string;
+  isParent?: boolean;
 }
 
 export interface User {
