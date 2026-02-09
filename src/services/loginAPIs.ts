@@ -26,6 +26,8 @@ export interface UserRegistrationRequest {
   // Additional fields from registration form
   description?: string;
   category?: string;
+  subCategory?: string; // User's selected subcategory during registration
+  subcategory?: string; // Alternative field name for consistency
   address?: string;
   alternatePhone?: string;
   website?: string;
@@ -58,6 +60,8 @@ export interface UserProfile {
   // Additional profile fields from registration form
   description?: string;
   category?: string;
+  subCategory?: string; // User's selected subcategory during registration
+  subcategory?: string; // Alternative field name for consistency
   address?: string;
   alternatePhone?: string;
   website?: string;
@@ -168,6 +172,7 @@ class LoginAPIsService {
         // Additional fields from registration form
         description: data.description,
         category: data.category,
+        subCategory: data.subCategory || data.subcategory,
         address: data.address,
         alternatePhone: data.alternatePhone,
         website: data.website,

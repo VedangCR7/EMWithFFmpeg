@@ -153,20 +153,80 @@ const MyBusinessScreen: React.FC = () => {
   // Get dynamic dimensions with responsive columns
   const { cardWidth, cardHeight, columns, gap } = getPosterCardDimensions(currentScreenWidth, currentScreenHeight);
 
-  // Optimized load with cache support
+  // Optimized load with cache support - fetch more posters to work around backend limit
   const loadBusinessCategoryPosters = useCallback(async (isRefresh: boolean = false) => {
     setPostersLoading(true);
     try {
-      // Cache will make this instant on subsequent loads
-      const response = await businessCategoryPostersApi.getUserCategoryPosters();
+      // Always force refresh on initial load to get latest posters
+      // This ensures we don't show stale cached data
+      const forceRefresh = !isRefresh; // Force refresh on initial load
+      
+      // Clear cache to ensure fresh data
+      if (forceRefresh) {
+        businessCategoryPostersApi.clearCategoryCache(''); // Clear all cache
+      }
+      
+      // Try multiple approaches to get more posters since backend limits to 5 per request
+      const response = await businessCategoryPostersApi.getUserCategoryPosters(forceRefresh);
       console.log('📦 [MY BUSINESS] Business poster endpoint response:', JSON.stringify(response, null, 2));
       
-      if (response.success) {
-        setBusinessCategoryPosters(response.data.posters);
-        setUserBusinessCategory(response.data.category);
-      } else {
-        setBusinessCategoryPosters([]);
+      let allPosters: any[] = [];
+      let userCategory = 'General';
+      
+      if (response.success && response.data.posters) {
+        allPosters = response.data.posters;
+        userCategory = response.data.category;
+        
+        // If we got less than 10 posters, try to get more by calling the API directly with different approaches
+        if (allPosters.length < 10) {
+          console.log('🔄 [MY BUSINESS] Got limited posters, trying to fetch more...');
+          
+          try {
+            // Try direct category fetch with higher limit
+            const directResponse = await businessCategoryPostersApi.getPostersByCategory(userCategory, 50, true);
+            if (directResponse.success && directResponse.data.posters) {
+              // Merge with existing posters, avoiding duplicates
+              const existingIds = new Set(allPosters.map(p => p.id));
+              const newPosters = directResponse.data.posters.filter((p: any) => !existingIds.has(p.id));
+              allPosters = [...allPosters, ...newPosters];
+              console.log(`📦 [MY BUSINESS] Added ${newPosters.length} more posters from direct fetch`);
+            }
+          } catch (error) {
+            console.warn('⚠️ [MY BUSINESS] Direct fetch failed:', error);
+          }
+          
+          // Try with category variations if still less than 20
+          if (allPosters.length < 20 && userCategory !== 'General') {
+            try {
+              // Try related categories or variations
+              const variations = [
+                userCategory.toLowerCase(),
+                userCategory.replace(/\s+/g, ''),
+                userCategory.replace(/[^a-zA-Z0-9]/g, ' ')
+              ];
+              
+              for (const variation of variations.slice(0, 2)) { // Limit to 2 variations to avoid too many calls
+                if (variation !== userCategory) {
+                  const varResponse = await businessCategoryPostersApi.getPostersByCategory(variation, 20, true);
+                  if (varResponse.success && varResponse.data.posters) {
+                    const existingIds = new Set(allPosters.map(p => p.id));
+                    const newPosters = varResponse.data.posters.filter((p: any) => !existingIds.has(p.id));
+                    allPosters = [...allPosters, ...newPosters];
+                    console.log(`📦 [MY BUSINESS] Added ${newPosters.length} posters from variation: ${variation}`);
+                  }
+                }
+              }
+            } catch (error) {
+              console.warn('⚠️ [MY BUSINESS] Variation fetch failed:', error);
+            }
+          }
+        }
       }
+      
+      console.log(`📦 [MY BUSINESS] Final poster count: ${allPosters.length}`);
+      
+      setBusinessCategoryPosters(allPosters);
+      setUserBusinessCategory(userCategory);
       
       // Hide initial loading after first fetch
       if (initialLoading) {
@@ -235,6 +295,8 @@ const MyBusinessScreen: React.FC = () => {
       relatedPosters: relatedTemplates,
       searchQuery: '',
       templateSource: 'professional',
+      businessCategory: userBusinessCategory, // Pass the business category to PosterPlayerScreen
+      posterLimit: 200, // Load all business posters, not just 5
     });
   };
 
@@ -444,7 +506,7 @@ const MyBusinessScreen: React.FC = () => {
                   alignItems: 'center',
                   justifyContent: 'center',
                 }]}
-                onPress={loadBusinessCategoryPosters}
+                onPress={() => loadBusinessCategoryPosters(true)}
               >
                 <Text style={[styles.refreshButtonText, {
                   fontSize: dynamicModerateScale(9),

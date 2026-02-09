@@ -10,6 +10,17 @@ export interface BusinessCategory {
   imageUrl?: string;
   image?: string;
   parentCategoryName?: string; // Backend returns this field name
+  subCategories?: any[]; // Array of subcategory objects
+  slug?: string;
+  color?: string;
+  posterCount?: number;
+  videoCount?: number;
+  totalContent?: number;
+  mainCategory?: string;
+  childCategoryNames?: any;
+  sortOrder?: number;
+  createdAt?: string;
+  isParent?: boolean;
 }
 
 export interface BusinessCategoriesResponse {
@@ -81,6 +92,40 @@ class BusinessCategoriesService {
       
       // Re-throw the error instead of returning mock data
       throw error;
+    });
+  }
+
+  // Get business categories for home screen
+  async getHomeBusinessCategories(): Promise<BusinessCategoriesResponse> {
+    const cacheKey = 'home_business_categories';
+    
+    return cacheService.getOrFetch(
+      cacheKey,
+      async () => {
+        logger.log('📡 [CATEGORY API HOME] Calling: /api/mobile/business-categories/home');
+        const response = await api.get('/api/mobile/business-categories/home');
+        
+        // Print the full response
+        console.log('📋 [HOME BUSINESS CATEGORIES] Full Response:', JSON.stringify(response.data, null, 2));
+        
+        // Handle response structure: categories are in response.data.data.categories
+        const categories = response.data.data?.categories || response.data.categories || [];
+        logger.log(`✅ [CATEGORY API HOME] ${categories.length} categories fetched`);
+        
+        // Return in expected format
+        return {
+          success: response.data.success || true,
+          categories: categories
+        };
+      },
+      10 * 60 * 1000, // 10 minutes TTL
+      true // Allow stale data
+    ).catch(error => {
+      logger.error('❌ [CATEGORY API HOME] Error:', error);
+      logger.log('🔄 [CATEGORY API HOME] Falling back to main endpoint');
+      
+      // Fallback to main endpoint
+      return this.getBusinessCategories();
     });
   }
 
