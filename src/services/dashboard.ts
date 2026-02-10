@@ -19,6 +19,7 @@ export interface Template {
   isDownloaded: boolean;
   languages?: string[];
   tags?: string[];
+  description?: string;
 }
 
 export interface Category {
@@ -50,7 +51,33 @@ class DashboardService {
 
   // Search templates (mock data only)
   async searchTemplates(query: string): Promise<Template[]> {
-    return [];
+    const templates = this.getMockTemplates();
+    const searchLower = query.toLowerCase().trim();
+    
+    if (!searchLower) {
+      return [];
+    }
+    
+    return templates.filter(template => {
+      // Search in name
+      if (template.name?.toLowerCase().includes(searchLower)) return true;
+      
+      // Search in category
+      if (template.category?.toLowerCase().includes(searchLower)) return true;
+      
+      // Search in tags array
+      if (template.tags && Array.isArray(template.tags)) {
+        const tagMatch = template.tags.some((tag: string) => 
+          tag?.toLowerCase().includes(searchLower)
+        );
+        if (tagMatch) return true;
+      }
+      
+      // Search in description (if available)
+      if ((template as any).description?.toLowerCase().includes(searchLower)) return true;
+      
+      return false;
+    });
   }
 
   // Get templates by category (mock data only)
@@ -114,54 +141,60 @@ class DashboardService {
         name: 'Modern Business Card',
         thumbnail: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=300&h=200&fit=crop',
         category: 'Business',
-
         downloads: 89,
         isDownloaded: false,
+        tags: ['business', 'professional', 'corporate', 'modern', 'card'],
+        description: 'A modern and professional business card design',
       },
       {
         id: '2',
         name: 'Festive Celebration',
         thumbnail: 'https://images.unsplash.com/photo-1511578314322-379afb476865?w=300&h=200&fit=crop',
         category: 'Celebration',
-
         downloads: 167,
         isDownloaded: false,
+        tags: ['festival', 'celebration', 'party', 'joy', 'festive'],
+        description: 'Colorful festive celebration poster design',
       },
       {
         id: '3',
         name: 'Special Offer',
         thumbnail: 'https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?w=300&h=200&fit=crop',
         category: 'Marketing',
-
         downloads: 45,
         isDownloaded: true,
+        tags: ['marketing', 'offer', 'sale', 'discount', 'promotion'],
+        description: 'Eye-catching special offer marketing template',
       },
       {
         id: '4',
         name: 'Professional Portfolio',
         thumbnail: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=300&h=200&fit=crop',
         category: 'Portfolio',
-
         downloads: 198,
         isDownloaded: false,
+        tags: ['portfolio', 'professional', 'work', 'showcase', 'creative'],
+        description: 'Professional portfolio showcase template',
       },
       {
         id: '5',
         name: 'Event Invitation',
         thumbnail: 'https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=300&h=200&fit=crop',
         category: 'Events',
-
         downloads: 123,
         isDownloaded: false,
+        tags: ['event', 'invitation', 'party', 'celebration', 'gathering'],
+        description: 'Elegant event invitation design',
       },
       {
         id: '6',
         name: 'Product Showcase',
         thumbnail: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=300&h=200&fit=crop',
         category: 'Product',
-
         downloads: 87,
         isDownloaded: false,
+        tags: ['product', 'showcase', 'display', 'marketing', 'presentation'],
+        description: 'Modern product showcase template',
       },
     ];
   }

@@ -2664,12 +2664,18 @@ const HomeScreen: React.FC = React.memo(() => {
           
           // Combine results and remove duplicates based on id
           const allResults = [...convertedGreetingResults, ...convertedGeneralCategoryResults];
-          const uniqueResults = Array.from(
+          const uniqueApiResults = Array.from(
             new Map(allResults.map(template => [template.id, template])).values()
           );
           
           if (currentRequestId === requestId) {
-            setTemplates(uniqueResults);
+            // Merge API results with existing local results, preserving local results
+            setTemplates(prevTemplates => {
+              const combinedResults = [...prevTemplates, ...uniqueApiResults];
+              return Array.from(
+                new Map(combinedResults.map(template => [template.id, template])).values()
+              );
+            });
           }
         } catch (error) {
           if (__DEV__) {
@@ -2816,7 +2822,13 @@ const HomeScreen: React.FC = React.memo(() => {
         
         // Only update if this is still the current request and we're still searching
         if (currentRequestId === requestId && isSearching) {
-          setTemplates(uniqueResults);
+          // Merge API results with existing local results, preserving local results
+          setTemplates(prevTemplates => {
+            const combinedResults = [...prevTemplates, ...uniqueResults];
+            return Array.from(
+              new Map(combinedResults.map(template => [template.id, template])).values()
+            );
+          });
         }
       } catch (error) {
         devError('Search error:', error);
