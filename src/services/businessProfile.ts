@@ -662,7 +662,7 @@ class BusinessProfileService {
       }
 
       const payload = {
-        amount: params?.amount ?? 499,
+        amount: params?.amount ?? 599,
         currency: params?.currency ?? 'INR',
       };
 

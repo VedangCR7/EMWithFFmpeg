@@ -627,7 +627,7 @@ const BusinessProfilesScreen: React.FC = () => {
 
       // Create payment order for business profile
       const orderDetails = await businessProfileService.createBusinessProfilePaymentOrder({
-        amount: 499,
+        amount: 599,
         currency: 'INR',
       });
       console.log('📦 [BUSINESS PAY] create-payment-order response:', orderDetails);
@@ -640,7 +640,7 @@ const BusinessProfilesScreen: React.FC = () => {
         ? orderDetails.amountInPaise
         : orderDetails.amount
           ? Math.round(Number(orderDetails.amount) * 100)
-          : 49900;
+          : 59900;
 
       if (!amountInPaise) {
         throw new Error('Invalid payment amount. Please contact support.');
