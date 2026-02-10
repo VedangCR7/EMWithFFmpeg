@@ -685,7 +685,7 @@ const PosterPlayerScreen: React.FC = () => {
       userSelectedPosterRef.current = null; // Clear user selection when navigating from different screen
       userManuallySelectedLanguageRef.current = false; // Allow auto-detection for new category/poster
       // Clear allTemplates immediately to prevent showing old posters in grid
-      setAllTemplates([]);
+      // setAllTemplates([]); // REMOVED - This was causing templates to be cleared when switching categories
     }
     
     // If initialPoster ID changed, update immediately regardless of category type
@@ -759,10 +759,10 @@ const PosterPlayerScreen: React.FC = () => {
       return;
     }
 
-    // Clear allTemplates immediately to prevent showing old posters in grid
-    setAllTemplates([]);
     // Reset manual language selection when switching categories to allow auto-detection
     userManuallySelectedLanguageRef.current = false;
+    // Set language to english to avoid language switching issues
+    setSelectedLanguage('english');
     // Track active category to prevent other useEffects from overwriting templates
     activeCategoryRef.current = { type: 'business', value: businessCategory };
 
@@ -1921,7 +1921,7 @@ const PosterPlayerScreen: React.FC = () => {
     const initialPosterId = initialPoster.id;
     const prevId = prevInitialPosterIdRef.current;
     if (prevId !== null && prevId !== initialPosterId) {
-      setAllTemplates([]);
+      // setAllTemplates([]); // REMOVED - This was causing templates to be cleared when language detection changes initial poster
     }
 
     const ensureLanguages = (template: Template): Template => mergeTemplateLanguages(template);
