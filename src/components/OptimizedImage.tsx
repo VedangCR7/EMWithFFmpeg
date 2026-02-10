@@ -156,7 +156,7 @@ const applyCloudinaryTransform = (input: string, targetWidth: number, highQualit
  * - Detail views: Use mode="full" with fullImageUri prop
  */
 const OptimizedImage: React.FC<OptimizedImageProps> = ({
-  uri = '',
+  uri,
   style,
   resizeMode = 'cover',
   showLoader = true,
@@ -167,7 +167,9 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
   fullImageUri,
   cacheKey,
 }) => {
-  const sanitizedUri = useMemo(() => (typeof uri === 'string' ? uri.trim() : ''), [uri]);
+  const processedUri = useMemo(() => ensureImageUri(uri || ''), [uri]);
+  
+  const sanitizedUri = useMemo(() => (typeof processedUri === 'string' ? processedUri.trim() : ''), [processedUri]);
   const sanitizedFullImageUri = useMemo(() => (typeof fullImageUri === 'string' ? fullImageUri.trim() : ''), [fullImageUri]);
   
   // Determine which mode to use

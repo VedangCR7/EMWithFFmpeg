@@ -12,6 +12,7 @@ export interface Template {
   id: string;
   name: string;
   thumbnail: string;
+  thumbnailUrl?: string; // Add thumbnailUrl for better compatibility with PosterPlayerScreen
   videoUrl?: string;
   category: string;
   downloads: number;

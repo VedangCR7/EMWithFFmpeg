@@ -597,13 +597,14 @@ const convertBusinessPosterToTemplate = (poster: any, categoryName: string): Tem
       .filter((tag: string) => tag.length > 0);
   }
 
-  // Prioritize thumbnailUrl for better performance (smaller, optimized images)
-  const thumbnail = poster.thumbnailUrl || poster.thumbnail || poster.imageUrl || '';
+  // Prioritize thumbnail field (already converted to absolute URL by API service)
+  const thumbnail = poster.thumbnail || poster.thumbnailUrl || poster.imageUrl || '';
 
   return {
     id: poster.id,
     name: poster.title || poster.name || `${categoryName} Poster`,
     thumbnail: thumbnail,
+    thumbnailUrl: thumbnail, // Set thumbnailUrl for better compatibility with PosterPlayerScreen
     category: poster.category || categoryName,
     downloads: poster.downloads || 0,
     isDownloaded: false,
@@ -1872,10 +1873,11 @@ const HomeScreen: React.FC = React.memo(() => {
             try {
               const response = await businessCategoryPostersApi.getPostersByCategory(category.name, 200); // Request all posters to show complete collection
               const posters = response.data?.posters || [];
+              
               const templates = posters
                 .map((poster: any) => convertBusinessPosterToTemplate(poster, category.name))
                 .filter((template: Template) => !!template.thumbnail)
-                .slice(0, 3); // Only need first 3 for preview
+                .slice(0, 6); // Show 6 images for business categories
               
               if (templates.length > 0) {
                 // Prefetch first thumbnail immediately for instant display
@@ -3914,7 +3916,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
         selectedPoster: cachedTemplates[0],
         relatedPosters: cachedTemplates.slice(1),
         searchQuery: '',
-        templateSource: 'greeting',
+        templateSource: 'professional', // Use 'professional' for business categories
         businessCategory: category.name,
         posterLimit: 6, // Limit 6 for business categories from HomeScreen
       });
@@ -3922,8 +3924,11 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
     }
 
     // Navigate immediately with loading state, then load data in background
+    // Use loading placeholder since we'll fetch actual data in background
+    const firstPoster = null;
+    
     navigation.navigate('PosterPlayer', {
-      selectedPoster: {
+      selectedPoster: firstPoster || {
         id: 'loading',
         name: category.name,
         thumbnail: '',
@@ -3931,9 +3936,9 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
         downloads: 0,
         isDownloaded: false,
       },
-      relatedPosters: [],
+      relatedPosters: firstPoster ? [firstPoster] : [],
       searchQuery: '',
-      templateSource: 'professional',
+      templateSource: 'professional', // Use 'professional' for business categories
       businessCategory: category.name,
       posterLimit: 200, // Request all posters for business categories from HomeScreen
     });

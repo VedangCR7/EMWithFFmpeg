@@ -8,6 +8,7 @@ export interface Template {
   title: string;
   description: string;
   imageUrl: string;
+  thumbnailUrl?: string; // Add thumbnailUrl for better compatibility
   category: 'free' | 'premium';
   language: string;
   tags: string[];

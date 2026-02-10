@@ -6,6 +6,7 @@ export interface Template {
   name: string;
   description: string;
   thumbnail: string;
+  thumbnailUrl?: string; // Add thumbnailUrl for better compatibility
   imageUrl: string;
   category: 'free' | 'premium';
   type: 'daily' | 'festival' | 'special';

@@ -8,8 +8,10 @@ import {
   Dimensions,
   StatusBar,
   FlatList,
+  ScrollView,
   PanResponder,
   Modal,
+  ActivityIndicator,
   InteractionManager,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -48,7 +50,7 @@ const extractLanguagesFromTags = (tags: unknown): string[] => {
       // Match full language name as whole word only (case-insensitive)
       // This prevents false positives like "Hiring" matching "hi"
       const wordBoundaryRegex = new RegExp(`\\b${keyword}\\b`, 'i');
-      return normalizedTags.some((tag: string) => wordBoundaryRegex.test(tag));
+      return normalizedTags.some(tag => wordBoundaryRegex.test(tag));
     });
     
     if (matches) {
@@ -107,7 +109,7 @@ const templateContainsLanguage = (template: Template, languageId: string): boole
     const hasLanguageKeyword = keywords.some(keyword => {
       // Match full language name as whole word only (case-insensitive)
       const wordBoundaryRegex = new RegExp(`\\b${keyword}\\b`, 'i');
-      return normalizedTags.some((tag: string) => wordBoundaryRegex.test(tag));
+      return normalizedTags.some(tag => wordBoundaryRegex.test(tag));
     });
     
     if (hasLanguageKeyword) {
@@ -123,7 +125,7 @@ const templateContainsLanguage = (template: Template, languageId: string): boole
         return langKeywords.some(keyword => {
           // Match full language name as whole word only
           const wordBoundaryRegex = new RegExp(`\\b${keyword}\\b`, 'i');
-          return normalizedTags.some((tag: string) => wordBoundaryRegex.test(tag));
+          return normalizedTags.some(tag => wordBoundaryRegex.test(tag));
         });
       });
       
@@ -320,6 +322,7 @@ const PosterPlayerScreen: React.FC = () => {
   
   // Dynamic device detection that updates on rotation
   const isTabletDevice = useMemo(() => screenWidth >= 768, [screenWidth]);
+  const isLandscapeMode = useMemo(() => screenWidth > screenHeight, [screenWidth, screenHeight]);
   
   // Responsive scaling functions with safety checks
   const scale = useCallback((size: number) => {
@@ -328,6 +331,13 @@ const PosterPlayerScreen: React.FC = () => {
     }
     return (screenWidth / 375) * size;
   }, [screenWidth]);
+  
+  const verticalScale = useCallback((size: number) => {
+    if (!screenHeight || isNaN(screenHeight) || screenHeight <= 0) {
+      return size; // Fallback to original size if screenHeight is invalid
+    }
+    return (screenHeight / 667) * size;
+  }, [screenHeight]);
   
   const moderateScale = useCallback((size: number, factor = 0.5) => {
     const scaled = scale(size);
@@ -342,14 +352,10 @@ const PosterPlayerScreen: React.FC = () => {
     relatedPosters: initialRelatedPosters,
     businessCategory,
     greetingCategory,
-    originScreen = 'GreetingTemplates',
+    originScreen,
     posterLimit,
     calendarDate,
-  } = route.params as any;
-
-  const safeBusinessCategory = useMemo(() => typeof businessCategory === 'string' ? businessCategory : businessCategory?.name, [businessCategory]);
-  const safeGreetingCategory = useMemo(() => typeof greetingCategory === 'string' ? greetingCategory : greetingCategory?.name, [greetingCategory]);
-
+  } = route.params;
   // Convert initialPoster to Template format if it's a GreetingTemplate
   // GreetingTemplates have content.background which should be used as thumbnail if thumbnail is missing
   const convertedInitialPoster = useMemo(() => {
@@ -372,8 +378,20 @@ const PosterPlayerScreen: React.FC = () => {
     const previousTemplates = allTemplatesRef.current;
     const newTemplates = typeof templates === 'function' ? templates(previousTemplates) : templates;
     allTemplatesRef.current = newTemplates;
+    
+    console.warn('🔴 [SET ALL TEMPLATES] Called:', {
+      newTemplatesCount: Array.isArray(newTemplates) ? newTemplates.length : 'unknown',
+      newTemplateIds: Array.isArray(newTemplates) ? newTemplates.map(t => t.id).slice(0, 10) : 'unknown',
+      previousCount: previousTemplates.length,
+      previousIds: previousTemplates.map(t => t.id).slice(0, 10),
+      businessCategory,
+      greetingCategory,
+      calendarDate,
+      activeCategoryRef: activeCategoryRef.current,
+      stackTrace: new Error().stack?.split('\n').slice(1, 6).join('\n')
+    });
     setAllTemplatesState(newTemplates);
-  }, [safeBusinessCategory, safeGreetingCategory, calendarDate]);
+  }, [businessCategory, greetingCategory, calendarDate]);
   
   // Update ref when state changes
   useEffect(() => {
@@ -555,7 +573,7 @@ const PosterPlayerScreen: React.FC = () => {
 
     // Return service-filtered results (even if empty, don't fallback to all templates)
     return serviceFiltered;
-  }, [allTemplates, selectedLanguage, templateMatchesServiceFilter, calendarDate, safeGreetingCategory, safeBusinessCategory]);
+  }, [allTemplates, selectedLanguage, templateMatchesServiceFilter, calendarDate, greetingCategory, businessCategory]);
 
   // Preload images for better scrolling performance
   const preloadImages = useCallback((posters: Template[], startIndex: number = 0, count: number = 20) => {
@@ -569,11 +587,6 @@ const PosterPlayerScreen: React.FC = () => {
         });
       }
     });
-  }, []);
-
-  // Clear all cache on component mount to ensure fresh data
-  useEffect(() => {
-    businessCategoryPostersApi.clearCategoryCache();
   }, []);
 
   // Preload images when filteredPosters change (reduced batch sizes for better performance)
@@ -742,101 +755,21 @@ const PosterPlayerScreen: React.FC = () => {
 
   // Fetch business category posters when businessCategory is provided
   useEffect(() => {
-    // Prevent running if no business category is provided (avoid initial race condition)
-    if (!safeBusinessCategory) {
+    if (!businessCategory) {
       return;
     }
 
-    // If we have relatedPosters from MyBusinessScreen, use them instead of fetching from API
-    // This avoids the 5 poster limit from the backend API
-    if (initialRelatedPosters && initialRelatedPosters.length > 0) {
-      console.log('🔍 [BUSINESS FETCH] Using relatedPosters from MyBusinessScreen instead of API:', {
-        category: safeBusinessCategory,
-        relatedPostersCount: initialRelatedPosters.length,
-        posterLimit
-      });
-      
-      // Reset manual language selection when switching categories to allow auto-detection
-      userManuallySelectedLanguageRef.current = false;
-      // Track active category to prevent other useEffects from overwriting templates
-      activeCategoryRef.current = { type: 'business', value: safeBusinessCategory || null };
-      
-      // Convert relatedPosters to Template format
-      const convertedTemplates: Template[] = initialRelatedPosters.map((poster: any) => {
-        // Normalize tags to ensure they're in the correct format
-        let normalizedTags: string[] = [];
-        if (Array.isArray(poster.tags)) {
-          normalizedTags = poster.tags.map((tag: any) => String(tag).trim()).filter((tag: string) => tag.length > 0);
-        } else if (typeof poster.tags === 'string') {
-          // Handle string tags (comma-separated or single tag)
-          normalizedTags = poster.tags.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag.length > 0);
-        }
-
-        const template: Template = {
-          id: poster.id,
-          name: poster.title || poster.name || 'Business Poster',
-          thumbnail: poster.imageUrl || poster.thumbnail || '',
-          category: poster.category || businessCategory,
-          downloads: poster.downloads || 0,
-          isDownloaded: false,
-          tags: normalizedTags,
-        };
-
-        return template;
-      });
-
-      if (convertedTemplates.length > 0) {
-        // Set first poster as current poster and others as related
-        const ensuredTemplates = convertedTemplates.map(t => mergeTemplateLanguages(t));
-        
-        console.log('🔍 [BUSINESS FETCH] Using relatedPosters templates:', {
-          category: businessCategory,
-          templateCount: ensuredTemplates.length,
-          templateIds: ensuredTemplates.map(t => t.id),
-          initialPosterId: initialPoster?.id,
-          initialPosterThumbnail: initialPoster?.thumbnail
-        });
-        
-        setAllTemplates(ensuredTemplates);
-        
-        // Try to find the initialPoster (the one that was clicked) in the loaded templates
-        // Use the clicked poster if it exists, otherwise use the first one
-        const ensuredInitialPoster = mergeTemplateLanguages(initialPoster);
-        const matchingPoster = ensuredTemplates.find(t => t.id === ensuredInitialPoster.id && ensuredInitialPoster.thumbnail);
-        const posterToSet = matchingPoster || ensuredTemplates[0];
-        
-        console.log('🔍 [BUSINESS FETCH] Poster selection:', {
-          matchingPosterFound: !!matchingPoster,
-          matchingPosterId: matchingPoster?.id,
-          posterToSetId: posterToSet.id,
-          posterToSetTags: posterToSet.tags,
-          posterToSetName: posterToSet.name
-        });
-        
-        setCurrentPoster(posterToSet);
-      }
-      return; // Skip API fetch since we used relatedPosters
-    }
-
-    // Original API fetch logic (fallback when no relatedPosters available)
+    // Clear allTemplates immediately to prevent showing old posters in grid
+    setAllTemplates([]);
     // Reset manual language selection when switching categories to allow auto-detection
     userManuallySelectedLanguageRef.current = false;
     // Track active category to prevent other useEffects from overwriting templates
-    activeCategoryRef.current = { type: 'business', value: safeBusinessCategory || null };
-    
-    // Clear allTemplates immediately to prevent showing old posters in grid
-    setAllTemplates([]);
-    // Clear cache immediately when business category changes to ensure fresh data
-    if (safeBusinessCategory) {
-      businessCategoryPostersApi.clearCategoryCache(safeBusinessCategory);
-    }
+    activeCategoryRef.current = { type: 'business', value: businessCategory };
 
     const fetchBusinessCategoryPosters = async () => {
       try {
         const limit = posterLimit || 5; // Default to 5 if not specified, use 200 for "My Business"
-        
-        // Force refresh to bypass stale cache and get latest posters
-        const response = await businessCategoryPostersApi.getPostersByCategory(safeBusinessCategory!, limit, true);
+        const response = await businessCategoryPostersApi.getPostersByCategory(businessCategory, limit);
         
         if (response.success && response.data.posters) {
           // Convert BusinessCategoryPoster to Template format (already limited to 5 by API)
@@ -937,7 +870,7 @@ const PosterPlayerScreen: React.FC = () => {
     };
 
     fetchBusinessCategoryPosters();
-  }, [safeBusinessCategory, posterLimit]);
+  }, [businessCategory, posterLimit]);
 
   // Fetch greeting category templates when greetingCategory is provided
   useEffect(() => {
@@ -968,7 +901,7 @@ const PosterPlayerScreen: React.FC = () => {
           .trim();
         
         // Generate search variations for better matching (e.g., "hiring/vacancy" -> ["hiring", "vacancy", "hiring vacancy"])
-        const categoryWords = normalizedCategory.split(/\s+/).filter((word: string) => word.length > 0);
+        const categoryWords = normalizedCategory.split(/\s+/).filter(word => word.length > 0);
         const searchVariations = [
           greetingCategory.toLowerCase(),
           normalizedCategory,
@@ -1044,9 +977,9 @@ const PosterPlayerScreen: React.FC = () => {
                 templateIds: searchTemplatesNormalized.filter((t: any) => t.category === cat).map((t: any) => t.id)
               }))
             },
-            variationResponses: variationResults.map((variationResult: any[], index: number) => ({
+            variationResponses: variationResults.map((variationResults: any[], index: number) => ({
               variation: searchVariations[index],
-              count: variationResult.length,
+              count: variationResults.length,
               allTemplates: variationResults.map((t: any) => ({
                 id: t.id,
                 name: t.name,
@@ -1066,21 +999,21 @@ const PosterPlayerScreen: React.FC = () => {
         console.log('📡 [API RESPONSE] Full JSON:', JSON.stringify(apiResponseData, null, 2));
         
         // Combine all search results and remove duplicates efficiently
-        const variationResultsFlat = [...variationResults.flat()]; // Flatten variation results
-        const searchResultsCombined = [
+        const allSearchResults = [
           ...searchTemplatesOriginal, 
           ...searchTemplatesNormalized,
-          ...variationResultsFlat
+          ...variationResults.flat() // Flatten variation results
         ];
-        const allResultsCombined = [...categoryTemplates, ...searchResultsCombined];
+        const combinedTemplates = [...categoryTemplates, ...allSearchResults];
         
         // Use Set for faster duplicate removal
         const uniqueTemplatesMap = new Map<string, any>();
-        allResultsCombined.forEach(template => {
+        combinedTemplates.forEach(template => {
           if (template?.id && !uniqueTemplatesMap.has(template.id)) {
             uniqueTemplatesMap.set(template.id, template);
           }
         });
+        const allTemplates = Array.from(uniqueTemplatesMap.values());
         
         // Log combined results for ALL greeting categories
         const combinedCategories = new Set(allTemplates.map((t: any) => t.category).filter(Boolean));
@@ -1109,51 +1042,20 @@ const PosterPlayerScreen: React.FC = () => {
         // Pre-compute normalized category and variations for efficient filtering
         const normalizedCategoryLower = normalizedCategory.toLowerCase();
         const greetingCategoryLower = greetingCategory.toLowerCase();
-        const categoryWordsLower = categoryWords.map((w: string) => w.toLowerCase());
+        const categoryWordsLower = categoryWords.map(w => w.toLowerCase());
         
         // Optimized filtering: be more lenient to catch all related templates
-        // Normalize both template categories and tags for consistent matching
         const filteredTemplates = allTemplates.filter(template => {
           const templateAny = template as any;
           const templateTags = Array.isArray(templateAny.tags) ? templateAny.tags : [];
           
           // Quick category match check first (fastest)
           if (template.category) {
-            const templateCategoryLower = template.category.toLowerCase().trim();
-            // Normalize template category the same way we normalize the search category
-            const normalizedTemplateCategory = templateCategoryLower
-              .replace(/[&]/g, 'and')
-              .replace(/[^a-z0-9\s]/g, ' ')
-              .replace(/\s+/g, ' ')
-              .trim();
-            
-            // Extract key words from both categories
-            const greetingWords = normalizedCategoryLower.split(/\s+/).filter((w: string) => w.length > 2);
-            const templateWords = normalizedTemplateCategory.split(/\s+/).filter((w: string) => w.length > 2);
-            
-            // Check if normalized categories match
-            if (normalizedTemplateCategory === normalizedCategoryLower) {
-              return true;
-            }
-            
-            // Check if template category contains all key words from greeting category
-            if (greetingWords.length > 0 && greetingWords.every((word: string) => 
-              normalizedTemplateCategory.includes(word)
-            )) {
-              return true;
-            }
-            
-            // Reverse check: if greeting category contains all key words from template
-            if (templateWords.length > 0 && templateWords.every((word: string) => 
-              normalizedCategoryLower.includes(word)
-            )) {
-              return true;
-            }
-            
-            // Also check original (non-normalized) for backward compatibility
+            const templateCategoryLower = template.category.toLowerCase();
+            // Check if category matches original, normalized, or any word
             if (templateCategoryLower.includes(greetingCategoryLower) || 
                 templateCategoryLower.includes(normalizedCategoryLower) ||
-                categoryWordsLower.some((word: string) => templateCategoryLower.includes(word))) {
+                categoryWordsLower.some(word => templateCategoryLower.includes(word))) {
               return true;
             }
           }
@@ -1162,31 +1064,11 @@ const PosterPlayerScreen: React.FC = () => {
           if (templateTags.length > 0) {
             return templateTags.some((tag: string) => {
               if (typeof tag !== 'string') return false;
-              const tagLower = tag.toLowerCase().trim();
-              
-              // Normalize tag for comparison
-              const normalizedTag = tagLower
-                .replace(/[&]/g, 'and')
-                .replace(/[^a-z0-9\s]/g, ' ')
-                .replace(/\s+/g, ' ')
-                .trim();
-              
-              const greetingWords = normalizedCategoryLower.split(/\s+/).filter((w: string) => w.length > 2);
-              
-              // Check if normalized tag matches normalized category
-              if (normalizedTag === normalizedCategoryLower || normalizedTag === greetingCategoryLower) {
-                return true;
-              }
-              
-              // Check if tag contains all key words from greeting category
-              if (greetingWords.length > 0 && greetingWords.every((word: string) => normalizedTag.includes(word))) {
-                return true;
-              }
-              
-              // Also check original (non-normalized) for backward compatibility
+              const tagLower = tag.toLowerCase();
+              // Check if tag matches original, normalized, or any word
               return tagLower.includes(greetingCategoryLower) || 
                      tagLower.includes(normalizedCategoryLower) ||
-                     categoryWordsLower.some((word: string) => tagLower.includes(word) || word.includes(tagLower));
+                     categoryWordsLower.some(word => tagLower.includes(word) || word.includes(tagLower));
             });
           }
           
@@ -1210,6 +1092,7 @@ const PosterPlayerScreen: React.FC = () => {
               const currentCategoryLower = greetingCategoryLower;
               const currentNormalizedLower = normalizedCategoryLower;
               const currentWords = categoryWordsLower;
+              const currentPoster = posterToMatch;
               const currentVariations = searchVariations;
               
               // Use same variation search for background loading
@@ -1275,9 +1158,9 @@ const PosterPlayerScreen: React.FC = () => {
                       templateIds: moreSearchNormalized.filter((t: any) => t.category === cat).map((t: any) => t.id)
                     }))
                   },
-                  variationResponses: moreVariationResults.map((variationResult: any[], index: number) => ({
+                  variationResponses: moreVariationResults.map((variationResults: any[], index: number) => ({
                     variation: currentVariations[index],
-                    count: variationResult.length,
+                    count: variationResults.length,
                     allTemplates: variationResults.map((t: any) => ({
                       id: t.id,
                       name: t.name,
@@ -1363,27 +1246,17 @@ const PosterPlayerScreen: React.FC = () => {
                   const templateTags = Array.isArray(template.tags) ? template.tags : [];
                   const tagsLower = templateTags.map((tag: any) => String(tag).toLowerCase().trim());
                   
-                  // Normalize tags for comparison
-                  const normalizedTags = tagsLower.map((tag: string) => 
-                    tag.replace(/[&]/g, 'and')
-                      .replace(/[^a-z0-9\s]/g, ' ')
-                      .replace(/\s+/g, ' ')
-                      .trim()
-                  );
-                  
-                  // Check if any normalized tag matches the normalized category
-                  if (normalizedTags.includes(currentNormalizedLowerTrimmed) || 
-                      normalizedTags.includes(currentCategoryLowerTrimmed)) {
+                  // Check if any tag exactly matches the expected category
+                  if (tagsLower.includes(currentCategoryLowerTrimmed) || 
+                      tagsLower.includes(currentNormalizedLowerTrimmed)) {
+                    // Set category to expected category so it passes later filter checks
                     template.category = currentCategory;
                     return true;
                   }
                   
-                  // Check if any tag contains all key words from current category
-                  const tagMatches = normalizedTags.some((tag: string) => {
-                    return currentWords.length > 0 && currentWords.every((word: string) => tag.includes(word));
-                  });
-                  
-                  if (tagMatches) {
+                  // Check if any tag contains the expected category (for tags like "Political Awareness English")
+                  if (tagsLower.some((tag: string) => tag === currentCategoryLowerTrimmed || tag.startsWith(currentCategoryLowerTrimmed + ' '))) {
+                    // Set category to expected category so it passes later filter checks
                     template.category = currentCategory;
                     return true;
                   }
@@ -1479,42 +1352,20 @@ const PosterPlayerScreen: React.FC = () => {
                 const categoryFilteredFinal = ensuredFinal.filter((template: any) => {
                   const templateCategory = template.category || '';
                   const templateCategoryLower = templateCategory.toLowerCase().trim();
+                  const currentCategoryLowerTrimmed = currentCategoryLower.trim();
                   const currentNormalizedLowerTrimmed = currentNormalizedLower.trim();
                   
-                  // Normalize template category the same way we normalize the search category
-                  const normalizedTemplateCategory = templateCategoryLower
-                    .replace(/[&]/g, 'and')
-                    .replace(/[^a-z0-9\s]/g, ' ')
-                    .replace(/\s+/g, ' ')
-                    .trim();
-                  
-                  // Extract key words from both categories for better matching
-                  const templateCategoryWords = currentNormalizedLowerTrimmed.split(/\s+/).filter((w: string) => w.length > 2);
-                  const templateWords = normalizedTemplateCategory.split(/\s+/).filter((w: string) => w.length > 2);
-                  
-                  // Exact match (after normalization)
-                  if (normalizedTemplateCategory === currentNormalizedLowerTrimmed) {
-                    return true;
+                  // STRICT: Only allow exact match or category that starts with current category + space
+                  // This prevents "Political" or "Awareness" from matching "Political Awareness"
+                  // Only "Political Awareness" or "Political Awareness English" will match
+                  if (templateCategoryLower === currentCategoryLowerTrimmed) {
+                    return true; // Exact match: "Political Awareness" === "Political Awareness"
                   }
                   
-                  // Check if template category contains all key words from current category
-                  const allKeyWordsMatch = templateCategoryWords.length > 0 && templateCategoryWords.every((word: string) => 
-                    normalizedTemplateCategory.includes(word)
-                  );
-                  
-                  if (allKeyWordsMatch) {
-                    return true;
-                  }
-                  
-                  // Check if template category starts with normalized category (for language variations)
-                  if (normalizedTemplateCategory.startsWith(currentNormalizedLowerTrimmed + ' ')) {
-                    return true;
-                  }
-                  
-                  // Reverse check: if current category contains all key words from template
-                  if (templateWords.length > 0 && templateWords.every((word: string) => 
-                    currentNormalizedLowerTrimmed.includes(word)
-                  )) {
+                  // Allow if category starts with current category + space (e.g., "Political Awareness English")
+                  // This allows variations like "Political Awareness Hindi" but NOT "Political" or "Awareness"
+                  if (templateCategoryLower.startsWith(currentCategoryLowerTrimmed + ' ') || 
+                      templateCategoryLower.startsWith(currentNormalizedLowerTrimmed + ' ')) {
                     return true;
                   }
                   
@@ -1609,51 +1460,25 @@ const PosterPlayerScreen: React.FC = () => {
           // Ensure all templates have languages extracted from tags
           const ensuredTemplates = convertedTemplates.map(t => mergeTemplateLanguages(t));
 
-          // Filter to include templates that match the current category
-          // Use lenient matching to handle variations - if no matches, use all templates
+          // Filter to only include templates that EXACTLY match the current category
+          // This is strict to prevent templates from other categories from showing up
           const categoryFilteredTemplates = ensuredTemplates.filter((template: any) => {
             const templateCategory = template.category || '';
             const templateCategoryLower = templateCategory.toLowerCase().trim();
             const greetingCategoryLowerTrimmed = greetingCategoryLower.trim();
             const normalizedCategoryLowerTrimmed = normalizedCategoryLower.trim();
             
-            // Normalize template category the same way we normalize the search category
-            // This handles "/" vs " " differences (e.g., "Hiring/ Vacancy" vs "Hiring Vacancy")
-            const normalizedTemplateCategory = templateCategoryLower
-              .replace(/[&]/g, 'and')
-              .replace(/[^a-z0-9\s]/g, ' ')
-              .replace(/\s+/g, ' ')
-              .trim();
-            
-            // Extract key words from both categories for better matching
-            const greetingWords = normalizedCategoryLowerTrimmed.split(/\s+/).filter((w: string) => w.length > 2); // Filter out short words like "hi"
-            const templateWords = normalizedTemplateCategory.split(/\s+/).filter((w: string) => w.length > 2);
-            
-            // Exact match (after normalization)
-            if (normalizedTemplateCategory === normalizedCategoryLowerTrimmed) {
-              return true;
+            // STRICT: Only allow exact match or category that starts with current category + space
+            // This prevents "Political" or "Awareness" from matching "Political Awareness"
+            // Only "Political Awareness" or "Political Awareness English" will match
+            if (templateCategoryLower === greetingCategoryLowerTrimmed) {
+              return true; // Exact match: "Political Awareness" === "Political Awareness"
             }
             
-            // Check if template category contains all key words from greeting category
-            // This handles "Hiring Vacancy" matching "Hiring/ Vacancy Posters"
-            const allKeyWordsMatch = greetingWords.length > 0 && greetingWords.every((word: string) => 
-              normalizedTemplateCategory.includes(word)
-            );
-            
-            if (allKeyWordsMatch) {
-              return true;
-            }
-            
-            // Check if template category starts with normalized category (for language variations)
-            if (normalizedTemplateCategory.startsWith(normalizedCategoryLowerTrimmed + ' ')) {
-              return true;
-            }
-            
-            // Reverse check: if greeting category contains all key words from template
-            // This handles "Hiring/ Vacancy Posters" matching "Hiring Vacancy"
-            if (templateWords.length > 0 && templateWords.every((word: string) => 
-              normalizedCategoryLowerTrimmed.includes(word)
-            )) {
+            // Allow if category starts with current category + space (e.g., "Political Awareness English")
+            // This allows variations like "Political Awareness Hindi" but NOT "Political" or "Awareness"
+            if (templateCategoryLower.startsWith(greetingCategoryLowerTrimmed + ' ') || 
+                templateCategoryLower.startsWith(normalizedCategoryLowerTrimmed + ' ')) {
               return true;
             }
             
@@ -1663,27 +1488,16 @@ const PosterPlayerScreen: React.FC = () => {
               const templateTags = Array.isArray(template.tags) ? template.tags : [];
               const tagsLower = templateTags.map((tag: any) => String(tag).toLowerCase().trim());
               
-              // Normalize tags for comparison
-              const normalizedTags = tagsLower.map((tag: string) => 
-                tag.replace(/[&]/g, 'and')
-                  .replace(/[^a-z0-9\s]/g, ' ')
-                  .replace(/\s+/g, ' ')
-                  .trim()
-              );
-              
-              // Check if any normalized tag matches the normalized category
-              if (normalizedTags.includes(normalizedCategoryLowerTrimmed) || 
-                  normalizedTags.includes(greetingCategoryLowerTrimmed)) {
+              // Check if any tag exactly matches the expected category
+              if (tagsLower.includes(greetingCategoryLowerTrimmed) || 
+                  tagsLower.includes(normalizedCategoryLowerTrimmed)) {
+                // Set category to expected category for consistency
                 template.category = greetingCategory;
                 return true;
               }
               
-              // Check if any tag contains all key words from greeting category
-              const tagMatches = normalizedTags.some((tag: string) => {
-                return greetingWords.length > 0 && greetingWords.every((word: string) => tag.includes(word));
-              });
-              
-              if (tagMatches) {
+              // Check if any tag contains the expected category (for tags like "Political Awareness English")
+              if (tagsLower.some((tag: string) => tag === greetingCategoryLowerTrimmed || tag.startsWith(greetingCategoryLowerTrimmed + ' '))) {
                 template.category = greetingCategory;
                 return true;
               }
@@ -1695,20 +1509,6 @@ const PosterPlayerScreen: React.FC = () => {
             // Exclude all other templates - they're from different categories
             // This includes "Political", "Awareness", "Political Campaign", etc.
             return false;
-          });
-          
-          // If filtering removed all templates, use all templates (be more lenient)
-          // This ensures we always show results even if category names don't match exactly
-          const templatesToUseForGrid = categoryFilteredTemplates.length > 0 
-            ? categoryFilteredTemplates 
-            : ensuredTemplates;
-          
-          console.log('🔍 [GREETING FETCH] Filtering results:', {
-            totalTemplates: ensuredTemplates.length,
-            filteredTemplates: categoryFilteredTemplates.length,
-            willUseFiltered: categoryFilteredTemplates.length > 0,
-            willUseAll: categoryFilteredTemplates.length === 0 && ensuredTemplates.length > 0,
-            category: greetingCategory
           });
           
           // Ensure the initially selected poster is present
@@ -1725,7 +1525,7 @@ const PosterPlayerScreen: React.FC = () => {
           const initialPosterThumbnail = initialPosterWithLanguages.thumbnail || (initialPosterWithLanguages as any).content?.background || '';
           const initialPosterBackground = (initialPosterWithLanguages as any).content?.background || '';
           
-          const matchingPosterById = templatesToUseForGrid.find(t => {
+          const matchingPosterById = categoryFilteredTemplates.find(t => {
             if (t.id !== initialPosterWithLanguages.id) return false;
             // Must have a valid thumbnail/background
             const tThumbnail = t.thumbnail || (t as any).content?.background || '';
@@ -1733,7 +1533,7 @@ const PosterPlayerScreen: React.FC = () => {
           });
           
           const matchingPosterByThumbnail = !matchingPosterById && (initialPosterThumbnail || initialPosterBackground)
-            ? templatesToUseForGrid.find(t => {
+            ? categoryFilteredTemplates.find(t => {
                 const tThumbnail = t.thumbnail || (t as any).content?.background || '';
                 // Compare both thumbnail and background URLs
                 return (tThumbnail && initialPosterThumbnail && tThumbnail === initialPosterThumbnail) ||
@@ -1745,7 +1545,7 @@ const PosterPlayerScreen: React.FC = () => {
           
           // Check if matching poster is already in the list
           if (matchingPoster) {
-            const matchingPosterIndex = templatesToUseForGrid.findIndex(t => t.id === matchingPoster.id);
+            const matchingPosterIndex = categoryFilteredTemplates.findIndex(t => t.id === matchingPoster.id);
             console.log('🔍 [GREETING FETCH] Matching poster check:', {
               matchingPosterId: matchingPoster.id,
               matchingPosterIndex,
@@ -1758,8 +1558,8 @@ const PosterPlayerScreen: React.FC = () => {
           
           // Only add initial poster to list if it's not found in fetched templates AND no match found by thumbnail
           // This prevents duplicates
-          let nextTemplates = templatesToUseForGrid;
-          const existingIndex = templatesToUseForGrid.findIndex(t => t.id === initialPosterWithLanguages.id);
+          let nextTemplates = categoryFilteredTemplates;
+          const existingIndex = categoryFilteredTemplates.findIndex(t => t.id === initialPosterWithLanguages.id);
           
           console.log('🔍 [GREETING FETCH] Duplicate check:', {
             category: greetingCategory,
@@ -1800,7 +1600,7 @@ const PosterPlayerScreen: React.FC = () => {
           });
           
           const duplicateThumbnails = Array.from(thumbnailMap.entries())
-            .filter(([_thumb, templates]) => templates.length > 1)
+            .filter(([thumb, templates]) => templates.length > 1)
             .map(([thumb, templates]) => ({ thumbnail: thumb, ids: templates.map(t => t.id) }));
           
           console.log('🔍 [GREETING FETCH] Final templates:', {
@@ -1870,32 +1670,13 @@ const PosterPlayerScreen: React.FC = () => {
               posterToSet = posterToMatch;
             } else if (nextTemplates.length > 0) {
               // Fallback to first template if clicked poster is loading placeholder or has no image
-              // ALWAYS use first template if we have templates, even if it's the loading placeholder
               posterToSet = nextTemplates[0];
-              console.log('✅ [GREETING FETCH] Using first template from nextTemplates:', {
-                templateId: posterToSet.id,
-                templateName: posterToSet.name,
-                templateThumbnail: posterToSet.thumbnail || (posterToSet as any).content?.background
-              });
-            } else if (ensuredTemplates.length > 0) {
-              // If nextTemplates is empty but we have ensuredTemplates, use the first one
-              // This handles cases where filtering removed all templates
-              posterToSet = ensuredTemplates[0];
-              console.log('✅ [GREETING FETCH] Using first template from ensuredTemplates (filtering removed all):', {
-                templateId: posterToSet.id,
-                templateName: posterToSet.name,
-                templateThumbnail: posterToSet.thumbnail || (posterToSet as any).content?.background
-              });
             }
           }
           
           // Ensure we have a valid poster
           if (!posterToSet) {
-            console.warn('⚠️ [POSTER PLAYER] No valid poster found, skipping update', {
-              nextTemplatesCount: nextTemplates.length,
-              ensuredTemplatesCount: ensuredTemplates.length,
-              categoryFilteredTemplatesCount: categoryFilteredTemplates.length
-            });
+            console.warn('⚠️ [POSTER PLAYER] No valid poster found, skipping update');
             return;
           }
           
@@ -2111,36 +1892,17 @@ const PosterPlayerScreen: React.FC = () => {
     // Skip if business category, greeting category, or calendar date is provided (handled by separate useEffects above)
     // IMPORTANT: This check must be FIRST to prevent setting allTemplates when categories are active
     // Also check activeCategoryRef to handle race conditions
-    
-    // Enhanced check: If activeCategoryRef is set but route params are undefined, 
-    // it means we navigated from a non-category screen, so clear the ref
-    const hasActiveCategory = !!(safeBusinessCategory || safeGreetingCategory || calendarDate);
+    const hasActiveCategory = !!(businessCategory || greetingCategory || calendarDate);
     const hasActiveCategoryRef = activeCategoryRef.current.type !== null;
     
-    if (hasActiveCategoryRef && !hasActiveCategory) {
-      console.log('🔄 [INITIAL POSTER SYNC] Clearing stale activeCategoryRef - route params have no category', {
-        activeCategoryRef: activeCategoryRef.current,
-        safeBusinessCategory,
-        safeGreetingCategory,
-        calendarDate
-      });
-      activeCategoryRef.current = { type: null, value: null };
-      // Don't return yet - let the useEffect continue to check again
-      // This prevents race conditions where category ref is cleared but sync hasn't re-run
-    }
-    
-    // Re-check after potential clear
-    const hasActiveCategoryAfterClear = !!(safeBusinessCategory || safeGreetingCategory || calendarDate);
-    const hasActiveCategoryRefAfterClear = activeCategoryRef.current.type !== null;
-    
-    if (hasActiveCategoryAfterClear || hasActiveCategoryRefAfterClear) {
+    if (hasActiveCategory || hasActiveCategoryRef) {
       console.log('🔍 [INITIAL POSTER SYNC] Skipped - category/calendar provided:', {
-        businessCategory: safeBusinessCategory,
-        greetingCategory: safeGreetingCategory,
+        businessCategory,
+        greetingCategory,
         calendarDate,
-        hasActiveCategory: hasActiveCategoryAfterClear,
-        hasActiveCategoryRef: hasActiveCategoryRefAfterClear,
+        hasActiveCategory,
         activeCategoryRef: activeCategoryRef.current,
+        hasActiveCategoryRef,
         initialPosterId: initialPoster.id,
         initialRelatedPostersCount: initialRelatedPosters.length
       });
@@ -2169,14 +1931,14 @@ const PosterPlayerScreen: React.FC = () => {
       return;
     }
 
-    const templatesToMerge = initialRelatedPosters.find((p: any) => p.id === initialPoster.id)
+    const templatesToMerge = initialRelatedPosters.find(p => p.id === initialPoster.id)
       ? initialRelatedPosters
       : [initialPoster, ...initialRelatedPosters];
 
     const templatesWithLanguages = templatesToMerge.map(ensureLanguages);
     const templatesMap = new Map<string, Template>();
 
-    templatesWithLanguages.forEach((template: any) => {
+    templatesWithLanguages.forEach(template => {
       templatesMap.set(template.id, template);
     });
 
@@ -2189,8 +1951,8 @@ const PosterPlayerScreen: React.FC = () => {
     console.warn('⚠️ [INITIAL POSTER SYNC] About to set allTemplates - THIS SHOULD NOT HAPPEN WHEN CATEGORY IS ACTIVE!', {
       updatedTemplatesCount: updatedTemplates.length,
       updatedTemplateIds: updatedTemplates.map(t => t.id),
-      businessCategory: safeBusinessCategory,
-      greetingCategory: safeGreetingCategory,
+      businessCategory,
+      greetingCategory,
       calendarDate,
       activeCategoryRef: activeCategoryRef.current,
       stackTrace: new Error().stack?.split('\n').slice(1, 5).join('\n')
@@ -2223,7 +1985,7 @@ const PosterPlayerScreen: React.FC = () => {
       const foundPoster = updatedTemplates.find(t => t.id === prevPoster.id);
       return foundPoster || ensuredInitialPoster;
     });
-  }, [initialPoster, initialRelatedPosters, selectedLanguage, safeBusinessCategory, safeGreetingCategory, calendarDate]); // Added category deps to re-evaluate when categories change
+  }, [initialPoster, initialRelatedPosters, selectedLanguage, businessCategory, greetingCategory, calendarDate]);
 
   // Detect language from initial poster on mount
   useEffect(() => {
@@ -2240,8 +2002,8 @@ const PosterPlayerScreen: React.FC = () => {
       posterName: initialPosterWithLanguages.name,
       posterTags: initialPosterWithLanguages.tags,
       category: initialPosterWithLanguages.category,
-      businessCategory: safeBusinessCategory,
-      greetingCategory: safeGreetingCategory,
+      businessCategory,
+      greetingCategory,
       calendarDate
     });
     
@@ -2321,7 +2083,7 @@ const PosterPlayerScreen: React.FC = () => {
     }
 
     // Only run for business category, greeting category, or calendar posters
-    if (!safeBusinessCategory && !safeGreetingCategory && !calendarDate) {
+    if (!businessCategory && !greetingCategory && !calendarDate) {
       console.log('🔍 [CURRENT LANG DETECT] Skipped - not a category/calendar poster');
       return;
     }
@@ -2330,8 +2092,8 @@ const PosterPlayerScreen: React.FC = () => {
       posterId: currentPoster.id,
       posterName: currentPoster.name,
       category: currentPoster.category,
-      businessCategory: safeBusinessCategory,
-      greetingCategory: safeGreetingCategory,
+      businessCategory,
+      greetingCategory,
       calendarDate
     });
 
@@ -2390,7 +2152,7 @@ const PosterPlayerScreen: React.FC = () => {
       console.log('❌ [CURRENT LANG DETECT] No language detected');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPoster?.id, safeBusinessCategory, safeGreetingCategory, calendarDate]); // Run when current poster changes for category or calendar
+  }, [currentPoster?.id, businessCategory, greetingCategory, calendarDate]); // Run when current poster changes for category or calendar
 
   // Log whenever allTemplates changes to track duplicates
   useEffect(() => {
@@ -2407,7 +2169,7 @@ const PosterPlayerScreen: React.FC = () => {
         }
       });
       const duplicateThumbnails = Array.from(thumbnailMap.entries())
-        .filter(([_thumb, templates]) => templates.length > 1)
+        .filter(([thumb, templates]) => templates.length > 1)
         .map(([thumb, templates]) => ({ thumbnail: thumb, ids: templates.map(t => t.id) }));
       
       console.log('🔍 [ALL TEMPLATES CHANGED]', {
@@ -2417,8 +2179,8 @@ const PosterPlayerScreen: React.FC = () => {
         templateNames: allTemplates.map(t => t.name).slice(0, 5), // First 5 names
         duplicateIds,
         duplicateThumbnails,
-        businessCategory: safeBusinessCategory,
-        greetingCategory: safeGreetingCategory,
+        businessCategory,
+        greetingCategory,
         calendarDate,
         stackTrace: new Error().stack?.split('\n').slice(1, 4).join('\n') // First 3 stack frames
       });
@@ -2513,7 +2275,7 @@ const PosterPlayerScreen: React.FC = () => {
 
       return resolvedPrevious || templatesWithLanguages[0];
     });
-  }, [allTemplates, selectedLanguage, safeGreetingCategory, safeBusinessCategory, calendarDate]);
+  }, [allTemplates, selectedLanguage, greetingCategory, businessCategory, calendarDate]);
 
   useEffect(() => {
     if (!isEventPlannerCategory && selectedServiceFilter) {
@@ -2530,8 +2292,8 @@ const PosterPlayerScreen: React.FC = () => {
       posterName: posterWithLanguages.name,
       posterTags: posterWithLanguages.tags,
       category: posterWithLanguages.category,
-      businessCategory: safeBusinessCategory,
-      greetingCategory: safeGreetingCategory,
+      businessCategory,
+      greetingCategory,
       calendarDate
     });
     
@@ -2761,8 +2523,8 @@ const PosterPlayerScreen: React.FC = () => {
 
   // Responsive icon sizes
   const getIconSize = useCallback((baseSize: number) => {
-    const scaleFactor = screenWidth / 375;
-    return Math.round(baseSize * scaleFactor);
+    const scale = screenWidth / 375;
+    return Math.round(baseSize * scale);
   }, [screenWidth]);
   
   // Detect if fold phone is unfolded (typically width >= 900px)
@@ -2881,10 +2643,10 @@ const PosterPlayerScreen: React.FC = () => {
       const reservedSpace = headerHeight + topSpacing + gridMinHeight + bottomSpacing + moderateScale(30); // Extra buffer
       
       // Maximum poster height - larger limits to show better preview
-      const isDeviceUnfolded = screenWidth >= 900; // Fold phones typically have width >= 900px when unfolded
+      const isFoldPhoneUnfolded = screenWidth >= 900; // Fold phones typically have width >= 900px when unfolded
       
       // Use larger max heights for better preview
-      const baseMaxPercentage = isDeviceUnfolded ? 0.50 : 0.60; // 50% for fold phones, 60% for regular
+      const baseMaxPercentage = isFoldPhoneUnfolded ? 0.50 : 0.60; // 50% for fold phones, 60% for regular
       const maxPosterHeightByPercentage = screenHeight * baseMaxPercentage;
       const maxPosterHeightBySpace = screenHeight - reservedSpace;
       
@@ -2963,6 +2725,9 @@ const PosterPlayerScreen: React.FC = () => {
     navigateToPosterEditor();
   }, [navigateToPosterEditor]);
 
+  // Memoize current poster ID to avoid recreating render function
+  const currentPosterId = useMemo(() => currentPoster?.id, [currentPoster?.id]);
+
   // Compute image props
   const imageProps = useMemo(() => {
     const thumbnailUri = currentPoster?.thumbnail || (currentPoster as any)?.content?.background || '';
@@ -2975,6 +2740,17 @@ const PosterPlayerScreen: React.FC = () => {
       fullImageUri
     };
   }, [currentPoster?.id, currentPoster, getHighQualityImageUrl]);
+
+  // Pre-compute image URLs and language codes for all templates to avoid recalculation during render
+  const templateMetadata = useMemo(() => {
+    const metadataMap = new Map<string, { imageUrl: string }>();
+    filteredPosters.forEach(template => {
+      metadataMap.set(template.id, {
+        imageUrl: getHighQualityImageUrl(template),
+      });
+    });
+    return metadataMap;
+  }, [filteredPosters, getHighQualityImageUrl]);
 
   const renderRelatedPoster = useCallback(({ item }: { item: Template }) => {
     // Prioritize thumbnailUrl for grid preview performance (smaller, optimized images)
@@ -3011,8 +2787,37 @@ const PosterPlayerScreen: React.FC = () => {
     );
   }, [cardWidth, cardHeight, handlePosterSelect, currentPoster, previewOverlayColors]);
 
-  return (
-    <View style={[styles.container, { backgroundColor: theme.colors.gradient[0] || '#e8e8e8' }]}>
+
+  const renderLanguageButton = useCallback((language: typeof languages[0]) => {
+    const iconSize = getIconSize(12);
+    
+    return (
+      <TouchableOpacity
+        key={language.id}
+        style={[
+          styles.languageButton,
+          selectedLanguage === language.id && styles.languageButtonSelected
+        ]}
+        onPress={() => handleLanguageChange(language.id)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.languageButtonContent}>
+          <Text style={[
+            styles.languageButtonText,
+            selectedLanguage === language.id && styles.languageButtonTextSelected
+          ]}>
+            {language.name}
+          </Text>
+          {selectedLanguage === language.id && (
+            <Icon name="check-circle" size={iconSize} color="#ffffff" />
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  }, [selectedLanguage, handleLanguageChange, getIconSize, screenWidth]);
+
+     return (
+     <View style={[styles.container, { backgroundColor: theme.colors.gradient[0] || '#e8e8e8' }]}>
        <StatusBar 
          barStyle="dark-content"
          backgroundColor="transparent" 
@@ -3058,7 +2863,7 @@ const PosterPlayerScreen: React.FC = () => {
                       const date = new Date(calendarDate);
                       return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
                     })()
-                  : safeBusinessCategory || safeGreetingCategory || currentPoster?.category || 'Templates'}
+                  : businessCategory || greetingCategory || currentPoster?.category || 'Templates'}
               </Text>
             </LinearGradient>
           </View>
@@ -3081,7 +2886,7 @@ const PosterPlayerScreen: React.FC = () => {
 
          {/* Compact Poster Section */}
          <View
-           style={[styles.posterContainer, { height: computedPreviewHeight }]}
+           style={[styles.posterContainer, { height: computedPreviewHeight, width: '100%' }]}
            {...swipeResponder.panHandlers}
            collapsable={false}
          >
@@ -3264,13 +3069,12 @@ const PosterPlayerScreen: React.FC = () => {
 };
 
 // Get dynamic screen dimensions (static for StyleSheet - component uses dynamic dimensions)
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// Static moderateScale function for StyleSheet (component has dynamic version)
-const moderateScale = (size: number, factor = 0.5) => {
-  const scale = (SCREEN_WIDTH / 375) * size;
-  return size + (scale - size) * factor;
-};
+// Responsive helper functions for StyleSheet (static - component has dynamic versions)
+const scale = (size: number) => (SCREEN_WIDTH / 375) * size;
+const verticalScale = (size: number) => (SCREEN_HEIGHT / 667) * size;
+const moderateScale = (size: number, factor = 0.5) => size + (scale(size) - size) * factor;
 
 const styles = StyleSheet.create({
   container: {
@@ -3482,7 +3286,6 @@ const styles = StyleSheet.create({
   },
   posterContainer: {
     position: 'relative',
-    width: '100%',
     // Height is set dynamically via inline style based on screen dimensions
     backgroundColor: 'transparent',
     justifyContent: 'center',
