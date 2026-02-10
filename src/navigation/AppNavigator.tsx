@@ -65,7 +65,7 @@ export type MainStackParamList = {
     relatedPosters: any[];
     searchQuery?: string;
     templateSource?: 'greeting' | 'professional' | 'featured';
-    businessCategory?: string;
+    businessCategory?: string | { name: string };
     greetingCategory?: string;
     originScreen?: string;
     posterLimit?: number;

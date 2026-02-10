@@ -2159,17 +2159,59 @@ const HomeScreen: React.FC = React.memo(() => {
             return;
           }
           
-          // Get current user's business category
+          // Get current user's business category (subcategory is what user actually selected)
           const currentUser = authService.getCurrentUser();
-          const userCategory = currentUser?.category || currentUser?._originalCategory || '';
+          const userSubCategory = currentUser?.subCategory || currentUser?.subcategory || '';
+          const selectedProfileSubCategory = selectedBusinessProfile?.subCategory || selectedBusinessProfile?.subcategory || '';
           
-          // Filter out user's own business category (for section display only)
+          console.log('🔍 [BUSINESS CATEGORY FILTER]', {
+            userSubCategory: userSubCategory,
+            selectedProfileSubCategory: selectedProfileSubCategory,
+            currentUser: currentUser
+          });
+          
+          // Filter out user's own business category and selected business profile's category (for section display only)
           const filteredCategories = allCategories.filter((category: BusinessCategory) => {
             const categoryName = category.name?.trim() || '';
-            const userCategoryName = userCategory?.trim() || '';
-            // Compare both name and ID to ensure we filter correctly
-            return categoryName.toLowerCase() !== userCategoryName.toLowerCase() &&
-                   category.id !== userCategory;
+            const userSubCategoryName = userSubCategory?.trim() || '';
+            const selectedProfileSubCategoryName = selectedProfileSubCategory?.trim() || '';
+            
+            // Check if user's subcategory matches this business category name
+            const matchesUserSubCategory = categoryName.toLowerCase() === userSubCategoryName.toLowerCase();
+            
+            // Check if selected profile's subcategory matches this business category name
+            const matchesSelectedProfileSubCategory = categoryName.toLowerCase() === selectedProfileSubCategoryName.toLowerCase();
+            
+            // Check if user's subcategory matches any subcategory within this business category
+            const containsUserSubCategory = category.subCategories?.some((subCat: any) => {
+              const subCatName = typeof subCat === 'string' ? subCat : subCat?.name;
+              return subCatName?.toLowerCase() === userSubCategoryName.toLowerCase();
+            }) || false;
+            
+            // Check if selected profile's subcategory matches any subcategory within this business category
+            const containsSelectedProfileSubCategory = category.subCategories?.some((subCat: any) => {
+              const subCatName = typeof subCat === 'string' ? subCat : subCat?.name;
+              return subCatName?.toLowerCase() === selectedProfileSubCategoryName.toLowerCase();
+            }) || false;
+            
+            console.log('🔍 [FILTERING CATEGORY]', {
+              categoryName: categoryName,
+              userSubCategoryName: userSubCategoryName,
+              selectedProfileSubCategoryName: selectedProfileSubCategoryName,
+              matchesUserSubCategory: matchesUserSubCategory,
+              matchesSelectedProfileSubCategory: matchesSelectedProfileSubCategory,
+              containsUserSubCategory: containsUserSubCategory,
+              containsSelectedProfileSubCategory: containsSelectedProfileSubCategory,
+              shouldExclude: matchesUserSubCategory || matchesSelectedProfileSubCategory || containsUserSubCategory || containsSelectedProfileSubCategory
+            });
+            
+            // Exclude categories that match user's subcategory or selected profile's subcategory
+            const shouldExclude = matchesUserSubCategory || 
+                                matchesSelectedProfileSubCategory || 
+                                containsUserSubCategory || 
+                                containsSelectedProfileSubCategory;
+            
+            return !shouldExclude;
           });
           
           setBusinessCategories(filteredCategories);
