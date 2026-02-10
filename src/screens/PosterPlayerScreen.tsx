@@ -399,6 +399,7 @@ const PosterPlayerScreen: React.FC = () => {
   }, [allTemplates]);
   
   const [selectedLanguage, setSelectedLanguage] = useState<string>('all');
+  const [isBusinessCategoryLoading, setIsBusinessCategoryLoading] = useState(false);
   const lastAutoDetectedPosterIdRef = useRef<string | null>(null); // Track which poster triggered auto-detection to prevent duplicate detection
   const userSelectedPosterRef = useRef<string | null>(null); // Track user-selected poster (via swipe or click) to prevent reset
   const userManuallySelectedLanguageRef = useRef<boolean>(false); // Track if user manually selected a language (including "All")
@@ -768,6 +769,9 @@ const PosterPlayerScreen: React.FC = () => {
 
     const fetchBusinessCategoryPosters = async () => {
       try {
+        // Show loading state when starting to fetch
+        setIsBusinessCategoryLoading(true);
+        
         const limit = posterLimit || 5; // Default to 5 if not specified, use 200 for "My Business"
         const response = await businessCategoryPostersApi.getPostersByCategory(businessCategory, limit);
         
@@ -866,6 +870,9 @@ const PosterPlayerScreen: React.FC = () => {
         }
       } catch (error) {
         console.error('❌ [POSTER PLAYER] Error fetching business category posters:', error);
+      } finally {
+        // Hide loading state regardless of success or error
+        setIsBusinessCategoryLoading(false);
       }
     };
 
@@ -2801,28 +2808,62 @@ const PosterPlayerScreen: React.FC = () => {
         onPress={() => handleLanguageChange(language.id)}
         activeOpacity={0.7}
       >
-        <View style={styles.languageButtonContent}>
-          <Text style={[
+        <Icon
+          name={language.icon}
+          size={iconSize}
+          color={selectedLanguage === language.id ? '#FFFFFF' : '#666666'}
+        />
+        <Text
+          style={[
             styles.languageButtonText,
             selectedLanguage === language.id && styles.languageButtonTextSelected
-          ]}>
-            {language.name}
-          </Text>
-          {selectedLanguage === language.id && (
-            <Icon name="check-circle" size={iconSize} color="#ffffff" />
-          )}
-        </View>
+          ]}
+        >
+          {language.name}
+        </Text>
       </TouchableOpacity>
     );
-  }, [selectedLanguage, handleLanguageChange, getIconSize, screenWidth]);
+  }, [selectedLanguage, handleLanguageChange]);
 
-     return (
-     <View style={[styles.container, { backgroundColor: theme.colors.gradient[0] || '#e8e8e8' }]}>
-       <StatusBar 
-         barStyle="dark-content"
-         backgroundColor="transparent" 
-         translucent={true}
-       />
+  // Skeleton component for loading state
+  const renderSkeletonItem = useCallback(() => {
+    return (
+      <View
+        style={[
+          styles.relatedPosterItem,
+          {
+            width: cardWidth,
+            height: cardHeight,
+            backgroundColor: '#f0f0f0',
+            borderRadius: moderateScale(8),
+          }
+        ]}
+      >
+        <View
+          style={[
+            styles.skeletonOverlay,
+            {
+              backgroundColor: '#e0e0e0',
+              borderRadius: moderateScale(8),
+            }
+          ]}
+        />
+      </View>
+    );
+  }, [cardWidth, cardHeight]);
+
+  // Generate skeleton data for loading state
+  const skeletonData = useMemo(() => {
+    return Array.from({ length: 6 }, (_, index) => ({ id: `skeleton-${index}` }));
+  }, []);
+
+  return (
+    <View style={[styles.container, { backgroundColor: theme.colors.gradient[0] || '#e8e8e8' }]}>
+      <StatusBar 
+        barStyle="dark-content"
+        backgroundColor="transparent" 
+        translucent={true}
+      />
        
        <LinearGradient
          colors={theme.colors.gradient}
@@ -2984,7 +3025,23 @@ const PosterPlayerScreen: React.FC = () => {
 
          {/* Compact Related Posters Section */}
         <View style={styles.relatedSection}>
-           {filteredPosters.length > 0 ? (
+           {isBusinessCategoryLoading ? (
+             <FlatList
+               data={skeletonData}
+               renderItem={renderSkeletonItem}
+               keyExtractor={(item) => item.id}
+               numColumns={numColumns}
+               key={`skeleton-grid-${numColumns}`}
+               columnWrapperStyle={styles.relatedGrid}
+               showsVerticalScrollIndicator={false}
+               contentContainerStyle={styles.relatedList}
+               style={styles.relatedFlatList}
+               removeClippedSubviews={true}
+               maxToRenderPerBatch={6}
+               windowSize={3}
+               initialNumToRender={6}
+             />
+           ) : filteredPosters.length > 0 ? (
              <FlatList
                data={filteredPosters}
                renderItem={renderRelatedPoster}
@@ -3489,6 +3546,31 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(9), // Compact
     fontWeight: '600',
     textAlign: 'center',
+  },
+  relatedPosterItem: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: moderateScale(8),
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: moderateScale(2),
+    },
+    shadowOpacity: 0.12,
+    shadowRadius: moderateScale(4),
+    elevation: 3,
+    borderWidth: moderateScale(0.5),
+    borderColor: 'rgba(255,255,255,0.15)',
+    marginBottom: moderateScale(6),
+  },
+  skeletonOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#e0e0e0',
+    borderRadius: moderateScale(8),
   },
   serviceFilterContainer: {
     flexDirection: 'row',
