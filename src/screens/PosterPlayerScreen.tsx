@@ -332,13 +332,6 @@ const PosterPlayerScreen: React.FC = () => {
     return (screenWidth / 375) * size;
   }, [screenWidth]);
   
-  const verticalScale = useCallback((size: number) => {
-    if (!screenHeight || isNaN(screenHeight) || screenHeight <= 0) {
-      return size; // Fallback to original size if screenHeight is invalid
-    }
-    return (screenHeight / 667) * size;
-  }, [screenHeight]);
-  
   const moderateScale = useCallback((size: number, factor = 0.5) => {
     const scaled = scale(size);
     if (isNaN(scaled) || !isFinite(scaled)) {
@@ -765,7 +758,8 @@ const PosterPlayerScreen: React.FC = () => {
     // Set language to english to avoid language switching issues
     setSelectedLanguage('english');
     // Track active category to prevent other useEffects from overwriting templates
-    activeCategoryRef.current = { type: 'business', value: businessCategory };
+    const categoryName = (typeof businessCategory === 'object' && businessCategory?.name) || businessCategory;
+    activeCategoryRef.current = { type: 'business', value: categoryName as string };
 
     const fetchBusinessCategoryPosters = async () => {
       try {
@@ -773,7 +767,8 @@ const PosterPlayerScreen: React.FC = () => {
         setIsBusinessCategoryLoading(true);
         
         const limit = posterLimit || 5; // Default to 5 if not specified, use 200 for "My Business"
-        const response = await businessCategoryPostersApi.getPostersByCategory(businessCategory, limit);
+        const categoryName = (typeof businessCategory === 'object' && businessCategory?.name) || businessCategory;
+        const response = await businessCategoryPostersApi.getPostersByCategory(categoryName as string, limit);
         
         if (response.success && response.data.posters) {
           // Convert BusinessCategoryPoster to Template format (already limited to 5 by API)
@@ -814,7 +809,7 @@ const PosterPlayerScreen: React.FC = () => {
             });
             
             // Ensure we're still on the same category (prevent race conditions)
-            if (activeCategoryRef.current.type !== 'business' || activeCategoryRef.current.value !== businessCategory) {
+            if (activeCategoryRef.current.type !== 'business' || activeCategoryRef.current.value !== categoryName) {
               console.warn('⚠️ [BUSINESS FETCH] Category changed, skipping setAllTemplates:', {
                 expectedCategory: businessCategory,
                 activeCategoryType: activeCategoryRef.current.type,
@@ -877,7 +872,7 @@ const PosterPlayerScreen: React.FC = () => {
     };
 
     fetchBusinessCategoryPosters();
-  }, [businessCategory, posterLimit]);
+  }, [businessCategory, posterLimit, initialPoster, selectedLanguage, setAllTemplates]);
 
   // Fetch greeting category templates when greetingCategory is provided
   useEffect(() => {
@@ -1098,7 +1093,6 @@ const PosterPlayerScreen: React.FC = () => {
               const currentNormalized = normalizedCategory;
               const currentCategoryLower = greetingCategoryLower;
               const currentNormalizedLower = normalizedCategoryLower;
-              const currentWords = categoryWordsLower;
               const currentPoster = posterToMatch;
               const currentVariations = searchVariations;
               
@@ -1607,7 +1601,7 @@ const PosterPlayerScreen: React.FC = () => {
           });
           
           const duplicateThumbnails = Array.from(thumbnailMap.entries())
-            .filter(([thumb, templates]) => templates.length > 1)
+            .filter(([_thumb, templates]) => templates.length > 1)
             .map(([thumb, templates]) => ({ thumbnail: thumb, ids: templates.map(t => t.id) }));
           
           console.log('🔍 [GREETING FETCH] Final templates:', {
@@ -1802,7 +1796,7 @@ const PosterPlayerScreen: React.FC = () => {
     };
 
     fetchGreetingCategoryTemplates();
-  }, [greetingCategory, convertedInitialPoster.id]);
+  }, [greetingCategory, convertedInitialPoster.id, selectedLanguage, setAllTemplates]);
 
   // Fetch calendar posters when calendarDate is provided
   useEffect(() => {
@@ -2176,7 +2170,7 @@ const PosterPlayerScreen: React.FC = () => {
         }
       });
       const duplicateThumbnails = Array.from(thumbnailMap.entries())
-        .filter(([thumb, templates]) => templates.length > 1)
+        .filter(([_thumb, templates]) => templates.length > 1)
         .map(([thumb, templates]) => ({ thumbnail: thumb, ids: templates.map(t => t.id) }));
       
       console.log('🔍 [ALL TEMPLATES CHANGED]', {
@@ -2732,9 +2726,6 @@ const PosterPlayerScreen: React.FC = () => {
     navigateToPosterEditor();
   }, [navigateToPosterEditor]);
 
-  // Memoize current poster ID to avoid recreating render function
-  const currentPosterId = useMemo(() => currentPoster?.id, [currentPoster?.id]);
-
   // Compute image props
   const imageProps = useMemo(() => {
     const thumbnailUri = currentPoster?.thumbnail || (currentPoster as any)?.content?.background || '';
@@ -2747,17 +2738,6 @@ const PosterPlayerScreen: React.FC = () => {
       fullImageUri
     };
   }, [currentPoster?.id, currentPoster, getHighQualityImageUrl]);
-
-  // Pre-compute image URLs and language codes for all templates to avoid recalculation during render
-  const templateMetadata = useMemo(() => {
-    const metadataMap = new Map<string, { imageUrl: string }>();
-    filteredPosters.forEach(template => {
-      metadataMap.set(template.id, {
-        imageUrl: getHighQualityImageUrl(template),
-      });
-    });
-    return metadataMap;
-  }, [filteredPosters, getHighQualityImageUrl]);
 
   const renderRelatedPoster = useCallback(({ item }: { item: Template }) => {
     // Prioritize thumbnailUrl for grid preview performance (smaller, optimized images)
@@ -2794,36 +2774,6 @@ const PosterPlayerScreen: React.FC = () => {
     );
   }, [cardWidth, cardHeight, handlePosterSelect, currentPoster, previewOverlayColors]);
 
-
-  const renderLanguageButton = useCallback((language: typeof languages[0]) => {
-    const iconSize = getIconSize(12);
-    
-    return (
-      <TouchableOpacity
-        key={language.id}
-        style={[
-          styles.languageButton,
-          selectedLanguage === language.id && styles.languageButtonSelected
-        ]}
-        onPress={() => handleLanguageChange(language.id)}
-        activeOpacity={0.7}
-      >
-        <Icon
-          name={language.icon}
-          size={iconSize}
-          color={selectedLanguage === language.id ? '#FFFFFF' : '#666666'}
-        />
-        <Text
-          style={[
-            styles.languageButtonText,
-            selectedLanguage === language.id && styles.languageButtonTextSelected
-          ]}
-        >
-          {language.name}
-        </Text>
-      </TouchableOpacity>
-    );
-  }, [selectedLanguage, handleLanguageChange]);
 
   // Skeleton component for loading state
   const renderSkeletonItem = useCallback(() => {
@@ -2904,7 +2854,7 @@ const PosterPlayerScreen: React.FC = () => {
                       const date = new Date(calendarDate);
                       return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
                     })()
-                  : businessCategory || greetingCategory || currentPoster?.category || 'Templates'}
+                  : (typeof businessCategory === 'object' ? businessCategory?.name : businessCategory) || greetingCategory || currentPoster?.category || 'Templates'}
               </Text>
             </LinearGradient>
           </View>
