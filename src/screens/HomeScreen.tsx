@@ -2505,8 +2505,16 @@ const HomeScreen: React.FC = React.memo(() => {
       );
       const matchingCategoryNames = matchingCategories.map(category => category.name.toLowerCase());
       
-      // Combine greeting templates and calendar posters for unified search
-      const allTemplates = [...allGreetingTemplates, ...calendarPosters];
+      // Check if search query matches any Business Category name
+      const matchingBusinessCategories = businessCategories.filter(category => 
+        category.name.toLowerCase().includes(searchLower) || 
+        searchLower.includes(category.name.toLowerCase())
+      );
+      const matchingBusinessCategoryNames = matchingBusinessCategories.map(category => category.name.toLowerCase());
+      
+      // Combine greeting templates, calendar posters, and business category previews for unified search
+      const allBusinessCategoryTemplates = Object.values(businessCategoryPreviews).flat();
+      const allTemplates = [...allGreetingTemplates, ...calendarPosters, ...allBusinessCategoryTemplates];
       
       // First, show immediate local results
       const filtered = allTemplates.filter(template => {
@@ -2543,6 +2551,13 @@ const HomeScreen: React.FC = React.memo(() => {
           return true;
         }
         
+        // Check if template category matches any Business Category name
+        if (template.category && matchingBusinessCategoryNames.some(catName => 
+          template.category?.toLowerCase().includes(catName)
+        )) {
+          return true;
+        }
+        
         return false;
       });
       
@@ -2555,9 +2570,10 @@ const HomeScreen: React.FC = React.memo(() => {
       setTemplates(uniqueFiltered);
       
       // Then fetch General Category templates if search matches a category and update results
-      if (matchingCategories.length > 0) {
+      if (matchingCategories.length > 0 || matchingBusinessCategories.length > 0) {
         (async () => {
           try {
+            // Fetch General Category templates
             const generalCategoryResultsPromises = matchingCategories.map(async (category) => {
               try {
                 const categoryTemplates = await greetingTemplatesService.searchTemplates(category.name);
@@ -2570,8 +2586,26 @@ const HomeScreen: React.FC = React.memo(() => {
               }
             });
             
-            const generalCategoryResultsArrays = await Promise.all(generalCategoryResultsPromises);
+            // Fetch Business Category templates
+            const businessCategoryResultsPromises = matchingBusinessCategories.map(async (category) => {
+              try {
+                const categoryTemplates = await businessCategoryPostersApi.getPostersByCategory(category.name, 50);
+                return categoryTemplates.success && categoryTemplates.data?.posters ? categoryTemplates.data.posters : [];
+              } catch (error) {
+                if (__DEV__) {
+                  devWarn(`Failed to search business category ${category.name}:`, error);
+                }
+                return [];
+              }
+            });
+            
+            const [generalCategoryResultsArrays, businessCategoryResultsArrays] = await Promise.all([
+              Promise.all(generalCategoryResultsPromises),
+              Promise.all(businessCategoryResultsPromises)
+            ]);
+            
             const generalCategoryResults = generalCategoryResultsArrays.flat();
+            const businessCategoryResults = businessCategoryResultsArrays.flat();
             
             // Convert general category results to Template format
             const convertedGeneralCategoryResults = generalCategoryResults.map(greetingTemplate => ({
@@ -2587,8 +2621,22 @@ const HomeScreen: React.FC = React.memo(() => {
               originalTemplate: greetingTemplate,
             }));
             
+            // Convert business category results to Template format
+            const convertedBusinessCategoryResults = businessCategoryResults.map((poster: any) => ({
+              id: poster.id,
+              name: poster.title || poster.name || 'Business Poster',
+              thumbnail: poster.thumbnail || poster.image || '',
+              category: poster.category || 'Business',
+              downloads: poster.downloads || 0,
+              isDownloaded: false,
+              description: poster.description || '',
+              tags: Array.isArray(poster.tags) ? poster.tags : [],
+              isBusiness: true,
+              originalTemplate: poster,
+            }));
+            
             // Combine with existing results and remove duplicates
-            const allResults = [...uniqueFiltered, ...convertedGeneralCategoryResults];
+            const allResults = [...uniqueFiltered, ...convertedGeneralCategoryResults, ...convertedBusinessCategoryResults];
             const finalUniqueResults = Array.from(
               new Map(allResults.map(template => [template.id, template])).values()
             );
@@ -2689,7 +2737,7 @@ const HomeScreen: React.FC = React.memo(() => {
 
     // Cleanup timeout on unmount or when searchQuery changes
     return () => clearTimeout(timeoutId);
-  }, [searchQuery, allGreetingTemplates, calendarPosters, currentRequestId, filteredGreetingCategoriesList]);
+  }, [searchQuery, allGreetingTemplates, calendarPosters, currentRequestId, filteredGreetingCategoriesList, businessCategories, businessCategoryPreviews]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -2781,6 +2829,12 @@ const HomeScreen: React.FC = React.memo(() => {
       )
       .map(category => category.name.toLowerCase());
     
+    // Debug logging
+    console.log('🔍 [SEARCH DEBUG] Search query:', searchQuery);
+    console.log('🔍 [SEARCH DEBUG] Business categories available:', businessCategories.map(c => c.name));
+    console.log('🔍 [SEARCH DEBUG] Matching business categories:', matchingBusinessCategoryNames);
+    console.log('🔍 [SEARCH DEBUG] Matching greeting categories:', matchingCategoryNames);
+    
     // Local search removed - only API search for greeting templates
     setTemplates([]);
     
@@ -2826,6 +2880,9 @@ const HomeScreen: React.FC = React.memo(() => {
         const generalCategoryResults = generalCategoryResultsArrays.flat();
         const businessCategoryResults = businessCategoryResultsArrays.flat();
         
+        console.log('🔍 [SEARCH DEBUG] General category results count:', generalCategoryResults.length);
+        console.log('🔍 [SEARCH DEBUG] Business category results count:', businessCategoryResults.length);
+        
         // Convert general category results to Template format
         const convertedGeneralCategoryResults = generalCategoryResults.map(greetingTemplate => ({
           id: greetingTemplate.id,
@@ -2859,6 +2916,10 @@ const HomeScreen: React.FC = React.memo(() => {
         const uniqueResults = Array.from(
           new Map(allResults.map(template => [template.id, template])).values()
         );
+        
+        console.log('🔍 [SEARCH DEBUG] Total results before dedup:', allResults.length);
+        console.log('🔍 [SEARCH DEBUG] Unique results after dedup:', uniqueResults.length);
+        console.log('🔍 [SEARCH DEBUG] Business templates in results:', convertedBusinessCategoryResults.length);
         
         // Only update if this is still the current request and we're still searching
         if (currentRequestId === requestId && isSearching) {
