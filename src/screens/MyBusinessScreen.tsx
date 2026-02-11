@@ -20,6 +20,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import businessCategoryPostersApi, { BusinessCategoryPoster } from '../services/businessCategoryPostersApi';
 import ComingSoonModal from '../components/ComingSoonModal';
 import OptimizedImage from '../components/OptimizedImage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Compact spacing multiplier to reduce all spacing (matching HomeScreen)
 const COMPACT_MULTIPLIER = 0.5;
@@ -114,6 +115,7 @@ const MyBusinessScreen: React.FC = () => {
   const [postersLoading, setPostersLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [userBusinessCategory, setUserBusinessCategory] = useState<string>('General');
+  const [selectedBusinessProfile, setSelectedBusinessProfile] = useState<{name: string, category: string, subcategory: string} | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [showComingSoonModal, setShowComingSoonModal] = useState(false);
   
@@ -153,10 +155,47 @@ const MyBusinessScreen: React.FC = () => {
   // Get dynamic dimensions with responsive columns
   const { cardWidth, cardHeight, columns, gap } = getPosterCardDimensions(currentScreenWidth, currentScreenHeight);
 
+  // Load selected business profile information
+  const loadSelectedBusinessProfile = useCallback(async () => {
+    try {
+      const profileId = await AsyncStorage.getItem('selectedBusinessProfileId');
+      const profileName = await AsyncStorage.getItem('selectedBusinessProfileName');
+      const profileCategory = await AsyncStorage.getItem('selectedBusinessProfileCategory');
+      const profileSubcategory = await AsyncStorage.getItem('selectedBusinessProfileSubcategory');
+      
+      console.log('🔍 [MY BUSINESS DEBUG] Loading profile data:', {
+        profileId,
+        profileName,
+        profileCategory,
+        profileSubcategory
+      });
+      
+      if (profileId && profileName) {
+        setSelectedBusinessProfile({
+          name: profileName,
+          category: profileCategory || 'General',
+          subcategory: profileSubcategory || ''
+        });
+        console.log('📋 [MY BUSINESS] Loaded selected profile:', {
+          name: profileName,
+          category: profileCategory,
+          subcategory: profileSubcategory
+        });
+      } else {
+        console.log('⚠️ [MY BUSINESS] No profile data found in AsyncStorage');
+      }
+    } catch (error) {
+      console.error('Error loading selected business profile:', error);
+    }
+  }, []);
+
   // Optimized load with cache support - fetch more posters to work around backend limit
   const loadBusinessCategoryPosters = useCallback(async (isRefresh: boolean = false) => {
     setPostersLoading(true);
     try {
+      console.log('🔄 [MY BUSINESS] Starting to load posters...');
+      console.log('📋 [MY BUSINESS] Current selected profile:', selectedBusinessProfile);
+      
       // Always force refresh on initial load to get latest posters
       // This ensures we don't show stale cached data
       const forceRefresh = !isRefresh; // Force refresh on initial load
@@ -244,21 +283,23 @@ const MyBusinessScreen: React.FC = () => {
   }, [initialLoading]);
 
   useEffect(() => {
+    loadSelectedBusinessProfile();
     loadBusinessCategoryPosters();
-  }, [loadBusinessCategoryPosters]);
+  }, [loadSelectedBusinessProfile, loadBusinessCategoryPosters]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
       // Clear cache before refreshing
       businessCategoryPostersApi.clearCache();
+      await loadSelectedBusinessProfile();
       await loadBusinessCategoryPosters(true);
     } catch (error) {
       console.error('Error refreshing posters:', error);
     } finally {
       setRefreshing(false);
     }
-  }, [loadBusinessCategoryPosters]);
+  }, [loadSelectedBusinessProfile, loadBusinessCategoryPosters]);
 
   const handlePosterPress = (poster: BusinessCategoryPoster) => {
     // Convert BusinessCategoryPoster to Template format
@@ -442,12 +483,23 @@ const MyBusinessScreen: React.FC = () => {
             marginTop: dynamicModerateScale(6),
             marginBottom: dynamicModerateScale(6),
           }]}>
-            <Text style={[styles.sectionTitle, {
-              fontSize: dynamicModerateScale(10),
-              color: theme.colors.text,
-            }]}>
-              {userBusinessCategory} Posters
-            </Text>
+            <View>
+              <Text style={[styles.sectionTitle, {
+                fontSize: dynamicModerateScale(10),
+                color: theme.colors.text,
+              }]}>
+                {selectedBusinessProfile ? `${selectedBusinessProfile.name} Posters` : 'My Business Posters'}
+              </Text>
+              {selectedBusinessProfile && (
+                <Text style={[styles.sectionSubtitle, {
+                  fontSize: dynamicModerateScale(8),
+                  color: theme.colors.textSecondary,
+                  marginTop: dynamicModerateScale(2),
+                }]}>
+                  {selectedBusinessProfile.subcategory || selectedBusinessProfile.category}
+                </Text>
+              )}
+            </View>
             {postersLoading && (
               <ActivityIndicator 
                 size="small" 
@@ -496,7 +548,10 @@ const MyBusinessScreen: React.FC = () => {
                 lineHeight: dynamicModerateScale(14),
                 color: theme.colors.textSecondary,
               }]}>
-                No posters available for {userBusinessCategory} category
+                {selectedBusinessProfile 
+                  ? `No posters available for ${selectedBusinessProfile.name} (${selectedBusinessProfile.subcategory || selectedBusinessProfile.category})`
+                  : `No posters available for ${userBusinessCategory} category`
+                }
               </Text>
               <TouchableOpacity
                 style={[styles.refreshButton, {
@@ -589,6 +644,11 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(10),
     fontWeight: 'bold',
     letterSpacing: 0.3,
+  },
+  sectionSubtitle: {
+    fontSize: moderateScale(8),
+    fontWeight: 'normal',
+    letterSpacing: 0.2,
   },
   loadingIndicator: {
     marginLeft: moderateScale(4),

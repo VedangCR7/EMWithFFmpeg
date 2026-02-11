@@ -192,27 +192,14 @@ class BusinessCategoryPostersApiService {
         return this.getPostersByCategory('General');
       }
 
-      // First, try to get the original category from user's registration data
-      const user = authService.getCurrentUser();
-      const originalCategory = user?._originalCategory || user?.category;
-      const originalSubCategory = user?.subCategory || user?.subcategory;
-
-      if (originalCategory || originalSubCategory) {
-        const targetCategory = originalSubCategory || originalCategory;
-        const categoryType = originalSubCategory ? 'subcategory (from registration)' : 'main category (from registration)';
-        
-        logger.log(`✅ [USER CATEGORY POSTERS] Using ${categoryType}: ${targetCategory}`);
-        if (originalSubCategory) {
-          logger.log(`📋 [USER CATEGORY POSTERS] Subcategory: ${originalSubCategory}, Main category: ${originalCategory}`);
-        }
-        return this.getPostersByCategory(targetCategory, 200, isRefresh); // Always request 200 to get all posters
-      }
-
-      // Fallback to business profiles if no registration category available
-      logger.log('🔄 [USER CATEGORY POSTERS] No registration category found, checking business profiles...');
+      // FIRST: Try to get category from selected business profile (priority)
+      logger.log('� [USER CATEGORY POSTERS] Checking selected business profile first...');
       
       const preferredProfileId = await AsyncStorage.getItem('selectedBusinessProfileId');
       const preferredCategory = await AsyncStorage.getItem('selectedBusinessProfileCategory');
+      
+      // DEBUG: Show what's being read from storage
+      logger.log(`🔍 [USER CATEGORY POSTERS] Stored data - ProfileID: ${preferredProfileId}, Category: ${preferredCategory}`);
 
       // Get user's business profiles to determine category
       const businessProfileService = (await import('./businessProfile')).default;
@@ -241,6 +228,9 @@ class BusinessCategoryPostersApiService {
           const matchedProfile = userProfiles.find(profile => profile.id === preferredProfileId);
           if (matchedProfile) {
             profileToUse = matchedProfile;
+            logger.log(`✅ [USER CATEGORY POSTERS] Found preferred profile: ${matchedProfile.name}`);
+          } else {
+            logger.log(`⚠️ [USER CATEGORY POSTERS] Preferred profile ID ${preferredProfileId} not found, using first profile`);
           }
         } else {
           // If no preferred profile is set, try to find the most recently created profile
@@ -251,10 +241,19 @@ class BusinessCategoryPostersApiService {
             return dateB.getTime() - dateA.getTime(); // Most recent first
           });
           profileToUse = sortedProfiles[0];
+          logger.log(`📋 [USER CATEGORY POSTERS] No preferred profile, using most recent: ${profileToUse.name}`);
         }
         
         const primaryCategory = profileToUse.category;
         const subCategory = profileToUse.subCategory || profileToUse.subcategory;
+        
+        // DEBUG: Show the profile details
+        logger.log(`📋 [USER CATEGORY POSTERS] Selected profile details:`, {
+          id: profileToUse.id,
+          name: profileToUse.name,
+          category: primaryCategory,
+          subCategory: subCategory
+        });
         
         // Use subcategory if available, otherwise use main category
         const targetCategory = subCategory || primaryCategory;
@@ -264,15 +263,34 @@ class BusinessCategoryPostersApiService {
         if (subCategory) {
           logger.log(`📋 [USER CATEGORY POSTERS] Subcategory: ${subCategory}, Main category: ${primaryCategory}`);
         }
+        
+        // DEBUG: Show what we're actually using for the API call
+        logger.log(`🎯 [USER CATEGORY POSTERS] API CALL - Fetching posters for category: "${targetCategory}"`);
+        
         return this.getPostersByCategory(targetCategory, 200, isRefresh);
-      } else {
-        if (preferredCategory) {
-          logger.warn(`⚠️ [USER CATEGORY POSTERS] No profiles found, using stored category: ${preferredCategory}`);
-          return this.getPostersByCategory(preferredCategory, 200, isRefresh);
-        }
-        logger.warn('⚠️ [USER CATEGORY POSTERS] No profiles found, using General category');
-        return this.getPostersByCategory('General', 200, isRefresh);
       }
+
+      // FALLBACK: Try to get the original category from user's registration data
+      logger.log('🔄 [USER CATEGORY POSTERS] No business profiles found, checking registration data...');
+      
+      const user = authService.getCurrentUser();
+      const originalCategory = user?._originalCategory || user?.category;
+      const originalSubCategory = user?.subCategory || user?.subcategory;
+
+      if (originalCategory || originalSubCategory) {
+        const targetCategory = originalSubCategory || originalCategory;
+        const categoryType = originalSubCategory ? 'subcategory (from registration)' : 'main category (from registration)';
+        
+        logger.log(`✅ [USER CATEGORY POSTERS] Using ${categoryType}: ${targetCategory}`);
+        if (originalSubCategory) {
+          logger.log(`📋 [USER CATEGORY POSTERS] Subcategory: ${originalSubCategory}, Main category: ${originalCategory}`);
+        }
+        return this.getPostersByCategory(targetCategory, 200, isRefresh); // Always request 200 to get all posters
+      }
+
+      // FINAL FALLBACK: Use General category
+      logger.warn('⚠️ [USER CATEGORY POSTERS] No category found, using General category');
+      return this.getPostersByCategory('General', 200, isRefresh);
     } catch (error: unknown) {
       const errorMessage =
         typeof error === 'object' && error !== null && 'message' in error
