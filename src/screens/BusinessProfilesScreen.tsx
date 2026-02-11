@@ -340,15 +340,15 @@ const BusinessProfilesScreen: React.FC = () => {
         setPendingProfileData(pendingData);
       }
 
-      console.log('🔍 PAYMENT LOGIC COMMENTED FOR TESTING - Checking payment status for business profile creation...');
-      // const paymentStatus = await businessProfileService.checkBusinessProfilePaymentStatus();
+      console.log('🔍 Checking payment status for business profile creation...');
+      const paymentStatus = await businessProfileService.checkBusinessProfilePaymentStatus();
 
-      // if (!paymentStatus.hasPaid) {
-      //   console.log('ℹ️ Payment not verified yet. Waiting for successful payment...');
-      //   return;
-      // }
+      if (!paymentStatus.hasPaid) {
+        console.log('ℹ️ Payment not verified yet. Waiting for successful payment...');
+        return;
+      }
 
-      console.log('✅ PAYMENT BYPASSED FOR TESTING - Creating business profile directly...');
+      console.log('✅ Payment verified - Creating business profile...');
       const newProfile = await businessProfileService.createBusinessProfile(pendingData);
 
       setProfiles(prev => [...prev, newProfile]);
@@ -357,15 +357,15 @@ const BusinessProfilesScreen: React.FC = () => {
       await AsyncStorage.removeItem('pending_business_profile_data');
       setPendingProfileData(null);
 
-      setSuccessMessage('Business profile created successfully (testing mode)');
+      setSuccessMessage('Business profile created successfully');
       setShowSuccessModal(true);
-      console.log('✅ Business profile created (testing mode):', newProfile.id);
+      console.log('✅ Business profile created:', newProfile.id);
 
       setTimeout(() => {
         loadBusinessProfiles();
       }, 1000);
     } catch (error) {
-      console.error('❌ Error creating business profile (testing mode):', error);
+      console.error('❌ Error creating business profile:', error);
       setErrorMessage('Failed to create business profile. Please try again.');
       setShowErrorModal(true);
     }
@@ -760,16 +760,15 @@ const BusinessProfilesScreen: React.FC = () => {
   }, [processBusinessProfilePaymentSuccess]);
 
   const handleFormSubmit = useCallback(async (formData: any) => {
-    // PAYMENT LOGIC COMMENTED FOR TESTING - Allow direct profile creation
     // All new profiles require payment approval before creation
-    // if (!editingProfile) {
-    //   setPendingProfileData(formData);
-    //   await AsyncStorage.setItem('pending_business_profile_data', JSON.stringify(formData));
-    //   setShowPaymentModal(true);
-    //   setShowForm(false);
-    //   setShowBottomSheet(false);
-    //   return; // IMPORTANT: Return early to prevent profile creation
-    // }
+    if (!editingProfile) {
+      setPendingProfileData(formData);
+      await AsyncStorage.setItem('pending_business_profile_data', JSON.stringify(formData));
+      setShowPaymentModal(true);
+      setShowForm(false);
+      setShowBottomSheet(false);
+      return; // IMPORTANT: Return early to prevent profile creation
+    }
 
     setFormLoading(true);
     try {
