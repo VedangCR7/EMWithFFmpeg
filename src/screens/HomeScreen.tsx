@@ -781,7 +781,27 @@ const HomeScreen: React.FC = React.memo(() => {
     if (selectedBusinessProfile?.category) {
       AsyncStorage.setItem('selectedBusinessProfileCategory', selectedBusinessProfile.category).catch(() => {});
     }
-  }, [selectedBusinessProfileId, selectedBusinessProfile?.category, userProfile?.id]);
+    // Store profile name for MyBusiness screen display
+    if (selectedBusinessProfile?.name) {
+      AsyncStorage.setItem('selectedBusinessProfileName', selectedBusinessProfile.name).catch(() => {});
+    }
+    // Store subcategory for MyBusiness screen filtering
+    if (selectedBusinessProfile?.subcategory || selectedBusinessProfile?.subCategory) {
+      const subcategory = selectedBusinessProfile.subcategory || selectedBusinessProfile.subCategory;
+      if (subcategory) {
+        AsyncStorage.setItem('selectedBusinessProfileSubcategory', subcategory).catch(() => {});
+      }
+    }
+    
+    // DEBUG: Log what's being stored
+    console.log('🔍 [HOMESCREEN DEBUG] Storing profile data:', {
+      selectedBusinessProfileId,
+      profileName: selectedBusinessProfile?.name,
+      profileCategory: selectedBusinessProfile?.category,
+      profileSubcategory: selectedBusinessProfile?.subcategory || selectedBusinessProfile?.subCategory,
+      currentUserId
+    });
+  }, [selectedBusinessProfileId, selectedBusinessProfile?.category, selectedBusinessProfile?.name, selectedBusinessProfile?.subcategory, selectedBusinessProfile?.subCategory, userProfile?.id]);
   
   // Dynamic dimensions for responsive layout
   const [dimensions, setDimensions] = useState(() => {
