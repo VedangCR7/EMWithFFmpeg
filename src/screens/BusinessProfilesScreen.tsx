@@ -401,13 +401,13 @@ const BusinessProfilesScreen: React.FC = () => {
 
     const lowercaseQuery = query.toLowerCase().trim();
     
-    // Filter cached profiles by company name, business category, or mobile number
+    // Filter cached profiles by company name, business subcategory, or mobile number
     const filtered = allProfiles.filter(profile => {
       const matchesName = profile.name?.toLowerCase().includes(lowercaseQuery);
-      const matchesCategory = profile.category?.toLowerCase().includes(lowercaseQuery);
+      const matchesSubcategory = (profile.subcategory || profile.subCategory)?.toLowerCase().includes(lowercaseQuery);
       const matchesPhone = profile.phone?.toLowerCase().includes(lowercaseQuery);
       
-      return matchesName || matchesCategory || matchesPhone;
+      return matchesName || matchesSubcategory || matchesPhone;
     });
     
     setProfiles(filtered);
@@ -976,9 +976,9 @@ const BusinessProfilesScreen: React.FC = () => {
                   <Text style={[styles.userBadge, { color: theme.colors.primary }]}> (Your Profile)</Text>
                 )}
               </Text>
-              {item.category && (
+              {(item.subcategory || item.subCategory) && (
                 <Text style={[styles.businessCategory, { color: theme.colors.primary }]}>
-                  {item.category}
+                  {item.subcategory || item.subCategory}
                 </Text>
               )}
             </View>
