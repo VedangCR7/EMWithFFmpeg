@@ -48,8 +48,6 @@ class BusinessProfileService {
     return await cacheService.getOrFetch(
       cacheKey,
       async () => {
-        console.log('📡 [BUSINESS PROFILES] Fetching from server...');
-        
         // First check if backend is available with a quick health check
         try {
           await api.get('/health', { timeout: 5000 });
@@ -58,32 +56,12 @@ class BusinessProfileService {
         }
         
         const response = await api.get(`/api/mobile/business-profile/${userId}`);
-        
-        if (response.data.success) {
+    
+    if (response.data.success) {
           const profiles = response.data.data.profiles;
           
           if (profiles && profiles.length > 0) {
-            console.log('═══════════════════════════════════════════════════════════');
-            console.log('📡 BACKEND RESPONSE - RAW BUSINESS PROFILES DATA');
-            console.log('═══════════════════════════════════════════════════════════');
-            profiles.forEach((profile: any, index: number) => {
-              console.log(`\n📋 Profile ${index + 1}:`);
-              console.log(`   🆔 ID: ${profile.id}`);
-              console.log(`   🏢 Name: ${profile.name || profile.businessName}`);
-              console.log(`   📍 Address: ${profile.address || '(empty)'}`);
-              console.log(`   🌐 Website: ${profile.website || '(empty)'}`);
-              console.log(`   🏷️ Category: ${profile.category || '(empty)'}`);
-              console.log(`   📝 Description: ${profile.description || '(empty)'}`);
-              console.log(`   📱 Phone: ${profile.phone || '(empty)'}`);
-              console.log(`   📱 Alt Phone: ${profile.alternatePhone || '(empty)'}`);
-              console.log(`   📧 Email: ${profile.email || '(empty)'}`);
-              console.log(`   🖼️ Logo: ${profile.logo || '(empty)'}`);
-              console.log(`   📅 Created: ${profile.createdAt}`);
-              console.log(`   📅 Updated: ${profile.updatedAt}`);
-            });
-            console.log('\n═══════════════════════════════════════════════════════════');
-            
-            // Convert backend profiles to frontend format (optimized - no per-item logging)
+            // Convert backend profiles to frontend format
             const businessProfiles: BusinessProfile[] = profiles.map((profile: any) => ({
               id: profile.id,
               name: profile.name || profile.businessName,

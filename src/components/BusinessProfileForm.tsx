@@ -111,6 +111,7 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
     name: '',
     description: '',
     category: '',
+    subcategory: '',
     address: '',
     phone: '',
     alternatePhone: '',
@@ -130,6 +131,8 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [phoneValidationError, setPhoneValidationError] = useState<string>('');
   const [alternatePhoneValidationError, setAlternatePhoneValidationError] = useState<string>('');
+  const [subcategories, setSubcategories] = useState<any[]>([]);
+  const [loadingSubcategories, setLoadingSubcategories] = useState<boolean>(false);
   const inputRefs = useRef<Record<string, RNTextInput | null>>({});
 
   const focusField = (field: string) => {
@@ -186,12 +189,74 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
     fetchCategories();
   }, [visible]);
 
+  // Fetch subcategories for a selected category
+  const fetchSubcategories = async (selectedCategory: string) => {
+    try {
+      setLoadingSubcategories(true);
+      console.log('📡 [BUSINESS PROFILE FORM] Fetching subcategories for category:', selectedCategory);
+      
+      // Use the same API endpoint but extract subcategories from the selected parent category
+      const response = await businessCategoriesService.getBusinessCategories();
+      
+      if (response.success && response.categories && response.categories.length > 0) {
+        // Find the selected parent category
+        const selectedParentCategory = response.categories.find((category: any) => {
+          const categoryName = category.name?.toLowerCase() || '';
+          const selectedCategoryLower = selectedCategory.toLowerCase();
+          return categoryName === selectedCategoryLower || 
+                 categoryName.includes(selectedCategoryLower) ||
+                 selectedCategoryLower.includes(categoryName);
+        });
+        
+        console.log('📋 [BUSINESS PROFILE FORM] Selected parent category:', selectedParentCategory);
+        
+        if (selectedParentCategory && selectedParentCategory.subCategories) {
+          // The subCategories is an array of objects, not a string
+          const subCategoriesArray = selectedParentCategory.subCategories;
+          console.log('📋 [BUSINESS PROFILE FORM] SubCategories array:', subCategoriesArray);
+          
+          // Check if it's an array and has items
+          if (Array.isArray(subCategoriesArray) && subCategoriesArray.length > 0) {
+            // Map the subcategory objects to our expected format
+            const categorySubcategories = subCategoriesArray.map((subcategory: any, index: number) => ({
+              id: subcategory.id || `${selectedParentCategory.id}_sub_${index}`,
+              name: subcategory.name || subcategory.title || `Subcategory ${index + 1}`,
+              parentCategoryName: selectedParentCategory.name,
+              slug: subcategory.slug,
+              description: subcategory.description,
+              icon: subcategory.icon,
+              color: subcategory.color
+            }));
+            
+            console.log('✅ [BUSINESS PROFILE FORM] Subcategories extracted:', categorySubcategories.length);
+            setSubcategories(categorySubcategories);
+          } else {
+            console.warn('⚠️ [BUSINESS PROFILE FORM] SubCategories is not a valid array or is empty');
+            setSubcategories([]);
+          }
+        } else {
+          console.warn('⚠️ [BUSINESS PROFILE FORM] No subcategories found for category:', selectedCategory);
+          setSubcategories([]);
+        }
+      } else {
+        console.warn('⚠️ [BUSINESS PROFILE FORM] Failed to fetch categories for subcategory extraction');
+        setSubcategories([]);
+      }
+    } catch (error) {
+      console.error('❌ [BUSINESS PROFILE FORM] Error fetching subcategories:', error);
+      setSubcategories([]);
+    } finally {
+      setLoadingSubcategories(false);
+    }
+  };
+
   useEffect(() => {
     if (profile) {
       setFormData({
         name: profile.name,
         description: profile.description,
         category: profile.category,
+        subcategory: profile.subCategory || profile.subcategory || '',
         address: profile.address,
         phone: profile.phone,
         email: profile.email,
@@ -203,6 +268,7 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
         name: '',
         description: '',
         category: '',
+        subcategory: '',
         address: '',
         phone: '',
         email: '',
@@ -212,6 +278,8 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
   }, [profile, visible]);
 
   const handleInputChange = (field: string, value: string) => {
+    console.log('🔍 [BUSINESS FORM] Field changed:', { field, value });
+    
     // Real-time phone validation with digit count
     if (field === 'phone') {
       // Only allow digits
@@ -246,11 +314,30 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
       return;
     }
     
-    // Handle all other fields normally
-    setFormData(prev => ({
-      ...prev,
-      [field]: value,
-    }));
+    // Handle category selection - fetch subcategories
+    if (field === 'category') {
+      setFormData(prev => ({
+        ...prev,
+        [field]: value,
+        subcategory: '', // Reset subcategory when category changes
+      }));
+      
+      // Fetch subcategories for the selected category
+      if (value) {
+        fetchSubcategories(value);
+      } else {
+        setSubcategories([]); // Clear subcategories if no category selected
+      }
+    } else {
+      // Handle all other fields normally
+      if (field === 'subcategory') {
+        console.log('🔍 [BUSINESS FORM] Subcategory specifically changed to:', value);
+      }
+      setFormData(prev => ({
+        ...prev,
+        [field]: value,
+      }));
+    }
   };
 
 
@@ -330,6 +417,11 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
       errors.push('Business category is required');
     }
 
+    // Subcategory validation (only if subcategories exist for the selected category)
+    if (!profile && formData.category && subcategories.length > 0 && (!formData.subcategory || !formData.subcategory.trim())) {
+      errors.push('Business subcategory is required');
+    }
+
     // Phone number validation
     if (!formData.phone.trim()) {
       errors.push('Phone number is required');
@@ -358,14 +450,19 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
   };
 
   const handleSubmit = () => {
+    console.log('🔍 [BUSINESS FORM] Register button clicked');
+    console.log('🔍 [BUSINESS FORM] Form data being submitted:', formData);
+    
     const validation = validateForm();
     
     if (!validation.isValid) {
+      console.log('⚠️ [BUSINESS FORM] Validation failed:', validation.errors);
       setValidationErrors(validation.errors);
       setShowValidationModal(true);
       return;
     }
 
+    console.log('✅ [BUSINESS FORM] Form validation passed, submitting to parent');
     onSubmit(formData);
   };
 
@@ -594,6 +691,86 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
                 )}
               </View>
             </View>
+
+            {/* Subcategory Field - Only show if category is selected and subcategories exist */}
+            {!profile && formData.category && subcategories.length > 0 && (
+              <View style={styles.inputContainer}>
+                <Text style={[styles.sectionTitle, { color: isDarkMode ? '#ffffff' : '#1a1a1a' }]}>
+                  Business Subcategory *
+                </Text>
+                
+                {/* Selected Subcategory Display */}
+                <View style={[
+                  styles.pickerContainer,
+                  {
+                    backgroundColor: theme.colors.inputBackground,
+                    borderColor: theme.colors.border
+                  },
+                  focusedField === 'subcategory' && [styles.inputFocused, { borderColor: theme.colors.primary }]
+                ]}>
+                  {loadingSubcategories ? (
+                    <View style={styles.categoryLoadingContainer}>
+                      <ActivityIndicator size="small" color={theme.colors.primary} />
+                      <Text style={[styles.pickerText, { color: theme.colors.textSecondary, marginLeft: 8 }]}>
+                        Loading subcategories...
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text style={[styles.pickerText, { color: formData.subcategory ? theme.colors.text : theme.colors.textSecondary }]}>
+                      {formData.subcategory || 'Select business subcategory'}
+                    </Text>
+                  )}
+                </View>
+                
+                {/* Subcategory Options */}
+                {loadingSubcategories ? (
+                  <View style={styles.categoryOptions}>
+                    <Text style={[styles.categoryLoadingText, { color: theme.colors.textSecondary }]}>
+                      Loading subcategories...
+                    </Text>
+                  </View>
+                ) : subcategories.length === 0 ? (
+                  <View style={styles.categoryOptions}>
+                    <Text style={[styles.categoryLoadingText, { color: theme.colors.textSecondary }]}>
+                      No subcategories available for this category.
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.categoryOptions}>
+                    {subcategories.map((subcategory) => (
+                      <TouchableOpacity
+                        key={subcategory.id || subcategory.name}
+                        style={[
+                          styles.categoryOption,
+                          { 
+                            backgroundColor: formData.subcategory === subcategory.name 
+                              ? theme.colors.primary 
+                              : (isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(102,126,234,0.1)'),
+                            borderWidth: 1,
+                            borderColor: formData.subcategory === subcategory.name 
+                              ? theme.colors.primary 
+                              : (isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(102,126,234,0.2)')
+                          }
+                        ]}
+                        onPress={() => handleInputChange('subcategory', subcategory.name)}
+                      >
+                        <Text style={[
+                          styles.categoryOptionText,
+                          { 
+                            color: formData.subcategory === subcategory.name 
+                              ? '#ffffff' 
+                              : (isDarkMode ? '#ffffff' : theme.colors.primary)
+                          },
+                          formData.subcategory === subcategory.name && styles.categoryOptionTextSelected
+                        ]}>
+                          {subcategory.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
 
             {/* Contact Information */}
             <View style={styles.section}>

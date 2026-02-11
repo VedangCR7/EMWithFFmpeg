@@ -27,7 +27,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { MainStackParamList } from '../navigation/AppNavigator';
 import dashboardService, { Banner, Template } from '../services/dashboard';
@@ -711,6 +711,33 @@ const HomeScreen: React.FC = React.memo(() => {
       isMounted = false;
     };
   }, [userProfile?.id]);
+
+  // Refresh business profiles when screen comes into focus (e.g., returning from BusinessProfilesScreen)
+  useFocusEffect(
+    useCallback(() => {
+      console.log('🔄 [HOMESCREEN] Screen focused - refreshing business profiles...');
+      const currentUserId = userProfile?.id || authService.getCurrentUser()?.id;
+      if (currentUserId) {
+        const loadProfiles = async () => {
+          try {
+            setBusinessProfilesLoadingState(true);
+            const profiles = await businessProfileService.getUserBusinessProfiles(currentUserId);
+            setUserBusinessProfiles(profiles);
+            
+            // Auto-select first profile if none selected
+            if (profiles.length > 0 && !selectedBusinessProfileId) {
+              setSelectedBusinessProfileId(profiles[0].id);
+            }
+          } catch (error) {
+            console.error('Error refreshing business profiles:', error);
+          } finally {
+            setBusinessProfilesLoadingState(false);
+          }
+        };
+        loadProfiles();
+      }
+    }, [userProfile?.id, selectedBusinessProfileId])
+  );
 
   const userName = useMemo(() => {
     return (
@@ -1721,7 +1748,7 @@ const HomeScreen: React.FC = React.memo(() => {
       id: poster.id,
       name: poster.name || poster.title || 'Calendar Poster',
       thumbnail: thumbnail,
-      category: poster.category || 'Festival',
+      category: poster.category || 'General',
       downloads: poster.downloads || 0,
       isDownloaded: poster.isDownloaded || false,
       tags: poster.tags || [],
@@ -4762,7 +4789,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                                 ]}
                                 numberOfLines={1}
                               >
-                                {profile.category || 'General'}
+                                {profile.subcategory || profile.subCategory || profile.category || 'General'}
                               </Text>
                             </View>
                           </View>
