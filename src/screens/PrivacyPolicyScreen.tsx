@@ -307,8 +307,9 @@ const PrivacyPolicyScreen = () => {
       textShadowColor: 'rgba(255, 255, 255, 0.5)',
       textShadowOffset: { width: 0, height: 1 },
       textShadowRadius: 2,
-      lineHeight: moderateScale(isTablet ? 16 : 15),
+      lineHeight: moderateScale(isTablet ? 18 : 17),
       includeFontPadding: true,
+      paddingBottom: moderateScale(1),
     },
     scrollContainer: {
       flex: 1,
@@ -358,8 +359,9 @@ const PrivacyPolicyScreen = () => {
       color: '#667eea',
       letterSpacing: 0.5,
       flex: 1,
-      lineHeight: moderateScale(isTablet ? 15 : 14),
+      lineHeight: moderateScale(isTablet ? 17 : 16),
       includeFontPadding: true,
+      paddingBottom: moderateScale(1),
     },
     sectionContent: {
       fontSize: moderateScale(isTablet ? 8 : 7.5), // Fixed text size
@@ -381,8 +383,9 @@ const PrivacyPolicyScreen = () => {
       color: '#667eea',
       marginTop: moderateScale(2),
       fontWeight: '600',
-      lineHeight: moderateScale(isTablet ? 14 : 13),
+      lineHeight: moderateScale(isTablet ? 16 : 15),
       includeFontPadding: true,
+      paddingBottom: moderateScale(1),
       // Dynamic spacing applied inline
     },
     bulletText: {
@@ -412,8 +415,9 @@ const PrivacyPolicyScreen = () => {
       color: '#667eea',
       textAlign: 'center',
       letterSpacing: 0.5,
-      lineHeight: moderateScale(isTablet ? 18 : 16),
+      lineHeight: moderateScale(isTablet ? 20 : 18),
       includeFontPadding: true,
+      paddingBottom: moderateScale(2),
       // Dynamic spacing applied inline
     },
     contactText: {
@@ -444,8 +448,9 @@ const PrivacyPolicyScreen = () => {
       textShadowOffset: { width: 0, height: 1 },
       textShadowRadius: 2,
       letterSpacing: isTablet ? 1 : 0.5,
-      lineHeight: moderateScale(isTablet ? 22 : 20),
+      lineHeight: moderateScale(isTablet ? 24 : 22),
       includeFontPadding: true,
+      paddingBottom: moderateScale(2),
     },
     heroSubtitle: {
       textAlign: 'center',
@@ -838,10 +843,6 @@ const PrivacyPolicyScreen = () => {
             <View style={[styles.bulletPoint, getBulletPointStyle()]}>
               <Text style={[styles.bullet, getBulletStyle()]}>•</Text>
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>Access and update your personal information</Text>
-            </View>
-            <View style={[styles.bulletPoint, getBulletPointStyle()]}>
-              <Text style={[styles.bullet, getBulletStyle()]}>•</Text>
-              <Text style={[styles.bulletText, { color: theme.colors.text }]}>Delete your account and associated data</Text>
             </View>
             <View style={[styles.bulletPoint, getBulletPointStyle()]}>
               <Text style={[styles.bullet, getBulletStyle()]}>•</Text>

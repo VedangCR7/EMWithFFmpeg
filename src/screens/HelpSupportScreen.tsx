@@ -321,7 +321,9 @@ const HelpSupportScreen: React.FC = () => {
             color: theme.colors.text,
             fontSize: isTabletDevice ? getFontSize(10) : getFontSize(9),
             marginRight: dynamicModerateScale(8),
-            lineHeight: isTabletDevice ? dynamicModerateScale(14) : dynamicModerateScale(13),
+            lineHeight: isTabletDevice ? dynamicModerateScale(16) : dynamicModerateScale(15),
+            includeFontPadding: true,
+            paddingBottom: moderateScale(1),
           }]}>{item.question}</Text>
           <Icon
             name={isExpanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
@@ -334,7 +336,9 @@ const HelpSupportScreen: React.FC = () => {
             color: theme.colors.textSecondary,
             fontSize: isTabletDevice ? getFontSize(9) : getFontSize(8),
             marginTop: dynamicModerateScale(8),
-            lineHeight: isTabletDevice ? dynamicModerateScale(14) : dynamicModerateScale(13),
+            lineHeight: isTabletDevice ? dynamicModerateScale(16) : dynamicModerateScale(15),
+            includeFontPadding: true,
+            paddingBottom: moderateScale(1),
           }]}>{item.answer}</Text>
         )}
       </TouchableOpacity>
@@ -410,7 +414,9 @@ const HelpSupportScreen: React.FC = () => {
             <Text style={[styles.welcomeSubtitle, { 
               color: theme.colors.textSecondary,
               fontSize: isTabletDevice ? getFontSize(9) : getFontSize(8),
-              lineHeight: isTabletDevice ? dynamicModerateScale(14) : dynamicModerateScale(12),
+              lineHeight: isTabletDevice ? dynamicModerateScale(16) : dynamicModerateScale(14),
+              includeFontPadding: true,
+              paddingBottom: moderateScale(1),
             }]}>
               We're here to assist you with any questions or issues you may have
             </Text>
@@ -549,6 +555,8 @@ const styles = StyleSheet.create({
     headerTitle: {
     fontWeight: 'bold',
     color: '#333333',
+    includeFontPadding: true,
+    paddingBottom: moderateScale(1),
   },
   scrollView: {
     flex: 1,
@@ -571,9 +579,13 @@ const styles = StyleSheet.create({
   welcomeTitle: {
     fontWeight: 'bold',
     textAlign: 'center',
+    includeFontPadding: true,
+    paddingBottom: moderateScale(1),
   },
   welcomeSubtitle: {
     textAlign: 'center',
+    includeFontPadding: true,
+    paddingBottom: moderateScale(1),
   },
   section: {
     // Inline styles used
@@ -583,6 +595,8 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
+    includeFontPadding: true,
+    paddingBottom: moderateScale(1),
   },
   contactGrid: {
     // Inline styles used
@@ -605,6 +619,8 @@ const styles = StyleSheet.create({
   },
   contactTitle: {
     fontWeight: '600',
+    includeFontPadding: true,
+    paddingBottom: moderateScale(1),
   },
   contactDescription: {
     // Inline styles used
@@ -627,6 +643,8 @@ const styles = StyleSheet.create({
   faqQuestion: {
     flex: 1,
     fontWeight: '600',
+    includeFontPadding: true,
+    paddingBottom: moderateScale(1),
   },
   faqAnswer: {
     // Inline styles used
@@ -643,15 +661,21 @@ const styles = StyleSheet.create({
   quickLinkText: {
     flex: 1,
     fontWeight: '500',
+    includeFontPadding: true,
+    paddingBottom: moderateScale(1),
   },
   footer: {
     alignItems: 'center',
   },
   footerText: {
     textAlign: 'center',
+    includeFontPadding: true,
+    paddingBottom: moderateScale(1),
   },
   footerVersion: {
     textAlign: 'center',
+    includeFontPadding: true,
+    paddingBottom: moderateScale(1),
   },
 });
 

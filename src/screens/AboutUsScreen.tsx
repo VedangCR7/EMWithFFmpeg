@@ -42,7 +42,7 @@ type AboutUsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Abou
 
 const AboutUsScreen: React.FC = () => {
   const navigation = useNavigation<AboutUsScreenNavigationProp>();
-  const { theme } = useTheme();
+  const { theme, isDarkMode } = useTheme();
   const insets = useSafeAreaInsets();
 
   // Dynamic dimensions for responsive layout (matching PrivacyPolicyScreen)
@@ -138,6 +138,8 @@ const AboutUsScreen: React.FC = () => {
       fontWeight: '700',
       color: theme.colors.text,
       flex: 1,
+      includeFontPadding: true,
+      paddingBottom: moderateScale(1),
     },
     scrollContainer: {
       flex: 1,
@@ -172,10 +174,12 @@ const AboutUsScreen: React.FC = () => {
       fontWeight: '900',
       color: theme.colors.text,
       textAlign: 'center',
-      lineHeight: moderateScale(isTablet ? 22 : 20),
+      lineHeight: moderateScale(isTablet ? 24 : 22),
       textShadowColor: 'rgba(0, 0, 0, 0.1)',
       textShadowOffset: { width: 0, height: 1 },
       textShadowRadius: 2,
+      includeFontPadding: true,
+      paddingBottom: moderateScale(2),
     },
     heroSubtitle: {
       fontSize: isTabletDevice ? getFontSize(8) : getFontSize(7.5),
@@ -202,11 +206,12 @@ const AboutUsScreen: React.FC = () => {
       fontWeight: '800',
       color: theme.colors.text,
       textAlign: 'center',
-      lineHeight: moderateScale(isTablet ? 20 : 18),
+      lineHeight: moderateScale(isTablet ? 22 : 20),
       textShadowColor: 'rgba(0, 0, 0, 0.1)',
       textShadowOffset: { width: 0, height: 1 },
       textShadowRadius: 2,
       includeFontPadding: true,
+      paddingBottom: moderateScale(2),
     },
     statsGrid: {
       flexDirection: 'row',
@@ -254,10 +259,12 @@ const AboutUsScreen: React.FC = () => {
       fontSize: isTabletDevice ? getFontSize(11) : getFontSize(10),
       fontWeight: '800',
       color: theme.colors.text,
-      lineHeight: moderateScale(isTablet ? 15 : 14),
+      lineHeight: moderateScale(isTablet ? 17 : 16),
       textShadowColor: 'rgba(0, 0, 0, 0.1)',
       textShadowOffset: { width: 0, height: 1 },
       textShadowRadius: 2,
+      includeFontPadding: true,
+      paddingBottom: moderateScale(1),
     },
     sectionText: {
       fontSize: isTabletDevice ? getFontSize(8) : getFontSize(6.5),
@@ -301,10 +308,12 @@ const AboutUsScreen: React.FC = () => {
       fontWeight: '800',
       color: theme.colors.text,
       textAlign: 'center',
-      lineHeight: moderateScale(isTablet ? 16 : 15),
+      lineHeight: moderateScale(isTablet ? 18 : 17),
       textShadowColor: 'rgba(0, 0, 0, 0.1)',
       textShadowOffset: { width: 0, height: 1 },
       textShadowRadius: 2,
+      includeFontPadding: true,
+      paddingBottom: moderateScale(2),
     },
     trialFeatures: {
       flexDirection: 'row',
@@ -361,7 +370,7 @@ const AboutUsScreen: React.FC = () => {
   return (
     <SafeAreaView style={dynamicStyles.container}>
       <StatusBar
-        barStyle={theme.isDark ? 'light-content' : 'dark-content'}
+        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
         backgroundColor={theme.colors.surface}
       />
       
@@ -664,29 +673,7 @@ const AboutUsScreen: React.FC = () => {
               <Icon name="check-circle" size={isTabletDevice ? getIconSize(16) : getIconSize(14)} color={theme.colors.primary} />
               <Text style={[dynamicStyles.trialFeatureText, {
                 marginLeft: dynamicModerateScale(6),
-              }]}>7-Day Free Trial</Text>
-            </View>
-            <View style={[dynamicStyles.trialFeature, {
-              paddingVertical: dynamicModerateScale(6),
-              paddingHorizontal: dynamicModerateScale(8),
-              borderRadius: dynamicModerateScale(8),
-              minHeight: isTabletDevice ? dynamicModerateScale(40) : dynamicModerateScale(35),
-            }]}>
-              <Icon name="check-circle" size={isTabletDevice ? getIconSize(16) : getIconSize(14)} color={theme.colors.primary} />
-              <Text style={[dynamicStyles.trialFeatureText, {
-                marginLeft: dynamicModerateScale(6),
               }]}>No Credit Card Required</Text>
-            </View>
-            <View style={[dynamicStyles.trialFeature, {
-              paddingVertical: dynamicModerateScale(6),
-              paddingHorizontal: dynamicModerateScale(8),
-              borderRadius: dynamicModerateScale(8),
-              minHeight: isTabletDevice ? dynamicModerateScale(40) : dynamicModerateScale(35),
-            }]}>
-              <Icon name="check-circle" size={isTabletDevice ? getIconSize(16) : getIconSize(14)} color={theme.colors.primary} />
-              <Text style={[dynamicStyles.trialFeatureText, {
-                marginLeft: dynamicModerateScale(6),
-              }]}>Cancel Anytime</Text>
             </View>
             <View style={[dynamicStyles.trialFeature, {
               paddingVertical: dynamicModerateScale(6),
