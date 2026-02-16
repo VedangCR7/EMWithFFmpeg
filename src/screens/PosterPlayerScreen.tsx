@@ -525,7 +525,29 @@ const PosterPlayerScreen: React.FC = () => {
   const isEventPlannerCategory = useMemo(() => {
     const category = (currentPoster?.category || initialPoster?.category || '').trim().toLowerCase();
     if (!category) return false;
-    return category.includes('event planner');
+    
+    // Check for multiple variations of "event planner"
+    const eventPlannerVariations = [
+      'event planners',
+      'event planner',
+      'event-planners',
+      'event-planner',
+      'eventplanners',
+      'eventplanner'
+    ];
+    
+    const result = eventPlannerVariations.some(variation => category.includes(variation));
+    
+    // Debug logging for category detection
+    console.log('🔍 [EVENT PLANNER DETECTION]', {
+      currentPosterCategory: currentPoster?.category,
+      initialPosterCategory: initialPoster?.category,
+      normalizedCategory: category,
+      isEventPlanner: result,
+      variations: eventPlannerVariations
+    });
+    
+    return result;
   }, [currentPoster, initialPoster]);
 
   const templateMatchesServiceFilter = useCallback((template: Template) => {
@@ -536,7 +558,10 @@ const PosterPlayerScreen: React.FC = () => {
           .filter((tag): tag is string => typeof tag === 'string')
           .map(tag => tag.toLowerCase())
       : [];
-    return keywords.some(keyword => templateTags.some(tag => tag.includes(keyword)));
+    
+    const matches = keywords.some(keyword => templateTags.some(tag => tag.includes(keyword)));
+    
+    return matches;
   }, [isEventPlannerCategory, selectedServiceFilter, serviceFilterKeywords]);
 
 
@@ -546,9 +571,9 @@ const PosterPlayerScreen: React.FC = () => {
     
     // If "All" is selected, return ALL templates without any language filtering
     if (selectedLanguage === 'all') {
-      // Only apply service filter if applicable (for Event Planner category)
-      // No language filtering at all when "All" is selected
-      return templatesWithLanguages.filter(templateMatchesServiceFilter);
+      const filtered = templatesWithLanguages.filter(templateMatchesServiceFilter);
+      
+      return filtered;
     }
     
     // Filter by language - if no matches, return empty array
@@ -672,12 +697,17 @@ const PosterPlayerScreen: React.FC = () => {
     const prevId = prevInitialPosterIdRef.current;
     
     // If initialPoster ID changed, it means a different poster was selected
-    // Reset auto-detection tracking so it can work for the new poster
+    // Reset auto-detection tracking so it can work for new poster
     // Also allow auto-detection again when navigating to a new category/poster
     if (prevId !== null && prevId !== initialPosterId) {
       lastAutoDetectedPosterIdRef.current = null; // Reset auto-detection tracking for new poster
       userSelectedPosterRef.current = null; // Clear user selection when navigating from different screen
-      userManuallySelectedLanguageRef.current = false; // Allow auto-detection for new category/poster
+      // Only reset manual language selection if it's a completely different poster (not just language change)
+      // This preserves user's language choice when navigating within the same category
+      if (!userManuallySelectedLanguageRef.current) {
+        userManuallySelectedLanguageRef.current = false; // Allow auto-detection for new category/poster
+        console.log('⚠️ [LANGUAGE RESET] Reset manual language selection - new category/poster navigation');
+      }
       // Clear allTemplates immediately to prevent showing old posters in grid
       // setAllTemplates([]); // REMOVED - This was causing templates to be cleared when switching categories
     }
@@ -753,22 +783,30 @@ const PosterPlayerScreen: React.FC = () => {
       return;
     }
 
-    // Reset manual language selection when switching categories to allow auto-detection
-    userManuallySelectedLanguageRef.current = false;
-    // Set language to english to avoid language switching issues
-    setSelectedLanguage('english');
     // Track active category to prevent other useEffects from overwriting templates
-    const categoryName = (typeof businessCategory === 'object' && businessCategory?.name) || businessCategory;
-    activeCategoryRef.current = { type: 'business', value: categoryName as string };
+    let categoryName: string;
+    if (typeof businessCategory === 'object' && businessCategory?.name) {
+      categoryName = businessCategory.name;
+    } else if (typeof businessCategory === 'string') {
+      categoryName = businessCategory;
+    } else {
+      categoryName = 'Event Planner'; // fallback
+    }
+    activeCategoryRef.current = { type: 'business', value: categoryName };
 
     const fetchBusinessCategoryPosters = async () => {
       try {
         // Show loading state when starting to fetch
         setIsBusinessCategoryLoading(true);
         
-        const limit = posterLimit || 5; // Default to 5 if not specified, use 200 for "My Business"
-        const categoryName = (typeof businessCategory === 'object' && businessCategory?.name) || businessCategory;
-        const response = await businessCategoryPostersApi.getPostersByCategory(categoryName as string, limit);
+        const limit = posterLimit || 1000; // Default to 1000 for "My Business", use 5 for other cases
+        const apiUrl = `/api/mobile/posters/category/${encodeURIComponent(categoryName)}?limit=${limit}`;
+        console.log(`🔍 [MY BUSINESS API] Fetching: ${apiUrl} (limit: ${limit})`);
+        
+        // Clear cache for "My Business" to ensure fresh data with new limit
+        businessCategoryPostersApi.clearCategoryCache(categoryName);
+        
+        const response = await businessCategoryPostersApi.getPostersByCategory(categoryName, limit);
         
         if (response.success && response.data.posters) {
           // Convert BusinessCategoryPoster to Template format (already limited to 5 by API)
@@ -855,11 +893,17 @@ const PosterPlayerScreen: React.FC = () => {
                 currentLanguage: selectedLanguage
               });
               
+              // Only auto-detect if user hasn't manually selected a language
+            if (!userManuallySelectedLanguageRef.current) {
               if (detectedLanguage) {
                 console.log('✅ [BUSINESS FETCH] Setting language to:', detectedLanguage);
                 setSelectedLanguage(detectedLanguage);
                 lastAutoDetectedPosterIdRef.current = posterToSet.id;
               }
+            } else {
+              // User manually selected language - keep their choice
+              console.log('ℹ️ [BUSINESS FETCH] User manually selected language, keeping:', selectedLanguage);
+            }
             }
           }
         }
@@ -883,7 +927,10 @@ const PosterPlayerScreen: React.FC = () => {
     // Clear allTemplates immediately to prevent showing old posters in grid
     setAllTemplates([]);
     // Reset manual language selection when switching categories to allow auto-detection
-    userManuallySelectedLanguageRef.current = false;
+    // Only reset if user hasn't manually selected a language
+    if (!userManuallySelectedLanguageRef.current) {
+      userManuallySelectedLanguageRef.current = false;
+    }
     // Track active category to prevent other useEffects from overwriting templates
     activeCategoryRef.current = { type: 'greeting', value: greetingCategory };
 
@@ -997,8 +1044,6 @@ const PosterPlayerScreen: React.FC = () => {
               }))
             }))
           };
-        console.log('📡 [API RESPONSE] Raw API responses for category:', greetingCategory);
-        console.log('📡 [API RESPONSE] Full JSON:', JSON.stringify(apiResponseData, null, 2));
         
         // Combine all search results and remove duplicates efficiently
         const allSearchResults = [
@@ -1038,8 +1083,6 @@ const PosterPlayerScreen: React.FC = () => {
               thumbnail: t.thumbnail || t.content?.background
             }))
           };
-        console.log('📡 [API RESPONSE] Combined templates after deduplication (MAIN FETCH) for category:', greetingCategory);
-        console.log('📡 [API RESPONSE] Combined Full JSON:', JSON.stringify(combinedData, null, 2));
         
         // Pre-compute normalized category and variations for efficient filtering
         const normalizedCategoryLower = normalizedCategory.toLowerCase();
@@ -1199,25 +1242,6 @@ const PosterPlayerScreen: React.FC = () => {
               
               // Log backend response to check for category issues
               const categoriesFromBackend = new Set(allMoreTemplates.map((t: any) => t.category).filter(Boolean));
-              console.log('🔍 [GREETING BACKGROUND LOAD] Backend returned templates:', {
-                totalTemplates: allMoreTemplates.length,
-                uniqueCategories: Array.from(categoriesFromBackend),
-                expectedCategory: currentCategory,
-                categoryBreakdown: Array.from(categoriesFromBackend).map(cat => ({
-                  category: cat,
-                  count: allMoreTemplates.filter((t: any) => t.category === cat).length,
-                  sampleIds: allMoreTemplates.filter((t: any) => t.category === cat).slice(0, 3).map((t: any) => t.id)
-                })),
-                // Show sample templates with their categories
-                sampleTemplates: allMoreTemplates.slice(0, 10).map((t: any) => ({
-                  id: t.id,
-                  name: t.name,
-                  category: t.category,
-                  categoryLower: (t.category || '').toLowerCase().trim(),
-                  expectedCategoryLower: currentCategoryLower.trim(),
-                  matches: (t.category || '').toLowerCase().trim() === currentCategoryLower.trim()
-                }))
-              });
               
               // STRICT filtering: Only allow templates that EXACTLY match the category
               // For templates with "GENERAL" or empty category, check tags to see if they match
@@ -1648,7 +1672,7 @@ const PosterPlayerScreen: React.FC = () => {
           console.log('🔍 [GREETING FETCH] About to set allTemplates:', {
             uniqueTemplatesCount: uniqueTemplates.length,
             uniqueTemplateIds: uniqueTemplates.map(t => t.id),
-            currentGreetingCategory: greetingCategory,
+            greetingCategory: greetingCategory,
             previousAllTemplatesCount: allTemplates.length,
             previousAllTemplatesIds: allTemplates.map(t => t.id),
             activeCategoryRef: activeCategoryRef.current
@@ -1765,22 +1789,31 @@ const PosterPlayerScreen: React.FC = () => {
                   willUpdate: detectedLanguage && detectedLanguage !== selectedLanguage
                 });
               
-              if (detectedLanguage) {
+              if (!userManuallySelectedLanguageRef.current) {
+                if (detectedLanguage) {
                   console.log('✅ [GREETING FETCH] Setting language to:', detectedLanguage);
-                setSelectedLanguage(detectedLanguage);
+                  setSelectedLanguage(detectedLanguage);
                   lastAutoDetectedPosterIdRef.current = posterForLangWithLanguages.id; // Track that we auto-detected for this poster
-              } else {
-                // If no matching language found, default to English for templates without language tags
+                } else {
+                  // If no matching language found, default to English for templates without language tags
                   console.log('⚠️ [GREETING FETCH] No matching language found, defaulting to English');
-                setSelectedLanguage('english');
+                  setSelectedLanguage('english');
                   lastAutoDetectedPosterIdRef.current = posterForLangWithLanguages.id;
+                }
+              } else {
+                // User manually selected language - keep their choice
+                console.log('ℹ️ [GREETING FETCH] User manually selected language, keeping:', selectedLanguage);
               }
             } else {
-              // No language keywords found in tags, default to English
+              // No language keywords found, default to English only if user hasn't manually selected
+              if (!userManuallySelectedLanguageRef.current) {
                 console.log('⚠️ [GREETING FETCH] No language keywords in tags, defaulting to English');
-              setSelectedLanguage('english');
+                setSelectedLanguage('english');
                 lastAutoDetectedPosterIdRef.current = posterForLangWithLanguages.id;
+              } else {
+                console.log('ℹ️ [GREETING FETCH] User manually selected language, keeping:', selectedLanguage);
               }
+            }
             } else {
               console.log('🔍 [GREETING FETCH] Language detection skipped:', {
                 reason: userManuallySelectedLanguageRef.current ? 'user manually selected' : 
@@ -1807,7 +1840,10 @@ const PosterPlayerScreen: React.FC = () => {
     // Clear allTemplates immediately to prevent showing old posters in grid
     setAllTemplates([]);
     // Reset manual language selection when switching categories to allow auto-detection
-    userManuallySelectedLanguageRef.current = false;
+    // Only reset if user hasn't manually selected a language
+    if (!userManuallySelectedLanguageRef.current) {
+      userManuallySelectedLanguageRef.current = false;
+    }
     // Track active category to prevent other useEffects from overwriting templates
     activeCategoryRef.current = { type: 'calendar', value: calendarDate };
 
@@ -2051,15 +2087,17 @@ const PosterPlayerScreen: React.FC = () => {
       willUpdate: detectedLanguage && lastAutoDetectedPosterIdRef.current !== initialPoster?.id
     });
     
-    // If a language is detected, switch to it
+    // If a language is detected, switch to it only if user hasn't manually selected
     // Always auto-detect based on the current poster's language
     // Only skip if we've already detected for this poster to avoid duplicate detection
-    if (detectedLanguage && lastAutoDetectedPosterIdRef.current !== initialPoster?.id) {
+    if (detectedLanguage && lastAutoDetectedPosterIdRef.current !== initialPoster?.id && !userManuallySelectedLanguageRef.current) {
       console.log('✅ [INITIAL LANG DETECT] Setting language to:', detectedLanguage);
       setSelectedLanguage(detectedLanguage);
       lastAutoDetectedPosterIdRef.current = initialPoster?.id || null;
     } else if (!detectedLanguage) {
       console.log('❌ [INITIAL LANG DETECT] No language detected - keeping current:', selectedLanguage);
+    } else if (userManuallySelectedLanguageRef.current) {
+      console.log('ℹ️ [INITIAL LANG DETECT] User manually selected language, keeping:', selectedLanguage);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialPoster?.id]); // Run when initial poster changes
@@ -2142,15 +2180,17 @@ const PosterPlayerScreen: React.FC = () => {
       willUpdate: detectedLanguage && lastAutoDetectedPosterIdRef.current !== currentPoster?.id
     });
     
-    // If a language is detected and it's different from current selection, switch to it
+    // If a language is detected and it's different from current selection, switch to it only if user hasn't manually selected
     // Always auto-detect based on the current poster's language
     // Only skip if we've already detected for this poster to avoid duplicate detection
-    if (detectedLanguage && lastAutoDetectedPosterIdRef.current !== currentPoster?.id) {
+    if (detectedLanguage && lastAutoDetectedPosterIdRef.current !== currentPoster?.id && !userManuallySelectedLanguageRef.current) {
       console.log('✅ [CURRENT LANG DETECT] Setting language to:', detectedLanguage);
       setSelectedLanguage(detectedLanguage);
       lastAutoDetectedPosterIdRef.current = currentPoster?.id || null;
     } else if (!detectedLanguage) {
       console.log('❌ [CURRENT LANG DETECT] No language detected');
+    } else if (userManuallySelectedLanguageRef.current) {
+      console.log('ℹ️ [CURRENT LANG DETECT] User manually selected language, keeping:', selectedLanguage);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPoster?.id, businessCategory, greetingCategory, calendarDate]); // Run when current poster changes for category or calendar
@@ -2284,6 +2324,10 @@ const PosterPlayerScreen: React.FC = () => {
     }
   }, [isEventPlannerCategory, selectedServiceFilter]);
 
+  useEffect(() => {
+    console.log('🔍 [SERVICE FILTER RENDER CHECK]', { isEventPlannerCategory });
+  }, [isEventPlannerCategory]);
+
   const handlePosterSelect = useCallback((poster: Template) => {
     // Merge template languages to ensure we have all language info
     const posterWithLanguages = mergeTemplateLanguages(poster);
@@ -2354,21 +2398,23 @@ const PosterPlayerScreen: React.FC = () => {
       willUpdate: detectedLanguage && detectedLanguage !== selectedLanguage
     });
     
-    // Always update the language filter based on the selected poster's language
+    // Update filter to show posters matching the detected language only if user hasn't manually selected
     // This ensures the grid shows posters matching the selected poster's language
     if (detectedLanguage) {
-      // Update filter to show posters matching the detected language
-      // This will filter the grid to show only posters with the same language
-      if (detectedLanguage !== selectedLanguage) {
+      if (detectedLanguage !== selectedLanguage && !userManuallySelectedLanguageRef.current) {
         console.log('✅ [HANDLE POSTER SELECT] Setting language to:', detectedLanguage);
         setSelectedLanguage(detectedLanguage);
+      } else if (userManuallySelectedLanguageRef.current) {
+        console.log('ℹ️ [HANDLE POSTER SELECT] User manually selected language, keeping:', selectedLanguage);
       } else {
         console.log('ℹ️ [HANDLE POSTER SELECT] Language already set to:', detectedLanguage);
       }
       lastAutoDetectedPosterIdRef.current = posterWithLanguages?.id || null;
-      // Allow language to be updated when selecting different posters
-      // This ensures the filter updates based on each selected poster
-      userManuallySelectedLanguageRef.current = false;
+      // Only reset manual language selection if user hasn't manually selected a language
+      // This preserves user's language choice when switching between posters
+      if (!userManuallySelectedLanguageRef.current) {
+        userManuallySelectedLanguageRef.current = false;
+      }
     } else {
       // No language detected in poster - keep current filter
       // If "All" is selected, keep it; otherwise keep current language filter
@@ -2930,9 +2976,9 @@ const PosterPlayerScreen: React.FC = () => {
            })}
          </View>
 
-         {/* Service filter buttons for Event Planners */}
-         {isEventPlannerCategory && (
-           <View style={styles.serviceFilterContainer}>
+        {/* Service filter buttons for Event Planners */}
+        {isEventPlannerCategory && (
+          <View style={styles.serviceFilterContainer}>
              {['generator', 'decorators', 'sound', 'mandap'].map(filterKey => {
                const isActive = selectedServiceFilter === filterKey;
                const labelMap: Record<string, string> = {
@@ -2948,7 +2994,9 @@ const PosterPlayerScreen: React.FC = () => {
                      styles.serviceFilterButton,
                      isActive && styles.serviceFilterButtonActive
                    ]}
-                   onPress={() => setSelectedServiceFilter(prev => prev === filterKey ? null : filterKey)}
+                   onPress={() => {
+                    setSelectedServiceFilter(prev => prev === filterKey ? null : filterKey);
+                  }}
                    activeOpacity={0.9}
                  >
                    <LinearGradient
