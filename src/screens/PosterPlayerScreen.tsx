@@ -569,24 +569,23 @@ const PosterPlayerScreen: React.FC = () => {
   }, [isEventPlannerCategory, selectedServiceFilter, serviceFilterKeywords]);
 
   // Function to fetch templates for a specific service filter
-  const fetchServiceFilterTemplates = useCallback(async (serviceFilter: string) => {
+  const fetchEventPlannerTemplates = useCallback(async () => {
     if (!isEventPlannerCategory) return;
     
-    // Check if we already have cached templates for this service filter
-    if (serviceFilterTemplates[serviceFilter] && serviceFilterTemplates[serviceFilter].length > 0) {
-      console.log(`📦 [SERVICE FILTER] Using cached templates for ${serviceFilter}`);
+    // Check if we already have cached EventPlanner templates
+    if (serviceFilterTemplates['eventplanner'] && serviceFilterTemplates['eventplanner'].length > 0) {
+      console.log('📦 [EVENT PLANNER] Using cached EventPlanner templates');
       return;
     }
 
-    const apiEndpoint = `/api/mobile/posters/category/${serviceFilter}?limit=200`;
-    console.log(`📡 [SERVICE FILTER] Fetching templates from endpoint: ${apiEndpoint}`);
-    setIsLoadingServiceFilter(prev => ({ ...prev, [serviceFilter]: true }));
+    const apiEndpoint = `/api/mobile/posters/category/eventplanner?limit=500`;
+    console.log(`📡 [EVENT PLANNER] Fetching all EventPlanner templates from endpoint: ${apiEndpoint}`);
+    setIsLoadingServiceFilter(prev => ({ ...prev, eventplanner: true }));
     
     try {
-      const response = await businessCategoryPostersApi.getPostersByCategory(serviceFilter, 200);
+      const response = await businessCategoryPostersApi.getPostersByCategory('eventplanner', 500);
       
-      // Print the full API response and endpoint
-      console.log(`🔍 [SERVICE FILTER] API Response for ${apiEndpoint}:`, {
+      console.log(`🔍 [EVENT PLANNER] API Response for ${apiEndpoint}:`, {
         endpoint: apiEndpoint,
         success: response.success,
         message: response.message,
@@ -608,47 +607,79 @@ const PosterPlayerScreen: React.FC = () => {
           previewUrl: poster.imageUrl || poster.downloadUrl,
         }));
         
-        // Cache the templates
+        // Cache all EventPlanner templates
         setServiceFilterTemplates(prev => ({
           ...prev,
-          [serviceFilter]: templates
+          eventplanner: templates
         }));
         
-        console.log(`✅ [SERVICE FILTER] Successfully fetched ${templates.length} templates for ${serviceFilter}`);
-        console.log(`📋 [SERVICE FILTER] Template details for ${serviceFilter}:`, JSON.stringify(templates, null, 2));
+        console.log(`✅ [EVENT PLANNER] Successfully fetched ${templates.length} EventPlanner templates`);
+        
+        // Log template tags for debugging
+        const allTags = templates.flatMap(t => t.tags || []);
+        const uniqueTags = [...new Set(allTags)];
+        console.log(`🏷️ [EVENT PLANNER] All unique tags found:`, uniqueTags);
+        
+        // Log samples for each service filter
+        const serviceKeywords = serviceFilterKeywords;
+        Object.keys(serviceKeywords).forEach(service => {
+          const keywords = serviceKeywords[service];
+          const matchingTemplates = templates.filter(template => {
+            const templateTags = Array.isArray(template.tags)
+              ? template.tags.map(tag => tag.toLowerCase())
+              : [];
+            return keywords.some(keyword => templateTags.some(tag => tag.includes(keyword)));
+          });
+          console.log(`📋 [EVENT PLANNER] ${service}: ${matchingTemplates.length} templates found`);
+        });
       } else {
-        console.warn(`⚠️ [SERVICE FILTER] No templates found for ${serviceFilter}`);
-        console.log(`🔍 [SERVICE FILTER] Failed response details:`, JSON.stringify(response, null, 2));
+        console.warn(`⚠️ [EVENT PLANNER] No templates found for EventPlanner category`);
         setServiceFilterTemplates(prev => ({
           ...prev,
-          [serviceFilter]: []
+          eventplanner: []
         }));
       }
     } catch (error) {
-      console.error(`❌ [SERVICE FILTER] Error fetching templates for ${serviceFilter}:`, error);
-      console.error(`🔍 [SERVICE FILTER] Error details:`, JSON.stringify(error, null, 2));
+      console.error(`❌ [EVENT PLANNER] Error fetching templates:`, error);
       setServiceFilterTemplates(prev => ({
         ...prev,
-        [serviceFilter]: []
+        eventplanner: []
       }));
     } finally {
-      setIsLoadingServiceFilter(prev => ({ ...prev, [serviceFilter]: false }));
+      setIsLoadingServiceFilter(prev => ({ ...prev, eventplanner: false }));
     }
-  }, [isEventPlannerCategory, serviceFilterTemplates]);
+  }, [isEventPlannerCategory, serviceFilterTemplates, serviceFilterKeywords]);
+
+  // Fetch EventPlanner templates when EventPlanner category is detected
+  useEffect(() => {
+    if (isEventPlannerCategory && !serviceFilterTemplates['eventplanner']) {
+      console.log('🎯 [EVENT PLANNER] EventPlanner category detected, fetching templates...');
+      fetchEventPlannerTemplates();
+    }
+  }, [isEventPlannerCategory, fetchEventPlannerTemplates, serviceFilterTemplates]);
 
   const filteredPosters = useMemo(() => {
-    // If we have a service filter selected and have templates for it, use those
-    if (selectedServiceFilter && serviceFilterTemplates[selectedServiceFilter]) {
-      const serviceTemplates = serviceFilterTemplates[selectedServiceFilter];
-      const templatesWithLanguages = serviceTemplates.map(t => mergeTemplateLanguages(t));
+    // If we have EventPlanner templates and a service filter selected, filter by tags
+    if (isEventPlannerCategory && selectedServiceFilter && serviceFilterTemplates['eventplanner']) {
+      const eventPlannerTemplates = serviceFilterTemplates['eventplanner'];
+      const templatesWithLanguages = eventPlannerTemplates.map(t => mergeTemplateLanguages(t));
       
-      // If "All" is selected, return ALL service filter templates without language filtering
+      // Filter by service keywords (tags)
+      const keywords = serviceFilterKeywords[selectedServiceFilter] || [];
+      const filteredByTags = templatesWithLanguages.filter(template => {
+        const templateTags = Array.isArray(template.tags)
+          ? template.tags.map(tag => tag.toLowerCase())
+          : [];
+        return keywords.some(keyword => templateTags.some(tag => tag.includes(keyword)));
+      });
+      
+      // If "All" is selected, return ALL filtered templates without language filtering
       if (selectedLanguage === 'all') {
-        return templatesWithLanguages;
+        return filteredByTags;
       }
       
       // Filter by language for service filter templates
-      const languageFiltered = templatesWithLanguages.filter(template => {
+      const languageFiltered = filteredByTags.filter(template => {
         const matches = templateContainsLanguage(template, selectedLanguage);
         return matches;
       });
@@ -3088,9 +3119,9 @@ const PosterPlayerScreen: React.FC = () => {
                     const newFilter = selectedServiceFilter === filterKey ? null : filterKey;
                     setSelectedServiceFilter(newFilter);
                     
-                    // Fetch templates if a filter is selected
+                    // Fetch templates if a filter is selected (no need to call API, templates are already fetched)
                     if (newFilter) {
-                      fetchServiceFilterTemplates(newFilter);
+                      console.log(`🎯 [EVENT PLANNER] Service filter selected: ${newFilter}`);
                     }
                   }}
                    activeOpacity={0.9}
