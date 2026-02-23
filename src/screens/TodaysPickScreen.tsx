@@ -12,6 +12,7 @@ import {
   PanResponder,
   Modal,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
@@ -28,6 +29,83 @@ import greetingTemplatesService from '../services/greetingTemplates';
 import calendarApi from '../services/calendarApi';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import authService from '../services/auth';
+
+// Skeleton Animation Component
+const SkeletonLoader = ({ width, height, style }: { width: number; height: number; style?: any }) => {
+  const shimmerAnim = useRef(new Animated.Value(0)).current;
+  
+  useEffect(() => {
+    const shimmerAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(shimmerAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shimmerAnim, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    shimmerAnimation.start();
+    
+    return () => shimmerAnimation.stop();
+  }, []);
+
+  const shimmerOpacity = shimmerAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.3, 0.8],
+  });
+
+  return (
+    <Animated.View
+      style={[
+        {
+          width,
+          height,
+          backgroundColor: '#e0e0e0',
+          borderRadius: 8,
+          opacity: shimmerOpacity,
+        },
+        style,
+      ]}
+    />
+  );
+};
+
+// Skeleton Poster Component
+const SkeletonPoster = ({ width, height, style }: { width: number; height: number; style?: any }) => {
+  return (
+    <View style={[{ width, height }, style]}>
+      <SkeletonLoader width={width} height={height * 0.7} />
+      <View style={{ marginTop: 8 }}>
+        <SkeletonLoader width={width * 0.8} height={12} />
+        <SkeletonLoader width={width * 0.6} height={10} style={{ marginTop: 4 }} />
+      </View>
+    </View>
+  );
+};
+
+// Skeleton Section Component
+const SkeletonSection = ({ title }: { title: string }) => {
+  return (
+    <View style={{ marginBottom: 20 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+        <SkeletonLoader width={30} height={30} style={{ marginRight: 10 }} />
+        <SkeletonLoader width={150} height={20} />
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <View style={{ flexDirection: 'row', paddingRight: 16 }}>
+          {[1, 2, 3].map((item) => (
+            <SkeletonPoster key={item} width={120} height={160} style={{ marginRight: 12 }} />
+          ))}
+        </View>
+      </ScrollView>
+    </View>
+  );
+};
 
 const LANGUAGE_KEYWORDS: Record<string, string[]> = {
   english: ['english'],
@@ -423,8 +501,18 @@ const TodaysPickScreen: React.FC = () => {
     
     // Use type as additional seed variation to ensure different selection for different types
     const typeSeed = type.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    const randomIndex = Math.floor(seededRandom(seed + typeSeed) * items.length);
-    return items[randomIndex];
+    const finalSeed = seed + typeSeed;
+    
+    // Log for debugging daily selection consistency
+    console.log(`🎲 [Daily Selection] Type: ${type}, Seed: ${seed}, TypeSeed: ${typeSeed}, FinalSeed: ${finalSeed}, Items: ${items.length}`);
+    
+    const randomValue = seededRandom(finalSeed, 0);
+    const randomIndex = Math.floor(randomValue * items.length);
+    const selectedItem = items[randomIndex];
+    
+    console.log(`🎯 [Daily Selection] Selected index: ${randomIndex}, Random value: ${randomValue}`);
+    
+    return selectedItem;
   }, [seededRandom]);
   const lastAutoDetectedPosterIdRef = useRef<string | null>(null); // Track which poster triggered auto-detection to prevent duplicate detection
   const userSelectedPosterRef = useRef<string | null>(null); // Track user-selected poster (via swipe or click) to prevent reset
@@ -628,12 +716,22 @@ const TodaysPickScreen: React.FC = () => {
               const motivationalPosters = cachedPosters.filter(p => p.category === 'Motivational');
               const businessPosters = cachedPosters.filter(p => p.category === 'Business');
               const marketingTipsPosters = cachedPosters.filter(p => p.category === 'Business Marketing Tips');
+              const calendarPosters = cachedPosters.filter(p => p.category === 'Festive Alerts');
+
+              // Print response of 4 categories from cached data
+              console.log('📊 [TodaysPickScreen] 4 Categories Response (CACHED):');
+              console.log('📊 [TodaysPickScreen] 1. Motivational Posters:', motivationalPosters.length, motivationalPosters.map(p => ({ id: p.id, name: p.name, thumbnail: p.thumbnail })));
+              console.log('📊 [TodaysPickScreen] 2. Business Posters:', businessPosters.length, businessPosters.map(p => ({ id: p.id, name: p.name, thumbnail: p.thumbnail })));
+              console.log('📊 [TodaysPickScreen] 3. Business Marketing Tips:', marketingTipsPosters.length, marketingTipsPosters.map(p => ({ id: p.id, name: p.name, thumbnail: p.thumbnail })));
+              console.log('📊 [TodaysPickScreen] 4. Festive Alerts:', calendarPosters.length, calendarPosters.map(p => ({ id: p.id, name: p.name, thumbnail: p.thumbnail })));
               
               if (businessPosters.length > 0) {
                 sectionsData.push({ title: 'Today\'s Business Post', data: businessPosters });
               }
               if (marketingTipsPosters.length > 0) {
-                sectionsData.push({ title: 'Today\'s Business Marketing Tips', data: marketingTipsPosters });
+                // Ensure only 1 poster per day for Business Marketing Tips
+                const singleMarketingTip = marketingTipsPosters.slice(0, 1);
+                sectionsData.push({ title: 'Today\'s Business Marketing Tips', data: singleMarketingTip });
               }
               if (calendarPosters.length > 0) {
                 sectionsData.push({ title: 'Today\'s Festive Alerts', data: calendarPosters });
@@ -643,7 +741,8 @@ const TodaysPickScreen: React.FC = () => {
               }
               
               setSections(sectionsData);
-              const orderedPosters = [...businessPosters, ...marketingTipsPosters, ...calendarPosters, ...motivationalPosters];
+              const singleMarketingTip = marketingTipsPosters.slice(0, 1);
+              const orderedPosters = [...businessPosters, ...singleMarketingTip, ...calendarPosters, ...motivationalPosters];
               setTodayPosters(orderedPosters);
               
               const templatesWithLanguages = orderedPosters.map((t: Template) => mergeTemplateLanguages(t));
@@ -670,6 +769,8 @@ const TodaysPickScreen: React.FC = () => {
       console.log(`🎲 [TodaysPickScreen] Daily seed: ${dailySeed}`);
       
       console.log(`📡 [TodaysPickScreen] Starting API calls for date: ${dateString}`);
+      const startTime = Date.now();
+      
       const [
         motivationalTemplates,
         businessResponse,
@@ -682,210 +783,260 @@ const TodaysPickScreen: React.FC = () => {
         calendarApi.getPostersByDate(dateString),
       ]);
       
+      const endTime = Date.now();
+      const totalTime = endTime - startTime;
+      
       console.log('✅ [TodaysPickScreen] All API calls completed', {
+        totalTime: `${totalTime}ms`,
         motivational: motivationalTemplates.status,
         business: businessResponse.status,
         marketingTips: marketingTipsByCategory.status,
         calendar: calendarResponse.status,
       });
+      
+      // Print detailed API responses
+      console.log('🔍 [TodaysPickScreen] API RESPONSES:');
+      
+      // 1. Motivational Templates Response
+      console.log('📋 [MOTIVATIONAL API] Response:', {
+        status: motivationalTemplates.status,
+        data: motivationalTemplates.status === 'fulfilled' ? {
+          success: true,
+          templateCount: motivationalTemplates.value?.length || 0,
+          templates: motivationalTemplates.value?.slice(0, 3) || [], // First 3 templates
+          fullResponse: motivationalTemplates.value
+        } : {
+          success: false,
+          reason: motivationalTemplates.status === 'rejected' ? motivationalTemplates.reason : 'Unknown error'
+        }
+      });
+      
+      // 2. Business Category Posters Response
+      console.log('📋 [BUSINESS API] Response:', {
+        status: businessResponse.status,
+        data: businessResponse.status === 'fulfilled' ? {
+          success: businessResponse.value?.success,
+          category: businessResponse.value?.data?.category,
+          posterCount: businessResponse.value?.data?.posters?.length || 0,
+          posters: businessResponse.value?.data?.posters?.slice(0, 3) || [], // First 3 posters
+          fullResponse: businessResponse.value
+        } : {
+          success: false,
+          reason: businessResponse.status === 'rejected' ? businessResponse.reason : 'Unknown error'
+        }
+      });
+      
+      // 3. Marketing Tips Response
+      console.log('📋 [MARKETING TIPS API] Response:', {
+        status: marketingTipsByCategory.status,
+        data: marketingTipsByCategory.status === 'fulfilled' && marketingTipsByCategory.value ? {
+          success: true,
+          templateCount: marketingTipsByCategory.value.length || 0,
+          templates: marketingTipsByCategory.value.slice(0, 3) || [], // First 3 templates
+          fullResponse: marketingTipsByCategory.value
+        } : {
+          success: false,
+          reason: marketingTipsByCategory.status === 'rejected' ? marketingTipsByCategory.reason : 'No data'
+        }
+      });
+      
+      // 4. Calendar API Response
+      console.log('📋 [CALENDAR API] Response:', {
+        status: calendarResponse.status,
+        data: calendarResponse.status === 'fulfilled' ? {
+          success: calendarResponse.value?.success,
+          date: calendarResponse.value?.data?.date,
+          posterCount: calendarResponse.value?.data?.posters?.length || 0,
+          posters: calendarResponse.value?.data?.posters?.slice(0, 3) || [], // First 3 posters
+          fullResponse: calendarResponse.value
+        } : {
+          success: false,
+          reason: calendarResponse.reason
+        }
+      });
 
       const allPosters: Template[] = [];
 
-      // 1. Process motivational quote (daily shuffled) - with batched AsyncStorage
-      if (motivationalTemplates.status === 'fulfilled' && motivationalTemplates.value && motivationalTemplates.value.length > 0) {
-        try {
-          const recentDays = await getRecentDaysBatch(today, 'motivational');
-          const availableTemplates = motivationalTemplates.value.filter(t => !recentDays.includes(t.id));
-          const templatesToSelect = availableTemplates.length > 0 ? availableTemplates : motivationalTemplates.value;
-          
-          const selectedMotivational = selectDailyItem(templatesToSelect, dailySeed, 'motivational');
-          if (selectedMotivational) {
-            const storageKey = `daily_motivational_${dateString}`;
-            AsyncStorage.setItem(storageKey, selectedMotivational.id).catch(() => {});
-            
-            const motivationalTemplate: Template = {
-              id: selectedMotivational.id,
-              name: selectedMotivational.name || 'Motivational Quote',
-              thumbnail: selectedMotivational.thumbnail,
-              category: 'Motivational',
-              downloads: selectedMotivational.downloads || 0,
-              isDownloaded: selectedMotivational.isDownloaded || false,
-              tags: [],
-            };
-            allPosters.push(motivationalTemplate);
-          }
-        } catch (error) {
-          console.error('Error processing motivational quotes:', error);
-        }
-      }
-
-      // 2. Process business category poster (daily shuffled) - with batched AsyncStorage
-      if (businessResponse.status === 'fulfilled' && businessResponse.value.success && businessResponse.value.data.posters.length > 0) {
-        try {
-          const businessPosters = businessResponse.value.data.posters;
-          const recentDays = await getRecentDaysBatch(today, 'business');
-          const availablePosters = businessPosters.filter(p => !recentDays.includes(p.id));
-          const postersToSelect = availablePosters.length > 0 ? availablePosters : businessPosters;
-          
-          const selectedBusiness = selectDailyItem(postersToSelect, dailySeed, 'business');
-          if (selectedBusiness) {
-            const storageKey = `daily_business_${dateString}`;
-            AsyncStorage.setItem(storageKey, selectedBusiness.id).catch(() => {});
-            
-            const businessTemplate: Template = {
-              id: selectedBusiness.id,
-              name: selectedBusiness.title || 'Business Poster',
-              thumbnail: selectedBusiness.imageUrl || selectedBusiness.thumbnail,
-              category: 'Business',
-              downloads: selectedBusiness.downloads || 0,
-              isDownloaded: false,
-              tags: selectedBusiness.tags || [],
-            };
-            allPosters.push(businessTemplate);
-          }
-        } catch (error) {
-          console.error('Error processing business category posters:', error);
-        }
-      }
-
-      // 3. Process Business Marketing Tips poster (daily shuffled) - optimized with parallel fallbacks
-      const marketingTipsTemplates = marketingTipsByCategory.status === 'fulfilled' && marketingTipsByCategory.value && marketingTipsByCategory.value.length > 0
-        ? marketingTipsByCategory.value
-        : null;
-      
-      if (!marketingTipsTemplates) {
-        // Try fallbacks in parallel if primary failed
-        const [byNameResult, searchResult] = await Promise.allSettled([
-          greetingTemplatesService.getTemplates({ category: 'Business Marketing Tips', limit: 200 }).catch(() => null),
-          greetingTemplatesService.searchTemplates('business marketing tips').catch(() => null),
-        ]);
-        
-        const finalMarketingTips = 
-          (byNameResult.status === 'fulfilled' && byNameResult.value && byNameResult.value.length > 0) ? byNameResult.value :
-          (searchResult.status === 'fulfilled' && searchResult.value && searchResult.value.length > 0) ? searchResult.value :
-          null;
-        
-        if (finalMarketingTips) {
-          try {
-            const recentDays = await getRecentDaysBatch(today, 'marketing_tips');
-            const availableTemplates = finalMarketingTips.filter(t => !recentDays.includes(t.id));
-            const templatesToSelect = availableTemplates.length > 0 ? availableTemplates : finalMarketingTips;
-            
-            const selectedMarketingTip = selectDailyItem(templatesToSelect, dailySeed, 'marketing_tips');
-            if (selectedMarketingTip) {
-              const storageKey = `daily_marketing_tips_${dateString}`;
-              AsyncStorage.setItem(storageKey, selectedMarketingTip.id).catch(() => {});
+      // Process all categories in parallel for better performance
+      const processingPromises = [
+        // 1. Process motivational quote (daily shuffled)
+        (async () => {
+          if (motivationalTemplates.status === 'fulfilled' && motivationalTemplates.value && motivationalTemplates.value.length > 0) {
+            try {
+              const recentDays = await getRecentDaysBatch(today, 'motivational');
+              const availableTemplates = motivationalTemplates.value.filter(t => !recentDays.includes(t.id));
+              const templatesToSelect = availableTemplates.length > 0 ? availableTemplates : motivationalTemplates.value;
               
-              const marketingTipTemplate: Template = {
-                id: selectedMarketingTip.id,
-                name: selectedMarketingTip.name || 'Business Marketing Tip',
-                thumbnail: selectedMarketingTip.thumbnail,
-                category: 'Business Marketing Tips',
-                downloads: selectedMarketingTip.downloads || 0,
-                isDownloaded: selectedMarketingTip.isDownloaded || false,
-                tags: [],
-              };
-              allPosters.push(marketingTipTemplate);
+              const selectedMotivational = selectDailyItem(templatesToSelect, dailySeed, 'motivational');
+              if (selectedMotivational) {
+                const storageKey = `daily_motivational_${dateString}`;
+                AsyncStorage.setItem(storageKey, selectedMotivational.id).catch(() => {});
+                
+                return {
+                  id: selectedMotivational.id,
+                  name: selectedMotivational.name || 'Motivational Quote',
+                  thumbnail: selectedMotivational.thumbnail,
+                  category: 'Motivational',
+                  downloads: selectedMotivational.downloads || 0,
+                  isDownloaded: selectedMotivational.isDownloaded || false,
+                  tags: [],
+                } as Template;
+              }
+            } catch (error) {
+              console.error('Error processing motivational quotes:', error);
             }
-          } catch (error) {
-            console.error('Error processing business marketing tips:', error);
           }
-        }
-      } else {
-        // Process if we got templates from primary call
-        try {
-          const recentDays = await getRecentDaysBatch(today, 'marketing_tips');
-          const availableTemplates = marketingTipsTemplates.filter(t => !recentDays.includes(t.id));
-          const templatesToSelect = availableTemplates.length > 0 ? availableTemplates : marketingTipsTemplates;
-          
-          const selectedMarketingTip = selectDailyItem(templatesToSelect, dailySeed, 'marketing_tips');
-          if (selectedMarketingTip) {
-            const storageKey = `daily_marketing_tips_${dateString}`;
-            AsyncStorage.setItem(storageKey, selectedMarketingTip.id).catch(() => {});
-            
-            const marketingTipTemplate: Template = {
-              id: selectedMarketingTip.id,
-              name: selectedMarketingTip.name || 'Business Marketing Tip',
-              thumbnail: selectedMarketingTip.thumbnail,
-              category: 'Business Marketing Tips',
-              downloads: selectedMarketingTip.downloads || 0,
-              isDownloaded: selectedMarketingTip.isDownloaded || false,
-              tags: [],
-            };
-            allPosters.push(marketingTipTemplate);
-          }
-        } catch (error) {
-          console.error('Error processing business marketing tips:', error);
-        }
-      }
+          return null;
+        })(),
 
-      // 4. Process Calendar/Festive Alerts poster (daily shuffled) - fetch current date only
-      console.log('🎯 [TodaysPickScreen] Processing calendar response...', {
-        status: calendarResponse.status,
-        hasValue: !!calendarResponse.value,
-        valueType: calendarResponse.status === 'fulfilled' ? typeof calendarResponse.value : 'N/A',
-      });
-      
-      if (calendarResponse.status === 'fulfilled' && calendarResponse.value) {
-        try {
-          const calendarApiResponse = calendarResponse.value;
-          console.log('📦 [TodaysPickScreen] Calendar API response:', {
-            success: calendarApiResponse.success,
-            hasData: !!calendarApiResponse.data,
-            dataType: typeof calendarApiResponse.data,
-            postersArray: Array.isArray(calendarApiResponse.data?.posters),
-            postersLength: calendarApiResponse.data?.posters?.length || 0,
-          });
-          
-          // Check if response is successful and has posters
-          if (calendarApiResponse.success && calendarApiResponse.data && calendarApiResponse.data.posters && calendarApiResponse.data.posters.length > 0) {
-            const calendarPosters = calendarApiResponse.data.posters;
-            console.log(`✅ [TodaysPickScreen] Found ${calendarPosters.length} calendar poster(s) for ${dateString}`);
-            
-            // Select one random poster from current date's posters
-            const selectedCalendarPoster = selectDailyItem(calendarPosters, dailySeed, 'calendar');
-            if (selectedCalendarPoster) {
-              const storageKey = `daily_calendar_${dateString}`;
-              AsyncStorage.setItem(storageKey, selectedCalendarPoster.id).catch(() => {});
+        // 2. Process business category poster (daily shuffled)
+        (async () => {
+          if (businessResponse.status === 'fulfilled' && businessResponse.value.success && businessResponse.value.data.posters.length > 0) {
+            try {
+              const businessPosters = businessResponse.value.data.posters;
+              const recentDays = await getRecentDaysBatch(today, 'business');
+              const availablePosters = businessPosters.filter(p => !recentDays.includes(p.id));
+              const postersToSelect = availablePosters.length > 0 ? availablePosters : businessPosters;
               
-              const calendarTemplate: Template = {
-                id: selectedCalendarPoster.id,
-                name: selectedCalendarPoster.name || selectedCalendarPoster.title || 'Festive Alert',
-                thumbnail: selectedCalendarPoster.thumbnail || selectedCalendarPoster.imageUrl || '',
-                category: 'Festive Alerts',
-                downloads: selectedCalendarPoster.downloads || 0,
-                isDownloaded: selectedCalendarPoster.isDownloaded || false,
-                tags: selectedCalendarPoster.tags || [],
-              };
-              allPosters.push(calendarTemplate);
-              console.log(`✅ [TodaysPickScreen] Added calendar poster: ${calendarTemplate.name} (${calendarTemplate.id})`);
-            } else {
-              console.warn(`⚠️ [TodaysPickScreen] No calendar poster selected from ${calendarPosters.length} available`);
+              const selectedBusiness = selectDailyItem(postersToSelect, dailySeed, 'business');
+              if (selectedBusiness) {
+                const storageKey = `daily_business_${dateString}`;
+                AsyncStorage.setItem(storageKey, selectedBusiness.id).catch(() => {});
+                
+                return {
+                  id: selectedBusiness.id,
+                  name: selectedBusiness.title || 'Business Poster',
+                  thumbnail: selectedBusiness.imageUrl || selectedBusiness.thumbnail,
+                  category: 'Business',
+                  downloads: selectedBusiness.downloads || 0,
+                  isDownloaded: false,
+                  tags: selectedBusiness.tags || [],
+                } as Template;
+              }
+            } catch (error) {
+              console.error('Error processing business posters:', error);
+            }
+          }
+          return null;
+        })(),
+
+        // 3. Process Business Marketing Tips (daily shuffled)
+        (async () => {
+          if (marketingTipsByCategory.status === 'fulfilled' && marketingTipsByCategory.value && marketingTipsByCategory.value.length > 0) {
+            try {
+              const marketingTipsTemplates = marketingTipsByCategory.value;
+              console.log(`📦 [Business Marketing Tips] Total templates available: ${marketingTipsTemplates.length}`);
+              
+              const recentDays = await getRecentDaysBatch(today, 'marketing_tips');
+              console.log(`📅 [Business Marketing Tips] Recent days used: ${recentDays.length}`, recentDays);
+              
+              const availableTemplates = marketingTipsTemplates.filter(t => !recentDays.includes(t.id));
+              const templatesToSelect = availableTemplates.length > 0 ? availableTemplates : marketingTipsTemplates;
+              
+              console.log(`🎯 [Business Marketing Tips] Templates to select from: ${templatesToSelect.length} (available: ${availableTemplates.length})`);
+              
+              const selectedMarketingTip = selectDailyItem(templatesToSelect, dailySeed, 'marketing_tips');
+              if (selectedMarketingTip) {
+                console.log(`✅ [Business Marketing Tips] Selected: ${selectedMarketingTip.name || selectedMarketingTip.id}`);
+                
+                const storageKey = `daily_marketing_tips_${dateString}`;
+                AsyncStorage.setItem(storageKey, selectedMarketingTip.id).catch(() => {});
+                
+                return {
+                  id: selectedMarketingTip.id,
+                  name: selectedMarketingTip.name || 'Business Marketing Tip',
+                  thumbnail: selectedMarketingTip.thumbnail,
+                  category: 'Business Marketing Tips',
+                  downloads: selectedMarketingTip.downloads || 0,
+                  isDownloaded: selectedMarketingTip.isDownloaded || false,
+                  tags: [],
+                } as Template;
+              } else {
+                console.warn(`❌ [Business Marketing Tips] No template selected`);
+              }
+            } catch (error) {
+              console.error('Error processing business marketing tips:', error);
             }
           } else {
-            console.log(`ℹ️ [TodaysPickScreen] No calendar posters found for ${dateString}`, {
-              success: calendarApiResponse.success,
-              hasData: !!calendarApiResponse.data,
-              postersCount: calendarApiResponse.data?.posters?.length || 0,
-              fullResponse: JSON.stringify(calendarApiResponse, null, 2),
-            });
+            console.log(`⚠️ [Business Marketing Tips] No data available. Status: ${marketingTipsByCategory.status}${marketingTipsByCategory.status === 'fulfilled' ? `, Length: ${marketingTipsByCategory.value?.length || 0}` : ''}`);
           }
-        } catch (error) {
-          console.error('❌ [TodaysPickScreen] Error processing calendar posters:', error);
-          console.error('❌ [TodaysPickScreen] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+          return null;
+        })(),
+
+        // 4. Process Calendar/Festive Alerts poster (daily shuffled)
+        (async () => {
+          if (calendarResponse.status === 'fulfilled' && calendarResponse.value) {
+            try {
+              const calendarApiResponse = calendarResponse.value;
+              console.log('📦 [TodaysPickScreen] Calendar API response:', {
+                success: calendarApiResponse.success,
+                hasData: !!calendarApiResponse.data,
+                dataType: typeof calendarApiResponse.data,
+                postersArray: Array.isArray(calendarApiResponse.data?.posters),
+                postersLength: calendarApiResponse.data?.posters?.length || 0,
+              });
+              
+              // Check if response is successful and has posters
+              if (calendarApiResponse.success && calendarApiResponse.data && calendarApiResponse.data.posters && calendarApiResponse.data.posters.length > 0) {
+                const calendarPosters = calendarApiResponse.data.posters;
+                const recentDays = await getRecentDaysBatch(today, 'calendar');
+                const availablePosters = calendarPosters.filter(p => !recentDays.includes(p.id));
+                const postersToSelect = availablePosters.length > 0 ? availablePosters : calendarPosters;
+                
+                const selectedCalendar = selectDailyItem(postersToSelect, dailySeed, 'calendar');
+                if (selectedCalendar) {
+                  const storageKey = `daily_calendar_${dateString}`;
+                  AsyncStorage.setItem(storageKey, selectedCalendar.id).catch(() => {});
+                  
+                  return {
+                    id: selectedCalendar.id,
+                    name: selectedCalendar.name || selectedCalendar.title || 'Calendar Poster',
+                    thumbnail: selectedCalendar.thumbnail,
+                    category: 'Calendar/Festive',
+                    downloads: selectedCalendar.downloads || 0,
+                    isDownloaded: selectedCalendar.isDownloaded || false,
+                    tags: selectedCalendar.tags || [],
+                  } as Template;
+                }
+              }
+            } catch (error) {
+              console.error('❌ [TodaysPickScreen] Error processing calendar posters:', error);
+              console.error('❌ [TodaysPickScreen] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+            }
+          } else if (calendarResponse.status === 'rejected') {
+            console.error('❌ [TodaysPickScreen] Calendar API call failed:', calendarResponse.reason);
+            console.error('❌ [TodaysPickScreen] Rejection reason:', JSON.stringify(calendarResponse.reason, null, 2));
+          } else {
+            console.log(`ℹ️ [TodaysPickScreen] Calendar response status: ${calendarResponse.status}`);
+          }
+          return null;
+        })()
+      ];
+
+      // Wait for all processing to complete in parallel
+      const processedResults = await Promise.all(processingPromises);
+      
+      // Filter out null results and add to allPosters
+      processedResults.forEach(result => {
+        if (result) {
+          allPosters.push(result);
         }
-      } else if (calendarResponse.status === 'rejected') {
-        console.error('❌ [TodaysPickScreen] Calendar API call failed:', calendarResponse.reason);
-        console.error('❌ [TodaysPickScreen] Rejection reason:', JSON.stringify(calendarResponse.reason, null, 2));
-      } else {
-        console.log(`ℹ️ [TodaysPickScreen] Calendar response status: ${calendarResponse.status}`);
-      }
+      });
+
+      console.log(`✅ [TodaysPickScreen] Processed ${allPosters.length} posters in parallel`);
 
       // Organize posters into sections
       const motivationalPosters = allPosters.filter(p => p.category === 'Motivational');
       const businessPosters = allPosters.filter(p => p.category === 'Business');
       const marketingTipsPosters = allPosters.filter(p => p.category === 'Business Marketing Tips');
       const calendarPosters = allPosters.filter(p => p.category === 'Festive Alerts');
+
+      // Print response of 4 categories being displayed
+      console.log('📊 [TodaysPickScreen] 4 Categories Response:');
+      console.log('📊 [TodaysPickScreen] 1. Motivational Posters:', motivationalPosters.length, motivationalPosters.map(p => ({ id: p.id, name: p.name, thumbnail: p.thumbnail })));
+      console.log('📊 [TodaysPickScreen] 2. Business Posters:', businessPosters.length, businessPosters.map(p => ({ id: p.id, name: p.name, thumbnail: p.thumbnail })));
+      console.log('📊 [TodaysPickScreen] 3. Business Marketing Tips:', marketingTipsPosters.length, marketingTipsPosters.map(p => ({ id: p.id, name: p.name, thumbnail: p.thumbnail })));
+      console.log('📊 [TodaysPickScreen] 4. Festive Alerts:', calendarPosters.length, calendarPosters.map(p => ({ id: p.id, name: p.name, thumbnail: p.thumbnail })));
 
       const sectionsData: Array<{ title: string; data: Template[] }> = [];
       
@@ -899,9 +1050,11 @@ const TodaysPickScreen: React.FC = () => {
       
       // Add Business Marketing Tips section second
       if (marketingTipsPosters.length > 0) {
+        // Ensure only 1 poster per day for Business Marketing Tips
+        const singleMarketingTip = marketingTipsPosters.slice(0, 1);
         sectionsData.push({
           title: 'Today\'s Business Marketing Tips',
-          data: marketingTipsPosters,
+          data: singleMarketingTip,
         });
       }
       
@@ -924,8 +1077,9 @@ const TodaysPickScreen: React.FC = () => {
       setSections(sectionsData);
       
       // Keep flat list for preloading and sync with allTemplates for layout compatibility
-      // Order: Business first, then Business Marketing Tips, then Festive Alerts, then Motivational
-      const orderedPosters = [...businessPosters, ...marketingTipsPosters, ...calendarPosters, ...motivationalPosters];
+      // Order: Business first, then Business Marketing Tips (single), then Festive Alerts, then Motivational
+      const singleMarketingTip = marketingTipsPosters.slice(0, 1);
+      const orderedPosters = [...businessPosters, ...singleMarketingTip, ...calendarPosters, ...motivationalPosters];
       
       // Cache today's selections for future use (persists across app restarts)
       if (orderedPosters.length > 0) {
@@ -2362,7 +2516,7 @@ const TodaysPickScreen: React.FC = () => {
               style={styles.headerTitleGradient}
             >
               <Text style={styles.headerCategoryTitle} numberOfLines={1} ellipsizeMode="tail">
-                Today's Pick
+                {loading ? 'Loading...' : "Today's Pick"}
               </Text>
             </LinearGradient>
           </View>
@@ -2371,87 +2525,119 @@ const TodaysPickScreen: React.FC = () => {
             onPress={handleNextPress}
             style={styles.headerTextButton}
             activeOpacity={0.85}
+            disabled={loading}
           >
             <LinearGradient
               colors={[theme.colors.secondary, theme.colors.primary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.headerTextButtonGradient}
-          >
-            <Text style={styles.headerButtonText}>Next</Text>
+            >
+              <Text style={styles.headerButtonText}>{loading ? 'Loading...' : 'Next'}</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
 
-        {/* Section Header */}
-        <View style={styles.sectionHeaderContainer}>
-          <LinearGradient
-            colors={isDarkMode 
-              ? [theme.colors.primary + '30', theme.colors.secondary + '20', 'transparent']
-              : [theme.colors.primary + '18', theme.colors.secondary + '10', 'transparent']
-            }
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.sectionHeaderGradient}
-          >
-            <View style={styles.sectionHeaderContent}>
-              <LinearGradient
-                colors={[theme.colors.primary, theme.colors.secondary]}
-                style={styles.sectionIconContainer}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
-                <Icon
-                  name={sectionHeaderInfo.icon}
-                  size={moderateScale(20)}
-                  color="#ffffff"
-                />
-              </LinearGradient>
-              <View style={styles.sectionTitleContainer}>
-                <Text style={[
-                  styles.sectionHeaderText,
-                  {
-                    color: theme.colors.text,
-                    fontSize: moderateScale(14),
-                    fontWeight: '700',
-                    marginLeft: moderateScale(10),
-                  }
-                ]}>
-                  {sectionHeaderInfo.title}
-                </Text>
-                <View style={[
-                  styles.sectionUnderline,
-                  {
-                    backgroundColor: theme.colors.primary,
-                    marginLeft: moderateScale(10),
-                    marginTop: moderateScale(2),
-                  }
-                ]} />
+        {/* Loading State - Show Skeletons */}
+        {loading ? (
+          <View style={{ flex: 1, paddingHorizontal: 16 }}>
+            {/* Skeleton Section Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+              <SkeletonLoader width={30} height={30} style={{ marginRight: 10, borderRadius: 15 }} />
+              <SkeletonLoader width={200} height={20} />
+            </View>
+
+            {/* Skeleton Main Poster */}
+            <View style={{ marginBottom: 20 }}>
+              <SkeletonLoader width={Dimensions.get('window').width - 32} height={200} style={{ marginBottom: 16, borderRadius: 12 }} />
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <SkeletonLoader width={120} height={16} />
+                <SkeletonLoader width={80} height={16} />
               </View>
             </View>
-          </LinearGradient>
-        </View>
 
-         {/* Compact Poster Section */}
-         <View
-           style={[styles.posterContainer, { height: computedPreviewHeight, width: '100%' }]}
-           {...swipeResponder.panHandlers}
-           collapsable={false}
-         >
-         <LazyFullImage
-           key={`poster-${currentPoster.id}-${currentPoster.thumbnail || (currentPoster as any).content?.background || ''}`}
-           thumbnailUri={currentPoster.thumbnail || (currentPoster as any).content?.background || ''}
-           fullImageUri={getHighQualityImageUrl(currentPoster)}
-           style={styles.posterImage}
-           resizeMode="contain"
-           loadOnMount={true}
-           preload={true}
-           quality="high"
-           maxWidth={2400}
-           showLoader={false}
-         />
+            {/* Skeleton Related Posters Horizontal List */}
+            <View style={{ marginBottom: 12 }}>
+              <SkeletonLoader width={150} height={18} style={{ marginBottom: 8 }} />
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={{ flexDirection: 'row', paddingRight: 16 }}>
+                {[1, 2, 3, 4, 5].map((item) => (
+                  <SkeletonPoster key={item} width={120} height={160} style={{ marginRight: 12 }} />
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+        ) : (
+          <>
+            {/* Section Header */}
+            <View style={styles.sectionHeaderContainer}>
+              <LinearGradient
+                colors={isDarkMode 
+                  ? [theme.colors.primary + '30', theme.colors.secondary + '20', 'transparent']
+                  : [theme.colors.primary + '18', theme.colors.secondary + '10', 'transparent']
+                }
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.sectionHeaderGradient}
+              >
+                <View style={styles.sectionHeaderContent}>
+                  <LinearGradient
+                    colors={[theme.colors.primary, theme.colors.secondary]}
+                    style={styles.sectionIconContainer}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                  >
+                    <Icon
+                      name={sectionHeaderInfo.icon}
+                      size={moderateScale(20)}
+                      color="#ffffff"
+                    />
+                  </LinearGradient>
+                  <View style={styles.sectionTitleContainer}>
+                    <Text style={[
+                      styles.sectionHeaderText,
+                      {
+                        color: theme.colors.text,
+                        fontSize: moderateScale(14),
+                        fontWeight: '700',
+                        marginLeft: moderateScale(10),
+                      }
+                    ]}>
+                      {sectionHeaderInfo.title}
+                    </Text>
+                    <View style={[
+                      styles.sectionUnderline,
+                      {
+                        backgroundColor: theme.colors.primary,
+                        marginLeft: moderateScale(10),
+                        marginTop: moderateScale(2),
+                      }
+                    ]} />
+                  </View>
+                </View>
+              </LinearGradient>
+            </View>
+
+           {/* Compact Poster Section */}
+           <View
+             style={[styles.posterContainer, { height: computedPreviewHeight, width: '100%' }]}
+             {...swipeResponder.panHandlers}
+             collapsable={false}
+           >
+           <LazyFullImage
+             key={`poster-${currentPoster.id}-${currentPoster.thumbnail || (currentPoster as any).content?.background || ''}`}
+             thumbnailUri={currentPoster.thumbnail || (currentPoster as any).content?.background || ''}
+             fullImageUri={getHighQualityImageUrl(currentPoster)}
+             style={styles.posterImage}
+             resizeMode="contain"
+             loadOnMount={true}
+             preload={true}
+             quality="high"
+             maxWidth={2400}
+             showLoader={false}
+           />
          </View>
-
 
          {/* Service filter buttons for Event Planners */}
          {isEventPlannerCategory && (
@@ -2512,41 +2698,38 @@ const TodaysPickScreen: React.FC = () => {
                // Enhanced performance optimizations for large lists
                removeClippedSubviews={true}
                maxToRenderPerBatch={isTabletDevice ? 8 : 6}
-               windowSize={5}
                initialNumToRender={isTabletDevice ? 8 : 6}
-               updateCellsBatchingPeriod={100}
+               windowSize={isTabletDevice ? 8 : 6}
+               getItemLayout={(data, index) => ({
+                 length: cardHeight,
+                 offset: cardHeight * index,
+                 index,
+               })}
+               updateCellsBatchingPeriod={50}
+               viewabilityConfig={{
+                itemVisiblePercentThreshold: 50,
+                minimumViewTime: 300,
+                waitForInteraction: true,
+              }}
+               // Optimized viewability callback for better performance
                onViewableItemsChanged={onViewableItemsChanged}
-               viewabilityConfig={viewabilityConfig.current}
              />
            ) : (
-             <View style={styles.noPostersContainer}>
-               {selectedLanguage === 'all' ? (
-                 <>
-                   <Text style={styles.noPostersText}>
-                     No templates available
-                   </Text>
-                   <Text style={styles.noPostersSubtext}>
-                     Try refreshing or selecting a different category
-                   </Text>
-                 </>
-               ) : (
-                 <>
-                   <Text style={styles.noPostersText}>
-                     No templates available in {languages.find(lang => lang.id === selectedLanguage)?.name}
-                   </Text>
-                   <Text style={styles.noPostersSubtext}>
-                     Try selecting "All" or a different language
-                   </Text>
-                 </>
-               )}
+             <View style={styles.noResultsContainer}>
+               <Text style={styles.noResultsText}>
+                 No posters available for this category
+               </Text>
              </View>
            )}
-         </View>
+        </View>
+          </>
+        )}
 
-         {/* Safe Area Bottom Spacing */}
-         <View style={{ height: insets.bottom }} />
-       </LinearGradient>
+        {/* Bottom Safe Area Spacing */}
+        <View style={{ height: insets.bottom + moderateScale(20) }} />
+      </LinearGradient>
 
+      {/* Business Profile Reminder Modal */}
       <Modal
         visible={isBusinessProfileReminderVisible}
         transparent
@@ -2555,22 +2738,20 @@ const TodaysPickScreen: React.FC = () => {
       >
         <View style={styles.businessProfileModalOverlay}>
           <View style={styles.businessProfileModalContent}>
-            <Text style={styles.businessProfileModalTitle}>Add More Business Profiles</Text>
+            <Text style={styles.businessProfileModalTitle}>Complete Your Business Profile</Text>
             <Text style={styles.businessProfileModalSubtitle}>
-              Create additional business profiles to unlock more tailored poster suggestions.
+              Add your business details to create personalized posters that showcase your brand effectively.
             </Text>
             <View style={styles.businessProfileModalActions}>
               <TouchableOpacity
                 style={[styles.businessProfileModalButton, styles.businessProfileModalSecondary]}
                 onPress={handleBusinessProfileAddPress}
-                activeOpacity={0.8}
               >
                 <Text style={styles.businessProfileModalSecondaryText}>Add Profile</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.businessProfileModalButton, styles.businessProfileModalPrimary]}
                 onPress={handleBusinessProfileContinue}
-                activeOpacity={0.85}
               >
                 <Text style={styles.businessProfileModalPrimaryText}>Continue</Text>
               </TouchableOpacity>
@@ -2578,8 +2759,8 @@ const TodaysPickScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
-     </View>
-   );
+    </View>
+  );
 };
 
 // Get dynamic screen dimensions (static for StyleSheet - component uses dynamic dimensions)
@@ -3058,6 +3239,19 @@ const styles = StyleSheet.create({
   noPostersSubtext: {
     fontSize: moderateScale(10), // Compact
     color: 'rgba(102,102,102,0.8)',
+    textAlign: 'center',
+  },
+  noResultsContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: moderateScale(20),
+    paddingHorizontal: moderateScale(16),
+  },
+  noResultsText: {
+    fontSize: moderateScale(14),
+    color: 'rgba(51,51,51,0.8)',
+    fontWeight: '600',
     textAlign: 'center',
   },
   languageSection: {

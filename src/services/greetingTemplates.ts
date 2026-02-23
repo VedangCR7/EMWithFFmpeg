@@ -264,8 +264,35 @@ class GreetingTemplatesService {
           });
         }
         
-        // If no matching templates found, return empty array (don't fall back to businessCategoryImages)
+        // If no matching templates found, return businessCategoryImages for Business Marketing Tips
         if (dataToMap.length === 0) {
+          // For Business Marketing Tips category, return businessCategoryImages if no templates match
+          if (category.toLowerCase().trim() === 'business marketing tips') {
+            console.log('🖼️ [getTemplatesByCategory] No templates found, returning businessCategoryImages:', businessCategoryImages.length);
+            // Map businessCategoryImages through the same URL conversion logic
+            const mappedBusinessImages = businessCategoryImages.map((backendTemplate: any) => {
+              const imageUrl = backendTemplate.url || backendTemplate.imageUrl || backendTemplate.thumbnail;
+              const thumbnailUrl = backendTemplate.thumbnailUrl || backendTemplate.url || backendTemplate.imageUrl;
+              const optimized = this.getOptimizedImageUrls(imageUrl, thumbnailUrl);
+
+              return {
+                id: backendTemplate.id,
+                name: backendTemplate.title || backendTemplate.name,
+                thumbnail: optimized.thumbnail,
+                category: backendTemplate.category || 'Business Marketing Tips',
+                categoryId: undefined,
+                content: {
+                  text: backendTemplate.description || '',
+                  background: optimized.background,
+                  layout: 'vertical' as const
+                },
+                downloads: backendTemplate.downloads || 0,
+                isDownloaded: false,
+                isPremium: backendTemplate.isPremium || false,
+              };
+            });
+            return mappedBusinessImages;
+          }
           return [];
         }
         

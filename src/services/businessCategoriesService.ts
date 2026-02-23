@@ -46,6 +46,14 @@ class BusinessCategoriesService {
         const categories = response.data.data?.categories || response.data.categories || [];
         logger.log(`✅ [CATEGORY API] ${categories.length} categories fetched`);
         
+        // Log first few categories to debug
+        if (categories.length > 0) {
+          console.log('📋 [BUSINESS CATEGORIES] First 3 categories received:');
+          categories.slice(0, 3).forEach((cat: any, index: number) => {
+            console.log(`  ${index + 1}. ${cat.name} (parent: ${cat.parentCategoryName || 'none'})`);
+          });
+        }
+        
         // Log parent category information for debugging
         if (categories.length > 0) {
           console.log('📋 [BUSINESS CATEGORIES] Total Categories:', categories.length);

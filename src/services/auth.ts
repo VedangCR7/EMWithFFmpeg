@@ -32,6 +32,12 @@ class AuthService {
       console.log('📦 AsyncStorage check - User:', storedUser ? 'Found' : 'Not found');
       console.log('📦 AsyncStorage check - Token:', authToken ? 'Found' : 'Not found');
       
+      // Print the full token for debugging
+      if (authToken) {
+        console.log('🔑 FULL AUTH TOKEN:', authToken);
+        console.log('🔑 TOKEN LENGTH:', authToken.length);
+      }
+      
       if (storedUser && authToken) {
         this.currentUser = JSON.parse(storedUser);
         console.log('✅ Loaded stored user:', this.currentUser.id || this.currentUser.uid);
@@ -440,6 +446,7 @@ class AuthService {
       
       console.log('🔑 authToken in AsyncStorage:', authToken ? 'EXISTS' : 'NOT FOUND');
       if (authToken) {
+        console.log('🔑 FULL AUTH TOKEN:', authToken);
         console.log('   - Token Length:', authToken.length);
         console.log('   - Token Preview:', authToken.substring(0, 30) + '...');
       }

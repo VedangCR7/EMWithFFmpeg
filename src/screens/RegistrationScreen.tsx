@@ -214,8 +214,28 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
             });
           });
           
-          // Show all categories without filtering
-          setCategories(response.categories);
+          // Extract unique parentCategoryName values (ignore null values)
+          const uniqueParentCategories = new Set<string>();
+          response.categories.forEach((category: any) => {
+            if (category.parentCategoryName && category.parentCategoryName.trim() !== '') {
+              uniqueParentCategories.add(category.parentCategoryName.trim());
+            }
+          });
+          
+          // Convert Set to array and create business category objects
+          const businessCategories = Array.from(uniqueParentCategories).map((parentName, index) => ({
+            id: `parent-${index}`,
+            name: parentName,
+            description: `${parentName} business category`,
+            icon: '📄',
+            parentCategoryName: null // Mark as business category
+          }));
+          
+          console.log('✅ [REGISTRATION] Business categories extracted:', businessCategories.length);
+          console.log('📋 [REGISTRATION] Business categories:', businessCategories.map(cat => cat.name));
+          
+          // Show business categories for selection
+          setCategories(businessCategories);
         } else {
           console.warn('⚠️ [REGISTRATION] No categories received from API');
           // Keep empty array, will show empty state in UI
@@ -266,68 +286,39 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
     fetchCategories();
   }, []);
 
-  // Fetch subcategories for a selected category
-  const fetchSubcategories = async (selectedCategory: string) => {
+  // Fetch subcategories for a selected business category
+  const fetchSubcategories = async (selectedBusinessCategory: string) => {
     try {
       setIsLoadingSubcategories(true);
-      console.log('📡 [REGISTRATION] Fetching subcategories for category:', selectedCategory);
+      console.log('📡 [REGISTRATION] Fetching subcategories for business category:', selectedBusinessCategory);
       
-      // Use the same API endpoint but extract subcategories from the selected parent category
+      // Use the same API endpoint but filter by parent category
       const response = await businessCategoriesService.getBusinessCategories();
       
       if (response.success && response.categories && response.categories.length > 0) {
-        // Find the selected parent category
-        const selectedParentCategory = response.categories.find((category: any) => {
-          const categoryName = category.name?.toLowerCase() || '';
-          const selectedCategoryLower = selectedCategory.toLowerCase();
-          return categoryName === selectedCategoryLower || 
-                 categoryName.includes(selectedCategoryLower) ||
-                 selectedCategoryLower.includes(categoryName);
+        // Filter categories where parentCategoryName matches the selected business category
+        const categorySubcategories = response.categories.filter((category: any) => {
+          const parentCategoryName = category.parentCategoryName?.trim().toLowerCase() || '';
+          const selectedCategoryLower = selectedBusinessCategory.trim().toLowerCase();
+          
+          console.log(`🔍 [REGISTRATION] Checking category: ${category.name}`);
+          console.log(`🔍 [REGISTRATION] - parentCategoryName: "${parentCategoryName}"`);
+          console.log(`🔍 [REGISTRATION] - selectedBusinessCategory: "${selectedCategoryLower}"`);
+          console.log(`🔍 [REGISTRATION] - Match: ${parentCategoryName === selectedCategoryLower}`);
+          
+          // Exact match for parent category
+          return parentCategoryName === selectedCategoryLower;
         });
         
-        console.log('📋 [REGISTRATION] Selected parent category:', selectedParentCategory);
+        console.log('✅ [REGISTRATION] Subcategories fetched:', categorySubcategories.length);
+        console.log('📋 [REGISTRATION] Final subcategories to display:');
+        categorySubcategories.forEach((subcategory: any, index: number) => {
+          console.log(`  ${index + 1}. ${subcategory.name} (parent: ${subcategory.parentCategoryName})`);
+        });
         
-        if (selectedParentCategory && selectedParentCategory.subCategories) {
-          // The subCategories is an array of objects, not a string
-          const subCategoriesArray = selectedParentCategory.subCategories;
-          console.log('📋 [REGISTRATION] SubCategories array:', subCategoriesArray);
-          
-          // Check if it's an array and has items
-          if (Array.isArray(subCategoriesArray) && subCategoriesArray.length > 0) {
-            // Map the subcategory objects to our expected format
-            const categorySubcategories = subCategoriesArray.map((subcategory: any, index: number) => ({
-              id: subcategory.id || `${selectedParentCategory.id}_sub_${index}`,
-              name: subcategory.name || subcategory.title || `Subcategory ${index + 1}`,
-              parentCategoryName: selectedParentCategory.name,
-              slug: subcategory.slug,
-              description: subcategory.description,
-              icon: subcategory.icon,
-              color: subcategory.color
-            }));
-            
-            console.log('✅ [REGISTRATION] Subcategories extracted:', categorySubcategories.length);
-            
-            // Print subcategory details
-            categorySubcategories.forEach((subcategory: any, index: number) => {
-              console.log(`📋 [REGISTRATION] Subcategory ${index + 1}:`, {
-                id: subcategory.id,
-                name: subcategory.name,
-                parentCategoryName: subcategory.parentCategoryName
-              });
-            });
-            
-            setSubcategories(categorySubcategories);
-          } else {
-            console.warn('⚠️ [REGISTRATION] SubCategories is not a valid array or is empty');
-            setSubcategories([]);
-          }
-        } else {
-          console.warn('⚠️ [REGISTRATION] No subcategories found for category:', selectedCategory);
-          console.warn('⚠️ [REGISTRATION] Selected category:', selectedParentCategory);
-          setSubcategories([]);
-        }
+        setSubcategories(categorySubcategories);
       } else {
-        console.warn('⚠️ [REGISTRATION] No categories received from API');
+        console.warn('⚠️ [REGISTRATION] No subcategories found for business category:', selectedBusinessCategory);
         setSubcategories([]);
       }
     } catch (error: any) {
@@ -850,7 +841,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                   )}
               </View>
               
-              {/* Subcategory Field - Only show if category is selected and subcategories exist */}
+              {/* Subcategory Field - Show when business category is selected */}
               {formData.category && subcategories.length > 0 && (
                 <View style={styles.categorySection}>
                   <Text style={[styles.categoryLabel, { color: theme.colors.text }]}>Subcategory *</Text>

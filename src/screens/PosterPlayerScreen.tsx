@@ -401,6 +401,10 @@ const PosterPlayerScreen: React.FC = () => {
   const [isBusinessProfileReminderVisible, setIsBusinessProfileReminderVisible] = useState(false);
   const preloadedImagesRef = useRef<Set<string>>(new Set());
 
+  // State for service filter specific templates
+  const [serviceFilterTemplates, setServiceFilterTemplates] = useState<Record<string, Template[]>>({});
+  const [isLoadingServiceFilter, setIsLoadingServiceFilter] = useState<Record<string, boolean>>({});
+
   // Get high quality image URL for preview (full quality, maximum resolution)
   const getHighQualityImageUrl = (poster: Template): string => {
     // Check if poster has a previewUrl property (cast to any to access)
@@ -564,8 +568,94 @@ const PosterPlayerScreen: React.FC = () => {
     return matches;
   }, [isEventPlannerCategory, selectedServiceFilter, serviceFilterKeywords]);
 
+  // Function to fetch templates for a specific service filter
+  const fetchServiceFilterTemplates = useCallback(async (serviceFilter: string) => {
+    if (!isEventPlannerCategory) return;
+    
+    // Check if we already have cached templates for this service filter
+    if (serviceFilterTemplates[serviceFilter] && serviceFilterTemplates[serviceFilter].length > 0) {
+      console.log(`📦 [SERVICE FILTER] Using cached templates for ${serviceFilter}`);
+      return;
+    }
+
+    const apiEndpoint = `/api/mobile/posters/category/${serviceFilter}?limit=200`;
+    console.log(`📡 [SERVICE FILTER] Fetching templates from endpoint: ${apiEndpoint}`);
+    setIsLoadingServiceFilter(prev => ({ ...prev, [serviceFilter]: true }));
+    
+    try {
+      const response = await businessCategoryPostersApi.getPostersByCategory(serviceFilter, 200);
+      
+      // Print the full API response and endpoint
+      console.log(`🔍 [SERVICE FILTER] API Response for ${apiEndpoint}:`, {
+        endpoint: apiEndpoint,
+        success: response.success,
+        message: response.message,
+        data: response.data,
+        fullResponse: JSON.stringify(response, null, 2)
+      });
+      
+      if (response.success && response.data.posters) {
+        // Convert BusinessCategoryPoster to Template format
+        const templates: Template[] = response.data.posters.map((poster: any) => ({
+          id: poster.id,
+          name: poster.title || poster.name,
+          thumbnail: poster.thumbnail,
+          category: poster.category,
+          downloads: poster.downloads || 0,
+          isDownloaded: poster.isDownloaded || false,
+          tags: poster.tags || [],
+          languages: [], // Will be populated if needed
+          previewUrl: poster.imageUrl || poster.downloadUrl,
+        }));
+        
+        // Cache the templates
+        setServiceFilterTemplates(prev => ({
+          ...prev,
+          [serviceFilter]: templates
+        }));
+        
+        console.log(`✅ [SERVICE FILTER] Successfully fetched ${templates.length} templates for ${serviceFilter}`);
+        console.log(`📋 [SERVICE FILTER] Template details for ${serviceFilter}:`, JSON.stringify(templates, null, 2));
+      } else {
+        console.warn(`⚠️ [SERVICE FILTER] No templates found for ${serviceFilter}`);
+        console.log(`🔍 [SERVICE FILTER] Failed response details:`, JSON.stringify(response, null, 2));
+        setServiceFilterTemplates(prev => ({
+          ...prev,
+          [serviceFilter]: []
+        }));
+      }
+    } catch (error) {
+      console.error(`❌ [SERVICE FILTER] Error fetching templates for ${serviceFilter}:`, error);
+      console.error(`🔍 [SERVICE FILTER] Error details:`, JSON.stringify(error, null, 2));
+      setServiceFilterTemplates(prev => ({
+        ...prev,
+        [serviceFilter]: []
+      }));
+    } finally {
+      setIsLoadingServiceFilter(prev => ({ ...prev, [serviceFilter]: false }));
+    }
+  }, [isEventPlannerCategory, serviceFilterTemplates]);
 
   const filteredPosters = useMemo(() => {
+    // If we have a service filter selected and have templates for it, use those
+    if (selectedServiceFilter && serviceFilterTemplates[selectedServiceFilter]) {
+      const serviceTemplates = serviceFilterTemplates[selectedServiceFilter];
+      const templatesWithLanguages = serviceTemplates.map(t => mergeTemplateLanguages(t));
+      
+      // If "All" is selected, return ALL service filter templates without language filtering
+      if (selectedLanguage === 'all') {
+        return templatesWithLanguages;
+      }
+      
+      // Filter by language for service filter templates
+      const languageFiltered = templatesWithLanguages.filter(template => {
+        const matches = templateContainsLanguage(template, selectedLanguage);
+        return matches;
+      });
+      
+      return languageFiltered;
+    }
+    
     // Ensure all templates have languages merged before filtering
     const templatesWithLanguages = allTemplates.map(t => mergeTemplateLanguages(t));
     
@@ -592,7 +682,7 @@ const PosterPlayerScreen: React.FC = () => {
 
     // Return service-filtered results (even if empty, don't fallback to all templates)
     return serviceFiltered;
-  }, [allTemplates, selectedLanguage, templateMatchesServiceFilter, calendarDate, greetingCategory, businessCategory]);
+  }, [allTemplates, selectedLanguage, templateMatchesServiceFilter, calendarDate, greetingCategory, businessCategory, selectedServiceFilter, serviceFilterTemplates]);
 
   // Preload images for better scrolling performance
   const preloadImages = useCallback((posters: Template[], startIndex: number = 0, count: number = 20) => {
@@ -2995,7 +3085,13 @@ const PosterPlayerScreen: React.FC = () => {
                      isActive && styles.serviceFilterButtonActive
                    ]}
                    onPress={() => {
-                    setSelectedServiceFilter(prev => prev === filterKey ? null : filterKey);
+                    const newFilter = selectedServiceFilter === filterKey ? null : filterKey;
+                    setSelectedServiceFilter(newFilter);
+                    
+                    // Fetch templates if a filter is selected
+                    if (newFilter) {
+                      fetchServiceFilterTemplates(newFilter);
+                    }
                   }}
                    activeOpacity={0.9}
                  >
@@ -3012,7 +3108,7 @@ const PosterPlayerScreen: React.FC = () => {
                        styles.serviceFilterButtonText,
                        isActive && styles.serviceFilterButtonTextActive
                      ]}>
-                       {labelMap[filterKey]}
+                       {isLoadingServiceFilter[filterKey] ? 'Loading...' : labelMap[filterKey]}
                      </Text>
                    </LinearGradient>
                  </TouchableOpacity>

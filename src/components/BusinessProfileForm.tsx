@@ -131,8 +131,11 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [phoneValidationError, setPhoneValidationError] = useState<string>('');
   const [alternatePhoneValidationError, setAlternatePhoneValidationError] = useState<string>('');
+  const [businessCategories, setBusinessCategories] = useState<string[]>([]);
   const [subcategories, setSubcategories] = useState<any[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState<boolean>(true);
   const [loadingSubcategories, setLoadingSubcategories] = useState<boolean>(false);
+  const [allCategoriesData, setAllCategoriesData] = useState<any[]>([]);
   const inputRefs = useRef<Record<string, RNTextInput | null>>({});
 
   const focusField = (field: string) => {
@@ -154,9 +157,7 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
     }
   };
 
-  const [categories, setCategories] = useState<string[]>([]);
-  const [loadingCategories, setLoadingCategories] = useState(false);
-
+  
   // Fetch business categories from API
   useEffect(() => {
     const fetchCategories = async () => {
@@ -168,19 +169,30 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
         const response = await businessCategoriesService.getBusinessCategories();
         
         if (response.success && response.categories && response.categories.length > 0) {
-          // Extract category names from the API response
-          const categoryNames = response.categories.map(cat => cat.name);
-          setCategories(categoryNames);
-          console.log('✅ [BUSINESS PROFILE FORM] Categories loaded:', categoryNames.length);
+          // Store all categories data for filtering
+          setAllCategoriesData(response.categories);
+          
+          // Extract unique parentCategoryName values for Business Category dropdown
+          const parentCategoryNames: string[] = [];
+          response.categories.forEach(cat => {
+            if (cat.parentCategoryName && cat.parentCategoryName.trim() !== '') {
+              parentCategoryNames.push(cat.parentCategoryName.trim());
+            }
+          });
+          const uniqueParentCategories = [...new Set(parentCategoryNames)].sort();
+          
+          setBusinessCategories(uniqueParentCategories);
+          console.log('✅ [BUSINESS PROFILE FORM] Business categories loaded:', uniqueParentCategories.length);
+          console.log('📋 [BUSINESS PROFILE FORM] Business categories:', uniqueParentCategories);
         } else {
           console.warn('⚠️ [BUSINESS PROFILE FORM] No categories received from API');
-          // Fallback to empty array or default categories
-          setCategories([]);
+          setAllCategoriesData([]);
+          setBusinessCategories([]);
         }
       } catch (error) {
         console.error('❌ [BUSINESS PROFILE FORM] Error fetching categories:', error);
         // Fallback to empty array on error
-        setCategories([]);
+        setBusinessCategories([]);
       } finally {
         setLoadingCategories(false);
       }
@@ -189,65 +201,30 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
     fetchCategories();
   }, [visible]);
 
-  // Fetch subcategories for a selected category
-  const fetchSubcategories = async (selectedCategory: string) => {
-    try {
-      setLoadingSubcategories(true);
-      console.log('📡 [BUSINESS PROFILE FORM] Fetching subcategories for category:', selectedCategory);
-      
-      // Use the same API endpoint but extract subcategories from the selected parent category
-      const response = await businessCategoriesService.getBusinessCategories();
-      
-      if (response.success && response.categories && response.categories.length > 0) {
-        // Find the selected parent category
-        const selectedParentCategory = response.categories.find((category: any) => {
-          const categoryName = category.name?.toLowerCase() || '';
-          const selectedCategoryLower = selectedCategory.toLowerCase();
-          return categoryName === selectedCategoryLower || 
-                 categoryName.includes(selectedCategoryLower) ||
-                 selectedCategoryLower.includes(categoryName);
-        });
-        
-        console.log('📋 [BUSINESS PROFILE FORM] Selected parent category:', selectedParentCategory);
-        
-        if (selectedParentCategory && selectedParentCategory.subCategories) {
-          // The subCategories is an array of objects, not a string
-          const subCategoriesArray = selectedParentCategory.subCategories;
-          console.log('📋 [BUSINESS PROFILE FORM] SubCategories array:', subCategoriesArray);
-          
-          // Check if it's an array and has items
-          if (Array.isArray(subCategoriesArray) && subCategoriesArray.length > 0) {
-            // Map the subcategory objects to our expected format
-            const categorySubcategories = subCategoriesArray.map((subcategory: any, index: number) => ({
-              id: subcategory.id || `${selectedParentCategory.id}_sub_${index}`,
-              name: subcategory.name || subcategory.title || `Subcategory ${index + 1}`,
-              parentCategoryName: selectedParentCategory.name,
-              slug: subcategory.slug,
-              description: subcategory.description,
-              icon: subcategory.icon,
-              color: subcategory.color
-            }));
-            
-            console.log('✅ [BUSINESS PROFILE FORM] Subcategories extracted:', categorySubcategories.length);
-            setSubcategories(categorySubcategories);
-          } else {
-            console.warn('⚠️ [BUSINESS PROFILE FORM] SubCategories is not a valid array or is empty');
-            setSubcategories([]);
-          }
-        } else {
-          console.warn('⚠️ [BUSINESS PROFILE FORM] No subcategories found for category:', selectedCategory);
-          setSubcategories([]);
-        }
-      } else {
-        console.warn('⚠️ [BUSINESS PROFILE FORM] Failed to fetch categories for subcategory extraction');
-        setSubcategories([]);
-      }
-    } catch (error) {
-      console.error('❌ [BUSINESS PROFILE FORM] Error fetching subcategories:', error);
-      setSubcategories([]);
-    } finally {
-      setLoadingSubcategories(false);
-    }
+  // Filter subcategories based on selected business category
+  const fetchSubcategories = (selectedBusinessCategory: string) => {
+    console.log('📡 [BUSINESS PROFILE FORM] Filtering subcategories for business category:', selectedBusinessCategory);
+    
+    // Filter categories where parentCategoryName matches the selected business category
+    const filteredSubcategories = allCategoriesData.filter(category => {
+      return category.parentCategoryName === selectedBusinessCategory;
+    });
+    
+    console.log('📋 [BUSINESS PROFILE FORM] Found subcategories:', filteredSubcategories.length);
+    
+    // Map to the expected format for the dropdown
+    const subcategoryOptions = filteredSubcategories.map(category => ({
+      id: category.id,
+      name: category.name,
+      parentCategoryName: category.parentCategoryName,
+      slug: category.slug,
+      description: category.description,
+      icon: category.icon,
+      color: category.color
+    }));
+    
+    setSubcategories(subcategoryOptions);
+    setLoadingSubcategories(false);
   };
 
   useEffect(() => {
@@ -314,19 +291,21 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
       return;
     }
     
-    // Handle category selection - fetch subcategories
+    // Handle business category selection - filter subcategories
     if (field === 'category') {
       setFormData(prev => ({
         ...prev,
         [field]: value,
-        subcategory: '', // Reset subcategory when category changes
+        subcategory: '', // Reset subcategory when business category changes
       }));
       
-      // Fetch subcategories for the selected category
+      // Filter subcategories for the selected business category
       if (value) {
+        setLoadingSubcategories(true);
         fetchSubcategories(value);
       } else {
-        setSubcategories([]); // Clear subcategories if no category selected
+        setSubcategories([]); // Clear subcategories if no business category selected
+        setLoadingSubcategories(false);
       }
     } else {
       // Handle all other fields normally
@@ -615,42 +594,47 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
                 ) : (
                   // New profile mode: Allow category selection
                   <>
-                    <View style={[
-                      styles.pickerContainer,
-                      { 
-                        backgroundColor: theme.colors.inputBackground,
-                        borderColor: theme.colors.border
-                      },
-                      focusedField === 'category' && [styles.inputFocused, { borderColor: theme.colors.primary }]
-                    ]}>
-                      {loadingCategories ? (
-                        <View style={styles.categoryLoadingContainer}>
-                          <ActivityIndicator size="small" color={theme.colors.primary} />
-                          <Text style={[styles.pickerText, { color: theme.colors.textSecondary, marginLeft: 8 }]}>
-                            Loading categories...
-                          </Text>
-                        </View>
-                      ) : (
-                        <Text style={[styles.pickerText, { color: formData.category ? theme.colors.text : theme.colors.textSecondary }]}>
-                          {formData.category || 'Select business category'}
-                        </Text>
-                      )}
+                    {/* Selected Category Display */}
+                    <View style={styles.selectedCategoryContainer}>
+                      <TextInput
+                        style={[
+                          styles.selectedCategoryInput,
+                          { 
+                            color: theme.colors.text,
+                            borderColor: formData.category ? theme.colors.primary : theme.colors.border,
+                            backgroundColor: theme.colors.inputBackground,
+                          }
+                        ]}
+                        value={formData.category}
+                        placeholder="Select your business category *"
+                        placeholderTextColor={theme.colors.textSecondary}
+                        editable={false}
+                        pointerEvents="none"
+                      />
                     </View>
+                    
+                    {/* Category Options */}
                     {loadingCategories ? (
-                      <View style={styles.categoryOptions}>
+                      <View style={styles.categoryLoadingContainer}>
+                        <ActivityIndicator size="small" color={theme.colors.primary} />
                         <Text style={[styles.categoryLoadingText, { color: theme.colors.textSecondary }]}>
                           Loading categories...
                         </Text>
                       </View>
-                    ) : categories.length === 0 ? (
-                      <View style={styles.categoryOptions}>
-                        <Text style={[styles.categoryLoadingText, { color: theme.colors.textSecondary }]}>
+                    ) : businessCategories.length === 0 ? (
+                      <View style={styles.categoryEmptyContainer}>
+                        <Icon name="info-outline" size={20} color={theme.colors.textSecondary} />
+                        <Text style={[styles.categoryEmptyText, { color: theme.colors.textSecondary }]}>
                           No categories available. Please try again later.
                         </Text>
                       </View>
                     ) : (
-                      <View style={styles.categoryOptions}>
-                        {categories.map((category) => (
+                      <ScrollView 
+                        horizontal 
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.categoryScrollContent}
+                      >
+                        {businessCategories.map((category) => (
                           <TouchableOpacity
                             key={category}
                             style={[
@@ -658,11 +642,17 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
                               { 
                                 backgroundColor: formData.category === category 
                                   ? theme.colors.primary 
-                                  : (isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(102,126,234,0.1)'),
-                                borderWidth: 1,
+                                  : (isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(102,126,234,0.1)'),
                                 borderColor: formData.category === category 
                                   ? theme.colors.primary 
-                                  : (isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(102,126,234,0.2)')
+                                  : (isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(102,126,234,0.3)'),
+                              },
+                              formData.category === category && {
+                                shadowColor: theme.colors.primary,
+                                shadowOffset: { width: 0, height: 2 },
+                                shadowOpacity: 0.3,
+                                shadowRadius: 4,
+                                elevation: 5,
                               }
                             ]}
                             onPress={() => handleInputChange('category', category)}
@@ -680,7 +670,7 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
                             </Text>
                           </TouchableOpacity>
                         ))}
-                      </View>
+                      </ScrollView>
                     )}
                   </>
                 )}
@@ -1674,6 +1664,36 @@ const styles = StyleSheet.create({
     fontSize: Math.min(screenWidth * 0.028, 11),
     marginTop: Math.max(4, screenHeight * 0.005),
     fontStyle: 'italic',
+  },
+  selectedCategoryContainer: {
+    position: 'relative',
+    marginBottom: Math.max(10, screenHeight * 0.012),
+  },
+  selectedCategoryInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: Math.max(12, screenWidth * 0.035),
+    paddingVertical: Math.max(10, screenHeight * 0.012),
+    fontSize: Math.min(screenWidth * 0.038, 15),
+    minHeight: Math.min(screenWidth * 0.12, 48),
+  },
+  categoryScrollContent: {
+    paddingRight: Math.max(14, screenWidth * 0.04),
+  },
+  categoryEmptyContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    borderRadius: 8,
+    paddingVertical: Math.max(12, screenHeight * 0.015),
+    paddingHorizontal: Math.max(12, screenWidth * 0.03),
+    gap: Math.max(8, screenWidth * 0.02),
+  },
+  categoryEmptyText: {
+    fontSize: Math.min(screenWidth * 0.033, 13),
+    textAlign: 'center',
+    flex: 1,
   },
 });
 
