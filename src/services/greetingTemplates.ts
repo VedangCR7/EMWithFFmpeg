@@ -228,9 +228,14 @@ class GreetingTemplatesService {
   }
 
   // Get greeting templates by category
-  async getTemplatesByCategory(category: string, limit: number = 200): Promise<GreetingTemplate[]> {
+  async getTemplatesByCategory(category: string, limit: number = 200, categoryId?: string): Promise<GreetingTemplate[]> {
     try {
-      const response = await api.get(`/api/mobile/greetings/templates?category=${category}&limit=${limit}`);
+      let apiUrl = `/api/mobile/greetings/templates?category=${category}&limit=${limit}`;
+      if (categoryId) {
+        apiUrl += `&categoryId=${encodeURIComponent(categoryId)}`;
+      }
+      
+      const response = await api.get(apiUrl);
       
       if (response.data.success) {
         // When category is provided, backend only returns templates (no businessCategoryImages)
@@ -338,7 +343,7 @@ class GreetingTemplatesService {
   }
 
   // Get all greeting templates with filters
-  async getTemplates(filters?: GreetingFilters): Promise<GreetingTemplate[]> {
+  async getTemplates(filters?: GreetingFilters & { categoryId?: string }): Promise<GreetingTemplate[]> {
     // Generate cache key based on filters
     const filtersKey = filters ? JSON.stringify(filters) : 'default';
     const cacheKey = `greeting_templates_${filtersKey}`;
@@ -351,6 +356,7 @@ class GreetingTemplatesService {
         if (filters?.language) params.append('language', filters.language);
         if (filters?.isPremium !== undefined) params.append('isPremium', filters.isPremium.toString());
         if (filters?.search) params.append('search', filters.search);
+        if (filters?.categoryId) params.append('categoryId', filters.categoryId);
         // Use limit 200 for category requests if no limit specified (for General Categories)
         const limit = filters?.limit || (filters?.category ? 200 : undefined);
         if (limit) params.append('limit', limit.toString());

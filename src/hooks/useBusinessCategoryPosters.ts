@@ -15,13 +15,14 @@ export const businessCategoryPostersKeys = {
 export const useBusinessCategoryPosters = (
   category: string,
   limit: number = 5,
+  categoryId?: string,
   options?: Omit<UseQueryOptions<any>, 'queryKey' | 'queryFn'>
 ) => {
   const cacheConfig = API_CACHE_CONFIG.businessCategoryPosters.byCategory;
 
   return useQuery({
     queryKey: businessCategoryPostersKeys.byCategory(category, limit),
-    queryFn: () => businessCategoryPostersApi.getPostersByCategory(category, limit),
+    queryFn: () => businessCategoryPostersApi.getPostersByCategory(category, limit, false, categoryId),
     enabled: !!category, // Only run if category is provided
     staleTime: cacheConfig.staleTime,
     gcTime: cacheConfig.gcTime,

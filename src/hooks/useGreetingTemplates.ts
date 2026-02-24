@@ -39,6 +39,7 @@ export const useGreetingTemplates = (
     isPremium?: boolean;
     search?: string;
     limit?: number;
+    categoryId?: string;
   },
   options?: Omit<UseQueryOptions<GreetingTemplate[]>, 'queryKey' | 'queryFn'>
 ) => {
@@ -75,11 +76,12 @@ export const useSearchGreetingTemplates = (
 export const useGreetingTemplatesByCategory = (
   category: string,
   limit: number = 200,
+  categoryId?: string,
   options?: Omit<UseQueryOptions<GreetingTemplate[]>, 'queryKey' | 'queryFn'>
 ) => {
   return useQuery({
     queryKey: greetingTemplatesKeys.byCategory(category, limit),
-    queryFn: () => greetingTemplatesService.getTemplatesByCategory(category, limit),
+    queryFn: () => greetingTemplatesService.getTemplatesByCategory(category, limit, categoryId),
     enabled: !!category, // Only run if category is provided
     // TTL will be set based on user configuration
     ...options,

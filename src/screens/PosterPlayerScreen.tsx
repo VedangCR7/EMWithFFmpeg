@@ -348,6 +348,7 @@ const PosterPlayerScreen: React.FC = () => {
     originScreen,
     posterLimit,
     calendarDate,
+    templateSource,
   } = route.params;
   // Convert initialPoster to Template format if it's a GreetingTemplate
   // GreetingTemplates have content.background which should be used as thumbnail if thumbnail is missing
@@ -399,6 +400,12 @@ const PosterPlayerScreen: React.FC = () => {
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const [selectedServiceFilter, setSelectedServiceFilter] = useState<string | null>(null);
   const [isBusinessProfileReminderVisible, setIsBusinessProfileReminderVisible] = useState(false);
+  
+  // Determine if we should show subscription message instead of language buttons
+  // Only for business categories coming from HomeScreen (templateSource: 'professional' and businessCategory provided)
+  const shouldShowSubscriptionMessage = useMemo(() => {
+    return templateSource === 'professional' && !!businessCategory;
+  }, [templateSource, businessCategory]);
   const preloadedImagesRef = useRef<Set<string>>(new Set());
 
   // State for service filter specific templates
@@ -3062,40 +3069,49 @@ const PosterPlayerScreen: React.FC = () => {
          />
          </View>
 
-         {/* Language Filter Buttons - Horizontal below preview */}
-         <View style={styles.languageFilterContainer}>
-           {languages.map((language) => {
-             const isSelected = selectedLanguage === language.id;
-             return (
-               <TouchableOpacity
-                 key={language.id}
-                 style={[
-                   styles.languageFilterButton,
-                   isSelected && styles.languageFilterButtonSelected
-                 ]}
-                 onPress={() => handleLanguageChange(language.id)}
-                 activeOpacity={0.8}
-               >
-                 <LinearGradient
-                   colors={isSelected 
-                     ? [theme.colors.secondary, theme.colors.primary]
-                     : ['rgba(0,0,0,0.05)', 'rgba(0,0,0,0.05)']
-                   }
-                   start={{ x: 0, y: 0 }}
-                   end={{ x: 1, y: 0 }}
-                   style={styles.languageFilterButtonGradient}
+         {/* Language Filter Buttons or Subscription Message - Horizontal below preview */}
+         {shouldShowSubscriptionMessage ? (
+           // Show subscription message for business categories from HomeScreen
+           <View style={styles.subscriptionMessageContainer}>
+             <Text style={styles.subscriptionMessageTitle}>For Premium images — subscribe Now.</Text>
+             <Text style={styles.subscriptionMessageSubtitle}>Subscribe for full access.</Text>
+           </View>
+         ) : (
+           // Show language filter buttons for all other cases
+           <View style={styles.languageFilterContainer}>
+             {languages.map((language) => {
+               const isSelected = selectedLanguage === language.id;
+               return (
+                 <TouchableOpacity
+                   key={language.id}
+                   style={[
+                     styles.languageFilterButton,
+                     isSelected && styles.languageFilterButtonSelected
+                   ]}
+                   onPress={() => handleLanguageChange(language.id)}
+                   activeOpacity={0.8}
                  >
-                   <Text style={[
-                     styles.languageFilterButtonText,
-                     isSelected && styles.languageFilterButtonTextSelected
-                   ]}>
-                     {language.name}
-                   </Text>
-                 </LinearGradient>
-               </TouchableOpacity>
-             );
-           })}
-         </View>
+                   <LinearGradient
+                     colors={isSelected 
+                       ? [theme.colors.secondary, theme.colors.primary]
+                       : ['rgba(0,0,0,0.05)', 'rgba(0,0,0,0.05)']
+                     }
+                     start={{ x: 0, y: 0 }}
+                     end={{ x: 1, y: 0 }}
+                     style={styles.languageFilterButtonGradient}
+                   >
+                     <Text style={[
+                       styles.languageFilterButtonText,
+                       isSelected && styles.languageFilterButtonTextSelected
+                     ]}>
+                       {language.name}
+                     </Text>
+                   </LinearGradient>
+                 </TouchableOpacity>
+               );
+             })}
+           </View>
+         )}
 
         {/* Service filter buttons for Event Planners */}
         {isEventPlannerCategory && (
@@ -3837,6 +3853,30 @@ const styles = StyleSheet.create({
     paddingVertical: moderateScale(8),
     gap: moderateScale(6),
     marginBottom: moderateScale(4),
+  },
+  subscriptionMessageContainer: {
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: moderateScale(16),
+    paddingVertical: moderateScale(12),
+    marginHorizontal: moderateScale(16),
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    borderRadius: moderateScale(12),
+    marginBottom: moderateScale(4),
+  },
+  subscriptionMessageTitle: {
+    fontSize: moderateScale(14),
+    fontWeight: '600',
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: moderateScale(4),
+  },
+  subscriptionMessageSubtitle: {
+    fontSize: moderateScale(12),
+    fontWeight: '400',
+    color: '#666',
+    textAlign: 'center',
   },
   languageFilterButton: {
     borderRadius: moderateScale(8),

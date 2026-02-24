@@ -54,7 +54,7 @@ class BusinessCategoryPostersApiService {
   /**
    * Get posters for a specific business category
    */
-  async getPostersByCategory(category: string, limit?: number, isRefresh: boolean = false): Promise<BusinessCategoryPostersResponse> {
+  async getPostersByCategory(category: string, limit?: number, isRefresh: boolean = false, categoryId?: string): Promise<BusinessCategoryPostersResponse> {
     try {
       const cacheKey = `category_${category}`;
       const now = Date.now();
@@ -84,9 +84,13 @@ class BusinessCategoryPostersApiService {
       }
       logger.log(`📡 [CATEGORY POSTERS API] Fetching posters for: ${category} (limit: ${requestLimit}, refresh: ${isRefresh})`);
       
-      const response = await api.get(
-        `/api/mobile/posters/category/${encodeURIComponent(category)}?limit=${requestLimit}`,
-      );
+      // Build URL with categoryId support and backward compatibility
+      let apiUrl = `/api/mobile/posters/category/${encodeURIComponent(category)}?limit=${requestLimit}`;
+      if (categoryId) {
+        apiUrl += `&categoryId=${encodeURIComponent(categoryId)}`;
+      }
+      
+      const response = await api.get(apiUrl);
       
       if (response.data.success) {
         const posters = response.data.data.posters;
@@ -259,18 +263,18 @@ class BusinessCategoryPostersApiService {
         const targetCategory = subCategory || primaryCategory;
         const categoryType = subCategory ? 'subcategory (from business profile)' : 'main category (from business profile)';
         
-        logger.log(`✅ [USER CATEGORY POSTERS] Using ${categoryType} from profile ${profileToUse.name}: ${targetCategory}`);
+        logger.log(`✅ [USER CATEGORY POSTERS] Using ${categoryType}: ${targetCategory}`);
         if (subCategory) {
           logger.log(`📋 [USER CATEGORY POSTERS] Subcategory: ${subCategory}, Main category: ${primaryCategory}`);
         }
         
-        // DEBUG: Show what we're actually using for the API call
+        // DEBUG: Show what we're actually using for API call
         logger.log(`🎯 [USER CATEGORY POSTERS] API CALL - Fetching posters for category: "${targetCategory}"`);
         
-        return this.getPostersByCategory(targetCategory, 200, isRefresh);
+        return this.getPostersByCategory(targetCategory, 200, isRefresh, profileToUse.id);
       }
 
-      // FALLBACK: Try to get the original category from user's registration data
+      // FALLBACK: Try to get original category from user's registration data
       logger.log('🔄 [USER CATEGORY POSTERS] No business profiles found, checking registration data...');
       
       const user = authService.getCurrentUser();

@@ -23,6 +23,7 @@ export interface TemplateFilters {
   search?: string;
   page?: number;
   limit?: number;
+  categoryId?: string;
 }
 
 export interface Banner {
@@ -159,6 +160,7 @@ class TemplatesBannersApiService {
       if (filters?.search) params.append('search', filters.search);
       if (filters?.page) params.append('page', filters.page.toString());
       if (filters?.limit) params.append('limit', filters.limit.toString());
+      if (filters?.categoryId) params.append('categoryId', filters.categoryId);
 
       console.log('📡 [TEMPLATES API] Fetching templates...');
       const response = await api.get(`/api/mobile/templates?${params.toString()}`);
