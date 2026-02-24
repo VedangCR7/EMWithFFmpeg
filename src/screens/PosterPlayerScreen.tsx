@@ -3074,7 +3074,6 @@ const PosterPlayerScreen: React.FC = () => {
            // Show subscription message for business categories from HomeScreen
            <View style={styles.subscriptionMessageContainer}>
              <Text style={styles.subscriptionMessageTitle}>For Premium images — subscribe Now.</Text>
-             <Text style={styles.subscriptionMessageSubtitle}>Subscribe for full access.</Text>
            </View>
          ) : (
            // Show language filter buttons for all other cases
@@ -3869,13 +3868,6 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(14),
     fontWeight: '600',
     color: '#333',
-    textAlign: 'center',
-    marginBottom: moderateScale(4),
-  },
-  subscriptionMessageSubtitle: {
-    fontSize: moderateScale(12),
-    fontWeight: '400',
-    color: '#666',
     textAlign: 'center',
   },
   languageFilterButton: {
