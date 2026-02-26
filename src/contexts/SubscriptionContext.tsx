@@ -161,7 +161,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
           failed: 0,
           pending: 0,
           totalAmount: 0,
-          monthlySubscriptions: 0,
+          quarterlySubscriptions: 0,
           yearlySubscriptions: 0,
         });
         lastRefreshTimeRef.current = now;
@@ -185,7 +185,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
           hasValidPlan &&
           isNotExpired;
         
-        setIsSubscribed(isActive);
+        setIsSubscribed(Boolean(isActive));
         setSubscriptionStatus(status);
         lastRefreshTimeRef.current = now;
         
@@ -290,7 +290,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       failed: 0,
       pending: 0,
       totalAmount: 0,
-      monthlySubscriptions: 0,
+      quarterlySubscriptions: 0,
       yearlySubscriptions: 0,
     });
     setCurrentUserId(null);

@@ -30,19 +30,25 @@ class AuthService {
       const authToken = await AsyncStorage.getItem('authToken');
       
       console.log('📦 AsyncStorage check - User:', storedUser ? 'Found' : 'Not found');
-      console.log('📦 AsyncStorage check - Token:', authToken ? 'Found' : 'Not found');
+      if (__DEV__) {
+        console.log('📦 AsyncStorage check - Token:', authToken ? 'Found' : 'Not found');
+      }
       
       // Print the full token for debugging
       if (authToken) {
-        console.log('🔑 FULL AUTH TOKEN:', authToken);
-        console.log('🔑 TOKEN LENGTH:', authToken.length);
+        if (__DEV__) {
+          console.log('🔑 FULL AUTH TOKEN:', authToken);
+          console.log('🔑 TOKEN LENGTH:', authToken.length);
+        }
       }
       
       if (storedUser && authToken) {
         this.currentUser = JSON.parse(storedUser);
         console.log('✅ Loaded stored user:', this.currentUser.id || this.currentUser.uid);
         console.log('✅ User email:', this.currentUser.email);
-        console.log('✅ Token length:', authToken.length);
+        if (__DEV__) {
+          console.log('✅ Token length:', authToken.length);
+        }
         
         // Mark as initialized and notify auth state listeners
         this.isInitialized = true;
@@ -68,13 +74,19 @@ class AuthService {
       console.log('💾 Saving user to AsyncStorage...', user.id);
       await AsyncStorage.setItem('currentUser', JSON.stringify(user));
       if (token) {
-        console.log('🔐 Saving auth token to AsyncStorage...');
+        if (__DEV__) {
+          console.log('🔐 Saving auth token to AsyncStorage...');
+        }
         await AsyncStorage.setItem('authToken', token);
-        console.log('✅ Auth token saved successfully');
+        if (__DEV__) {
+          console.log('✅ Auth token saved successfully');
+        }
         
         // Verify token was saved
         const savedToken = await AsyncStorage.getItem('authToken');
-        console.log('🔍 Verified token in storage:', savedToken ? 'YES' : 'NO');
+        if (__DEV__) {
+          console.log('🔍 Verified token in storage:', savedToken ? 'YES' : 'NO');
+        }
       }
       console.log('✅ User data saved to AsyncStorage successfully');
     } catch (error) {
@@ -185,10 +197,12 @@ class AuthService {
           _originalCategory: userData._originalCategory
         });
         console.log('═══════════════════════════════════════════════════════════');
-        console.log('🔑 AUTH TOKEN (auth.ts):');
-        console.log('Token:', response.data.token);
-        console.log('Token Length:', response.data.token?.length || 0);
-        console.log('Token Preview:', response.data.token?.substring(0, 50) + '...');
+        if (__DEV__) {
+          console.log('🔑 AUTH TOKEN (auth.ts):');
+          console.log('Token:', response.data.token);
+          console.log('Token Length:', response.data.token?.length || 0);
+          console.log('Token Preview:', response.data.token?.substring(0, 50) + '...');
+        }
         console.log('═══════════════════════════════════════════════════════════');
         return { success: true, user: userData };
       } else {
@@ -249,10 +263,12 @@ class AuthService {
           _originalCategory: userData._originalCategory
         });
         console.log('═══════════════════════════════════════════════════════════');
-        console.log('🔑 GOOGLE AUTH TOKEN (auth.ts):');
-        console.log('Token:', response.data.token);
-        console.log('Token Length:', response.data.token?.length || 0);
-        console.log('Token Preview:', response.data.token?.substring(0, 50) + '...');
+        if (__DEV__) {
+          console.log('🔑 GOOGLE AUTH TOKEN (auth.ts):');
+          console.log('Token:', response.data.token);
+          console.log('Token Length:', response.data.token?.length || 0);
+          console.log('Token Preview:', response.data.token?.substring(0, 50) + '...');
+        }
         console.log('═══════════════════════════════════════════════════════════');
         return { success: true, user: userData };
       } else {
@@ -444,11 +460,13 @@ class AuthService {
         console.log('   - User Name:', parsed.companyName || parsed.displayName);
       }
       
-      console.log('🔑 authToken in AsyncStorage:', authToken ? 'EXISTS' : 'NOT FOUND');
-      if (authToken) {
-        console.log('🔑 FULL AUTH TOKEN:', authToken);
-        console.log('   - Token Length:', authToken.length);
-        console.log('   - Token Preview:', authToken.substring(0, 30) + '...');
+      if (__DEV__) {
+        console.log('🔑 authToken in AsyncStorage:', authToken ? 'EXISTS' : 'NOT FOUND');
+        if (authToken) {
+          console.log('🔑 FULL AUTH TOKEN:', authToken);
+          console.log('   - Token Length:', authToken.length);
+          console.log('   - Token Preview:', authToken.substring(0, 30) + '...');
+        }
       }
       
       console.log('👤 currentUser in memory:', this.currentUser ? 'EXISTS' : 'NOT FOUND');

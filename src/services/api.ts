@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DeviceEventEmitter } from 'react-native';
 import cacheService from './cacheService';
 import logger from '../utils/logger';
+import { BASE_URL } from '../config/env';
 
 // Event name for token expiration
 export const TOKEN_EXPIRED_EVENT = 'TOKEN_EXPIRED';
@@ -122,9 +123,7 @@ function getCacheConfig(url: string | undefined): { key: string; ttl: number } |
 
 // Create axios instance with the EventMarketers backend URL
 const api = axios.create({
-  // baseURL: 'http://192.168.1.43:3001', // Local development server (Android compatible)
-  // baseURL: 'http://localhost:3001', // Local development server (Web only)
-  baseURL: 'https://eventmarketersbackend.onrender.com', // Production backend server
+  baseURL: BASE_URL, // Uses environment-specific base URL
   timeout: 30000, // 30 seconds timeout for slower connections and server cold starts
   headers: {
     'Content-Type': 'application/json',

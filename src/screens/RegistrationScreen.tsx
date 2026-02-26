@@ -228,7 +228,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
             name: parentName,
             description: `${parentName} business category`,
             icon: '📄',
-            parentCategoryName: null // Mark as business category
+            parentCategoryName: undefined // Mark as business category
           }));
           
           console.log('✅ [REGISTRATION] Business categories extracted:', businessCategories.length);
@@ -547,8 +547,14 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
         displayName: formData.name.trim(),
       });
 
-      // Navigation will be handled automatically by auth state change
-      // No need to show success alert as user will be redirected to home
+      // Handle registration response
+      if (result.requiresVerification) {
+        // Navigate to email verification screen
+        navigation.navigate('EmailVerification', { email: formData.email.trim() });
+      } else {
+        // Navigation will be handled automatically by auth state change
+        // No need to show success alert as user will be redirected to home
+      }
     } catch (error: any) {
       console.error('Registration error:', error);
       

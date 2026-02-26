@@ -90,6 +90,7 @@ export interface AuthResponse {
   };
   message: string;
   errors?: string[]; // For validation errors
+  requiresVerification?: boolean; // Whether email verification is required
 }
 
 /**
@@ -130,14 +131,6 @@ export interface PasswordResetWithCodeRequest {
   code: string;
   newPassword: string;
   confirmPassword: string;
-}
-
-/**
- * Email Verification Request
- * For verifying email address
- */
-export interface EmailVerificationRequest {
-  token: string;
 }
 
 // ========================================
@@ -181,42 +174,86 @@ class LoginAPIsService {
       });
       
       if (response.data.success) {
-        // Store user data and token in auth service
-        console.log('🔍 Registration response data structure:', JSON.stringify(response.data.data, null, 2));
-        const { user, accessToken, token } = response.data.data;
-        const authTokenToSave = accessToken || token; // Backend might return 'token' or 'accessToken'
+        // Handle email verification required response
+        if (response.data.requiresVerification === true) {
+          console.log('📧 Email verification required for registration');
+          return {
+            success: true,
+            data: {
+              user: {} as UserProfile,
+              token: '',
+              expiresIn: 0
+            },
+            message: 'Email verification required',
+            requiresVerification: true
+          };
+        }
         
-        console.log('🔑 accessToken value:', accessToken);
-        console.log('🔑 token value:', token);
-        console.log('🔑 Extracted token from response:', authTokenToSave ? 'YES' : 'NO');
-        console.log('🔑 Token length:', authTokenToSave?.length || 0);
+        // Handle token-based registration (device-only)
+        if (response.data?.data?.token || response.data?.data?.accessToken) {
+          console.log('🔍 Registration response data structure:', JSON.stringify(response.data.data, null, 2));
+          
+          const { user, accessToken, token } = response.data.data;
+          const authTokenToSave = accessToken || token; // Backend might return 'token' or 'accessToken'
+          
+          if (__DEV__) {
+            console.log('🔑 accessToken value:', accessToken);
+            console.log('🔑 token value:', token);
+            console.log('🔑 Extracted token from response:', authTokenToSave ? 'YES' : 'NO');
+            console.log('🔑 Token length:', authTokenToSave?.length || 0);
+          }
+          
+          // Create complete user data by merging backend response with registration data
+          const completeUserData = {
+            ...user,
+            // Add all registration fields that might not be returned by backend
+            displayName: data.displayName || data.companyName,
+            companyName: data.companyName,
+            description: data.description,
+            category: data.category,
+            address: data.address,
+            phoneNumber: data.phoneNumber,
+            alternatePhone: data.alternatePhone,
+            website: data.website,
+            companyLogo: data.companyLogo,
+          };
+          
+          // IMPORTANT: Save token to storage FIRST
+          await authService.saveUserToStorage(completeUserData, authTokenToSave);
+          authService.setCurrentUser(completeUserData);
+          
+          // Reset token expiration flag on successful login
+          resetTokenExpirationFlag();
+          
+          // Notify auth state listeners (this will trigger navigation)
+          authService.notifyAuthStateListeners(completeUserData);
+          
+          console.log('✅ User registration successful and complete data stored');
+          
+          return {
+            success: true,
+            data: {
+              user: completeUserData,
+              token: authTokenToSave || '',
+              expiresIn: 3600 // Default 1 hour
+            },
+            message: 'Registration successful',
+            requiresVerification: false
+          };
+        }
         
-        // Create complete user data by merging backend response with registration data
-        const completeUserData = {
-          ...user,
-          // Add all registration fields that might not be returned by backend
-          displayName: data.displayName || data.companyName,
-          companyName: data.companyName,
-          description: data.description,
-          category: data.category,
-          address: data.address,
-          phoneNumber: data.phoneNumber,
-          alternatePhone: data.alternatePhone,
-          website: data.website,
-          companyLogo: data.companyLogo,
+        // Fallback for unexpected response structure
+        console.log('⚠️ Unexpected registration response structure:', response.data);
+        return {
+          success: true,
+          data: {
+            user: {} as UserProfile,
+            token: '',
+            expiresIn: 0
+          },
+          message: 'Registration completed',
+          requiresVerification: false
         };
-        
-        // IMPORTANT: Save token to storage FIRST
-        await authService.saveUserToStorage(completeUserData, authTokenToSave);
-        authService.setCurrentUser(completeUserData);
-        
-        // Reset token expiration flag on successful login
-        resetTokenExpirationFlag();
-        
-        // Notify auth state listeners (this will trigger navigation)
-        authService.notifyAuthStateListeners(completeUserData);
-        
-        console.log('✅ User registration successful and complete data stored');
       }
       
       return response.data;
@@ -263,12 +300,14 @@ class LoginAPIsService {
         const authTokenToSave = accessToken || token; // Backend might return 'token' or 'accessToken'
         
         console.log('═══════════════════════════════════════════════════════════');
-        console.log('🔑 LOGIN SUCCESSFUL - AUTH TOKEN (loginAPIs.ts):');
-        console.log('accessToken value:', accessToken);
-        console.log('token value:', token);
-        console.log('Final Token Used:', authTokenToSave);
-        console.log('Token Length:', authTokenToSave?.length || 0);
-        console.log('Token Preview:', authTokenToSave?.substring(0, 50) + '...');
+        if (__DEV__) {
+          console.log('🔑 LOGIN SUCCESSFUL - AUTH TOKEN (loginAPIs.ts):');
+          console.log('accessToken value:', accessToken);
+          console.log('token value:', token);
+          console.log('Final Token Used:', authTokenToSave);
+          console.log('Token Length:', authTokenToSave?.length || 0);
+          console.log('Token Preview:', authTokenToSave?.substring(0, 50) + '...');
+        }
         console.log('═══════════════════════════════════════════════════════════');
         console.log('👤 USER INFO FROM LOGIN RESPONSE:');
         console.log('User ID:', user.id);
@@ -575,21 +614,22 @@ class LoginAPIsService {
   // ========================================
   
   /**
-   * Verify email address
+   * Verify email address with OTP code
    * Endpoint: POST /api/mobile/auth/verify-email
-   * Used in: Email verification page
+   * Used in: Email verification screen
    */
-  async verifyEmail(data: EmailVerificationRequest): Promise<{ success: boolean; message: string }> {
+  async verifyEmailCode(data: { email: string; otpCode: string }): Promise<{ success: boolean; message: string; token?: string; user?: any; businessProfile?: any }> {
     try {
-      console.log('📧 Verifying email address');
+      console.log('📧 Verifying email code for:', data.email);
+      console.log('📧 Sending OTP code:', data.otpCode); // Debug log
       
       const response = await api.post('/api/mobile/auth/verify-email', {
-        token: data.token,
+        email: data.email,
+        otpCode: data.otpCode, // Backend expects otpCode, not code
       });
       
       console.log('✅ Email verification successful');
       return response.data;
-      
     } catch (error: any) {
       console.error('❌ Email verification error:', error.response?.data || error.message);
       throw error;
@@ -597,19 +637,20 @@ class LoginAPIsService {
   }
 
   /**
-   * Resend email verification
+   * Resend email verification code
    * Endpoint: POST /api/mobile/auth/resend-verification
-   * Used in: Email verification page
+   * Used in: Email verification screen
    */
-  async resendEmailVerification(): Promise<{ success: boolean; message: string }> {
+  async resendEmailVerification(data: { email: string }): Promise<{ success: boolean; message: string }> {
     try {
-      console.log('📧 Resending email verification');
+      console.log('📧 Resending verification code to:', data.email);
       
-      const response = await api.post('/api/mobile/auth/resend-verification');
+      const response = await api.post('/api/mobile/auth/resend-verification', {
+        email: data.email,
+      });
       
-      console.log('✅ Email verification resent');
+      console.log('✅ Verification code resent');
       return response.data;
-      
     } catch (error: any) {
       console.error('❌ Resend verification error:', error.response?.data || error.message);
       throw error;

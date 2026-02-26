@@ -528,7 +528,18 @@ const GreetingCard: React.FC<GreetingCardProps> = React.memo(({ item, cardWidth,
   }, [item, relatedTemplates, searchQuery, navigation, onCardPress]);
 
   if (!item || !item.thumbnail) {
-    return null;
+    return (
+      <View style={[styles.templateCard, { height: cardWidth, backgroundColor: theme.colors.cardBackground }]}>
+        <View style={[styles.templateImageContainer, { height: cardWidth }]}>
+          <ActivityIndicator 
+            size="large" 
+            color={theme.colors.primary} 
+            style={styles.loadingIndicator}
+          />
+          <Text style={[styles.loadingText, { color: theme.colors.primary }]}>Loading...</Text>
+        </View>
+      </View>
+    );
   }
 
   return (
@@ -4110,6 +4121,11 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
 
   // Memoized renderItem functions for modal FlatLists
   const handleBusinessCategoryPress = useCallback(async (category: BusinessCategory) => {
+    console.log('🔍 [BUSINESS CATEGORY PRESS]', {
+      categoryName: category.name,
+      settingTemplateSource: true
+    });
+    
     const cachedTemplates = businessCategoryPreviews[category.id];
 
     // Navigate immediately if we have cached templates
@@ -4118,7 +4134,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
         selectedPoster: cachedTemplates[0],
         relatedPosters: cachedTemplates.slice(1),
         searchQuery: '',
-        templateSource: 'professional', // Use 'professional' for business categories
+        templateSource: 'professional', // Show subscription message for direct business category access
         businessCategory: category.name,
         posterLimit: 6, // Limit 6 for business categories from HomeScreen
       });
@@ -4140,7 +4156,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
       },
       relatedPosters: firstPoster ? [firstPoster] : [],
       searchQuery: '',
-      templateSource: 'professional', // Use 'professional' for business categories
+      templateSource: 'professional', // Show subscription message for direct business category access
       businessCategory: category.name,
       posterLimit: 200, // Request all posters for business categories from HomeScreen
     });
@@ -6861,6 +6877,17 @@ const styles = StyleSheet.create({
   },
   sectionLoadingIndicator: {
     marginLeft: 8,
+  },
+  loadingIndicator: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: moderateScale(8),
+    fontSize: moderateScale(12),
+    fontWeight: '500',
+    textAlign: 'center',
   },
      templateStat: {
      fontSize: responsiveFontSize.xs,

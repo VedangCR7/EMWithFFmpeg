@@ -335,7 +335,6 @@ const MyBusinessScreen: React.FC = () => {
       selectedPoster: selectedTemplate,
       relatedPosters: relatedTemplates,
       searchQuery: '',
-      templateSource: 'professional',
       businessCategory: userBusinessCategory, // Pass the business category to PosterPlayerScreen
       posterLimit: 200, // Load all business posters, not just 5
     });

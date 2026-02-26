@@ -1,5 +1,5 @@
 {
-  "name": "MarketBrand",
+  "name": "market-brand",
   "version": "0.0.1",
   "private": true,
   "scripts": {
@@ -39,7 +39,7 @@
     "react-native-razorpay": "^2.3.0",
     "react-native-responsive-dimensions": "^3.1.1",
     "react-native-safe-area-context": "^5.5.2",
-    "react-native-screens": "^4.18.0",
+    "react-native-screens": "^4.24.0",
     "react-native-share": "^12.2.1",
     "react-native-vector-icons": "^10.3.0",
     "react-native-video": "^6.16.1",
@@ -49,7 +49,7 @@
     "@babel/core": "^7.25.2",
     "@babel/preset-env": "^7.25.3",
     "@babel/runtime": "^7.25.0",
-    "@react-native-community/cli": "^19.1.1",
+    "@react-native-community/cli": "latest",
     "@react-native-community/cli-platform-android": "19.1.1",
     "@react-native-community/cli-platform-ios": "19.1.1",
     "@react-native/babel-preset": "0.80.2",

@@ -1290,9 +1290,11 @@ const GreetingTemplatesScreen: React.FC = () => {
           <OptimizedImage uri={previewUri} style={styles.categoryImage} resizeMode="cover" />
         ) : (
           <View style={[styles.categoryFallback, { backgroundColor: addOpacityToColor(cardColor, 0.15) }]}>
-            <Text style={[styles.categoryFallbackText, { color: cardColor }]}>
-              {isEmoji ? item.icon : initials}
-            </Text>
+            <ActivityIndicator 
+              size="large" 
+              color={cardColor} 
+              style={styles.categoryLoadingIndicator}
+            />
           </View>
         )}
         <LinearGradient
@@ -1835,6 +1837,11 @@ const styles = StyleSheet.create({
   categoryFallbackText: {
     fontSize: moderateScale(28),
     fontWeight: '700',
+  },
+  categoryLoadingIndicator: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   categoryGradient: {
     position: 'absolute',

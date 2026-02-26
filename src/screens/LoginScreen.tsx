@@ -140,6 +140,13 @@ const LoginScreen: React.FC = ({ navigation }: any) => {
         password: password.trim(),
       });
       
+      // Handle verification requirement
+      if (result.requiresVerification) {
+        // Navigate to email verification screen without storing token
+        navigation.navigate('EmailVerification', { email: email.trim() });
+        return;
+      }
+      
       console.log('✅ Login successful:', result);
       // Navigation will be handled automatically by auth state change
       // No need to show success alert as user will be redirected

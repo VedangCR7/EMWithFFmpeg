@@ -45,6 +45,7 @@ export type RootStackParamList = {
   ForgotPassword: undefined;
   VerifyResetCode: { email: string };
   ResetPassword: { email: string; code: string };
+  EmailVerification: { email: string };
   Splash: undefined;
   PrivacyPolicy: undefined;
 };
@@ -142,6 +143,7 @@ import RegistrationScreen from '../screens/RegistrationScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import VerifyResetCodeScreen from '../screens/VerifyResetCodeScreen';
 import ResetPasswordScreen from '../screens/ResetPasswordScreen';
+import EmailVerificationScreen from '../screens/EmailVerificationScreen';
 import HomeScreen from '../screens/HomeScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import EventsScreen from '../screens/EventsScreen';
@@ -337,7 +339,6 @@ const CustomTabBar = (props: any) => {
           selectedPoster,
           relatedPosters,
           searchQuery: '',
-          templateSource: 'professional' as const,
           businessCategory: response.data.category, // Pass the business category to PosterPlayerScreen
           posterLimit: 200, // Add high limit to ensure more posters are loaded
         };
@@ -1280,6 +1281,11 @@ const AppNavigator = () => {
             <Stack.Screen 
               name="ResetPassword" 
               component={ResetPasswordScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="EmailVerification" 
+              component={EmailVerificationScreen}
               options={{ headerShown: false }}
             />
           </>

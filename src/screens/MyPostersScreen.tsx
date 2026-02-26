@@ -357,7 +357,6 @@ const MyPostersScreen: React.FC = () => {
       selectedPoster: selectedTemplate,
       relatedPosters: relatedTemplates,
       searchQuery: '',
-      templateSource: 'professional',
     });
   };
 

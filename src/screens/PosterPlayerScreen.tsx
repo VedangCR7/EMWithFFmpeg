@@ -13,6 +13,7 @@ import {
   Modal,
   ActivityIndicator,
   InteractionManager,
+  Animated,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
@@ -219,12 +220,22 @@ const RelatedPosterItem: React.FC<RelatedPosterItemProps> = React.memo(({
       activeOpacity={0.8}
     >
       {isSelected && <View style={styles.selectedPosterGlow} pointerEvents="none" />}
-      <OptimizedImage
-        uri={imageUrl}
-        style={styles.relatedPosterImage}
-        resizeMode="cover"
-        mode="thumbnail"
-      />
+      {imageUrl ? (
+        <OptimizedImage
+          uri={imageUrl}
+          style={styles.relatedPosterImage}
+          resizeMode="cover"
+          mode="thumbnail"
+        />
+      ) : (
+        <View style={[styles.relatedPosterImage, { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.05)' }]}>
+          <ActivityIndicator 
+            size="small" 
+            color="#667eea" 
+            style={styles.relatedPosterLoadingIndicator}
+          />
+        </View>
+      )}
       {isSelected && (
         <LinearGradient
           colors={overlayColors}
@@ -290,6 +301,17 @@ const PosterPlayerScreen: React.FC = () => {
   const route = useRoute<PosterPlayerScreenRouteProp>();
   const insets = useSafeAreaInsets();
   
+  const { 
+    selectedPoster: initialPoster, 
+    relatedPosters: initialRelatedPosters,
+    businessCategory,
+    greetingCategory,
+    originScreen,
+    posterLimit,
+    calendarDate,
+    templateSource,
+  } = route.params;
+  
   // Track previous initialPoster ID to detect when a different poster is selected
   const prevInitialPosterIdRef = useRef<string | null>(null);
   const activeCategoryRef = useRef<{ type: 'business' | 'greeting' | 'calendar' | null; value: string | null }>({ type: null, value: null });
@@ -340,16 +362,6 @@ const PosterPlayerScreen: React.FC = () => {
     return size + (scaled - size) * factor;
   }, [scale]);
   
-  const { 
-    selectedPoster: initialPoster, 
-    relatedPosters: initialRelatedPosters,
-    businessCategory,
-    greetingCategory,
-    originScreen,
-    posterLimit,
-    calendarDate,
-    templateSource,
-  } = route.params;
   // Convert initialPoster to Template format if it's a GreetingTemplate
   // GreetingTemplates have content.background which should be used as thumbnail if thumbnail is missing
   const convertedInitialPoster = useMemo(() => {
@@ -394,6 +406,7 @@ const PosterPlayerScreen: React.FC = () => {
   
   const [selectedLanguage, setSelectedLanguage] = useState<string>('all');
   const [isBusinessCategoryLoading, setIsBusinessCategoryLoading] = useState(false);
+  const [isGreetingCategoryLoading, setIsGreetingCategoryLoading] = useState(false);
   const lastAutoDetectedPosterIdRef = useRef<string | null>(null); // Track which poster triggered auto-detection to prevent duplicate detection
   const userSelectedPosterRef = useRef<string | null>(null); // Track user-selected poster (via swipe or click) to prevent reset
   const userManuallySelectedLanguageRef = useRef<boolean>(false); // Track if user manually selected a language (including "All")
@@ -1066,9 +1079,15 @@ const PosterPlayerScreen: React.FC = () => {
       // Use convertedInitialPoster which has thumbnail properly set for GreetingTemplates
       const posterToMatch = convertedInitialPoster;
       
-      // Note: Immediate update is handled by the route param change detection useEffect above
-      // This ensures the correct image is shown immediately when a new poster is selected
+      if (!posterToMatch) {
+        console.warn('⚠️ [GREETING FETCH] No poster to match, skipping fetch');
+        return;
+      }
+      
       try {
+        // Show loading state when starting to fetch
+        setIsGreetingCategoryLoading(true);
+        
         // Normalize category name for search (like HomeScreen does)
         // Convert "Money & Finance" to "money and finance" to match how templates are tagged
         const normalizedCategory = greetingCategory.toLowerCase()
@@ -1085,12 +1104,12 @@ const PosterPlayerScreen: React.FC = () => {
           ...categoryWords, // Individual words
           categoryWords.join(' '), // Combined words
         ].filter((v, i, arr) => arr.indexOf(v) === i); // Remove duplicates
-        
+
+        // Search with multiple variations to catch all related templates
         // Optimized fetching: Use fast search with limits for initial load, then load more progressively
         // First, get initial batch quickly (50 items) for fast initial render
         const initialLimit = 50;
         
-        // Search with multiple variations to catch all related templates
         const searchPromises = [
           greetingTemplatesService.getTemplates({ category: greetingCategory, limit: initialLimit }),
           greetingTemplatesService.searchTemplates(greetingCategory, undefined, initialLimit),
@@ -1953,6 +1972,9 @@ const PosterPlayerScreen: React.FC = () => {
         }
       } catch (error) {
         console.error('❌ [POSTER PLAYER] Error fetching greeting category templates:', error);
+      } finally {
+        // Hide loading state regardless of success or error
+        setIsGreetingCategoryLoading(false);
       }
     };
 
@@ -2949,8 +2971,35 @@ const PosterPlayerScreen: React.FC = () => {
   }, [cardWidth, cardHeight, handlePosterSelect, currentPoster, previewOverlayColors]);
 
 
-  // Skeleton component for loading state
-  const renderSkeletonItem = useCallback(() => {
+  // Animated skeleton component for loading state
+  const SkeletonItem = useCallback(() => {
+    const shimmerAnim = useRef(new Animated.Value(0)).current;
+    
+    useEffect(() => {
+      const shimmerAnimation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(shimmerAnim, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(shimmerAnim, {
+            toValue: 0,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      shimmerAnimation.start();
+      
+      return () => shimmerAnimation.stop();
+    }, [shimmerAnim]);
+    
+    const shimmerTranslateX = shimmerAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [-cardWidth * 1.5, cardWidth * 1.5],
+    });
+    
     return (
       <View
         style={[
@@ -2960,18 +3009,29 @@ const PosterPlayerScreen: React.FC = () => {
             height: cardHeight,
             backgroundColor: '#f0f0f0',
             borderRadius: moderateScale(8),
+            overflow: 'hidden',
           }
         ]}
       >
-        <View
+        {/* Shimmer animation overlay */}
+        <Animated.View
           style={[
-            styles.skeletonOverlay,
+            styles.skeletonShimmer,
             {
-              backgroundColor: '#e0e0e0',
-              borderRadius: moderateScale(8),
-            }
+              transform: [{ translateX: shimmerTranslateX }],
+            },
           ]}
         />
+        {/* Placeholder content structure */}
+        <View style={styles.skeletonContent}>
+          {/* Main image area */}
+          <View style={styles.skeletonImage} />
+          {/* Text placeholder at bottom */}
+          <View style={styles.skeletonTextContainer}>
+            <View style={[styles.skeletonTextLine, { width: '70%' }]} />
+            <View style={[styles.skeletonTextLine, { width: '50%', marginTop: 4 }]} />
+          </View>
+        </View>
       </View>
     );
   }, [cardWidth, cardHeight]);
@@ -2980,6 +3040,11 @@ const PosterPlayerScreen: React.FC = () => {
   const skeletonData = useMemo(() => {
     return Array.from({ length: 6 }, (_, index) => ({ id: `skeleton-${index}` }));
   }, []);
+
+  // Render skeleton item for FlatList
+  const renderSkeletonItem = useCallback(() => {
+    return <SkeletonItem />;
+  }, [SkeletonItem]);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.gradient[0] || '#e8e8e8' }]}>
@@ -3165,7 +3230,7 @@ const PosterPlayerScreen: React.FC = () => {
 
          {/* Compact Related Posters Section */}
         <View style={styles.relatedSection}>
-           {isBusinessCategoryLoading ? (
+           {isBusinessCategoryLoading || isGreetingCategoryLoading ? (
              <FlatList
                data={skeletonData}
                renderItem={renderSkeletonItem}
@@ -3630,6 +3695,11 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  relatedPosterLoadingIndicator: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   selectedPosterBadge: {
     position: 'absolute',
     bottom: moderateScale(4),
@@ -3702,15 +3772,6 @@ const styles = StyleSheet.create({
     borderWidth: moderateScale(0.5),
     borderColor: 'rgba(255,255,255,0.15)',
     marginBottom: moderateScale(6),
-  },
-  skeletonOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: '#e0e0e0',
-    borderRadius: moderateScale(8),
   },
   serviceFilterContainer: {
     flexDirection: 'row',
@@ -3961,6 +4022,43 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: moderateScale(12),
     fontWeight: '600',
+  },
+  // Enhanced skeleton loader styles with shimmer animation
+  skeletonContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    overflow: 'hidden',
+    borderRadius: moderateScale(8),
+  },
+  skeletonShimmer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  skeletonContent: {
+    flex: 1,
+    padding: moderateScale(4),
+  },
+  skeletonImage: {
+    flex: 1,
+    backgroundColor: '#e8e8e8',
+    borderRadius: moderateScale(6),
+    marginBottom: moderateScale(4),
+  },
+  skeletonTextContainer: {
+    paddingHorizontal: moderateScale(2),
+  },
+  skeletonTextLine: {
+    height: moderateScale(8),
+    backgroundColor: '#e0e0e0',
+    borderRadius: moderateScale(4),
+    marginBottom: moderateScale(2),
   },
 });
 

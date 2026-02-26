@@ -1,10 +1,7 @@
 // EventMarketers Backend API Configuration
+import { API_CONFIG } from '../config/env';
 
-export const API_CONFIG = {
-  BASE_URL: 'http://192.168.1.22:3001', // Local backend for testing (Android compatible)
-  TIMEOUT: 30000, // 30 seconds
-  VERSION: '1.0.0',
-};
+export { API_CONFIG };
 
 // API Endpoints
 export const API_ENDPOINTS = {

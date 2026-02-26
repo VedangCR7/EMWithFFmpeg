@@ -54,7 +54,9 @@ class TransactionHistoryService {
         console.log('📡 Endpoint:', endpoint);
         console.log('🔗 Full URL:', api.defaults.baseURL + endpoint);
         console.log('📤 Request Method: GET');
-        console.log('🔑 Auth Token:', currentUser?.token ? '✅ Present (length: ' + currentUser.token.length + ')' : '❌ Missing');
+        if (__DEV__) {
+          console.log('🔑 Auth Token:', currentUser?.token ? '✅ Present (length: ' + currentUser.token.length + ')' : '❌ Missing');
+        }
         console.log('⏰ Request Time:', new Date().toISOString());
         console.log('--------------------------------------------------------------------------------');
         

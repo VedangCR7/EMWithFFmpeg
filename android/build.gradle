@@ -2,7 +2,7 @@ buildscript {
     ext {
         buildToolsVersion = "35.0.0"
         minSdkVersion = 24
-        compileSdkVersion = 35  // Required by AndroidX libraries
+        compileSdkVersion = 36  // Required by AndroidX libraries
         targetSdkVersion = 35
         // NDK r28+ aligns libraries to 16 KB by default, but AGP 8.5.1+ handles it automatically
         // Keep r25 for compatibility with React Native 0.80.2
