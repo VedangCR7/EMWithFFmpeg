@@ -38,6 +38,17 @@ export interface CreateBusinessProfileData {
   logo?: string;                   // Alternative logo field name
 }
 
+export interface BusinessProfileTransaction {
+  id: string;
+  orderId: string;
+  paymentId: string;
+  amount: number;
+  currency: string;
+  status: 'success' | 'failed' | 'pending' | 'cancelled';
+  createdAt: string;
+  verifiedAt?: string;
+}
+
 class BusinessProfileService {
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache
 
@@ -788,6 +799,91 @@ class BusinessProfileService {
       
       // For other errors, assume payment is required for safety
       return { hasPaid: false, message: 'Unable to verify payment status' };
+    }
+  }
+
+  // Get business profile transaction history
+  async getTransactionHistory(page = 1, limit = 10): Promise<{
+    success: boolean;
+    data: BusinessProfileTransaction[];
+    pagination: {
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    };
+  }> {
+    try {
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id;
+
+      if (!userId) {
+        console.log('⚠️ No user ID available, cannot fetch business profile transactions');
+        return {
+          success: false,
+          data: [],
+          pagination: {
+            total: 0,
+            page: 1,
+            limit: 10,
+            totalPages: 0,
+          },
+        };
+      }
+
+      console.log('🔍 Fetching business profile transaction history for user:', userId);
+
+      const response = await api.get('/api/mobile/business-profile/transactions', {
+        params: { page, limit },
+      });
+
+      if (response.data.success) {
+        const transactions = response.data.data || [];
+        const pagination = response.data.pagination || {
+          total: transactions.length,
+          page: 1,
+          limit: 10,
+          totalPages: 1,
+        };
+
+        console.log('✅ Retrieved business profile transactions:', transactions.length);
+        return {
+          success: true,
+          data: transactions,
+          pagination,
+        };
+      } else {
+        console.log('⚠️ Business profile transactions API returned unsuccessful response');
+        return {
+          success: false,
+          data: [],
+          pagination: {
+            total: 0,
+            page: 1,
+            limit: 10,
+            totalPages: 0,
+          },
+        };
+      }
+    } catch (error: any) {
+      console.error('❌ Error fetching business profile transaction history:', error);
+
+      // If it's a 401 error, return empty history instead of throwing
+      if (error.response?.status === 401) {
+        console.log('⚠️ Business profile transaction history requires authentication, returning empty history');
+        return {
+          success: false,
+          data: [],
+          pagination: {
+            total: 0,
+            page: 1,
+            limit: 10,
+            totalPages: 0,
+          },
+        };
+      }
+
+      throw error;
     }
   }
 

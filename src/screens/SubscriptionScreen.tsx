@@ -487,27 +487,30 @@ const SubscriptionScreen: React.FC = () => {
         step: error.step,
         reason: error.reason
       });
-      
-      // Record failed transaction
-      try {
-        await addTransaction({
-          paymentId: 'pay_failed_' + Date.now(),
-          orderId: 'order_failed_' + Date.now(),
-          amount: amountInRupees,
-          currency: 'INR',
-          status: 'failed',
-          plan: selectedPlan,
-          planName: currentPlan.name,
-          description: `${currentPlan.name} Subscription - Failed`,
-          method: 'razorpay',
-          metadata: {
-            email: currentUser?.email || 'user@example.com',
-            contact: currentUser?.phoneNumber || '9999999999',
-            name: currentUser?.name || 'User Name',
-          },
-        });
-      } catch (txnError) {
-        console.error('Error recording failed transaction:', txnError);
+      // Record failed transaction only for actual errors, not cancellation
+      if (error.code === 'PAYMENT_CANCELLED') {
+        // Do not record transaction for user cancellation
+      } else {
+        try {
+          await addTransaction({
+            paymentId: 'pay_failed_' + Date.now(),
+            orderId: 'order_failed_' + Date.now(),
+            amount: amountInRupees,
+            currency: 'INR',
+            status: 'failed',
+            plan: selectedPlan,
+            planName: currentPlan.name,
+            description: `${currentPlan.name} Subscription - Failed`,
+            method: 'razorpay',
+            metadata: {
+              email: currentUser?.email || 'user@example.com',
+              contact: currentUser?.phoneNumber || '9999999999',
+              name: currentUser?.name || 'User Name',
+            },
+          });
+        } catch (txnError) {
+          console.error('Error recording failed transaction:', txnError);
+        }
       }
       
       if (error.code === 'PAYMENT_CANCELLED') {

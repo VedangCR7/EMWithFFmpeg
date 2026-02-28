@@ -532,14 +532,16 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
 
       console.log('Registering user with data:', registrationData);
       
+      console.log('api', registrationData);
+      
       const result = await loginAPIs.registerUser({
         email: formData.email.trim(),
         password: formData.password.trim(),
         companyName: formData.name.trim(),
         phoneNumber: formData.phone.trim(),
         description: formData.description.trim(),
-        category: formData.category.trim(), // Main category
-        subCategory: formData.subcategory.trim(), // User's selected subcategory
+        category: formData.category.trim(),
+        subCategory: formData.subcategory.trim(),
         address: formData.address.trim(),
         alternatePhone: formData.alternatePhone.trim(),
         website: formData.website.trim(),
@@ -547,13 +549,13 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
         displayName: formData.name.trim(),
       });
 
-      // Handle registration response
+      console.log('Response', result);
+
+      // Handle email verification required
       if (result.requiresVerification) {
-        // Navigate to email verification screen
+        console.log('📧 [REGISTRATION] Email verification required, navigating to EmailVerificationScreen');
         navigation.navigate('EmailVerification', { email: formData.email.trim() });
-      } else {
-        // Navigation will be handled automatically by auth state change
-        // No need to show success alert as user will be redirected to home
+        return;
       }
     } catch (error: any) {
       console.error('Registration error:', error);

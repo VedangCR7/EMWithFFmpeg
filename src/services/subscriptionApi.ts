@@ -390,7 +390,7 @@ class SubscriptionApiService {
       // For now, simulate renewal
       console.log('Simulating subscription renewal');
       
-      const result = {
+      const result: SubscriptionResponse = {
         success: true,
         data: {
           isActive: true,
@@ -432,15 +432,32 @@ class SubscriptionApiService {
 
       const response = await api.get('/api/mobile/subscriptions/history');
       
+      console.log('📡 Subscription history API response:', JSON.stringify(response.data, null, 2));
+      
+      // Handle different response structures
+      let paymentsArray = [];
+      if (response.data.data && Array.isArray(response.data.data)) {
+        // Direct array in data
+        paymentsArray = response.data.data;
+        console.log('✅ Using response.data.data as payments array');
+      } else if (response.data.data && response.data.data.payments && Array.isArray(response.data.data.payments)) {
+        // Nested payments array
+        paymentsArray = response.data.data.payments;
+        console.log('✅ Using response.data.data.payments as payments array');
+      } else {
+        console.warn('⚠️ Unexpected response structure for subscription history');
+        paymentsArray = [];
+      }
+      
       // Transform the response to match expected format
-      const transformedData = response.data.data.payments.map((payment: any) => ({
+      const transformedData = paymentsArray.map((payment: any) => ({
         id: payment.id,
         planId: payment.plan,
         planName: payment.plan === 'quarterly_pro' ? 'Quarterly Pro' : 'Yearly Pro',
         amount: payment.amount,
         currency: payment.currency,
         status: payment.status.toLowerCase(),
-        createdAt: payment.paidAt,
+        createdAt: payment.paidAt || payment.createdAt,
         paymentMethod: payment.paymentMethod
       }));
 

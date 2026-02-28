@@ -19,8 +19,12 @@ const EmailVerificationScreen: React.FC<Props> = ({ navigation, route }) => {
   const { email } = route.params;
 
   const handleVerify = useCallback(async (code: string) => {
+    console.log('api', { email, otpCode: code });
+    
     // Call email verification API
     const response = await loginAPIs.verifyEmailCode({ email, otpCode: code });
+    
+    console.log('Response', response);
     
     if (response.success && response.token) {
       // Save token and user data
@@ -37,7 +41,11 @@ const EmailVerificationScreen: React.FC<Props> = ({ navigation, route }) => {
   }, [email, navigation]);
 
   const handleResend = useCallback(async () => {
+    console.log('api', { email });
+    
     await loginAPIs.resendEmailVerification({ email });
+    
+    console.log('Response', 'Resend requested');
   }, [email]);
 
   return (

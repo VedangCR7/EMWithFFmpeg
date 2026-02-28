@@ -17,12 +17,21 @@ const VerifyResetCodeScreen: React.FC<Props> = ({ navigation, route }) => {
   const { email } = route.params;
 
   const handleVerify = useCallback(async (code: string) => {
+    console.log('api', { email, code });
+    
     await loginAPIs.verifyResetCode({ email, code });
+    
+    console.log('Response', 'Code verified');
+    
     navigation.navigate('ResetPassword', { email, code });
   }, [email, navigation]);
 
   const handleResend = useCallback(async () => {
+    console.log('api', { email });
+    
     await loginAPIs.requestPasswordReset({ email });
+    
+    console.log('Response', 'Reset requested');
   }, [email]);
 
   return (

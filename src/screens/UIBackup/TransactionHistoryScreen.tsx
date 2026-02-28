@@ -17,11 +17,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { useTheme } from '../context/ThemeContext';
-import { BusinessProfileTransaction } from '../services/businessProfile';
 import { Transaction } from '../services/transactionHistory';
-import businessProfileService from '../services/businessProfile';
-import subscriptionApi from '../services/subscriptionApi';
-import authService from '../services/auth';
 
 // Compact spacing multiplier to reduce all spacing (matching HomeScreen)
 const COMPACT_MULTIPLIER = 0.5;
@@ -57,23 +53,13 @@ const responsiveFontSize = {
   xxxl: moderateScale(isSmallScreen ? 14 : isMediumScreen ? 16 : 18),
 };
 
-type FilterType = 'all' | 'success' | 'failed' | 'pending' | 'business_profile' | 'subscription';
+type FilterType = 'all' | 'success' | 'failed' | 'pending';
 
 const TransactionHistoryScreen: React.FC = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const { transactions, transactionStats, refreshTransactions } = useSubscription();
   const { theme, isDarkMode } = useTheme();
-  
-  // Business profile transaction state
-  const [transactions, setTransactions] = useState<BusinessProfileTransaction[]>([]);
-  const [subscriptionTransactions, setSubscriptionTransactions] = useState<any[]>([]);
-  const [pagination, setPagination] = useState({
-    total: 0,
-    page: 1,
-    limit: 10,
-    totalPages: 0,
-  });
-  const [hasMore, setHasMore] = useState(true);
   
   // Dynamic dimensions for responsive layout (matching HomeScreen)
   const [dimensions, setDimensions] = useState(() => {
@@ -132,133 +118,43 @@ const TransactionHistoryScreen: React.FC = () => {
   const [filter, setFilter] = useState<FilterType>('all');
   const [showStats, setShowStats] = useState(true);
 
-  // Fetch business profile transactions
-  const fetchTransactions = async (page = 1, append = false) => {
-    try {
-      console.log('🔄 Fetching business profile transactions, page:', page);
-      const result = await businessProfileService.getTransactionHistory(page, 10);
-
-      if (result.success) {
-        // Ensure result.data is always an array
-        const transactionData = Array.isArray(result.data) ? result.data : [];
-        if (append) {
-          setTransactions(prev => [...prev, ...transactionData]);
-        } else {
-          setTransactions(transactionData);
-        }
-        setPagination(result.pagination);
-        setHasMore(page < result.pagination.totalPages);
-        console.log('✅ Business profile transactions fetched:', transactionData.length);
-      } else {
-        console.log('⚠️ No business profile transactions found');
-        if (!append) {
-          setTransactions([]);
-        }
-      }
-    } catch (error) {
-      console.error('❌ Error fetching business profile transactions:', error);
-      if (!append) {
-        setTransactions([]);
-      }
-    }
-  };
-
-  // Fetch subscription transactions
-  const fetchSubscriptionTransactions = async () => {
-    try {
-      console.log('🔄 Fetching subscription transactions');
-      console.log('🔍 Checking subscription transactions - User authenticated:', !!authService.getCurrentUser(), 'User ID:', authService.getCurrentUser()?.id);
-      const result = await subscriptionApi.getHistory();
-      console.log('📊 Subscription API result:', result);
-      console.log('📡 Subscription API response:', JSON.stringify(result, null, 2));
-
-      if (result.success) {
-        console.log('✅ Subscription API returned success with data:', result.data?.length || 0, 'transactions');
-        setSubscriptionTransactions(result.data || []);
-        console.log('✅ Subscription transactions set in state:', (result.data || []).length);
-      } else {
-        console.log('⚠️ Subscription API returned unsuccessful response:', result.message);
-        setSubscriptionTransactions([]);
-      }
-    } catch (error) {
-      console.error('❌ Error fetching subscription transactions:', error);
-      setSubscriptionTransactions([]);
-    }
-  };
-
+  // Debug logging on mount and when transactions change
   useEffect(() => {
     console.log('🏦 TransactionHistoryScreen - Mounted');
-    console.log('🏦 Business profile transactions:', transactions.length);
-    console.log('🏦 Subscription transactions:', subscriptionTransactions.length);
+    console.log('🏦 Transactions from context:', transactions.length);
+    console.log('🏦 Transactions data:', JSON.stringify(transactions, null, 2));
+    console.log('🏦 Stats from context:', transactionStats);
     
     // Auto-refresh transactions on mount
-    if (transactions.length === 0 && subscriptionTransactions.length === 0) {
+    if (transactions.length === 0) {
       console.log('🔄 No transactions found, triggering refresh...');
-      fetchTransactions();
-      fetchSubscriptionTransactions();
+      refreshTransactions();
     }
   }, []);
 
-  // Combine business profile and subscription transactions
-  const allTransactions = [
-    ...transactions.map(t => ({ ...t, type: 'business_profile' as const })),
-    ...subscriptionTransactions.map(t => ({ ...t, type: 'subscription' as const }))
-  ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-  // Calculate transaction statistics
-  const transactionStats = {
-    total: allTransactions.length,
-    successful: allTransactions.filter(t => t.status === 'success').length,
-    failed: allTransactions.filter(t => t.status === 'failed').length,
-    pending: allTransactions.filter(t => t.status === 'pending').length,
-    totalAmount: allTransactions.reduce((sum, t) => sum + (t.amount || 0), 0),
-    quarterlySubscriptions: subscriptionTransactions.filter(t => t.planName?.toLowerCase().includes('quarterly')).length,
-    yearlySubscriptions: subscriptionTransactions.filter(t => t.planName?.toLowerCase().includes('yearly')).length,
-  };
-
   // Filter transactions based on selected filter
-  const filteredTransactions = allTransactions.filter(transaction => {
+  const filteredTransactions = transactions.filter(transaction => {
     if (filter === 'all') return true;
-    if (filter === 'business_profile') return transaction.type === 'business_profile';
-    if (filter === 'subscription') return transaction.type === 'subscription';
     return transaction.status === filter;
-  });
-
-  console.log('🔄 Combined transactions:', {
-    businessProfile: transactions?.length || 0,
-    subscription: subscriptionTransactions?.length || 0,
-    total: allTransactions?.length || 0
   });
 
   // Handle refresh
   const onRefresh = async () => {
     console.log('================================================================================');
-    console.log('🔄🔄🔄 MANUAL REFRESH TRIGGERED BY USER - ALL TRANSACTIONS 🔄🔄🔄');
+    console.log('🔄🔄🔄 MANUAL REFRESH TRIGGERED BY USER - TRANSACTION HISTORY 🔄🔄🔄');
     console.log('================================================================================');
     console.log('⏰ Refresh Time:', new Date().toISOString());
     setRefreshing(true);
-    await Promise.all([
-      fetchTransactions(1, false),
-      fetchSubscriptionTransactions()
-    ]);
+    await refreshTransactions();
     setRefreshing(false);
     console.log('================================================================================');
-    console.log('✅✅✅ MANUAL REFRESH COMPLETED - ALL TRANSACTIONS ✅✅✅');
+    console.log('✅✅✅ MANUAL REFRESH COMPLETED - TRANSACTION HISTORY ✅✅✅');
     console.log('================================================================================');
-  };
-
-  // Handle load more
-  const handleLoadMore = () => {
-    if (hasMore && !refreshing) {
-      const nextPage = pagination.page + 1;
-      console.log('📄 Loading more business profile transactions, page:', nextPage);
-      fetchTransactions(nextPage, true);
-    }
   };
 
   // Format date
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
+  const formatDate = (timestamp: number) => {
+    const date = new Date(timestamp);
     return date.toLocaleDateString('en-IN', {
       day: '2-digit',
       month: 'short',
@@ -303,7 +199,7 @@ const TransactionHistoryScreen: React.FC = () => {
 
 
   // Render transaction item
-  const renderTransactionItem = ({ item }: { item: any }) => (
+  const renderTransactionItem = ({ item }: { item: Transaction }) => (
     <View style={[styles.transactionCard, { 
       backgroundColor: theme.colors.cardBackground,
       borderRadius: dynamicModerateScale(12),
@@ -319,13 +215,13 @@ const TransactionHistoryScreen: React.FC = () => {
             fontSize: isTabletDevice ? dynamicModerateScale(11) : dynamicModerateScale(10),
             marginBottom: dynamicModerateScale(2),
           }]}>
-            {item.type === 'business_profile' ? 'Business Profile Payment' : item.planName || 'Subscription Payment'}
+            {item.planName}
           </Text>
           <Text style={[styles.transactionDate, { 
             color: theme.colors.textSecondary,
             fontSize: isTabletDevice ? dynamicModerateScale(8) : dynamicModerateScale(7.5),
           }]}>
-            {formatDate(item.createdAt)}
+            {formatDate(item.timestamp)}
           </Text>
         </View>
         <View style={styles.transactionAmount}>
@@ -363,7 +259,7 @@ const TransactionHistoryScreen: React.FC = () => {
             color: theme.colors.text,
             fontSize: isTabletDevice ? dynamicModerateScale(8) : dynamicModerateScale(7.5),
             marginLeft: dynamicModerateScale(6),
-          }]}>{item.paymentId || item.id}</Text>
+          }]}>{item.paymentId}</Text>
         </View>
         <View style={styles.detailRow}>
           <Text style={[styles.detailLabel, { 
@@ -374,30 +270,30 @@ const TransactionHistoryScreen: React.FC = () => {
             color: theme.colors.text,
             fontSize: isTabletDevice ? dynamicModerateScale(8) : dynamicModerateScale(7.5),
             marginLeft: dynamicModerateScale(6),
-          }]}>{item.orderId || 'N/A'}</Text>
+          }]}>{item.orderId}</Text>
         </View>
         <View style={styles.detailRow}>
           <Text style={[styles.detailLabel, { 
             color: theme.colors.textSecondary,
             fontSize: isTabletDevice ? dynamicModerateScale(8) : dynamicModerateScale(7.5),
-          }]}>Currency:</Text>
+          }]}>Method:</Text>
           <Text style={[styles.detailValue, { 
             color: theme.colors.text,
             fontSize: isTabletDevice ? dynamicModerateScale(8) : dynamicModerateScale(7.5),
             marginLeft: dynamicModerateScale(6),
-          }]}>{item.currency}</Text>
+          }]}>{item.method}</Text>
         </View>
-        {item.type === 'business_profile' && item.verifiedAt && (
+        {item.metadata?.email && (
           <View style={styles.detailRow}>
             <Text style={[styles.detailLabel, { 
               color: theme.colors.textSecondary,
               fontSize: isTabletDevice ? dynamicModerateScale(8) : dynamicModerateScale(7.5),
-            }]}>Verified:</Text>
+            }]}>Email:</Text>
             <Text style={[styles.detailValue, { 
               color: theme.colors.text,
               fontSize: isTabletDevice ? dynamicModerateScale(8) : dynamicModerateScale(7.5),
               marginLeft: dynamicModerateScale(6),
-            }]}>{formatDate(item.verifiedAt)}</Text>
+            }]}>{item.metadata.email}</Text>
           </View>
         )}
       </View>
@@ -411,7 +307,7 @@ const TransactionHistoryScreen: React.FC = () => {
       marginBottom: dynamicModerateScale(8),
     }]}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        {(['all', 'success', 'failed', 'pending', 'business_profile', 'subscription'] as FilterType[]).map((filterType) => (
+        {(['all', 'success', 'failed', 'pending'] as FilterType[]).map((filterType) => (
           <TouchableOpacity
             key={filterType}
             style={[
@@ -434,7 +330,7 @@ const TransactionHistoryScreen: React.FC = () => {
                 fontSize: isTabletDevice ? dynamicModerateScale(9) : dynamicModerateScale(8),
               }
             ]}>
-              {filterType === 'business_profile' ? 'Business Profile' : filterType === 'subscription' ? 'Subscription' : filterType.charAt(0).toUpperCase() + filterType.slice(1)}
+              {filterType.charAt(0).toUpperCase() + filterType.slice(1)}
             </Text>
           </TouchableOpacity>
         ))}
@@ -687,12 +583,8 @@ const TransactionHistoryScreen: React.FC = () => {
                 paddingHorizontal: dynamicModerateScale(20),
               }]}>
                 {filter === 'all' 
-                  ? 'You haven\'t made any payments yet.' 
-                  : filter === 'business_profile'
-                    ? 'No business profile transactions found.'
-                    : filter === 'subscription'
-                      ? 'No subscription transactions found.'
-                      : `No ${filter} transactions found.`
+                  ? 'You haven\'t made any transactions yet.' 
+                  : `No ${filter} transactions found.`
                 }
               </Text>
             </View>
@@ -703,15 +595,6 @@ const TransactionHistoryScreen: React.FC = () => {
               keyExtractor={(item) => item.id}
               scrollEnabled={false}
               showsVerticalScrollIndicator={false}
-              onEndReached={handleLoadMore}
-              onEndReachedThreshold={0.1}
-              ListFooterComponent={
-                hasMore && !refreshing ? (
-                  <View style={{ paddingVertical: 20, alignItems: 'center' }}>
-                    <Text style={{ color: theme.colors.textSecondary }}>Loading more...</Text>
-                  </View>
-                ) : null
-              }
               contentContainerStyle={[styles.transactionsList, {
                 gap: 0, // Already handled in renderTransactionItem
               }]}
