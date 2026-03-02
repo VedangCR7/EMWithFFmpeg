@@ -69,7 +69,10 @@ class CalendarApiService {
     if (forceRefresh) {
       try {
         // Fetch directly without using cache
-        const response = await api.get(`/api/mobile/calendar/posters/${date}`);
+        const endpoint = `/api/mobile/calendar/posters/${date}`;
+        console.log('📅 [CALENDAR API] Force refresh - Endpoint:', endpoint);
+        const response = await api.get(endpoint);
+        console.log('📅 [CALENDAR API] Force refresh - Response:', response.data);
 
         if (response.data.success) {
           const posters = response.data.data?.posters || response.data.posters || [];
@@ -138,6 +141,8 @@ class CalendarApiService {
         async () => {
 
           const response = await api.get(`/api/mobile/calendar/posters/${date}`);
+          console.log('📅 [CALENDAR API] Normal fetch - Endpoint:', `/api/mobile/calendar/posters/${date}`);
+          console.log('📅 [CALENDAR API] Normal fetch - Response:', response.data);
 
           if (response.data.success) {
             const posters = response.data.data?.posters || response.data.posters || [];
@@ -227,6 +232,8 @@ class CalendarApiService {
         async () => {
 
           const response = await api.get(`/api/mobile/calendar/posters/month/${year}/${month}`);
+          console.log('📅 [CALENDAR API] Month fetch - Endpoint:', `/api/mobile/calendar/posters/month/${year}/${month}`);
+          console.log('📅 [CALENDAR API] Month fetch - Response:', response.data);
 
           if (response.data.success) {
             const posters = response.data.data?.posters || response.data.posters || [];

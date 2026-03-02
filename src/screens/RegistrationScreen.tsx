@@ -70,6 +70,8 @@ const FloatingInput = React.memo(({
   returnKeyType = 'next',
   onSubmitEditing,
   blurOnSubmit = false,
+  autoCapitalize = 'sentences',
+  autoCorrect = true,
 }: {
   value: string;
   onChangeText: (text: string) => void;
@@ -87,6 +89,8 @@ const FloatingInput = React.memo(({
   returnKeyType?: 'done' | 'go' | 'next' | 'search' | 'send';
   onSubmitEditing?: () => void;
   blurOnSubmit?: boolean;
+  autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
+  autoCorrect?: boolean;
 }) => (
   <View style={styles.inputContainer}>
     <TextInput
@@ -113,6 +117,8 @@ const FloatingInput = React.memo(({
       returnKeyType={returnKeyType}
       onSubmitEditing={onSubmitEditing}
       blurOnSubmit={blurOnSubmit}
+      autoCapitalize={autoCapitalize}
+      autoCorrect={autoCorrect}
     />
   </View>
 ));
@@ -341,6 +347,24 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
   };
 
   const handleInputChange = (field: string, value: string) => {
+    // Handle email field - convert to lowercase and trim
+    if (field === 'email') {
+      const lowercasedEmail = value.toLowerCase().trim();
+      setFormData(prev => ({
+        ...prev,
+        [field]: lowercasedEmail,
+      }));
+
+      // Clear validation error when user starts typing
+      if (validationErrors.email) {
+        setValidationErrors(prev => ({
+          ...prev,
+          email: '',
+        }));
+      }
+      return;
+    }
+
     // Real-time phone validation with digit count
     if (field === 'phone') {
       // Only allow digits
@@ -1053,6 +1077,8 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                     field="email"
                     placeholder="Enter email address *"
                     keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
                     focusedField={focusedField}
                     setFocusedField={setFocusedField}
                     theme={theme}
