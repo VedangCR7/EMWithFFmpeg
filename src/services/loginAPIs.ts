@@ -34,6 +34,8 @@ export interface UserRegistrationRequest {
   companyLogo?: string;
   // Optional display name
   displayName?: string;
+  // Optional promo code
+  promoCode?: string;
 }
 
 /**
@@ -138,11 +140,11 @@ export interface PasswordResetWithCodeRequest {
 // ========================================
 
 class LoginAPIsService {
-  
+
   // ========================================
   // REGISTRATION API
   // ========================================
-  
+
   /**
    * Register a new user
    * Endpoint: POST /api/mobile/auth/register
@@ -152,11 +154,11 @@ class LoginAPIsService {
   async registerUser(data: UserRegistrationRequest): Promise<AuthResponse> {
     try {
       console.log('📝 Registering new user:', data.email);
-      
+
       // Clear all caches before registration to ensure fresh start
       console.log('🗑️ Clearing all caches before registration...');
       await this.clearAllCaches();
-      
+
       const response = await api.post('/api/mobile/auth/register', {
         email: data.email,
         password: data.password,
@@ -171,8 +173,9 @@ class LoginAPIsService {
         website: data.website,
         companyLogo: data.companyLogo,
         displayName: data.displayName,
+        promoCode: data.promoCode,
       });
-      
+
       if (response.data.success) {
         // Handle email verification required response
         if (response.data.requiresVerification === true) {
@@ -188,21 +191,21 @@ class LoginAPIsService {
             requiresVerification: true
           };
         }
-        
+
         // Handle token-based registration (device-only)
         if (response.data?.data?.token || response.data?.data?.accessToken) {
           console.log('🔍 Registration response data structure:', JSON.stringify(response.data.data, null, 2));
-          
+
           const { user, accessToken, token } = response.data.data;
           const authTokenToSave = accessToken || token; // Backend might return 'token' or 'accessToken'
-          
+
           if (__DEV__) {
             console.log('🔑 accessToken value:', accessToken);
             console.log('🔑 token value:', token);
             console.log('🔑 Extracted token from response:', authTokenToSave ? 'YES' : 'NO');
             console.log('🔑 Token length:', authTokenToSave?.length || 0);
           }
-          
+
           // Create complete user data by merging backend response with registration data
           const completeUserData = {
             ...user,
@@ -217,19 +220,19 @@ class LoginAPIsService {
             website: data.website,
             companyLogo: data.companyLogo,
           };
-          
+
           // IMPORTANT: Save token to storage FIRST
           await authService.saveUserToStorage(completeUserData, authTokenToSave);
           authService.setCurrentUser(completeUserData);
-          
+
           // Reset token expiration flag on successful login
           resetTokenExpirationFlag();
-          
+
           // Notify auth state listeners (this will trigger navigation)
           authService.notifyAuthStateListeners(completeUserData);
-          
+
           console.log('✅ User registration successful and complete data stored');
-          
+
           return {
             success: true,
             data: {
@@ -241,7 +244,7 @@ class LoginAPIsService {
             requiresVerification: false
           };
         }
-        
+
         // Fallback for unexpected response structure
         console.log('⚠️ Unexpected registration response structure:', response.data);
         return {
@@ -255,9 +258,9 @@ class LoginAPIsService {
           requiresVerification: false
         };
       }
-      
+
       return response.data;
-      
+
     } catch (error: any) {
       console.error('❌ Registration error:', error.response?.data || error.message);
       throw error;
@@ -267,7 +270,7 @@ class LoginAPIsService {
   // ========================================
   // LOGIN API
   // ========================================
-  
+
   /**
    * Login existing user
    * Endpoint: POST /api/mobile/auth/login
@@ -276,29 +279,29 @@ class LoginAPIsService {
   async loginUser(data: UserLoginRequest): Promise<AuthResponse> {
     try {
       console.log('🔐 Logging in user:', data.email);
-      
+
       // Clear all caches before login to ensure fresh data for new user
       console.log('🗑️ Clearing all caches before login...');
       await this.clearAllCaches();
-      
+
       console.log('📡 Making API call to:', '/api/mobile/auth/login');
       console.log('📡 Request data:', { email: data.email, rememberMe: data.rememberMe || false });
-      
+
       const response = await api.post('/api/mobile/auth/login', {
         email: data.email,
         password: data.password,
         rememberMe: data.rememberMe || false,
       });
-      
+
       console.log('📡 API Response status:', response.status);
       console.log('📡 API Response data:', response.data);
-      
+
       if (response.data.success) {
         // Store user data and token in auth service
         console.log('🔍 Response data structure:', JSON.stringify(response.data.data, null, 2));
         const { user, accessToken, token } = response.data.data;
         const authTokenToSave = accessToken || token; // Backend might return 'token' or 'accessToken'
-        
+
         console.log('═══════════════════════════════════════════════════════════');
         if (__DEV__) {
           console.log('🔑 LOGIN SUCCESSFUL - AUTH TOKEN (loginAPIs.ts):');
@@ -319,28 +322,28 @@ class LoginAPIsService {
         console.log('Category:', user.category);
         console.log('Description:', user.description);
         console.log('═══════════════════════════════════════════════════════════');
-        
+
         // IMPORTANT: Save token to storage FIRST so it's available for subsequent API calls
         await authService.saveUserToStorage(user, authTokenToSave);
         authService.setCurrentUser(user);
-        
+
         // Reset token expiration flag on successful login
         resetTokenExpirationFlag();
-        
+
         // Now fetch complete profile data from API (token is now available in AsyncStorage)
         let completeUserData = user;
         try {
           console.log('🔍 Fetching complete profile data from API after login...');
-          
+
           // Try to get complete profile using user ID
           const profileResponse = await authApi.getProfile(user.id);
           if (profileResponse.success && profileResponse.data) {
             // CRITICAL: Exclude companyName from API to prevent business profile contamination
             const { companyName: apiCompanyName, businessProfiles, ...cleanApiData } = profileResponse.data as any;
-            
+
             // Sync logo from API response (prefer 'logo' field, fallback to 'companyLogo')
             const apiLogo = cleanApiData.logo || cleanApiData.companyLogo || user.logo || user.companyLogo;
-            
+
             completeUserData = {
               ...user,
               ...cleanApiData, // Merge clean profile data (without companyName from API)
@@ -368,7 +371,7 @@ class LoginAPIsService {
             console.log('Category:', completeUserData.category);
             console.log('Logo:', completeUserData.logo);
             console.log('═══════════════════════════════════════════════════════════');
-            
+
             // Update storage with complete profile data
             await authService.saveUserToStorage(completeUserData, authTokenToSave);
             authService.setCurrentUser(completeUserData);
@@ -379,10 +382,10 @@ class LoginAPIsService {
           console.log('⚠️ Failed to fetch complete profile from API, using basic user data:', profileError.message);
           // Continue with basic user data - the profile will be fetched later when needed
         }
-        
+
         // Notify auth state listeners (this will trigger navigation)
         authService.notifyAuthStateListeners(completeUserData);
-        
+
         console.log('✅ User login successful and complete data stored');
         console.log('═══════════════════════════════════════════════════════════');
         console.log('💾 DATA SAVED TO ASYNC STORAGE:');
@@ -393,9 +396,9 @@ class LoginAPIsService {
         console.log('❌ Login failed - success=false:', response.data);
         throw new Error(response.data.message || 'Login failed');
       }
-      
+
       return response.data;
-      
+
     } catch (error: any) {
       console.error('❌ Login error:', error.response?.data || error.message);
       throw error;
@@ -405,7 +408,7 @@ class LoginAPIsService {
   // ========================================
   // PASSWORD MANAGEMENT APIs
   // ========================================
-  
+
   /**
    * Request password reset
    * Endpoint: POST /api/mobile/auth/forgot-password
@@ -421,11 +424,11 @@ class LoginAPIsService {
         console.log('📤 Request Body:', JSON.stringify({ email: data.email }, null, 2));
         console.log('🌐 API Endpoint: POST /api/mobile/auth/forgot-password');
       }
-      
+
       const response = await api.post('/api/mobile/auth/forgot-password', {
         email: data.email,
       });
-      
+
       if (__DEV__) {
         console.log('═══════════════════════════════════════════════════════════');
         console.log('✅ FORGET PASSWORD API RESPONSE (SUCCESS)');
@@ -445,9 +448,9 @@ class LoginAPIsService {
         }
         console.log('═══════════════════════════════════════════════════════════');
       }
-      
+
       return response.data;
-      
+
     } catch (error: any) {
       if (__DEV__) {
         console.log('═══════════════════════════════════════════════════════════');
@@ -456,7 +459,7 @@ class LoginAPIsService {
         console.log('🔴 Error Type:', error.name || 'Unknown');
         console.log('🔴 Error Message:', error.message);
         console.log('🔴 Error Code:', error.code);
-        
+
         if (error.config) {
           console.log('📤 Request Details:');
           console.log('   Method:', error.config.method?.toUpperCase());
@@ -464,7 +467,7 @@ class LoginAPIsService {
           console.log('   Request Headers:', JSON.stringify(error.config.headers, null, 2));
           console.log('   Request Data:', JSON.stringify(error.config.data, null, 2));
         }
-        
+
         if (error.response) {
           console.log('📊 Error Response Status:', error.response.status);
           console.log('📊 Error Status Text:', error.response.statusText);
@@ -478,15 +481,15 @@ class LoginAPIsService {
           console.log('⚠️ No response received from server');
           console.log('   This usually means a network error or server is unreachable');
         }
-        
+
         if (error.request) {
           console.log('📡 Request Object:', error.request);
         }
-        
+
         console.log('🔍 Full Error Object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
         console.log('═══════════════════════════════════════════════════════════');
       }
-      
+
       throw error;
     }
   }
@@ -501,18 +504,18 @@ class LoginAPIsService {
       if (__DEV__) {
         console.log('🔑 Confirming password reset');
       }
-      
+
       const response = await api.post('/api/mobile/auth/reset-password', {
         token: data.token,
         newPassword: data.newPassword,
         confirmPassword: data.confirmPassword,
       });
-      
+
       if (__DEV__) {
         console.log('✅ Password reset confirmed');
       }
       return response.data;
-      
+
     } catch (error: any) {
       if (__DEV__) {
         console.error('❌ Password reset confirmation error:', error.response?.data || error.message);
@@ -589,18 +592,18 @@ class LoginAPIsService {
       if (__DEV__) {
         console.log('🔐 Changing password');
       }
-      
+
       const response = await api.put('/api/mobile/auth/change-password', {
         currentPassword: data.currentPassword,
         newPassword: data.newPassword,
         confirmPassword: data.confirmPassword,
       });
-      
+
       if (__DEV__) {
         console.log('✅ Password changed successfully');
       }
       return response.data;
-      
+
     } catch (error: any) {
       if (__DEV__) {
         console.error('❌ Change password error:', error.response?.data || error.message);
@@ -612,7 +615,7 @@ class LoginAPIsService {
   // ========================================
   // EMAIL VERIFICATION API
   // ========================================
-  
+
   /**
    * Verify email address with OTP code
    * Endpoint: POST /api/mobile/auth/verify-email
@@ -622,12 +625,12 @@ class LoginAPIsService {
     try {
       console.log('📧 Verifying email code for:', data.email);
       console.log('📧 Sending OTP code:', data.otpCode); // Debug log
-      
+
       const response = await api.post('/api/mobile/auth/verify-email', {
         email: data.email,
         otpCode: data.otpCode, // Backend expects otpCode, not code
       });
-      
+
       console.log('✅ Email verification successful');
       return response.data;
     } catch (error: any) {
@@ -644,11 +647,11 @@ class LoginAPIsService {
   async resendEmailVerification(data: { email: string }): Promise<{ success: boolean; message: string }> {
     try {
       console.log('📧 Resending verification code to:', data.email);
-      
+
       const response = await api.post('/api/mobile/auth/resend-verification', {
         email: data.email,
       });
-      
+
       console.log('✅ Verification code resent');
       return response.data;
     } catch (error: any) {
@@ -660,7 +663,7 @@ class LoginAPIsService {
   // ========================================
   // LOGOUT API
   // ========================================
-  
+
   /**
    * Logout user
    * Endpoint: POST /api/mobile/auth/logout
@@ -669,12 +672,12 @@ class LoginAPIsService {
   async logoutUser(): Promise<{ success: boolean; message: string }> {
     try {
       console.log('🚪 Logging out user');
-      
+
       const response = await api.post('/api/mobile/auth/logout');
-      
+
       console.log('✅ User logged out successfully');
       return response.data;
-      
+
     } catch (error: any) {
       console.error('❌ Logout error:', error.response?.data || error.message);
       throw error;
@@ -684,7 +687,7 @@ class LoginAPIsService {
   // ========================================
   // TOKEN REFRESH API
   // ========================================
-  
+
   /**
    * Refresh authentication token
    * Endpoint: POST /api/mobile/auth/refresh-token
@@ -693,14 +696,14 @@ class LoginAPIsService {
   async refreshToken(refreshToken: string): Promise<{ success: boolean; data: { token: string; expiresIn: number } }> {
     try {
       console.log('🔄 Refreshing authentication token');
-      
+
       const response = await api.post('/api/mobile/auth/refresh-token', {
         refreshToken: refreshToken,
       });
-      
+
       console.log('✅ Token refreshed successfully');
       return response.data;
-      
+
     } catch (error: any) {
       console.error('❌ Token refresh error:', error.response?.data || error.message);
       throw error;
@@ -723,7 +726,7 @@ class LoginAPIsService {
     } catch (error) {
       console.error('Failed to clear business profile cache:', error);
     }
-    
+
     try {
       const businessCategoryPostersApi = require('./businessCategoryPostersApi').default;
       businessCategoryPostersApi.clearCache();
@@ -731,7 +734,7 @@ class LoginAPIsService {
     } catch (error) {
       console.error('Failed to clear business category posters cache:', error);
     }
-    
+
     try {
       const homeApi = require('./homeApi').default;
       homeApi.clearCache();
@@ -739,7 +742,7 @@ class LoginAPIsService {
     } catch (error) {
       console.error('Failed to clear home API cache:', error);
     }
-    
+
     try {
       const templatesService = require('./templates').default;
       templatesService.clearCache();
@@ -747,7 +750,7 @@ class LoginAPIsService {
     } catch (error) {
       console.error('Failed to clear templates cache:', error);
     }
-    
+
     try {
       const businessCategoriesService = require('./businessCategoriesService').default;
       businessCategoriesService.clearCache();
@@ -755,7 +758,7 @@ class LoginAPIsService {
     } catch (error) {
       console.error('Failed to clear business categories cache:', error);
     }
-    
+
     console.log('✅ All caches cleared successfully');
   }
 }

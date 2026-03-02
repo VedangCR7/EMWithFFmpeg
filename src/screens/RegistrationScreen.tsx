@@ -40,7 +40,7 @@ const getModalDimensions = () => {
   const currentWidth = Dimensions.get('window').width;
   const currentHeight = Dimensions.get('window').height;
   const isCurrentlyLandscape = currentWidth > currentHeight;
-  
+
   return {
     width: currentWidth,
     height: currentHeight,
@@ -53,11 +53,11 @@ const getModalDimensions = () => {
 };
 
 // Create a stable FloatingInput component outside the main component
-const FloatingInput = React.memo(({ 
-  value, 
-  onChangeText, 
+const FloatingInput = React.memo(({
+  value,
+  onChangeText,
   field,
-  placeholder, 
+  placeholder,
   focusedField,
   setFocusedField,
   theme,
@@ -88,33 +88,33 @@ const FloatingInput = React.memo(({
   onSubmitEditing?: () => void;
   blurOnSubmit?: boolean;
 }) => (
-    <View style={styles.inputContainer}>
+  <View style={styles.inputContainer}>
     <TextInput
       ref={inputRef}
       style={[
         styles.input,
-        { 
+        {
           color: theme.colors.text,
           borderColor: hasError ? theme.colors.error : (focusedField === field ? theme.colors.primary : theme.colors.border),
           backgroundColor: theme.colors.inputBackground,
         },
         multiline && styles.multilineInput
       ]}
-              value={value}
+      value={value}
       onChangeText={onChangeText}
-        onFocus={() => setFocusedField(field)}
-        onBlur={() => setFocusedField(null)}
+      onFocus={() => setFocusedField(field)}
+      onBlur={() => setFocusedField(null)}
       placeholder={placeholder}
       placeholderTextColor={theme.colors.textSecondary}
       multiline={multiline}
       numberOfLines={numberOfLines}
       keyboardType={keyboardType}
-        secureTextEntry={secureTextEntry}
+      secureTextEntry={secureTextEntry}
       returnKeyType={returnKeyType}
       onSubmitEditing={onSubmitEditing}
       blurOnSubmit={blurOnSubmit}
     />
-      </View>
+  </View>
 ));
 
 interface RegistrationScreenProps {
@@ -136,6 +136,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
     companyLogo: '',
     password: '',
     confirmPassword: '',
+    promoCode: '',
   });
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [logoImage, setLogoImage] = useState<string | null>(null);
@@ -144,7 +145,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [modalAnimation] = useState(new Animated.Value(0));
-  const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
+  const [validationErrors, setValidationErrors] = useState<{ [key: string]: string }>({});
   const [modalDimensions, setModalDimensions] = useState(getModalDimensions());
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -195,16 +196,16 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
         setIsLoadingCategories(true);
         console.log('📡 [REGISTRATION] Fetching business categories...');
         const response = await businessCategoriesService.getBusinessCategories();
-        
+
         // Print the full API response for debugging
         console.log('📋 [REGISTRATION] Full API Response:', JSON.stringify(response, null, 2));
         console.log('📋 [REGISTRATION] Response success:', response.success);
         console.log('📋 [REGISTRATION] Categories array:', response.categories);
         console.log('📋 [REGISTRATION] Categories length:', response.categories?.length || 0);
-        
+
         if (response.success && response.categories && response.categories.length > 0) {
           console.log('✅ [REGISTRATION] Categories fetched successfully:', response.categories.length);
-          
+
           // Print each category details
           response.categories.forEach((category: any, index: number) => {
             console.log(`📋 [REGISTRATION] Category ${index + 1}:`, {
@@ -213,7 +214,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
               parentCategoryName: category.parentCategoryName
             });
           });
-          
+
           // Extract unique parentCategoryName values (ignore null values)
           const uniqueParentCategories = new Set<string>();
           response.categories.forEach((category: any) => {
@@ -221,7 +222,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
               uniqueParentCategories.add(category.parentCategoryName.trim());
             }
           });
-          
+
           // Convert Set to array and create business category objects
           const businessCategories = Array.from(uniqueParentCategories).map((parentName, index) => ({
             id: `parent-${index}`,
@@ -230,10 +231,10 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
             icon: '📄',
             parentCategoryName: undefined // Mark as business category
           }));
-          
+
           console.log('✅ [REGISTRATION] Business categories extracted:', businessCategories.length);
           console.log('📋 [REGISTRATION] Business categories:', businessCategories.map(cat => cat.name));
-          
+
           // Show business categories for selection
           setCategories(businessCategories);
         } else {
@@ -247,13 +248,13 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
         console.error('❌ [REGISTRATION] Error message:', error?.message);
         console.error('❌ [REGISTRATION] Error code:', error?.code);
         console.error('❌ [REGISTRATION] Error string:', String(error));
-        
+
         // Check if it's a network error - handle both Error objects and string errors
         const errorMessage = error?.message || String(error) || '';
         const errorCode = error?.code || '';
         const errorString = String(error).toLowerCase();
-        
-        const isNetworkError = 
+
+        const isNetworkError =
           errorMessage === 'NETWORK_ERROR' ||
           errorMessage.includes('NETWORK_ERROR') ||
           errorCode === 'NETWORK_ERROR' ||
@@ -267,15 +268,15 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
           errorCode === 'ETIMEDOUT' ||
           errorCode === 'ECONNRESET' ||
           !error?.response; // No response usually means network issue
-        
+
         console.log('🔍 [REGISTRATION] Is network error?', isNetworkError);
-        
+
         if (isNetworkError) {
           // Show network error modal
           console.log('📱 [REGISTRATION] Showing network error modal');
           setShowCategoryErrorModal(true);
         }
-        
+
         // On error, keep empty array - user can still register but won't see categories
         setCategories([]);
       } finally {
@@ -291,31 +292,31 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
     try {
       setIsLoadingSubcategories(true);
       console.log('📡 [REGISTRATION] Fetching subcategories for business category:', selectedBusinessCategory);
-      
+
       // Use the same API endpoint but filter by parent category
       const response = await businessCategoriesService.getBusinessCategories();
-      
+
       if (response.success && response.categories && response.categories.length > 0) {
         // Filter categories where parentCategoryName matches the selected business category
         const categorySubcategories = response.categories.filter((category: any) => {
           const parentCategoryName = category.parentCategoryName?.trim().toLowerCase() || '';
           const selectedCategoryLower = selectedBusinessCategory.trim().toLowerCase();
-          
+
           console.log(`🔍 [REGISTRATION] Checking category: ${category.name}`);
           console.log(`🔍 [REGISTRATION] - parentCategoryName: "${parentCategoryName}"`);
           console.log(`🔍 [REGISTRATION] - selectedBusinessCategory: "${selectedCategoryLower}"`);
           console.log(`🔍 [REGISTRATION] - Match: ${parentCategoryName === selectedCategoryLower}`);
-          
+
           // Exact match for parent category
           return parentCategoryName === selectedCategoryLower;
         });
-        
+
         console.log('✅ [REGISTRATION] Subcategories fetched:', categorySubcategories.length);
         console.log('📋 [REGISTRATION] Final subcategories to display:');
         categorySubcategories.forEach((subcategory: any, index: number) => {
           console.log(`  ${index + 1}. ${subcategory.name} (parent: ${subcategory.parentCategoryName})`);
         });
-        
+
         setSubcategories(categorySubcategories);
       } else {
         console.warn('⚠️ [REGISTRATION] No subcategories found for business category:', selectedBusinessCategory);
@@ -348,11 +349,11 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
         ...prev,
         [field]: digitsOnly,
       }));
-      
+
       // Validate as user types with digit count
       const error = validatePhone(digitsOnly);
       setPhoneValidationError(error);
-      
+
       // Clear form validation error
       if (validationErrors.phone) {
         setValidationErrors(prev => ({
@@ -362,7 +363,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
       }
       return;
     }
-    
+
     // Real-time alternate phone validation with digit count
     if (field === 'alternatePhone') {
       // Only allow digits
@@ -371,7 +372,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
         ...prev,
         [field]: digitsOnly,
       }));
-      
+
       // Validate as user types (optional field)
       if (digitsOnly.trim()) {
         const error = validatePhone(digitsOnly);
@@ -379,7 +380,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
       } else {
         setAlternatePhoneValidationError(''); // Clear error if empty
       }
-      
+
       // Clear form validation error
       if (validationErrors.alternatePhone) {
         setValidationErrors(prev => ({
@@ -389,7 +390,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
       }
       return;
     }
-    
+
     // Handle category selection - fetch subcategories
     if (field === 'category') {
       setFormData(prev => ({
@@ -397,7 +398,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
         [field]: value,
         subcategory: '', // Reset subcategory when category changes
       }));
-      
+
       // Fetch subcategories for the selected category
       if (value) {
         fetchSubcategories(value);
@@ -421,7 +422,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
   };
 
   const validateForm = () => {
-    const errors: {[key: string]: string} = {};
+    const errors: { [key: string]: string } = {};
 
     // Company Name validation
     if (!formData.name.trim()) {
@@ -527,13 +528,13 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
         password: formData.password.trim(),
         displayName: formData.name.trim(),
         companyName: formData.name.trim(),
-          companyLogo: logoImage || formData.companyLogo,
+        companyLogo: logoImage || formData.companyLogo,
       };
 
       console.log('Registering user with data:', registrationData);
-      
+
       console.log('api', registrationData);
-      
+
       const result = await loginAPIs.registerUser({
         email: formData.email.trim(),
         password: formData.password.trim(),
@@ -547,6 +548,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
         website: formData.website.trim(),
         companyLogo: logoImage || formData.companyLogo,
         displayName: formData.name.trim(),
+        promoCode: formData.promoCode.trim(),
       });
 
       console.log('Response', result);
@@ -559,13 +561,13 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
       }
     } catch (error: any) {
       console.error('Registration error:', error);
-      
+
       // Extract error message from API response
       const errorMessage = error.response?.data?.message || error.message || '';
       const errorMessageLower = errorMessage.toLowerCase();
-      
+
       // Check if error indicates email is already registered
-      const isEmailAlreadyRegistered = 
+      const isEmailAlreadyRegistered =
         errorMessageLower.includes('already registered') ||
         errorMessageLower.includes('email already') ||
         errorMessageLower.includes('already exists') ||
@@ -576,13 +578,13 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
         errorMessageLower.includes('email already registered') ||
         (error.response?.status === 409) || // Conflict status code often used for duplicates
         (error.response?.status === 400 && errorMessageLower.includes('email'));
-      
+
       if (isEmailAlreadyRegistered) {
         setErrorMessage('This email is already registered. Please use a different email address or try signing in.');
       } else {
         setErrorMessage(errorMessage || 'Registration failed. Please try again.');
       }
-      
+
       setShowErrorModal(true);
     } finally {
       setIsLoading(false);
@@ -642,18 +644,18 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
         colors={[theme.colors.primary, theme.colors.secondary]}
         style={styles.gradient}
       >
-        <KeyboardAvoidingView 
+        <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.keyboardAvoidingView}
         >
-          <ScrollView 
+          <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
           >
             <View style={styles.header}>
-              <Image 
-                source={require('../assets/MainLogo/main_logo.png')} 
+              <Image
+                source={require('../assets/MainLogo/main_logo.png')}
                 style={styles.logo}
                 resizeMode="contain"
               />
@@ -669,54 +671,54 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                 <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Company Logo</Text>
                 {logoImage || formData.companyLogo ? (
                   <View style={styles.logoContainer}>
-                    <Image 
-                      source={{ uri: logoImage || formData.companyLogo }} 
+                    <Image
+                      source={{ uri: logoImage || formData.companyLogo }}
                       style={styles.logoImage}
                       resizeMode="cover"
                     />
-                        <View style={styles.logoOverlay}>
-                          <Icon name="photo" size={24} color="#ffffff" />
-                      </View>
-                      <View style={styles.logoActionButtons}>
-                        <TouchableOpacity 
-                          style={styles.logoActionButton}
-                        onPress={handleImagePickerPress}
-                        >
-                          <Icon name="edit" size={16} color="#ffffff" style={styles.buttonIcon} />
-                          <Text style={styles.logoActionButtonText}>Change</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity 
-                          style={[styles.logoActionButton, styles.removeLogoButton]}
-                          onPress={() => {
-                            setLogoImage(null);
-                            setFormData(prev => ({ ...prev, companyLogo: '' }));
-                          }}
-                        >
-                          <Icon name="delete" size={16} color="#ffffff" style={styles.buttonIcon} />
-                          <Text style={styles.logoActionButtonText}>Remove</Text>
-                        </TouchableOpacity>
-                      </View>
+                    <View style={styles.logoOverlay}>
+                      <Icon name="photo" size={24} color="#ffffff" />
                     </View>
-                  ) : (
-                    <View style={styles.logoPlaceholder}>
-                      <TouchableOpacity 
-                        style={styles.uploadAreaButton}
-                      onPress={handleImagePickerPress}
+                    <View style={styles.logoActionButtons}>
+                      <TouchableOpacity
+                        style={styles.logoActionButton}
+                        onPress={handleImagePickerPress}
                       >
-                        <View style={styles.logoIconContainer}>
-                          <Icon name="add-a-photo" size={24} color="#667eea" />
-                        </View>
-                      <Text style={[styles.logoPlaceholderTitle, { color: theme.colors.text }]}>Upload Company Logo</Text>
-                      <Text style={[styles.logoPlaceholderSubtext, { color: theme.colors.textSecondary }]}>Tap to select from gallery or take a photo</Text>
+                        <Icon name="edit" size={16} color="#ffffff" style={styles.buttonIcon} />
+                        <Text style={styles.logoActionButtonText}>Change</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.logoActionButton, styles.removeLogoButton]}
+                        onPress={() => {
+                          setLogoImage(null);
+                          setFormData(prev => ({ ...prev, companyLogo: '' }));
+                        }}
+                      >
+                        <Icon name="delete" size={16} color="#ffffff" style={styles.buttonIcon} />
+                        <Text style={styles.logoActionButtonText}>Remove</Text>
                       </TouchableOpacity>
                     </View>
-                  )}
+                  </View>
+                ) : (
+                  <View style={styles.logoPlaceholder}>
+                    <TouchableOpacity
+                      style={styles.uploadAreaButton}
+                      onPress={handleImagePickerPress}
+                    >
+                      <View style={styles.logoIconContainer}>
+                        <Icon name="add-a-photo" size={24} color="#667eea" />
+                      </View>
+                      <Text style={[styles.logoPlaceholderTitle, { color: theme.colors.text }]}>Upload Company Logo</Text>
+                      <Text style={[styles.logoPlaceholderSubtext, { color: theme.colors.textSecondary }]}>Tap to select from gallery or take a photo</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
 
               {/* Company Information */}
               <View style={styles.section}>
                 <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Company Information</Text>
-                
+
                 <View style={styles.inputWrapper}>
                   <FloatingInput
                     value={formData.name}
@@ -759,13 +761,13 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                 {/* Business Category */}
                 <View style={styles.categorySection}>
                   <Text style={[styles.categoryLabel, { color: theme.colors.text }]}>Business Category *</Text>
-                  
+
                   {/* Selected Category Display */}
                   <View style={styles.selectedCategoryContainer}>
                     <TextInput
                       style={[
                         styles.selectedCategoryInput,
-                        { 
+                        {
                           color: theme.colors.text,
                           borderColor: validationErrors.category ? theme.colors.error : (formData.category ? theme.colors.primary : theme.colors.border),
                           backgroundColor: theme.colors.inputBackground,
@@ -778,7 +780,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                       pointerEvents="none"
                     />
                   </View>
-                  
+
                   {/* Category Validation Error */}
                   {validationErrors.category && (
                     <View style={styles.errorContainer}>
@@ -788,7 +790,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                       </Text>
                     </View>
                   )}
-                  
+
                   {/* Category Options */}
                   {isLoadingCategories ? (
                     <View style={styles.categoryLoadingContainer}>
@@ -805,8 +807,8 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                       </Text>
                     </View>
                   ) : (
-                    <ScrollView 
-                      horizontal 
+                    <ScrollView
+                      horizontal
                       showsHorizontalScrollIndicator={false}
                       contentContainerStyle={styles.categoryScrollContent}
                     >
@@ -815,12 +817,12 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                           key={category.id || category.name}
                           style={[
                             styles.categoryOption,
-                            { 
-                              backgroundColor: formData.category === category.name 
-                                ? theme.colors.primary 
+                            {
+                              backgroundColor: formData.category === category.name
+                                ? theme.colors.primary
                                 : (isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(102,126,234,0.1)'),
-                              borderColor: formData.category === category.name 
-                                ? theme.colors.primary 
+                              borderColor: formData.category === category.name
+                                ? theme.colors.primary
                                 : (isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(102,126,234,0.3)'),
                             },
                             formData.category === category.name && {
@@ -835,9 +837,9 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                         >
                           <Text style={[
                             styles.categoryOptionText,
-                            { 
-                              color: formData.category === category.name 
-                                ? '#ffffff' 
+                            {
+                              color: formData.category === category.name
+                                ? '#ffffff'
                                 : (isDarkMode ? '#ffffff' : theme.colors.primary)
                             }
                           ]}>
@@ -847,202 +849,202 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                       ))}
                     </ScrollView>
                   )}
-              </View>
-              
-              {/* Subcategory Field - Show when business category is selected */}
-              {formData.category && subcategories.length > 0 && (
-                <View style={styles.categorySection}>
-                  <Text style={[styles.categoryLabel, { color: theme.colors.text }]}>Subcategory *</Text>
-                  
-                  {/* Selected Subcategory Display */}
-                  <View style={styles.selectedCategoryContainer}>
-                    <TextInput
-                      style={[
-                        styles.selectedCategoryInput,
-                        { 
-                          color: theme.colors.text,
-                          borderColor: validationErrors.subcategory ? theme.colors.error : (formData.subcategory ? theme.colors.primary : theme.colors.border),
-                          backgroundColor: theme.colors.inputBackground,
-                        }
-                      ]}
-                      value={formData.subcategory}
-                      placeholder="Select your business subcategory *"
-                      placeholderTextColor={theme.colors.textSecondary}
-                      editable={false}
-                      pointerEvents="none"
-                    />
+                </View>
+
+                {/* Subcategory Field - Show when business category is selected */}
+                {formData.category && subcategories.length > 0 && (
+                  <View style={styles.categorySection}>
+                    <Text style={[styles.categoryLabel, { color: theme.colors.text }]}>Subcategory *</Text>
+
+                    {/* Selected Subcategory Display */}
+                    <View style={styles.selectedCategoryContainer}>
+                      <TextInput
+                        style={[
+                          styles.selectedCategoryInput,
+                          {
+                            color: theme.colors.text,
+                            borderColor: validationErrors.subcategory ? theme.colors.error : (formData.subcategory ? theme.colors.primary : theme.colors.border),
+                            backgroundColor: theme.colors.inputBackground,
+                          }
+                        ]}
+                        value={formData.subcategory}
+                        placeholder="Select your business subcategory *"
+                        placeholderTextColor={theme.colors.textSecondary}
+                        editable={false}
+                        pointerEvents="none"
+                      />
+                    </View>
+
+                    {/* Subcategory Validation Error */}
+                    {validationErrors.subcategory && (
+                      <View style={styles.errorContainer}>
+                        <Icon name="error" size={16} color={theme.colors.error} />
+                        <Text style={[styles.errorText, { color: theme.colors.error }]}>
+                          {validationErrors.subcategory}
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* Subcategory Options */}
+                    {isLoadingSubcategories ? (
+                      <View style={styles.categoryLoadingContainer}>
+                        <ActivityIndicator size="small" color={theme.colors.primary} />
+                        <Text style={[styles.categoryLoadingText, { color: theme.colors.textSecondary }]}>
+                          Loading subcategories...
+                        </Text>
+                      </View>
+                    ) : subcategories.length === 0 ? (
+                      <View style={styles.categoryEmptyContainer}>
+                        <Icon name="info-outline" size={20} color={theme.colors.textSecondary} />
+                        <Text style={[styles.categoryEmptyText, { color: theme.colors.textSecondary }]}>
+                          No subcategories available for this category.
+                        </Text>
+                      </View>
+                    ) : (
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.categoryScrollContent}
+                      >
+                        {subcategories.map((subcategory) => (
+                          <TouchableOpacity
+                            key={subcategory.id || subcategory.name}
+                            style={[
+                              styles.categoryOption,
+                              {
+                                backgroundColor: formData.subcategory === subcategory.name
+                                  ? theme.colors.primary
+                                  : (isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(102,126,234,0.1)'),
+                                borderColor: formData.subcategory === subcategory.name
+                                  ? theme.colors.primary
+                                  : (isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(102,126,234,0.3)'),
+                              },
+                              formData.subcategory === subcategory.name && {
+                                shadowColor: theme.colors.primary,
+                                shadowOffset: { width: 0, height: 2 },
+                                shadowOpacity: 0.3,
+                                shadowRadius: 4,
+                                elevation: 5,
+                              }
+                            ]}
+                            onPress={() => handleInputChange('subcategory', subcategory.name)}
+                          >
+                            <Text style={[
+                              styles.categoryOptionText,
+                              {
+                                color: formData.subcategory === subcategory.name
+                                  ? '#ffffff'
+                                  : (isDarkMode ? '#ffffff' : theme.colors.primary)
+                              }
+                            ]}>
+                              {subcategory.name}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    )}
                   </View>
-                  
-                  {/* Subcategory Validation Error */}
-                  {validationErrors.subcategory && (
+                )}
+
+                {/* Phone Number with Real-time Validation */}
+                <View style={styles.inputWrapper}>
+                  <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Phone Number *</Text>
+                  <TextInput
+                    ref={registerInputRef('phone')}
+                    style={[
+                      styles.input,
+                      {
+                        color: theme.colors.text,
+                        borderColor: phoneValidationError ? theme.colors.error : (focusedField === 'phone' ? theme.colors.primary : theme.colors.border),
+                        backgroundColor: theme.colors.inputBackground,
+                      }
+                    ]}
+                    value={formData.phone}
+                    onChangeText={(value) => handleInputChange('phone', value)}
+                    onFocus={() => setFocusedField('phone')}
+                    onBlur={() => setFocusedField(null)}
+                    placeholder="Enter 10 digit phone number"
+                    placeholderTextColor={theme.colors.textSecondary}
+                    keyboardType="phone-pad"
+                    maxLength={10}
+                    returnKeyType="next"
+                    onSubmitEditing={handleSubmitEditing('alternatePhone')}
+                  />
+                  {phoneValidationError ? (
                     <View style={styles.errorContainer}>
                       <Icon name="error" size={16} color={theme.colors.error} />
                       <Text style={[styles.errorText, { color: theme.colors.error }]}>
-                        {validationErrors.subcategory}
+                        {phoneValidationError}
                       </Text>
                     </View>
-                  )}
-                  
-                  {/* Subcategory Options */}
-                  {isLoadingSubcategories ? (
-                    <View style={styles.categoryLoadingContainer}>
-                      <ActivityIndicator size="small" color={theme.colors.primary} />
-                      <Text style={[styles.categoryLoadingText, { color: theme.colors.textSecondary }]}>
-                        Loading subcategories...
+                  ) : null}
+                  {!phoneValidationError && formData.phone.trim() && formData.phone.replace(/\D/g, '').length === 10 ? (
+                    <View style={styles.successContainer}>
+                      <Icon name="check-circle" size={16} color="#4CAF50" />
+                      <Text style={[styles.successText, { color: '#4CAF50' }]}>
+                        ✓ Valid phone number
                       </Text>
                     </View>
-                  ) : subcategories.length === 0 ? (
-                    <View style={styles.categoryEmptyContainer}>
-                      <Icon name="info-outline" size={20} color={theme.colors.textSecondary} />
-                      <Text style={[styles.categoryEmptyText, { color: theme.colors.textSecondary }]}>
-                        No subcategories available for this category.
+                  ) : null}
+                  {validationErrors.phone && (
+                    <View style={styles.errorContainer}>
+                      <Icon name="error" size={16} color={theme.colors.error} />
+                      <Text style={[styles.errorText, { color: theme.colors.error }]}>
+                        {validationErrors.phone}
                       </Text>
                     </View>
-                  ) : (
-                    <ScrollView 
-                      horizontal 
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={styles.categoryScrollContent}
-                    >
-                      {subcategories.map((subcategory) => (
-                        <TouchableOpacity
-                          key={subcategory.id || subcategory.name}
-                          style={[
-                            styles.categoryOption,
-                            { 
-                              backgroundColor: formData.subcategory === subcategory.name 
-                                ? theme.colors.primary 
-                                : (isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(102,126,234,0.1)'),
-                              borderColor: formData.subcategory === subcategory.name 
-                                ? theme.colors.primary 
-                                : (isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(102,126,234,0.3)'),
-                            },
-                            formData.subcategory === subcategory.name && {
-                              shadowColor: theme.colors.primary,
-                              shadowOffset: { width: 0, height: 2 },
-                              shadowOpacity: 0.3,
-                              shadowRadius: 4,
-                              elevation: 5,
-                            }
-                          ]}
-                          onPress={() => handleInputChange('subcategory', subcategory.name)}
-                        >
-                          <Text style={[
-                            styles.categoryOptionText,
-                            { 
-                              color: formData.subcategory === subcategory.name 
-                                ? '#ffffff' 
-                                : (isDarkMode ? '#ffffff' : theme.colors.primary)
-                            }
-                          ]}>
-                            {subcategory.name}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
                   )}
                 </View>
-              )}
-              
-              {/* Phone Number with Real-time Validation */}
-              <View style={styles.inputWrapper}>
-                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Phone Number *</Text>
-                <TextInput
-                  ref={registerInputRef('phone')}
-                  style={[
-                    styles.input,
-                    { 
-                      color: theme.colors.text,
-                      borderColor: phoneValidationError ? theme.colors.error : (focusedField === 'phone' ? theme.colors.primary : theme.colors.border),
-                      backgroundColor: theme.colors.inputBackground,
-                    }
-                  ]}
-                  value={formData.phone}
-                  onChangeText={(value) => handleInputChange('phone', value)}
-                  onFocus={() => setFocusedField('phone')}
-                  onBlur={() => setFocusedField(null)}
-                  placeholder="Enter 10 digit phone number"
-                  placeholderTextColor={theme.colors.textSecondary}
-                  keyboardType="phone-pad"
-                  maxLength={10}
-                  returnKeyType="next"
-                  onSubmitEditing={handleSubmitEditing('alternatePhone')}
-                />
-                {phoneValidationError ? (
-                  <View style={styles.errorContainer}>
-                    <Icon name="error" size={16} color={theme.colors.error} />
-                    <Text style={[styles.errorText, { color: theme.colors.error }]}>
-                      {phoneValidationError}
-                    </Text>
-                  </View>
-                ) : null}
-                {!phoneValidationError && formData.phone.trim() && formData.phone.replace(/\D/g, '').length === 10 ? (
-                  <View style={styles.successContainer}>
-                    <Icon name="check-circle" size={16} color="#4CAF50" />
-                    <Text style={[styles.successText, { color: '#4CAF50' }]}>
-                      ✓ Valid phone number
-                    </Text>
-                  </View>
-                ) : null}
-                {validationErrors.phone && (
-                  <View style={styles.errorContainer}>
-                    <Icon name="error" size={16} color={theme.colors.error} />
-                    <Text style={[styles.errorText, { color: theme.colors.error }]}>
-                      {validationErrors.phone}
-                    </Text>
-                  </View>
-                )}
-              </View>
 
-              {/* Alternate Phone Number with Real-time Validation */}
-              <View style={styles.inputWrapper}>
-                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Alternate Phone (Optional)</Text>
-                <TextInput
-                  ref={registerInputRef('alternatePhone')}
-                  style={[
-                    styles.input,
-                    { 
-                      color: theme.colors.text,
-                      borderColor: alternatePhoneValidationError ? theme.colors.error : (focusedField === 'alternatePhone' ? theme.colors.primary : theme.colors.border),
-                      backgroundColor: theme.colors.inputBackground,
-                    }
-                  ]}
-                  value={formData.alternatePhone || ''}
-                  onChangeText={(value) => handleInputChange('alternatePhone', value)}
-                  onFocus={() => setFocusedField('alternatePhone')}
-                  onBlur={() => setFocusedField(null)}
-                  placeholder="Enter 10 digit alternate phone (optional)"
-                  placeholderTextColor={theme.colors.textSecondary}
-                  keyboardType="phone-pad"
-                  maxLength={10}
-                  returnKeyType="next"
-                  onSubmitEditing={handleSubmitEditing('email')}
-                />
-                {alternatePhoneValidationError ? (
-                  <View style={styles.errorContainer}>
-                    <Icon name="error" size={16} color={theme.colors.error} />
-                    <Text style={[styles.errorText, { color: theme.colors.error }]}>
-                      {alternatePhoneValidationError}
-                    </Text>
-                  </View>
-                ) : null}
-                {!alternatePhoneValidationError && formData.alternatePhone && formData.alternatePhone.trim() && formData.alternatePhone.replace(/\D/g, '').length === 10 ? (
-                  <View style={styles.successContainer}>
-                    <Icon name="check-circle" size={16} color="#4CAF50" />
-                    <Text style={[styles.successText, { color: '#4CAF50' }]}>
-                      ✓ Valid phone number
-                    </Text>
-                  </View>
-                ) : null}
-                {validationErrors.alternatePhone && (
-                  <View style={styles.errorContainer}>
-                    <Icon name="error" size={16} color={theme.colors.error} />
-                    <Text style={[styles.errorText, { color: theme.colors.error }]}>
-                      {validationErrors.alternatePhone}
-                    </Text>
-                  </View>
-                )}
-              </View>
+                {/* Alternate Phone Number with Real-time Validation */}
+                <View style={styles.inputWrapper}>
+                  <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Alternate Phone (Optional)</Text>
+                  <TextInput
+                    ref={registerInputRef('alternatePhone')}
+                    style={[
+                      styles.input,
+                      {
+                        color: theme.colors.text,
+                        borderColor: alternatePhoneValidationError ? theme.colors.error : (focusedField === 'alternatePhone' ? theme.colors.primary : theme.colors.border),
+                        backgroundColor: theme.colors.inputBackground,
+                      }
+                    ]}
+                    value={formData.alternatePhone || ''}
+                    onChangeText={(value) => handleInputChange('alternatePhone', value)}
+                    onFocus={() => setFocusedField('alternatePhone')}
+                    onBlur={() => setFocusedField(null)}
+                    placeholder="Enter 10 digit alternate phone (optional)"
+                    placeholderTextColor={theme.colors.textSecondary}
+                    keyboardType="phone-pad"
+                    maxLength={10}
+                    returnKeyType="next"
+                    onSubmitEditing={handleSubmitEditing('email')}
+                  />
+                  {alternatePhoneValidationError ? (
+                    <View style={styles.errorContainer}>
+                      <Icon name="error" size={16} color={theme.colors.error} />
+                      <Text style={[styles.errorText, { color: theme.colors.error }]}>
+                        {alternatePhoneValidationError}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {!alternatePhoneValidationError && formData.alternatePhone && formData.alternatePhone.trim() && formData.alternatePhone.replace(/\D/g, '').length === 10 ? (
+                    <View style={styles.successContainer}>
+                      <Icon name="check-circle" size={16} color="#4CAF50" />
+                      <Text style={[styles.successText, { color: '#4CAF50' }]}>
+                        ✓ Valid phone number
+                      </Text>
+                    </View>
+                  ) : null}
+                  {validationErrors.alternatePhone && (
+                    <View style={styles.errorContainer}>
+                      <Icon name="error" size={16} color={theme.colors.error} />
+                      <Text style={[styles.errorText, { color: theme.colors.error }]}>
+                        {validationErrors.alternatePhone}
+                      </Text>
+                    </View>
+                  )}
+                </View>
 
                 <View style={styles.inputWrapper}>
                   <FloatingInput
@@ -1069,83 +1071,83 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                   )}
                 </View>
 
-              <FloatingInput
-                value={formData.website || ''}
-                onChangeText={(value) => handleInputChange('website', value)}
-                field="website"
-                placeholder="Enter company website URL"
-                keyboardType="url"
-                focusedField={focusedField}
-                setFocusedField={setFocusedField}
-                theme={theme}
-                inputRef={registerInputRef('website')}
-                returnKeyType="next"
-                onSubmitEditing={handleSubmitEditing('address')}
-              />
+                <FloatingInput
+                  value={formData.website || ''}
+                  onChangeText={(value) => handleInputChange('website', value)}
+                  field="website"
+                  placeholder="Enter company website URL"
+                  keyboardType="url"
+                  focusedField={focusedField}
+                  setFocusedField={setFocusedField}
+                  theme={theme}
+                  inputRef={registerInputRef('website')}
+                  returnKeyType="next"
+                  onSubmitEditing={handleSubmitEditing('address')}
+                />
 
-              <FloatingInput
-                value={formData.address}
-                onChangeText={(value) => handleInputChange('address', value)}
-                field="address"
-                placeholder="Enter company address"
-                multiline
-                numberOfLines={2}
-                focusedField={focusedField}
-                setFocusedField={setFocusedField}
-                theme={theme}
-                inputRef={registerInputRef('address')}
-                returnKeyType="next"
-                blurOnSubmit
-                onSubmitEditing={handleSubmitEditing('password')}
-              />
-            </View>
-
-            {/* Account Security */}
-            <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Account Security</Text>
-              
-              <View style={styles.inputWrapper}>
-                <View style={styles.passwordContainer}>
-                  <TextInput
-                    ref={registerInputRef('password')}
-                    style={[
-                      styles.passwordInput,
-                      { 
-                        color: theme.colors.text,
-                        borderColor: validationErrors.password ? theme.colors.error : (focusedField === 'password' ? theme.colors.primary : theme.colors.border),
-                        backgroundColor: theme.colors.inputBackground,
-                      }
-                    ]}
-                    value={formData.password}
-                    onChangeText={(value) => handleInputChange('password', value)}
-                    onFocus={() => setFocusedField('password')}
-                    onBlur={() => setFocusedField(null)}
-                    placeholder="Enter password *"
-                    placeholderTextColor={theme.colors.textSecondary}
-                    secureTextEntry={!showPassword}
-                    returnKeyType="next"
-                    onSubmitEditing={handleSubmitEditing('confirmPassword')}
-                  />
-                  <TouchableOpacity 
-                    style={styles.eyeButton}
-                    onPress={() => setShowPassword(!showPassword)}
-                  >
-                    <Icon 
-                      name={showPassword ? "visibility" : "visibility-off"} 
-                      size={22} 
-                      color={theme.colors.textSecondary} 
-                    />
-                  </TouchableOpacity>
-                </View>
-                {validationErrors.password && (
-                  <View style={styles.errorContainer}>
-                    <Icon name="error" size={16} color={theme.colors.error} />
-                    <Text style={[styles.errorText, { color: theme.colors.error }]}>
-                      {validationErrors.password}
-                    </Text>
-                  </View>
-                )}
+                <FloatingInput
+                  value={formData.address}
+                  onChangeText={(value) => handleInputChange('address', value)}
+                  field="address"
+                  placeholder="Enter company address"
+                  multiline
+                  numberOfLines={2}
+                  focusedField={focusedField}
+                  setFocusedField={setFocusedField}
+                  theme={theme}
+                  inputRef={registerInputRef('address')}
+                  returnKeyType="next"
+                  blurOnSubmit
+                  onSubmitEditing={handleSubmitEditing('password')}
+                />
               </View>
+
+              {/* Account Security */}
+              <View style={styles.section}>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Account Security</Text>
+
+                <View style={styles.inputWrapper}>
+                  <View style={styles.passwordContainer}>
+                    <TextInput
+                      ref={registerInputRef('password')}
+                      style={[
+                        styles.passwordInput,
+                        {
+                          color: theme.colors.text,
+                          borderColor: validationErrors.password ? theme.colors.error : (focusedField === 'password' ? theme.colors.primary : theme.colors.border),
+                          backgroundColor: theme.colors.inputBackground,
+                        }
+                      ]}
+                      value={formData.password}
+                      onChangeText={(value) => handleInputChange('password', value)}
+                      onFocus={() => setFocusedField('password')}
+                      onBlur={() => setFocusedField(null)}
+                      placeholder="Enter password *"
+                      placeholderTextColor={theme.colors.textSecondary}
+                      secureTextEntry={!showPassword}
+                      returnKeyType="next"
+                      onSubmitEditing={handleSubmitEditing('confirmPassword')}
+                    />
+                    <TouchableOpacity
+                      style={styles.eyeButton}
+                      onPress={() => setShowPassword(!showPassword)}
+                    >
+                      <Icon
+                        name={showPassword ? "visibility" : "visibility-off"}
+                        size={22}
+                        color={theme.colors.textSecondary}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                  {validationErrors.password && (
+                    <View style={styles.errorContainer}>
+                      <Icon name="error" size={16} color={theme.colors.error} />
+                      <Text style={[styles.errorText, { color: theme.colors.error }]}>
+                        {validationErrors.password}
+                      </Text>
+                    </View>
+                  )}
+                </View>
 
                 <View style={styles.inputWrapper}>
                   <View style={styles.passwordContainer}>
@@ -1153,7 +1155,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                       ref={registerInputRef('confirmPassword')}
                       style={[
                         styles.passwordInput,
-                        { 
+                        {
                           color: theme.colors.text,
                           borderColor: validationErrors.confirmPassword ? theme.colors.error : (focusedField === 'confirmPassword' ? theme.colors.primary : theme.colors.border),
                           backgroundColor: theme.colors.inputBackground,
@@ -1169,14 +1171,14 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                       returnKeyType="done"
                       onSubmitEditing={handleSubmitEditing(undefined, handleRegister)}
                     />
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={styles.eyeButton}
                       onPress={() => setShowConfirmPassword(!showConfirmPassword)}
                     >
-                      <Icon 
-                        name={showConfirmPassword ? "visibility" : "visibility-off"} 
-                        size={22} 
-                        color={theme.colors.textSecondary} 
+                      <Icon
+                        name={showConfirmPassword ? "visibility" : "visibility-off"}
+                        size={22}
+                        color={theme.colors.textSecondary}
                       />
                     </TouchableOpacity>
                   </View>
@@ -1189,10 +1191,44 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                     </View>
                   )}
                 </View>
-            </View>
+              </View>
+
+              {/* Promo Code Section */}
+              <View style={styles.section}>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Promo Code (Optional)</Text>
+
+                <View style={styles.inputWrapper}>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        color: theme.colors.text,
+                        borderColor: focusedField === 'promoCode' ? theme.colors.primary : theme.colors.border,
+                        backgroundColor: theme.colors.inputBackground,
+                        textTransform: 'uppercase',
+                        letterSpacing: 2,
+                      }
+                    ]}
+                    value={formData.promoCode}
+                    onChangeText={(value) => handleInputChange('promoCode', value.toUpperCase())}
+                    onFocus={() => setFocusedField('promoCode')}
+                    onBlur={() => setFocusedField(null)}
+                    placeholder="ENTER PROMO CODE"
+                    placeholderTextColor={theme.colors.textSecondary}
+                    autoCapitalize="characters"
+                    returnKeyType="done"
+                    onSubmitEditing={handleRegister}
+                  />
+                  {formData.promoCode ? (
+                    <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 4 }}>
+                      Promo code will be verified upon email verification.
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
 
               {/* Register Button */}
-        <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.registerButton, { backgroundColor: theme.colors.primary }]}
                 onPress={handleRegister}
                 disabled={isLoading}
@@ -1203,7 +1239,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                 ) : (
                   <Text style={styles.registerButtonText}>Create Account</Text>
                 )}
-                </TouchableOpacity>
+              </TouchableOpacity>
 
               {/* Login Link */}
               <View style={styles.loginLinkContainer}>
@@ -1212,9 +1248,9 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                 </Text>
                 <TouchableOpacity onPress={() => navigation.navigate('Login')}>
                   <Text style={[styles.loginLink, { color: theme.colors.primary }]}>Sign In</Text>
-                  </TouchableOpacity>
-                    </View>
-                    
+                </TouchableOpacity>
+              </View>
+
               {/* Privacy Policy Link */}
               <View style={styles.privacyFooter}>
                 <Text style={[styles.privacyFooterText, { color: theme.colors.textSecondary }]}>
@@ -1226,10 +1262,10 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                   </Text>
                 </TouchableOpacity>
               </View>
-                </View>
-              </ScrollView>
-                   </KeyboardAvoidingView>
-        </LinearGradient>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </LinearGradient>
 
       {/* Professional Error Modal */}
       <Modal
@@ -1245,7 +1281,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
             paddingVertical: modalDimensions.height * 0.05,
           }
         ]}>
-          <Animated.View 
+          <Animated.View
             style={[
               styles.modalContainer,
               { backgroundColor: theme.colors.surface },
@@ -1255,10 +1291,10 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
               },
               {
                 transform: [{
-                    scale: modalAnimation.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.8, 1],
-                    }),
+                  scale: modalAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.8, 1],
+                  }),
                 }],
                 opacity: modalAnimation,
               }
@@ -1311,7 +1347,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
             paddingVertical: modalDimensions.height * 0.05,
           }
         ]}>
-          <Animated.View 
+          <Animated.View
             style={[
               styles.modalContainer,
               { backgroundColor: theme.colors.surface },
@@ -1355,7 +1391,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
           </Animated.View>
         </View>
       </Modal>
-      </SafeAreaView>
+    </SafeAreaView>
   );
 };
 
@@ -1656,7 +1692,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    },
+  },
   loginLinkText: {
     fontSize: isSmallScreen ? 12 : 14,
   },

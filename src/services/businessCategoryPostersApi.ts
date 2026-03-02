@@ -82,7 +82,6 @@ class BusinessCategoryPostersApiService {
           };
         }
       }
-      logger.log(`📡 [CATEGORY POSTERS API] Fetching posters for: ${category} (limit: ${requestLimit}, refresh: ${isRefresh})`);
       
       // Build URL with categoryId support and backward compatibility
       let apiUrl = `/api/mobile/posters/category/${encodeURIComponent(category)}?limit=${requestLimit}`;
@@ -94,7 +93,6 @@ class BusinessCategoryPostersApiService {
       
       if (response.data.success) {
         const posters = response.data.data.posters;
-        logger.log(`✅ [CATEGORY POSTERS API] ${posters.length} poster(s) fetched for ${response.data.data.category || category}`);
         
         // Convert backend response to frontend format and fix URLs (optimized - no per-item logging)
         const baseUrl = 'https://eventmarketersbackend.onrender.com';
@@ -135,7 +133,6 @@ class BusinessCategoryPostersApiService {
           timestamp: now
         });
         
-        logger.log(`✅ [CATEGORY POSTERS API] Cached ${postersWithAbsoluteUrls.length} poster(s), returning ${limitedPosters.length}`);
         
         return {
           ...response.data,
@@ -150,7 +147,6 @@ class BusinessCategoryPostersApiService {
         // This is normal, return empty array instead of throwing error
         const errorMessage = response.data.message || response.data.error || 'No posters available for this category';
         if (__DEV__) {
-          logger.log(`ℹ️ [CATEGORY POSTERS API] No posters found for category: ${category} - ${errorMessage}`);
         }
         
         // Return empty response instead of throwing error
@@ -165,9 +161,7 @@ class BusinessCategoryPostersApiService {
         } as BusinessCategoryPostersResponse;
       }
     } catch (error: any) {
-      logger.error('❌ [CATEGORY POSTERS API] Error fetching posters:', error.message);
       if (error.response) {
-        logger.error('   ↳ Status:', error.response.status, 'Message:', error.response.data?.message);
       }
       
       // Return empty data when API fails

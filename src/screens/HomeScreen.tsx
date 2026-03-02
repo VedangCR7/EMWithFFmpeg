@@ -504,7 +504,7 @@ const GreetingCard: React.FC<GreetingCardProps> = React.memo(({ item, cardWidth,
   const handlePress = useCallback(() => {
     if (!item || !item.thumbnail) {
       if (__DEV__) {
-        devError('âŒ [GREETING CARD] Invalid item:', item);
+        devError('G¥î [GREETING CARD] Invalid item:', item);
       }
       return;
     }
@@ -639,12 +639,12 @@ const HomeScreen: React.FC = React.memo(() => {
 
   useEffect(() => {
     const unsubscribe = authService.onAuthStateChanged(user => {
-      console.log('ðŸ”„ [HOMESCREEN] Auth state changed, new user:', user?.id || 'null');
+      console.log('=ƒöä [HOMESCREEN] Auth state changed, new user:', user?.id || 'null');
       setUserProfile(user);
       
       // Clear business profile selection when user changes
       if (!user) {
-        console.log('ðŸ§¹ [HOMESCREEN] User logged out, clearing business profile selection');
+        console.log('=ƒº¦ [HOMESCREEN] User logged out, clearing business profile selection');
         setSelectedBusinessProfileId(null);
         setUserBusinessProfiles([]);
         // Clear stored business profile ID
@@ -660,13 +660,13 @@ const HomeScreen: React.FC = React.memo(() => {
     const loadBusinessProfiles = async () => {
       const currentUserId = userProfile?.id || authService.getCurrentUser()?.id;
       if (!currentUserId) {
-        console.log('âš ï¸ [HOMESCREEN] No user ID, skipping business profiles load');
+        console.log('GÜán+Å [HOMESCREEN] No user ID, skipping business profiles load');
         setUserBusinessProfiles([]);
         setSelectedBusinessProfileId(null);
         return;
       }
       
-      console.log('ðŸ“‹ [HOMESCREEN] Loading business profiles for user:', currentUserId);
+      console.log('=ƒôï [HOMESCREEN] Loading business profiles for user:', currentUserId);
       setBusinessProfilesLoadingState(true);
       try {
         const profiles = await businessProfileService.getUserBusinessProfiles(currentUserId);
@@ -674,7 +674,7 @@ const HomeScreen: React.FC = React.memo(() => {
           return;
         }
         
-        console.log('âœ… [HOMESCREEN] Loaded business profiles:', profiles.length);
+        console.log('G£à [HOMESCREEN] Loaded business profiles:', profiles.length);
         setUserBusinessProfiles(profiles);
         
         // Get stored profile ID, but verify it belongs to current user
@@ -686,11 +686,10 @@ const HomeScreen: React.FC = React.memo(() => {
         // Only use stored profile ID if it belongs to the current user
         if (storedProfileId && storedUserId === currentUserId && profiles.some(profile => profile.id === storedProfileId)) {
           resolvedProfileId = storedProfileId;
-          console.log('âœ… [HOMESCREEN] Using stored business profile:', resolvedProfileId);
-        } else if (profiles.length > 0) {
+          console.log('G£à [HOMESCREEN] Using stored business profile:', resolvedProfileId);
           // Use first profile if no valid stored profile
           resolvedProfileId = profiles[0].id;
-          console.log('âœ… [HOMESCREEN] Using first business profile:', resolvedProfileId);
+          console.log('G£à [HOMESCREEN] Using first business profile:', resolvedProfileId);
           // Store the user ID with the profile ID
           await AsyncStorage.setItem('selectedBusinessProfileUserId', currentUserId).catch(() => {});
         } else {
@@ -726,7 +725,7 @@ const HomeScreen: React.FC = React.memo(() => {
   // Refresh business profiles when screen comes into focus (e.g., returning from BusinessProfilesScreen)
   useFocusEffect(
     useCallback(() => {
-      console.log('ðŸ”„ [HOMESCREEN] Screen focused - refreshing business profiles...');
+      console.log('=ƒöä [HOMESCREEN] Screen focused - refreshing business profiles...');
       const currentUserId = userProfile?.id || authService.getCurrentUser()?.id;
       if (currentUserId) {
         const loadProfiles = async () => {
@@ -805,7 +804,7 @@ const HomeScreen: React.FC = React.memo(() => {
     }
     
     // DEBUG: Log what's being stored
-    console.log('ðŸ” [HOMESCREEN DEBUG] Storing profile data:', {
+    console.log('=ƒöì [HOMESCREEN DEBUG] Storing profile data:', {
       selectedBusinessProfileId,
       profileName: selectedBusinessProfile?.name,
       profileCategory: selectedBusinessProfile?.category,
@@ -1146,7 +1145,7 @@ const HomeScreen: React.FC = React.memo(() => {
   const imagePreloadRef = useRef({ critical: false, high: false, medium: false, low: false });
   
   // Progressive image preloading system
-  // Loads images in batches: Critical â†’ High â†’ Medium â†’ Low priority
+  // Loads images in batches: Critical GåÆ High GåÆ Medium GåÆ Low priority
   // IMPORTANT: Defined before loadApiData so it can be called from within it
   const startProgressiveImagePreloading = useCallback(() => {
     if (imagePreloadRef.current.critical) {
@@ -1171,7 +1170,7 @@ const HomeScreen: React.FC = React.memo(() => {
             criticalImages.map(url => Image.prefetch(url).catch(() => {}))
           );
           if (__DEV__) {
-            console.log(`[IMAGE PRELOAD] âœ… Critical: ${criticalImages.length} images preloaded`);
+            console.log(`[IMAGE PRELOAD] G£à Critical: ${criticalImages.length} images preloaded`);
           }
         }
         
@@ -1205,7 +1204,7 @@ const HomeScreen: React.FC = React.memo(() => {
               highPriorityImages.map(url => Image.prefetch(url).catch(() => {}))
             ).then(() => {
               if (__DEV__) {
-                console.log(`[IMAGE PRELOAD] âœ… High Priority: ${highPriorityImages.length} images preloaded`);
+                console.log(`[IMAGE PRELOAD] G£à High Priority: ${highPriorityImages.length} images preloaded`);
               }
             });
           }
@@ -1248,7 +1247,7 @@ const HomeScreen: React.FC = React.memo(() => {
               mediumPriorityImages.map(url => Image.prefetch(url).catch(() => {}))
             ).then(() => {
               if (__DEV__) {
-                console.log(`[IMAGE PRELOAD] âœ… Medium Priority: ${mediumPriorityImages.length} images preloaded`);
+                console.log(`[IMAGE PRELOAD] G£à Medium Priority: ${mediumPriorityImages.length} images preloaded`);
               }
             });
           }
@@ -1276,7 +1275,7 @@ const HomeScreen: React.FC = React.memo(() => {
               lowPriorityImages.map(url => Image.prefetch(url).catch(() => {}))
             ).then(() => {
               if (__DEV__) {
-                console.log(`[IMAGE PRELOAD] âœ… Low Priority: ${lowPriorityImages.length} images preloaded`);
+                console.log(`[IMAGE PRELOAD] G£à Low Priority: ${lowPriorityImages.length} images preloaded`);
               }
             });
           }
@@ -1467,11 +1466,11 @@ const HomeScreen: React.FC = React.memo(() => {
                 }
               });
               if (__DEV__) {
-                console.log('[FEATURED CONTENT] âœ… Loaded:', response.data?.length || 0, 'items');
+                console.log('[FEATURED CONTENT] G£à Loaded:', response.data?.length || 0, 'items');
               }
             } else {
               if (__DEV__) {
-                console.warn('[FEATURED CONTENT] âš ï¸ API returned unsuccessful response or invalid data:', {
+                console.warn('[FEATURED CONTENT] GÜán+Å API returned unsuccessful response or invalid data:', {
                   success: response.success,
                   hasData: !!response.data,
                   isArray: Array.isArray(response.data),
@@ -1486,7 +1485,7 @@ const HomeScreen: React.FC = React.memo(() => {
             return { type: 'featured', response, success: response.success };
           }).catch(err => {
             if (__DEV__) {
-              console.error('[FEATURED CONTENT] âŒ Error loading:', err?.message || err);
+              console.error('[FEATURED CONTENT] G¥î Error loading:', err?.message || err);
               console.error('[FEATURED CONTENT] Error details:', {
                 message: err?.message,
                 code: err?.code,
@@ -1516,11 +1515,11 @@ const HomeScreen: React.FC = React.memo(() => {
           //       setVideoContent(response.data);
           //     });
           //     if (__DEV__) {
-          //       console.log('[VIDEO CONTENT] âœ… Loaded:', response.data?.length || 0, 'items');
+          //       console.log('[VIDEO CONTENT] G£à Loaded:', response.data?.length || 0, 'items');
           //     }
           //   } else {
           //     if (__DEV__) {
-          //       console.warn('[VIDEO CONTENT] âš ï¸ API returned unsuccessful response:', response);
+          //       console.warn('[VIDEO CONTENT] GÜán+Å API returned unsuccessful response:', response);
           //     }
           //     React.startTransition(() => {
           //       setVideoContent([]);
@@ -1529,7 +1528,7 @@ const HomeScreen: React.FC = React.memo(() => {
           //   return { type: 'videos', response, success: response.success };
           // }).catch(err => {
           //   if (__DEV__) {
-          //     console.error('[VIDEO CONTENT] âŒ Error loading:', err?.message || err);
+          //     console.error('[VIDEO CONTENT] G¥î Error loading:', err?.message || err);
           //     console.error('[VIDEO CONTENT] Error details:', {
           //       message: err?.message,
           //       code: err?.code,
@@ -1747,7 +1746,7 @@ const HomeScreen: React.FC = React.memo(() => {
             }, 200);
             
             if (__DEV__) {
-              console.log('[GREETING SECTIONS] âœ… State updated immediately - sections should be visible now');
+              console.log('[GREETING SECTIONS] G£à State updated immediately - sections should be visible now');
             }
           } catch (error) {
             if (__DEV__) {
@@ -1948,7 +1947,7 @@ const HomeScreen: React.FC = React.memo(() => {
               }
             } catch (error) {
               if (__DEV__) {
-                devWarn(`âš ï¸ Failed to fetch preview for category ${category.name}:`, error);
+                devWarn(`GÜán+Å Failed to fetch preview for category ${category.name}:`, error);
               }
             }
             return { categoryId: category.id, templates: undefined, success: false };
@@ -2037,7 +2036,7 @@ const HomeScreen: React.FC = React.memo(() => {
           }
         } catch (error) {
           if (__DEV__) {
-            devWarn(`âš ï¸ Failed to fetch preview for greeting category ${category.name}:`, error);
+            devWarn(`GÜán+Å Failed to fetch preview for greeting category ${category.name}:`, error);
           }
         }
         return { categoryId: category.id, imageUrl: undefined, success: false };
@@ -2173,7 +2172,7 @@ const HomeScreen: React.FC = React.memo(() => {
     fetchGreetingCategoryPreviewImages(missingCategories, false)
       .catch(error => {
         if (__DEV__) {
-          devWarn('âš ï¸ [GENERAL CATEGORIES MODAL] Failed to preload thumbnails:', error);
+          devWarn('GÜán+Å [GENERAL CATEGORIES MODAL] Failed to preload thumbnails:', error);
         }
       })
       .finally(() => {
@@ -2203,7 +2202,7 @@ const HomeScreen: React.FC = React.memo(() => {
         // Print the full response (only in dev mode, and limit size)
         if (__DEV__ && response && response.success) {
           const categories = response.categories || (response as any).data?.categories || [];
-          console.log(`ðŸ“‹ [HOME BUSINESS CATEGORIES] Loaded ${categories.length} categories`);
+          console.log(`=ƒôï [HOME BUSINESS CATEGORIES] Loaded ${categories.length} categories`);
         }
         if (isMounted && response && response.success) {
           // Get all categories from response (for rotation)
@@ -2212,7 +2211,7 @@ const HomeScreen: React.FC = React.memo(() => {
           
           if (!allCategories || allCategories.length === 0) {
             if (__DEV__) {
-              devWarn('âš ï¸ [BUSINESS CATEGORIES] No categories in response:', response);
+              devWarn('GÜán+Å [BUSINESS CATEGORIES] No categories in response:', response);
             }
             return;
           }
@@ -2222,7 +2221,7 @@ const HomeScreen: React.FC = React.memo(() => {
           const userSubCategory = currentUser?.subCategory || currentUser?.subcategory || '';
           const selectedProfileSubCategory = selectedBusinessProfile?.subCategory || selectedBusinessProfile?.subcategory || '';
           
-          console.log('ðŸ” [BUSINESS CATEGORY FILTER]', {
+          console.log('=ƒöì [BUSINESS CATEGORY FILTER]', {
             userSubCategory: userSubCategory,
             selectedProfileSubCategory: selectedProfileSubCategory,
             currentUser: currentUser
@@ -2252,7 +2251,7 @@ const HomeScreen: React.FC = React.memo(() => {
               return subCatName?.toLowerCase() === selectedProfileSubCategoryName.toLowerCase();
             }) || false;
             
-            console.log('ðŸ” [FILTERING CATEGORY]', {
+            console.log('=ƒöì [FILTERING CATEGORY]', {
               categoryName: categoryName,
               userSubCategoryName: userSubCategoryName,
               selectedProfileSubCategoryName: selectedProfileSubCategoryName,
@@ -2297,7 +2296,7 @@ const HomeScreen: React.FC = React.memo(() => {
             }
           } else {
             if (__DEV__) {
-              devWarn('âš ï¸ [ROTATING BUSINESS CATEGORIES] No valid categories found');
+              devWarn('GÜán+Å [ROTATING BUSINESS CATEGORIES] No valid categories found');
             }
           }
           
@@ -2309,7 +2308,7 @@ const HomeScreen: React.FC = React.memo(() => {
           }
         } else {
           if (__DEV__) {
-            devWarn('âš ï¸ [BUSINESS CATEGORIES] No categories in API response');
+            devWarn('GÜán+Å [BUSINESS CATEGORIES] No categories in API response');
           }
         }
       } catch (error) {
@@ -2888,10 +2887,10 @@ const HomeScreen: React.FC = React.memo(() => {
       .map(category => category.name.toLowerCase());
     
     // Debug logging
-    console.log('ðŸ” [SEARCH DEBUG] Search query:', searchQuery);
-    console.log('ðŸ” [SEARCH DEBUG] Business categories available:', businessCategories.map(c => c.name));
-    console.log('ðŸ” [SEARCH DEBUG] Matching business categories:', matchingBusinessCategoryNames);
-    console.log('ðŸ” [SEARCH DEBUG] Matching greeting categories:', matchingCategoryNames);
+    console.log('=ƒöì [SEARCH DEBUG] Search query:', searchQuery);
+    console.log('=ƒöì [SEARCH DEBUG] Business categories available:', businessCategories.map(c => c.name));
+    console.log('=ƒöì [SEARCH DEBUG] Matching business categories:', matchingBusinessCategoryNames);
+    console.log('=ƒöì [SEARCH DEBUG] Matching greeting categories:', matchingCategoryNames);
     
     // Local search removed - only API search for greeting templates
     setTemplates([]);
@@ -2938,8 +2937,8 @@ const HomeScreen: React.FC = React.memo(() => {
         const generalCategoryResults = generalCategoryResultsArrays.flat();
         const businessCategoryResults = businessCategoryResultsArrays.flat();
         
-        console.log('ðŸ” [SEARCH DEBUG] General category results count:', generalCategoryResults.length);
-        console.log('ðŸ” [SEARCH DEBUG] Business category results count:', businessCategoryResults.length);
+        console.log('=ƒöì [SEARCH DEBUG] General category results count:', generalCategoryResults.length);
+        console.log('=ƒöì [SEARCH DEBUG] Business category results count:', businessCategoryResults.length);
         
         // Convert general category results to Template format
         const convertedGeneralCategoryResults = generalCategoryResults.map(greetingTemplate => ({
@@ -2975,9 +2974,9 @@ const HomeScreen: React.FC = React.memo(() => {
           new Map(allResults.map(template => [template.id, template])).values()
         );
         
-        console.log('ðŸ” [SEARCH DEBUG] Total results before dedup:', allResults.length);
-        console.log('ðŸ” [SEARCH DEBUG] Unique results after dedup:', uniqueResults.length);
-        console.log('ðŸ” [SEARCH DEBUG] Business templates in results:', convertedBusinessCategoryResults.length);
+        console.log('=ƒöì [SEARCH DEBUG] Total results before dedup:', allResults.length);
+        console.log('=ƒöì [SEARCH DEBUG] Unique results after dedup:', uniqueResults.length);
+        console.log('=ƒöì [SEARCH DEBUG] Business templates in results:', convertedBusinessCategoryResults.length);
         
         // Only update if this is still the current request and we're still searching
         if (currentRequestId === requestId && isSearching) {
@@ -4121,7 +4120,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
 
   // Memoized renderItem functions for modal FlatLists
   const handleBusinessCategoryPress = useCallback(async (category: BusinessCategory) => {
-    console.log('ðŸ” [BUSINESS CATEGORY PRESS]', {
+    console.log('=ƒöì [BUSINESS CATEGORY PRESS]', {
       categoryName: category.name,
       settingTemplateSource: true
     });
@@ -5548,7 +5547,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                  style={styles.closeButton}
                  onPress={closeModal}
                >
-                 <Text style={styles.closeButtonText}>âœ•</Text>
+                 <Text style={styles.closeButtonText}>G£ò</Text>
                </TouchableOpacity>
                {selectedTemplate && (
                  <>
@@ -5609,7 +5608,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                     onPress={closeBusinessCategoriesModal}
                     activeOpacity={0.7}
                   >
-                    <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>âœ•</Text>
+                    <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>G£ò</Text>
                   </TouchableOpacity>
                 </View>
               </LinearGradient>
@@ -5657,7 +5656,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                     style={styles.upcomingEventsCloseButton}
                     onPress={closeGeneralCategoriesModal}
                   >
-                    <Text style={styles.upcomingEventsCloseButtonText}>âœ•</Text>
+                    <Text style={styles.upcomingEventsCloseButtonText}>G£ò</Text>
                   </TouchableOpacity>
                 </View>
               </LinearGradient>
@@ -5734,7 +5733,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                     style={styles.upcomingEventsCloseButton}
                     onPress={closeVideosModal}
                   >
-                    <Text style={styles.upcomingEventsCloseButtonText}>âœ•</Text>
+                    <Text style={styles.upcomingEventsCloseButtonText}>G£ò</Text>
                   </TouchableOpacity>
                 </View>
               </LinearGradient>
@@ -5789,7 +5788,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                   onPress={closeCustomerSupportModal}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.customerSupportCloseButtonText}>âœ•</Text>
+                  <Text style={styles.customerSupportCloseButtonText}>G£ò</Text>
                 </TouchableOpacity>
 
                 {/* Contact Options */}
@@ -5867,7 +5866,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                     style={styles.upcomingEventsCloseButton}
                     onPress={closeBusinessEthicsModal}
                   >
-                    <Text style={styles.upcomingEventsCloseButtonText}>âœ•</Text>
+                    <Text style={styles.upcomingEventsCloseButtonText}>G£ò</Text>
                   </TouchableOpacity>
                 </View>
               </LinearGradient>
@@ -5914,7 +5913,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                     style={styles.upcomingEventsCloseButton}
                     onPress={closeSuccessMindsetModal}
                   >
-                    <Text style={styles.upcomingEventsCloseButtonText}>âœ•</Text>
+                    <Text style={styles.upcomingEventsCloseButtonText}>G£ò</Text>
                   </TouchableOpacity>
                 </View>
               </LinearGradient>
@@ -5961,7 +5960,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                     style={styles.upcomingEventsCloseButton}
                     onPress={closeSocialMediaGrowthModal}
                   >
-                    <Text style={styles.upcomingEventsCloseButtonText}>âœ•</Text>
+                    <Text style={styles.upcomingEventsCloseButtonText}>G£ò</Text>
                   </TouchableOpacity>
                 </View>
               </LinearGradient>
@@ -6008,7 +6007,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                     style={styles.upcomingEventsCloseButton}
                     onPress={closeMoneyAndFinanceModal}
                   >
-                    <Text style={styles.upcomingEventsCloseButtonText}>âœ•</Text>
+                    <Text style={styles.upcomingEventsCloseButtonText}>G£ò</Text>
                   </TouchableOpacity>
                 </View>
               </LinearGradient>
@@ -6055,7 +6054,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                     style={styles.upcomingEventsCloseButton}
                     onPress={closeBusinessLegendQuoteModal}
                   >
-                    <Text style={styles.upcomingEventsCloseButtonText}>âœ•</Text>
+                    <Text style={styles.upcomingEventsCloseButtonText}>G£ò</Text>
                   </TouchableOpacity>
                 </View>
               </LinearGradient>
@@ -6102,7 +6101,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                     style={styles.upcomingEventsCloseButton}
                     onPress={closeBusinessMarketingTipsModal}
                   >
-                    <Text style={styles.upcomingEventsCloseButtonText}>âœ•</Text>
+                    <Text style={styles.upcomingEventsCloseButtonText}>G£ò</Text>
                   </TouchableOpacity>
                 </View>
               </LinearGradient>
@@ -6149,7 +6148,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                     style={styles.upcomingEventsCloseButton}
                     onPress={closeBusinessQuotesModal}
                   >
-                    <Text style={styles.upcomingEventsCloseButtonText}>âœ•</Text>
+                    <Text style={styles.upcomingEventsCloseButtonText}>G£ò</Text>
                   </TouchableOpacity>
                 </View>
               </LinearGradient>
@@ -6186,7 +6185,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                     <Text style={styles.upcomingEventsModalTitle}>Featured Content</Text>
                   </View>
                   <TouchableOpacity style={styles.upcomingEventsCloseButton} onPress={closeFeaturedContentModal}>
-                    <Text style={styles.upcomingEventsCloseButtonText}>âœ•</Text>
+                    <Text style={styles.upcomingEventsCloseButtonText}>G£ò</Text>
                   </TouchableOpacity>
                 </View>
               </LinearGradient>
