@@ -21,6 +21,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import businessProfileService from '../services/businessProfile';
 import userBusinessProfilesService from '../services/userBusinessProfiles';
 import authService from '../services/auth';
+import api from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BusinessProfileForm from '../components/BusinessProfileForm';
 import BottomSheet from '../components/BottomSheet';
@@ -470,6 +471,51 @@ const BusinessProfilesScreen: React.FC = () => {
     setIsProcessingPayment(false);
   }, []);
 
+  // Report payment failure to backend (non-blocking)
+  const reportPaymentFailure = async (orderId: string, status: string) => {
+    try {
+      console.log('🔴 Reporting payment failure to backend:', { orderId, status });
+      
+      // Verify auth token
+      const token = await AsyncStorage.getItem('authToken');
+      console.log('🔑 Auth token for update-status:', token ? 'FOUND' : 'MISSING');
+      
+      // Log orderId being sent
+      console.log('📦 Sending orderId to backend:', orderId);
+      
+      // Await API call to ensure it completes before proceeding
+      const response = await fetch(`${api.defaults.baseURL}/api/mobile/transactions/update-status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          orderId: orderId,
+          status: status
+        })
+      });
+      
+      const data = await response.json().catch(() => null);
+      console.log('📡 update-status response:', {
+        status: response.status,
+        ok: response.ok,
+        data
+      });
+      
+      // Add small delay to ensure database update is visible to next query
+      if (response.ok) {
+        console.log('⏳ Waiting 400ms for database update to propagate...');
+        await new Promise(resolve => setTimeout(resolve, 400));
+        console.log('✅ Database update delay completed');
+      }
+      
+    } catch (error) {
+      console.warn('⚠️ Error in reportPaymentFailure:', error);
+      // Silently handle - don't affect user experience
+    }
+  };
+
   const processBusinessProfilePaymentSuccess = useCallback(async (
     paymentResponse: any,
     orderMeta: { amount?: number; amountPaise?: number; currency?: string; orderId?: string }
@@ -616,6 +662,8 @@ const BusinessProfilesScreen: React.FC = () => {
       return;
     }
 
+    let orderDetails: any;
+
     try {
       console.log('🟠 [BUSINESS PAY] Starting payment flow');
       setShowPaymentModal(false);
@@ -626,7 +674,7 @@ const BusinessProfilesScreen: React.FC = () => {
       console.log('🗂️ [BUSINESS PAY] Pending form data saved to AsyncStorage');
 
       // Create payment order for business profile
-      const orderDetails = await businessProfileService.createBusinessProfilePaymentOrder({
+      orderDetails = await businessProfileService.createBusinessProfilePaymentOrder({
         amount: 599,
         currency: 'INR',
       });
@@ -732,6 +780,10 @@ const BusinessProfilesScreen: React.FC = () => {
         modal: {
           ondismiss: () => {
             console.log('⚪ [BUSINESS PAY] Razorpay modal dismissed');
+            // Report failure to backend
+            if (orderDetails?.orderId) {
+              reportPaymentFailure(orderDetails.orderId, 'FAILED');
+            }
             setIsProcessingPayment(false);
           },
         },
@@ -753,6 +805,10 @@ const BusinessProfilesScreen: React.FC = () => {
         code: error?.code,
         metadata: error?.metadata,
       });
+      // Report failure to backend
+      if (orderDetails?.orderId) {
+        reportPaymentFailure(orderDetails.orderId, 'FAILED');
+      }
       setErrorMessage(error.message || 'Payment failed. Please try again.');
       setShowErrorModal(true);
       setIsProcessingPayment(false);

@@ -19,8 +19,7 @@ import { useSubscription } from '../contexts/SubscriptionContext';
 import { useTheme } from '../context/ThemeContext';
 import { BusinessProfileTransaction } from '../services/businessProfile';
 import { Transaction } from '../services/transactionHistory';
-import businessProfileService from '../services/businessProfile';
-import subscriptionApi from '../services/subscriptionApi';
+import transactionHistoryService from '../services/transactionHistory';
 import authService from '../services/auth';
 
 // Compact spacing multiplier to reduce all spacing (matching HomeScreen)
@@ -64,9 +63,8 @@ const TransactionHistoryScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { theme, isDarkMode } = useTheme();
   
-  // Business profile transaction state
-  const [transactions, setTransactions] = useState<BusinessProfileTransaction[]>([]);
-  const [subscriptionTransactions, setSubscriptionTransactions] = useState<any[]>([]);
+  // Transaction state using unified API
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [pagination, setPagination] = useState({
     total: 0,
     page: 1,
@@ -132,127 +130,75 @@ const TransactionHistoryScreen: React.FC = () => {
   const [filter, setFilter] = useState<FilterType>('all');
   const [showStats, setShowStats] = useState(true);
 
-  // Fetch business profile transactions
-  const fetchTransactions = async (page = 1, append = false) => {
+  // Fetch all transactions using unified API
+  const fetchAllTransactions = async () => {
     try {
-      console.log('🔄 Fetching business profile transactions, page:', page);
-      const result = await businessProfileService.getTransactionHistory(page, 10);
-
-      if (result.success) {
-        // Ensure result.data is always an array
-        const transactionData = Array.isArray(result.data) ? result.data : [];
-        if (append) {
-          setTransactions(prev => [...prev, ...transactionData]);
-        } else {
-          setTransactions(transactionData);
-        }
-        setPagination(result.pagination);
-        setHasMore(page < result.pagination.totalPages);
-        console.log('✅ Business profile transactions fetched:', transactionData.length);
-      } else {
-        console.log('⚠️ No business profile transactions found');
-        if (!append) {
-          setTransactions([]);
-        }
-      }
+      console.log('🔄 Fetching all transactions using unified API');
+      const transactions = await transactionHistoryService.getTransactions();
+      setTransactions(transactions);
+      console.log('✅ Unified transactions fetched:', transactions.length);
     } catch (error) {
-      console.error('❌ Error fetching business profile transactions:', error);
-      if (!append) {
-        setTransactions([]);
-      }
-    }
-  };
-
-  // Fetch subscription transactions
-  const fetchSubscriptionTransactions = async () => {
-    try {
-      console.log('🔄 Fetching subscription transactions');
-      console.log('🔍 Checking subscription transactions - User authenticated:', !!authService.getCurrentUser(), 'User ID:', authService.getCurrentUser()?.id);
-      const result = await subscriptionApi.getHistory();
-      console.log('📊 Subscription API result:', result);
-      console.log('📡 Subscription API response:', JSON.stringify(result, null, 2));
-
-      if (result.success) {
-        console.log('✅ Subscription API returned success with data:', result.data?.length || 0, 'transactions');
-        setSubscriptionTransactions(result.data || []);
-        console.log('✅ Subscription transactions set in state:', (result.data || []).length);
-      } else {
-        console.log('⚠️ Subscription API returned unsuccessful response:', result.message);
-        setSubscriptionTransactions([]);
-      }
-    } catch (error) {
-      console.error('❌ Error fetching subscription transactions:', error);
-      setSubscriptionTransactions([]);
+      console.error('❌ Error fetching unified transactions:', error);
+      setTransactions([]);
     }
   };
 
   useEffect(() => {
     console.log('🏦 TransactionHistoryScreen - Mounted');
-    console.log('🏦 Business profile transactions:', transactions.length);
-    console.log('🏦 Subscription transactions:', subscriptionTransactions.length);
+    console.log('🏦 Total transactions:', transactions.length);
     
     // Auto-refresh transactions on mount
-    if (transactions.length === 0 && subscriptionTransactions.length === 0) {
+    if (transactions.length === 0) {
       console.log('🔄 No transactions found, triggering refresh...');
-      fetchTransactions();
-      fetchSubscriptionTransactions();
+      fetchAllTransactions();
     }
   }, []);
 
-  // Combine business profile and subscription transactions
-  const allTransactions = [
-    ...transactions.map(t => ({ ...t, type: 'business_profile' as const })),
-    ...subscriptionTransactions.map(t => ({ ...t, type: 'subscription' as const }))
-  ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-  // Calculate transaction statistics
+  // Calculate transaction statistics from unified data
   const transactionStats = {
-    total: allTransactions.length,
-    successful: allTransactions.filter(t => t.status === 'success').length,
-    failed: allTransactions.filter(t => t.status === 'failed').length,
-    pending: allTransactions.filter(t => t.status === 'pending').length,
-    totalAmount: allTransactions.reduce((sum, t) => sum + (t.amount || 0), 0),
-    quarterlySubscriptions: subscriptionTransactions.filter(t => t.planName?.toLowerCase().includes('quarterly')).length,
-    yearlySubscriptions: subscriptionTransactions.filter(t => t.planName?.toLowerCase().includes('yearly')).length,
+    total: transactions.length,
+    successful: transactions.filter(t => t.status === 'success').length,
+    failed: transactions.filter(t => t.status === 'failed').length,
+    pending: transactions.filter(t => t.status === 'pending').length,
+    totalAmount: transactions.reduce((sum, t) => sum + (t.amount || 0), 0),
+    quarterlySubscriptions: transactions.filter(t => t.type === 'subscription' && t.planName?.toLowerCase().includes('quarterly')).length,
+    yearlySubscriptions: transactions.filter(t => t.type === 'subscription' && t.planName?.toLowerCase().includes('yearly')).length,
   };
 
   // Filter transactions based on selected filter
-  const filteredTransactions = allTransactions.filter(transaction => {
+  const filteredTransactions = transactions.filter(transaction => {
     if (filter === 'all') return true;
     if (filter === 'business_profile') return transaction.type === 'business_profile';
     if (filter === 'subscription') return transaction.type === 'subscription';
     return transaction.status === filter;
   });
 
-  console.log('🔄 Combined transactions:', {
-    businessProfile: transactions?.length || 0,
-    subscription: subscriptionTransactions?.length || 0,
-    total: allTransactions?.length || 0
+  console.log('🔄 Unified transactions:', {
+    total: transactions?.length || 0,
+    filtered: filteredTransactions?.length || 0
   });
 
   // Handle refresh
   const onRefresh = async () => {
     console.log('================================================================================');
-    console.log('🔄🔄🔄 MANUAL REFRESH TRIGGERED BY USER - ALL TRANSACTIONS 🔄🔄🔄');
+    console.log('🔄🔄🔄 MANUAL REFRESH TRIGGERED BY USER - UNIFIED TRANSACTIONS 🔄🔄🔄');
     console.log('================================================================================');
     console.log('⏰ Refresh Time:', new Date().toISOString());
     setRefreshing(true);
-    await Promise.all([
-      fetchTransactions(1, false),
-      fetchSubscriptionTransactions()
-    ]);
+    await fetchAllTransactions();
     setRefreshing(false);
     console.log('================================================================================');
-    console.log('✅✅✅ MANUAL REFRESH COMPLETED - ALL TRANSACTIONS ✅✅✅');
+    console.log('✅✅✅ MANUAL REFRESH COMPLETED - UNIFIED TRANSACTIONS ✅✅✅');
     console.log('================================================================================');
   };
 
-  // Handle load more
+  // Handle load more (not needed with unified API but kept for UI consistency)
   const handleLoadMore = () => {
-    if (hasMore && !refreshing) {
-      const nextPage = pagination.page + 1;
-      console.log('📄 Loading more business profile transactions, page:', nextPage);
-      fetchTransactions(nextPage, true);
+    console.log('📄 Load more requested - unified API handles pagination');
+    // With unified API, pagination is handled by the service if needed
+    // For now, just fetch all transactions again
+    if (!refreshing) {
+      fetchAllTransactions();
     }
   };
 
@@ -303,7 +249,7 @@ const TransactionHistoryScreen: React.FC = () => {
 
 
   // Render transaction item
-  const renderTransactionItem = ({ item }: { item: any }) => (
+  const renderTransactionItem = ({ item }: { item: Transaction }) => (
     <View style={[styles.transactionCard, { 
       backgroundColor: theme.colors.cardBackground,
       borderRadius: dynamicModerateScale(12),
@@ -325,7 +271,7 @@ const TransactionHistoryScreen: React.FC = () => {
             color: theme.colors.textSecondary,
             fontSize: isTabletDevice ? dynamicModerateScale(8) : dynamicModerateScale(7.5),
           }]}>
-            {formatDate(item.createdAt)}
+            {formatDate(new Date(item.timestamp).toISOString())}
           </Text>
         </View>
         <View style={styles.transactionAmount}>
@@ -387,19 +333,6 @@ const TransactionHistoryScreen: React.FC = () => {
             marginLeft: dynamicModerateScale(6),
           }]}>{item.currency}</Text>
         </View>
-        {item.type === 'business_profile' && item.verifiedAt && (
-          <View style={styles.detailRow}>
-            <Text style={[styles.detailLabel, { 
-              color: theme.colors.textSecondary,
-              fontSize: isTabletDevice ? dynamicModerateScale(8) : dynamicModerateScale(7.5),
-            }]}>Verified:</Text>
-            <Text style={[styles.detailValue, { 
-              color: theme.colors.text,
-              fontSize: isTabletDevice ? dynamicModerateScale(8) : dynamicModerateScale(7.5),
-              marginLeft: dynamicModerateScale(6),
-            }]}>{formatDate(item.verifiedAt)}</Text>
-          </View>
-        )}
       </View>
     </View>
   );

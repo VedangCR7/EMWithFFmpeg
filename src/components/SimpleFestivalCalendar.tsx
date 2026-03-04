@@ -13,6 +13,48 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useTheme } from '../context/ThemeContext';
+import OptimizedImage from './OptimizedImage';
+
+// Helper function to enhance thumbnail URL for high quality
+const getHighQualityThumbnailUrl = (thumbnailUrl: string): string => {
+  if (!thumbnailUrl) return thumbnailUrl;
+  
+  // For Cloudinary URLs, enhance to high quality
+  if (thumbnailUrl.includes('res.cloudinary.com') && thumbnailUrl.includes('/upload/')) {
+    try {
+      const [prefix, remainder] = thumbnailUrl.split('/upload/');
+      if (!remainder) {
+        return thumbnailUrl;
+      }
+      
+      const parts = remainder.split('/');
+      
+      // Find the version number (starts with 'v' followed by digits)
+      let versionIndex = -1;
+      for (let i = 0; i < parts.length; i++) {
+        if (/^v\d+/.test(parts[i])) {
+          versionIndex = i;
+          break;
+        }
+      }
+      
+      if (versionIndex >= 0) {
+        // Extract everything from version onwards
+        const versionAndPath = parts.slice(versionIndex).join('/');
+        
+        // Use ultra high quality transform for thumbnails (w_1200 for HD displays)
+        const highQualityTransform = 'f_auto,q_auto:best,c_limit,w_1200,dpr_2.0';
+        const highQualityUrl = `${prefix}/upload/${highQualityTransform}/${versionAndPath}`;
+        
+        return highQualityUrl;
+      }
+    } catch (error) {
+      // Fall through to return original URL
+    }
+  }
+  
+  return thumbnailUrl;
+};
 
 // Festival data structure
 interface FestivalData {
@@ -760,7 +802,11 @@ const SimpleFestivalCalendar: React.FC = () => {
       style={dynamicStyles.posterCard}
       activeOpacity={0.8}
     >
-      <Image source={{ uri: item.thumbnail }} style={dynamicStyles.posterImage} />
+      <OptimizedImage 
+        uri={getHighQualityThumbnailUrl(item.thumbnail)} 
+        style={dynamicStyles.posterImage} 
+        resizeMode="cover" 
+      />
       <View style={dynamicStyles.posterInfo}>
         <Text style={dynamicStyles.posterTitle} numberOfLines={1}>
           {item.title}

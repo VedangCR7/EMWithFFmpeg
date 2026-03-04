@@ -330,8 +330,8 @@ const getHighQualityThumbnailUrl = (thumbnailUrl: string): string => {
         // Extract everything from version onwards
         const versionAndPath = parts.slice(versionIndex).join('/');
         
-        // Use high quality transform for thumbnails (w_800 for good quality but reasonable size)
-        const highQualityTransform = 'f_auto,q_auto:best,c_limit,w_800';
+        // Use ultra high quality transform for thumbnails (w_1200 for HD displays)
+        const highQualityTransform = 'f_auto,q_auto:best,c_limit,w_1200,dpr_2.0';
         const highQualityUrl = `${prefix}/upload/${highQualityTransform}/${versionAndPath}`;
         
         return highQualityUrl;
@@ -649,7 +649,7 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
         activeOpacity={0.8}
       >
         <OptimizedImage 
-          uri={item.thumbnail} 
+          uri={getHighQualityThumbnailUrl(item.thumbnail)} 
           style={styles.posterImage} 
           resizeMode="cover" 
         />

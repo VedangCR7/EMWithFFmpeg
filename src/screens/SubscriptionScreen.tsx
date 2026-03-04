@@ -18,11 +18,13 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import RazorpayCheckout from 'react-native-razorpay';
 import { RAZORPAY_KEY_ID } from '@env';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import PaymentErrorModal from '../components/PaymentErrorModal';
 import { useTheme } from '../context/ThemeContext';
 import subscriptionApi, { SubscriptionPlan, SubscriptionStatus } from '../services/subscriptionApi';
 import authService from '../services/auth';
+import api from '../services/api';
 
 // Compact spacing multiplier to reduce all spacing (matching HomeScreen)
 const COMPACT_MULTIPLIER = 0.5;
@@ -119,6 +121,7 @@ const SubscriptionScreen: React.FC = () => {
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus | null>(null);
   const [apiLoading, setApiLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [paymentInProgress, setPaymentInProgress] = useState(false);
 
   // Subscription plans configuration
   const plans = {
@@ -226,18 +229,70 @@ const SubscriptionScreen: React.FC = () => {
     setIsErrorModalVisible(true);
   };
 
+  // Report payment failure to backend (non-blocking)
+  const reportPaymentFailure = async (orderId: string, status: string) => {
+    try {
+      console.log('🔴 Reporting payment failure to backend:', { orderId, status });
+      
+      // Verify auth token
+      const token = await AsyncStorage.getItem('authToken');
+      console.log('🔑 Auth token for update-status:', token ? 'FOUND' : 'MISSING');
+      
+      // Log orderId being sent
+      console.log('📦 Sending orderId to backend:', orderId);
+      
+      // Await the API call to ensure it completes before proceeding
+      const response = await fetch(`${api.defaults.baseURL}/api/mobile/transactions/update-status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          orderId: orderId,
+          status: status
+        })
+      });
+      
+      const data = await response.json().catch(() => null);
+      console.log('📡 update-status response:', {
+        status: response.status,
+        ok: response.ok,
+        data
+      });
+      
+      // Add small delay to ensure database update is visible to next query
+      if (response.ok) {
+        console.log('⏳ Waiting 400ms for database update to propagate...');
+        await new Promise(resolve => setTimeout(resolve, 400));
+        console.log('✅ Database update delay completed');
+      }
+      
+    } catch (error) {
+      console.warn('⚠️ Error in reportPaymentFailure:', error);
+      // Silently handle - don't affect user experience
+    }
+  };
+
   // Handle payment with Razorpay
   const handlePayment = async () => {
+    if (paymentInProgress) {
+      console.log('Payment already in progress, ignoring duplicate click');
+      return;
+    }
+
     if (isSubscribed) {
       showErrorModal('Already Subscribed', 'You are already a Pro subscriber!');
       return;
     }
 
+    setPaymentInProgress(true);
     setIsProcessing(true);
 
     const currentUser = authService.getCurrentUser();
     let amountInPaise = 100;
     let amountInRupees = 1;
+    let orderDetails: any;
 
     try {
       // Validate Razorpay configuration
@@ -268,7 +323,7 @@ const SubscriptionScreen: React.FC = () => {
       const normalizedPlanAmountRupees = 599;
 
       // Create payment order with backend to obtain order ID and amount
-      const orderDetails = await subscriptionApi.createPaymentOrder({
+      orderDetails = await subscriptionApi.createPaymentOrder({
         planId: backendPlanId,
         amount: normalizedPlanAmountRupees,
         currency: 'INR',
@@ -436,20 +491,24 @@ const SubscriptionScreen: React.FC = () => {
                 Alert.alert('🎉 Success', 'Payment successful! Welcome to Pro!');
               }
               console.log('✅ Payment processing complete, navigating back');
+              setPaymentInProgress(false);
               navigation.goBack();
             } else {
               // Subscription verification failed
               console.warn('⚠️ Payment successful but subscription not activated');
+              setPaymentInProgress(false);
               showErrorModal('Subscription Activation Failed', 'Payment was successful but subscription could not be activated. Please contact support or check your subscription status.');
             }
           } catch (error) {
             console.error('❌ Error processing successful payment:', error);
+            setPaymentInProgress(false);
             showErrorModal('Payment Processing Error', 'Payment was successful but there was an error activating your subscription. Please contact support or refresh the app.');
           }
         },
         modal: {
           ondismiss: () => {
             setIsProcessing(false);
+            setPaymentInProgress(false);
           },
         },
       };
@@ -490,6 +549,10 @@ const SubscriptionScreen: React.FC = () => {
       // Record failed transaction only for actual errors, not cancellation
       if (error.code === 'PAYMENT_CANCELLED') {
         // Do not record transaction for user cancellation
+        // Report failure to backend for analytics
+        if (orderDetails?.orderId) {
+          reportPaymentFailure(orderDetails.orderId, 'FAILED');
+        }
       } else {
         try {
           await addTransaction({
@@ -508,6 +571,10 @@ const SubscriptionScreen: React.FC = () => {
               name: currentUser?.name || 'User Name',
             },
           });
+          // Report failure to backend
+          if (orderDetails?.orderId) {
+            reportPaymentFailure(orderDetails.orderId, 'FAILED');
+          }
         } catch (txnError) {
           console.error('Error recording failed transaction:', txnError);
         }
@@ -524,6 +591,7 @@ const SubscriptionScreen: React.FC = () => {
       }
     } finally {
       setIsProcessing(false);
+      setPaymentInProgress(false);
     }
   };
 
@@ -980,12 +1048,12 @@ const SubscriptionScreen: React.FC = () => {
             marginBottom: isTabletDevice ? dynamicModerateScale(8) : dynamicModerateScale(6),
           }]}
           onPress={handlePayment}
-          disabled={isProcessing || isSubscribed}
+          disabled={isProcessing || isSubscribed || paymentInProgress}
         >
           <LinearGradient
             colors={isSubscribed 
               ? ['#28a745', '#20c997'] 
-              : isProcessing 
+              : isProcessing || paymentInProgress
                 ? ['#cccccc', '#999999'] 
                 : ['#667eea', '#764ba2']
             }
@@ -999,7 +1067,7 @@ const SubscriptionScreen: React.FC = () => {
             }]}>
                {isSubscribed 
                  ? 'Already Pro' 
-                 : isProcessing 
+                 : isProcessing || paymentInProgress
                    ? 'Processing...' 
                    : `Upgrade to Pro - ${currentPlan.price}`
                }

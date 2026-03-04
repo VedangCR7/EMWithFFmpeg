@@ -1,6 +1,7 @@
 import api from './api';
 import authService from './auth';
 import cacheService from './cacheService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type TransactionPlan = 'quarterly' | 'yearly' | 'business_profile';
 
@@ -39,23 +40,25 @@ class TransactionHistoryService {
       return [];
     }
 
-    const cacheKey = `transactions_user_${userId}`;
+    const cacheKey = `transactions_unified_user_${userId}`;
 
     return await cacheService.getOrFetch(
       cacheKey,
       async () => {
         console.log('🔍 getTransactions - Current user ID:', userId);
 
-        // Get transactions from backend API (using authenticated endpoint)
-        const endpoint = `/api/mobile/transactions`;
+        // Get transactions from unified backend API endpoint
+        const endpoint = `/api/mobile/transactions/unified`;
         console.log('================================================================================');
-        console.log('🔵 TRANSACTION API CALL - GET ALL TRANSACTIONS');
+        console.log('🔵 UNIFIED TRANSACTION API CALL - GET ALL TRANSACTIONS');
         console.log('================================================================================');
         console.log('📡 Endpoint:', endpoint);
         console.log('🔗 Full URL:', api.defaults.baseURL + endpoint);
         console.log('📤 Request Method: GET');
         if (__DEV__) {
-          console.log('🔑 Auth Token:', currentUser?.token ? '✅ Present (length: ' + currentUser.token.length + ')' : '❌ Missing');
+          // Check auth token from AsyncStorage since api instance uses it
+          const authToken = await AsyncStorage.getItem('authToken');
+          console.log('🔑 Auth Token:', authToken ? '✅ Present (length: ' + authToken.length + ')' : '❌ Missing');
         }
         console.log('⏰ Request Time:', new Date().toISOString());
         console.log('--------------------------------------------------------------------------------');
@@ -70,25 +73,32 @@ class TransactionHistoryService {
         console.log('================================================================================');
         
         if (response.data.success) {
-          const backendTransactions = response.data.data.transactions || [];
+          // Handle unified API response format
+          const backendTransactions = response.data.transactions || response.data.data?.transactions || [];
           console.log('📦 Backend transactions count:', backendTransactions.length);
           console.log('📦 Backend transactions raw:', JSON.stringify(backendTransactions, null, 2));
           
           // Transform backend transactions to frontend format
           const transformedTransactions = backendTransactions.map((txn: any) => {
-            const normalizedPlanRaw = (txn.plan || txn.planId || txn.type || '').toLowerCase();
+            // Normalize transaction type from unified API
+            const normalizedType = txn.type?.toLowerCase();
             let plan: TransactionPlan = 'quarterly';
-            if (normalizedPlanRaw.includes('business')) {
+            let type: 'subscription' | 'business_profile' = 'subscription';
+            
+            if (normalizedType === 'business_profile' || (txn.plan && txn.plan.toLowerCase().includes('business'))) {
               plan = 'business_profile';
-            } else if (normalizedPlanRaw.includes('year')) {
+              type = 'business_profile';
+            } else if (txn.plan && txn.plan.toLowerCase().includes('year')) {
               plan = 'yearly';
+              type = 'subscription';
             } else {
               plan = 'quarterly';
+              type = 'subscription';
             }
 
             const planName =
               txn.planName ||
-              (plan === 'business_profile'
+              (type === 'business_profile'
                 ? 'Business Profile'
                 : plan === 'yearly'
                   ? 'Yearly Pro'
@@ -96,7 +106,8 @@ class TransactionHistoryService {
 
             const description =
               txn.description ||
-              (plan === 'business_profile' ? 'Business Profile Payment' : `${planName} Subscription`);
+              (type === 'business_profile' ? 'Business Profile Payment' : `${planName} Subscription`);
+              
             return {
               id: txn.id,
               paymentId: txn.paymentId || txn.transactionId,
@@ -108,9 +119,9 @@ class TransactionHistoryService {
               planName,
               timestamp: new Date(txn.createdAt).getTime(),
               description,
-              method: 'razorpay',
-              metadata: txn.metadata ? JSON.parse(txn.metadata) : undefined,
-              type: plan === 'business_profile' ? 'business_profile' : 'subscription',
+              method: txn.paymentMethod || 'razorpay',
+              metadata: txn.metadata ? (typeof txn.metadata === 'string' ? JSON.parse(txn.metadata) : txn.metadata) : undefined,
+              type,
             };
           });
           console.log('✅ Retrieved transactions:', transformedTransactions.length);
@@ -124,7 +135,7 @@ class TransactionHistoryService {
       true // Allow stale data
     ).catch((error: any) => {
       console.log('================================================================================');
-      console.log('🔴 TRANSACTION API ERROR - GET ALL TRANSACTIONS');
+      console.log('🔴 UNIFIED TRANSACTION API ERROR - GET ALL TRANSACTIONS');
       console.log('================================================================================');
       console.error('❌ Error Type:', error.name);
       console.error('❌ Error Message:', error.message);
@@ -197,7 +208,7 @@ class TransactionHistoryService {
         // Clear cache after adding transaction
         const currentUser = authService.getCurrentUser();
         if (currentUser?.id) {
-          cacheService.clear(`transactions_user_${currentUser.id}`);
+          cacheService.clear(`transactions_unified_user_${currentUser.id}`);
         }
         return mappedTransaction;
       }

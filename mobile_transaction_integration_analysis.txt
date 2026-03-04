@@ -1,0 +1,408 @@
+MOBILE APP TRANSACTION INTEGRATION ANALYSIS REPORT
+=================================================
+
+GENERATED: March 4, 2026
+OBJECTIVE: Analyze mobile app payment workflow for unified transaction API integration
+NEW ENDPOINT: GET /api/mobile/transactions/unified
+
+==================================================
+
+1. PAYMENT-RELATED SCREENS IDENTIFIED
+=====================================
+
+A. SubscriptionScreen.tsx
+   - Path: src/screens/SubscriptionScreen.tsx
+   - Purpose: Handle subscription purchases and display subscription plans
+   - API Calls Used:
+     * subscriptionApi.createPaymentOrder() - POST /api/mobile/subscriptions/create-order
+     * subscriptionApi.verifyPayment() - POST /api/mobile/subscriptions/verify-payment
+     * subscriptionApi.subscribe() - POST /api/mobile/subscriptions/subscribe
+     * subscriptionApi.getStatus() - GET /api/mobile/subscriptions/status
+     * subscriptionApi.getPlans() - GET /api/mobile/subscriptions/plans
+   - Razorpay Usage:
+     * Uses react-native-razorpay package
+     * Initializes Razorpay modal with order ID from backend
+     * Handles success/failure callbacks
+     * Records transactions via addTransaction() context method
+
+B. TransactionHistoryScreen.tsx
+   - Path: src/screens/TransactionHistoryScreen.tsx
+   - Purpose: Display transaction history with filtering and statistics
+   - API Calls Used:
+     * businessProfileService.getTransactionHistory() - GET /api/mobile/business-profile/transactions
+     * subscriptionApi.getHistory() - GET /api/mobile/subscriptions/history
+   - Current Implementation:
+     * Combines business profile and subscription transactions separately
+     * Displays unified view with filtering by status and type
+     * Shows statistics (total, successful, failed, pending)
+
+C. BusinessProfilesScreen.tsx
+   - Path: src/screens/BusinessProfilesScreen.tsx
+   - Purpose: Manage business profiles and handle profile creation payments
+   - API Calls Used:
+     * businessProfileService.createBusinessProfilePaymentOrder() - POST /api/mobile/business-profile/create-payment-order
+     * businessProfileService.verifyBusinessProfilePayment() - POST /api/mobile/business-profile/verify-payment
+   - Razorpay Usage:
+     * Similar to subscription flow but for business profile creation
+     * Records transactions as 'business_profile' type
+
+==================================================
+
+2. SUBSCRIPTION WORKFLOW ANALYSIS
+=================================
+
+Complete Subscription Purchase Flow:
+
+Step 1: User selects subscription plan
+   - Screen: SubscriptionScreen.tsx
+   - Action: User taps "Subscribe" button
+   - Function: handlePayment()
+
+Step 2: Create payment order
+   - Service: subscriptionApi.createPaymentOrder()
+   - Endpoint: POST /api/mobile/subscriptions/create-order
+   - Payload: { planId, amount, currency }
+   - Response: { orderId, amount, razorpayKey }
+
+Step 3: Initialize Razorpay modal
+   - Package: react-native-razorpay
+   - Configuration: Order ID, amount, user details, UPI apps only
+   - Method: RazorpayCheckout.open(options)
+
+Step 4: Payment success callback
+   - Action: Record transaction via addTransaction()
+   - Service: subscriptionApi.verifyPayment()
+   - Endpoint: POST /api/mobile/subscriptions/verify-payment
+   - Payload: { orderId, paymentId, signature, amount, planId }
+
+Step 5: Activate subscription
+   - Service: subscriptionApi.subscribe()
+   - Endpoint: POST /api/mobile/subscriptions/subscribe
+   - Payload: { planId, paymentMethod, autoRenew }
+
+Step 6: Update UI state
+   - Context: SubscriptionContext
+   - Actions: setIsSubscribed(true), refreshSubscription()
+
+Payment Failure Handling:
+   - Razorpay modal close events handled
+   - Failed transactions recorded with status 'failed'
+   - Error modal displayed to user
+   - No backend status update for failures
+
+==================================================
+
+3. CURRENT TRANSACTION HISTORY IMPLEMENTATION
+============================================
+
+A. TransactionHistoryScreen.tsx
+   - Current APIs:
+     * GET /api/mobile/business-profile/transactions (business profile payments)
+     * GET /api/mobile/subscriptions/history (subscription payments)
+   - Data Structure:
+     * Combines two separate API responses
+     * Maps to unified Transaction interface
+     * Supports filtering by status and type
+   - Statistics:
+     * Calculated client-side from combined data
+     * Shows total, successful, failed, pending counts
+
+B. Transaction Types Supported:
+   - subscription: Subscription payments (quarterly/yearly)
+   - business_profile: Business profile creation payments
+   - Status: success, failed, pending, cancelled
+
+C. Current Limitations:
+   - Two separate API calls required
+   - No unified endpoint
+   - Client-side data combination
+   - Potential data inconsistency
+
+==================================================
+
+4. API SERVICE LAYER ANALYSIS
+===============================
+
+A. Base API Configuration
+   - File: src/services/api.ts
+   - Base URL: From environment config (BASE_URL)
+   - Authentication: Bearer token from AsyncStorage
+   - Timeout: 30 seconds
+   - Error handling: Comprehensive with token expiration
+
+B. Transaction Services:
+   1. subscriptionApi.ts
+      - Endpoints: /api/mobile/subscriptions/*
+      - Methods: createPaymentOrder, verifyPayment, subscribe, getHistory
+   2. businessProfile.ts
+      - Endpoints: /api/mobile/business-profile/*
+      - Methods: createBusinessProfilePaymentOrder, verifyBusinessProfilePayment
+   3. transactionHistory.ts
+      - Endpoint: /api/mobile/transactions
+      - Methods: getTransactions, addTransaction, getTransactionStats
+
+C. Authentication Flow:
+   - JWT token stored in AsyncStorage
+   - Automatic token injection via axios interceptor
+   - Token expiration handling with modal prompt
+   - User-specific data isolation
+
+==================================================
+
+5. RAZORPAY INTEGRATION ANALYSIS
+=================================
+
+A. Implementation Details:
+   - Package: react-native-razorpay
+   - Key: RAZORPAY_KEY_ID from environment
+   - Payment Methods: UPI intent apps (GPay, PhonePe) only
+
+B. Initialization:
+   - Order ID from backend required
+   - Amount in paise (Indian currency)
+   - User prefill data from auth service
+   - Theme color customization
+
+C. Success Callback:
+   - Payment verification with backend
+   - Transaction recording
+   - Subscription activation
+   - UI state updates
+
+D. Failure Handling:
+   - Modal close events captured
+   - Error categorization (cancelled, network, invalid)
+   - Failed transaction recording
+   - User-friendly error messages
+
+==================================================
+
+6. FAILURE HANDLING MECHANISM
+==============================
+
+A. Current Implementation:
+   - Razorpay modal dismiss events handled
+   - Payment cancellation not recorded as transaction
+   - Failed payments recorded with 'failed' status
+   - No backend status update for failures
+
+B. Error Categories:
+   - PAYMENT_CANCELLED: User cancelled payment
+   - NETWORK_ERROR: Connectivity issues
+   - INVALID_OPTIONS: Configuration errors
+   - Generic: Other payment failures
+
+C. Missing Features:
+   - No POST /api/mobile/transactions/update-status endpoint
+   - Failed transactions only stored locally
+   - No backend synchronization of payment failures
+
+==================================================
+
+7. TRANSACTION DATA STRUCTURE
+==============================
+
+A. Transaction Interface (transactionHistory.ts):
+```typescript
+interface Transaction {
+  id: string;
+  paymentId: string;
+  orderId: string;
+  amount: number;
+  currency: string;
+  status: 'success' | 'failed' | 'pending' | 'cancelled';
+  plan: 'quarterly' | 'yearly' | 'business_profile';
+  planName: string;
+  timestamp: number;
+  description: string;
+  method: 'razorpay';
+  metadata?: { email?, contact?, name?, ... };
+  type?: 'subscription' | 'business_profile';
+}
+```
+
+B. UI Data Mapping:
+   - Status colors: success (green), failed (red), pending (yellow)
+   - Status icons: check-circle, error, schedule
+   - Date formatting: Localized with time
+   - Currency: INR with ₹ symbol
+
+C. Expected Data:
+   - All statuses supported
+   - Both transaction types (subscription, business_profile)
+   - Complete metadata for user identification
+   - Chronological ordering by timestamp
+
+==================================================
+
+8. SIDE EFFECTS AND DEPENDENCIES
+==================================
+
+A. Subscription Purchase Flow:
+   - Context: SubscriptionContext
+   - State: isSubscribed, subscriptionStatus
+   - Caching: 3-minute TTL for subscription status
+   - Cache invalidation on payment success
+
+B. Transaction History:
+   - Context: SubscriptionContext (transactions array)
+   - Caching: 5-minute TTL for transaction data
+   - Real-time updates via addTransaction method
+
+C. Business Profile Creation:
+   - Navigation: BusinessProfilesScreen
+   - State: profiles array, payment modal
+   - Cache: Profile data cached per user
+
+D. Potential Risks:
+   - Subscription context dependency
+   - Cache invalidation timing
+   - Multiple API calls for transaction history
+   - Data consistency between services
+
+==================================================
+
+9. SCREENS REQUIRING UPDATES FOR UNIFIED API
+===============================================
+
+A. Primary Updates Required:
+   1. TransactionHistoryScreen.tsx
+      - Replace dual API calls with single unified endpoint
+      - Update data transformation logic
+      - Maintain existing UI and filtering
+
+   2. transactionHistory.ts service
+      - Update getTransactions() method
+      - Modify data transformation for unified response
+      - Update caching strategy
+
+B. Secondary Updates:
+   1. SubscriptionContext.tsx
+      - Update refreshTransactions() method
+      - Maintain existing interface
+
+   2. API cache configuration
+      - Add caching rules for unified endpoint
+      - Remove old endpoint caching
+
+C. No Changes Required:
+   - SubscriptionScreen.tsx (payment flow unchanged)
+   - BusinessProfilesScreen.tsx (payment flow unchanged)
+   - Razorpay integration (unchanged)
+
+==================================================
+
+10. INTEGRATION STRATEGY RECOMMENDATIONS
+========================================
+
+A. Phased Approach:
+   Phase 1: Backend Implementation
+   - Implement GET /api/mobile/transactions/unified
+   - Ensure backward compatibility with existing endpoints
+   - Test data structure matches frontend expectations
+
+   Phase 2: Frontend Integration
+   - Update transactionHistory.ts service
+   - Modify TransactionHistoryScreen.tsx
+   - Test with existing UI components
+
+   Phase 3: Cleanup
+   - Remove dual API calls
+   - Update cache configuration
+   - Remove deprecated endpoints
+
+B. Risk Mitigation:
+   - Maintain existing endpoints during transition
+   - Feature flag for unified API
+   - Comprehensive testing of transaction types
+   - Fallback to old implementation if needed
+
+C. Testing Strategy:
+   - Test all transaction types (subscription, business_profile)
+   - Verify all statuses (success, failed, pending, cancelled)
+   - Test filtering and statistics
+   - Validate caching behavior
+
+D. Success Criteria:
+   - Single API call replaces dual calls
+   - No UI changes required
+   - All existing functionality preserved
+   - Improved performance and data consistency
+
+==================================================
+
+11. TECHNICAL IMPLEMENTATION DETAILS
+====================================
+
+A. Expected Unified API Response Structure:
+```typescript
+{
+  success: boolean;
+  data: {
+    transactions: [
+      {
+        id: string;
+        paymentId: string;
+        orderId: string;
+        amount: number;
+        currency: string;
+        status: 'success' | 'failed' | 'pending' | 'cancelled';
+        type: 'subscription' | 'business_profile';
+        plan: string;
+        planName: string;
+        description: string;
+        method: 'razorpay';
+        createdAt: string;
+        metadata?: any;
+      }
+    ];
+    pagination?: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+  };
+  message: string;
+}
+```
+
+B. Code Changes Required:
+   1. transactionHistory.ts:
+      - Update getTransactions() endpoint URL
+      - Modify data transformation logic
+      - Update cache key
+
+   2. TransactionHistoryScreen.tsx:
+      - Remove businessProfileService.getTransactionHistory() call
+      - Remove subscriptionApi.getHistory() call
+      - Use single unified API call
+
+C. Cache Configuration:
+   - Add unified endpoint to API_CACHE_CONFIG
+   - Set appropriate TTL (5 minutes for transaction data)
+   - Remove old endpoint caching
+
+==================================================
+
+12. CONCLUSION
+===============
+
+The mobile app has a well-structured payment and transaction system with:
+- Clear separation between subscription and business profile payments
+- Comprehensive Razorpay integration
+- Robust error handling and user feedback
+- Efficient caching and state management
+
+The unified transaction API integration is straightforward:
+- Primary changes needed in transactionHistory.ts service
+- TransactionHistoryScreen.tsx requires minimal updates
+- No changes to payment flows or Razorpay integration
+- Existing UI components can remain unchanged
+
+The integration will improve performance by reducing API calls and ensure data consistency across transaction types.
+
+==================================================
+
+END OF ANALYSIS
+=================
