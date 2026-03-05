@@ -364,6 +364,8 @@ interface PosterEditorScreenProps {
         uri: string;
         title?: string;
         description?: string;
+        id?: string;
+        templateId?: string;
       };
       selectedLanguage: string;
       selectedTemplateId: string;

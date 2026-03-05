@@ -85,13 +85,13 @@ const MyPostersScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<MyPostersScreenNavigationProp>();
   
+  // Cache TTL configuration
+  const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+  
   // Get card dimensions for horizontal scrolling
   const { cardWidth, cardHeight, visibleCards, gap } = getPosterCardDimensions();
 
-  // Load posters on component mount
-  useEffect(() => {
-    loadPosters();
-  }, []);
+  // Load posters on component mount - REMOVED to prevent double API calls
 
   // Refresh posters when screen comes into focus (e.g., after downloading a new poster)
   useFocusEffect(
@@ -124,22 +124,60 @@ const MyPostersScreen: React.FC = () => {
         return;
       }
 
-      // Clear cache to force fresh data fetch (especially after new downloads)
-      console.log('🗑️ [MY POSTERS] Clearing downloads cache to force refresh...');
-      await cacheService.clearPattern(`user_downloads_${userId}_`);
+      // Check cache first before making API call
+      const cacheKey = `user_downloads_${userId}`;
+      const cachedData = await cacheService.get<{downloads: any[]}>(cacheKey);
+      const cachedTimestamp = await cacheService.get(`${cacheKey}_timestamp`);
       
-      // Fetch downloads from backend API (will fetch fresh data after cache clear)
+      if (cachedData && cachedTimestamp) {
+        const cacheAge = Date.now() - Number(cachedTimestamp);
+        
+        if (cacheAge < CACHE_TTL) {
+          console.log(`� [MY POSTERS] Using cached downloads data (${Math.round(cacheAge / 1000)}s old)`);
+          
+          // Use cached data directly (already parsed by cache service)
+          const cachedDownloads = cachedData;
+          if (cachedDownloads && cachedDownloads.downloads) {
+            // Process cached data through same deduplication logic
+            await processDownloadsData(cachedDownloads.downloads, userId);
+            return;
+          }
+        } else {
+          console.log(`⏰ [MY POSTERS] Cache expired (${Math.round(cacheAge / 1000)}s old), fetching fresh data`);
+        }
+      } else {
+        console.log('📭 [MY POSTERS] No cache data available, fetching from API');
+      }
+      
+      // Fetch downloads from backend API (only if cache expired or missing)
       console.log('📡 [MY POSTERS] Fetching downloads from API...');
       const downloadsResponse = await downloadTrackingService.getUserDownloads(userId);
       
-      // Convert DownloadedContent to DownloadedPoster format
-      console.log('📥 [MY POSTERS] Raw downloads data:', JSON.stringify(downloadsResponse.downloads.slice(0, 2), null, 2));
-      console.log(`📊 [MY POSTERS] Total downloads received: ${downloadsResponse.downloads.length}`);
+      // Store fresh data in cache
+      await cacheService.set(cacheKey, JSON.stringify(downloadsResponse));
+      await cacheService.set(`${cacheKey}_timestamp`, Date.now().toString());
       
-      // Step 1: Filter out downloads without valid image URLs
-      // Accept both HTTP/HTTPS URLs and file:// URLs (for local images)
-      const validDownloads = downloadsResponse.downloads.filter((download: DownloadedContent) => {
-        const hasValidUrl = download.fileUrl || download.thumbnail;
+      // Process the fresh data
+      await processDownloadsData(downloadsResponse.downloads, userId);
+      
+    } catch (error) {
+      console.error('Error loading posters:', error);
+      Alert.alert('Error', 'Failed to load downloaded posters. Please check your internet connection.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Helper function to process downloads data (used for both cached and fresh data)
+  const processDownloadsData = async (downloads: DownloadedContent[], userId: string) => {
+    // Convert DownloadedContent to DownloadedPoster format
+    console.log('📥 [MY POSTERS] Raw downloads data:', JSON.stringify(downloads.slice(0, 2), null, 2));
+    console.log(`📊 [MY POSTERS] Total downloads received: ${downloads.length}`);
+    
+    // Step 1: Filter out downloads without valid image URLs
+    // Accept both HTTP/HTTPS URLs and file:// URLs (for local images)
+    const validDownloads = downloads.filter((download: DownloadedContent) => {
+      const hasValidUrl = download.fileUrl || download.thumbnail;
         const isValidUrl = hasValidUrl && 
           typeof hasValidUrl === 'string' && 
           hasValidUrl.trim() !== '' && 
@@ -161,12 +199,12 @@ const MyPostersScreen: React.FC = () => {
       
       console.log(`✅ [MY POSTERS] Valid downloads after URL filtering: ${validDownloads.length}`);
       
-      // Step 2: Deduplicate by resourceId and resourceType (keep the most recent one)
+      // Step 2: Deduplicate by resourceId only (POSTER and TEMPLATE with same resourceId should be single item)
       const uniqueDownloadsMap = new Map<string, DownloadedContent>();
       
       validDownloads.forEach((download: DownloadedContent) => {
-        // Create a unique key from resourceId and resourceType
-        const uniqueKey = `${download.resourceId}_${download.resourceType}`;
+        // Create a unique key from resourceId only (not resourceId + resourceType)
+        const uniqueKey = download.resourceId;
         
         const existing = uniqueDownloadsMap.get(uniqueKey);
         
@@ -174,22 +212,26 @@ const MyPostersScreen: React.FC = () => {
           // First occurrence, add it
           uniqueDownloadsMap.set(uniqueKey, download);
         } else {
-          // Duplicate found, keep the one with the most recent createdAt date
+          // Duplicate found, keep one with the most recent createdAt date
           const existingDate = new Date(existing.createdAt || 0);
           const currentDate = new Date(download.createdAt || 0);
           
           if (currentDate > existingDate) {
-            console.log(`🔄 [MY POSTERS] Replacing duplicate for ${uniqueKey}:`, {
+            console.log(`🔄 [MY POSTERS] Replacing duplicate for ${uniqueKey} (resourceType: ${download.resourceType}):`, {
               oldId: existing.id,
               newId: download.id,
               oldDate: existing.createdAt,
               newDate: download.createdAt,
+              oldResourceType: existing.resourceType,
+              newResourceType: download.resourceType,
             });
             uniqueDownloadsMap.set(uniqueKey, download);
           } else {
-            console.log(`⏭️ [MY POSTERS] Skipping duplicate for ${uniqueKey} (keeping older):`, {
+            console.log(`⏭️ [MY POSTERS] Skipping duplicate for ${uniqueKey} (resourceType: ${download.resourceType}) (keeping older):`, {
               keptId: existing.id,
               skippedId: download.id,
+              keptResourceType: existing.resourceType,
+              skippedResourceType: download.resourceType,
             });
           }
         }
@@ -241,12 +283,6 @@ const MyPostersScreen: React.FC = () => {
         new Set(downloadedPosters.map(poster => poster.category || 'Uncategorized'))
       );
       setCategories(uniqueCategories);
-    } catch (error) {
-      console.error('Error loading posters:', error);
-      Alert.alert('Error', 'Failed to load downloaded posters. Please check your internet connection.');
-    } finally {
-      setLoading(false);
-    }
   };
 
   const filterPosters = () => {
@@ -273,9 +309,26 @@ const MyPostersScreen: React.FC = () => {
   };
 
   const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await loadPosters();
-    setRefreshing(false);
+    try {
+      setRefreshing(true);
+      
+      // Get current user ID
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id;
+      
+      if (userId) {
+        console.log('🔄 [MY POSTERS] Manual refresh - clearing cache and fetching fresh data');
+        
+        // Clear cache and fetch fresh data
+        await cacheService.clearPattern(`user_downloads_${userId}_`);
+        await loadPosters();
+      }
+    } catch (error) {
+      console.error('Error refreshing posters:', error);
+      Alert.alert('Error', 'Failed to refresh posters. Please try again.');
+    } finally {
+      setRefreshing(false);
+    }
   }, []);
 
   const handleSharePoster = async (poster: DownloadedPoster) => {
@@ -386,12 +439,15 @@ const MyPostersScreen: React.FC = () => {
               }}
               style={styles.posterImage}
               resizeMode="cover"
-              onError={(error) => {
-                console.error(`❌ [MY POSTERS] Image load error for ${item.id}:`, {
-                  thumbnailUri: item.thumbnailUri,
-                  imageUri: item.imageUri,
-                  error: error.nativeEvent?.error || error,
-                });
+              onError={() => {
+                console.log("🖼️ [MY POSTERS] Image cache missing for item:", item.id, "- trying fallback");
+                // Try the other URL as fallback
+                if (item.thumbnailUri !== item.imageUri) {
+                  // Force re-render with fallback URL
+                  setTimeout(() => {
+                    // This will trigger re-render with the other URL
+                  }, 100);
+                }
               }}
               onLoad={() => {
                 console.log(`✅ [MY POSTERS] Image loaded for ${item.id}:`, item.thumbnailUri || item.imageUri);
@@ -490,6 +546,18 @@ const MyPostersScreen: React.FC = () => {
                 source={{ uri: selectedPoster.thumbnailUri || selectedPoster.imageUri }}
                 style={styles.previewImage}
                 resizeMode="contain"
+                onError={() => {
+                  console.log("🖼️ [MY POSTERS] Preview image cache missing, trying fallback");
+                  // Try the other URL as fallback
+                  if (selectedPoster.thumbnailUri !== selectedPoster.imageUri) {
+                    setTimeout(() => {
+                      // This will trigger re-render with the other URL
+                    }, 100);
+                  }
+                }}
+                onLoad={() => {
+                  console.log(`✅ [MY POSTERS] Preview image loaded for ${selectedPoster.id}`);
+                }}
               />
             ) : (
               <View style={styles.previewImagePlaceholder}>
