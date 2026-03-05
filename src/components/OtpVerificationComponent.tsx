@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import { useTheme } from '../context/ThemeContext';
+import { getUserFriendlyError } from '../utils/errorHandler';
 
 interface OtpVerificationComponentProps {
   email: string;
@@ -62,7 +63,7 @@ const OtpVerificationComponent: React.FC<OtpVerificationComponentProps> = ({
     try {
       await onVerify(code);
     } catch (error: any) {
-      const message = error?.response?.data?.message || error.message || 'Verification failed. Please try again.';
+      const message = getUserFriendlyError(error);
       Alert.alert('Verification Failed', message);
     } finally {
       setIsSubmitting(false);
@@ -76,7 +77,7 @@ const OtpVerificationComponent: React.FC<OtpVerificationComponentProps> = ({
       Alert.alert('Code Resent', 'A new verification code has been sent to your email.');
       setResendTimer(resendCooldown);
     } catch (error: any) {
-      const message = error?.response?.data?.message || error.message || 'Unable to resend code right now.';
+      const message = getUserFriendlyError(error);
       Alert.alert('Resend Failed', message);
     } finally {
       setIsSubmitting(false);

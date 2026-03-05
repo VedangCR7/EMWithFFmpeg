@@ -18,6 +18,7 @@ import { RouteProp } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 import loginAPIs from '../services/loginAPIs';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import { getUserFriendlyError } from '../utils/errorHandler';
 
 type ForgotPasswordScreenNavigationProp = StackNavigationProp<RootStackParamList, 'ForgotPassword'>;
 type ForgotPasswordScreenRouteProp = RouteProp<RootStackParamList, 'ForgotPassword'>;
@@ -50,7 +51,7 @@ const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
         [{ text: 'OK', onPress: () => navigation.navigate('VerifyResetCode', { email: email.trim() }) }],
       );
     } catch (error: any) {
-      const message = error?.response?.data?.message || error.message || 'Unable to send code. Please try again.';
+      const message = getUserFriendlyError(error);
       Alert.alert('Request Failed', message);
     } finally {
       setIsSubmitting(false);

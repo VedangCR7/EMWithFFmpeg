@@ -20,6 +20,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useTheme } from '../context/ThemeContext';
 import loginAPIs from '../services/loginAPIs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getUserFriendlyError } from '../utils/errorHandler';
 import responsiveUtils, { 
   responsiveSpacing, 
   responsiveFontSize, 
@@ -154,8 +155,8 @@ const LoginScreen: React.FC = ({ navigation }: any) => {
       console.error('❌ Sign in error:', error);
       console.error('❌ Error response:', error.response?.data);
       console.error('❌ Error status:', error.response?.status);
-      const errorMsg = error.response?.data?.message || error.message || 'Sign in failed. Please try again.';
-      setErrorMessage(errorMsg);
+      const message = getUserFriendlyError(error);
+      setErrorMessage(message);
       setShowErrorModal(true);
     } finally {
       setIsLoading(false);

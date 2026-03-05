@@ -25,6 +25,7 @@ import { useTheme } from '../context/ThemeContext';
 import loginAPIs from '../services/loginAPIs';
 import ImagePickerModal from '../components/ImagePickerModal';
 import businessCategoriesService, { BusinessCategory } from '../services/businessCategoriesService';
+import { getUserFriendlyError } from '../utils/errorHandler';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -606,7 +607,9 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
       if (isEmailAlreadyRegistered) {
         setErrorMessage('This email is already registered. Please use a different email address or try signing in.');
       } else {
-        setErrorMessage(errorMessage || 'Registration failed. Please try again.');
+        // Use centralized error handler for all other errors
+        const message = getUserFriendlyError(error);
+        setErrorMessage(message);
       }
 
       setShowErrorModal(true);
