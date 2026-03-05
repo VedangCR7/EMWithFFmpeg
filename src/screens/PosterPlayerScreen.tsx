@@ -3138,7 +3138,7 @@ const PosterPlayerScreen: React.FC = () => {
          {shouldShowSubscriptionMessage ? (
            // Show subscription message for business categories from HomeScreen
            <View style={styles.subscriptionMessageContainer}>
-             <Text style={styles.subscriptionMessageTitle}>For Premium images — subscribe Now.</Text>
+             <Text style={styles.subscriptionMessageTitle}>For Premium images — Subscribe Now.</Text>
            </View>
          ) : (
            // Show language filter buttons for all other cases

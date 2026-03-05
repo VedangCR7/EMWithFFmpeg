@@ -1076,7 +1076,6 @@ const HomeScreen: React.FC = React.memo(() => {
   const [isBusinessQuotesModalVisible, setIsBusinessQuotesModalVisible] = useState(false);
   const [isFeaturedContentModalVisible, setIsFeaturedContentModalVisible] = useState(false);
   const [isGeneralCategoriesModalVisible, setIsGeneralCategoriesModalVisible] = useState(false);
-  const [testCategoryModalVisible, setTestCategoryModalVisible] = useState(false);
 
   // New API data states
   const [featuredContent, setFeaturedContent] = useState<FeaturedContent[]>([]);
@@ -3225,17 +3224,6 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
     setIsFeaturedContentModalVisible(false);
   }, []);
 
-  const closeTestCategoryModal = useCallback(() => {
-    setTestCategoryModalVisible(false);
-  }, []);
-
-  const handleTestBusinessCategoryPress = useCallback((category: BusinessCategory) => {
-    closeTestCategoryModal();
-    navigation.navigate('TestScreen', {
-      selectedCategory: category.name,
-    });
-  }, [closeTestCategoryModal, navigation]);
-
   const handleViewAllBusinessCategories = useCallback(() => {
     setIsBusinessCategoriesModalVisible(true);
   }, []);
@@ -4229,36 +4217,6 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
       </View>
     );
   }, [modalCardWidth, modalCardGap, modalColumns, businessCategoryPreviews, closeBusinessCategoriesModal, handleBusinessCategoryPress]);
-
-  const renderTestBusinessCategoryModalItem = useCallback(({ item, index, section }: { item: BusinessCategory[]; index: number; section: { title: string; data: BusinessCategory[][] } }) => {
-    // item is now a row (array of categories)
-    // Each row should only contain up to modalColumns items
-    return (
-      <View style={styles.upcomingEventModalRow}>
-        {item.map((category, categoryIndex) => {
-          const previewTemplates = businessCategoryPreviews[category.id] || [];
-          const handlePress = () => {
-            closeTestCategoryModal();
-            handleTestBusinessCategoryPress(category);
-          };
-          const isLastInRow = categoryIndex === item.length - 1;
-          return (
-            <ModalBusinessCategoryItem
-              key={category.id}
-              category={category}
-              previewTemplates={previewTemplates}
-              modalCardWidth={modalCardWidth}
-              modalCardGap={modalCardGap}
-              modalColumns={modalColumns}
-              index={categoryIndex}
-              isLastInRow={isLastInRow}
-              onPress={handlePress}
-            />
-          );
-        })}
-      </View>
-    );
-  }, [modalCardWidth, modalCardGap, modalColumns, businessCategoryPreviews, closeTestCategoryModal, handleTestBusinessCategoryPress]);
 
   const renderVideoModalItem = useCallback(({ item, index }: { item: VideoContent; index: number }) => {
     const handlePress = () => {
@@ -6253,83 +6211,6 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
           </View>
         </Modal>
 
-        {/* Test Category Modal */}
-        <Modal visible={testCategoryModalVisible} transparent={true} animationType="fade" onRequestClose={closeTestCategoryModal}>
-          <View style={styles.modalOverlay} pointerEvents="box-none">
-            <TouchableOpacity
-              style={StyleSheet.absoluteFill}
-              activeOpacity={1}
-              onPress={closeTestCategoryModal}
-            />
-            <View style={[styles.upcomingEventsModalContent, { backgroundColor: theme.colors.surface }]}>
-              <LinearGradient
-                colors={theme.colors.gradient}
-                style={styles.upcomingEventsModalGradient}
-              >
-                <View style={styles.upcomingEventsModalHeader}>
-                  <View style={styles.upcomingEventsModalTitleContainer}>
-                    <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>All Business Categories</Text>
-                  </View>
-                  <TouchableOpacity 
-                    style={styles.upcomingEventsCloseButton}
-                    onPress={closeTestCategoryModal}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>✕</Text>
-                  </TouchableOpacity>
-                </View>
-              </LinearGradient>
-              <View style={[styles.upcomingEventsModalBody, { backgroundColor: theme.colors.background }]}>
-                <SectionList
-                  key={`test-categories-modal-${businessCategories.length}`}
-                  sections={groupedBusinessCategories}
-                  keyExtractor={(item, index) => `row-${index}-${item.map(c => c.id).join('-')}`}
-                  renderItem={renderTestBusinessCategoryModalItem}
-                  renderSectionHeader={renderBusinessCategorySectionHeader}
-                  contentContainerStyle={styles.upcomingEventsModalScroll}
-                  showsVerticalScrollIndicator={false}
-                  removeClippedSubviews={true}
-                  maxToRenderPerBatch={10}
-                  windowSize={5}
-                  initialNumToRender={10}
-                  updateCellsBatchingPeriod={50}
-                  stickySectionHeadersEnabled={false}
-                />
-              </View>
-            </View>
-          </View>
-        </Modal>
-
-            {/* Floating Test Button */}
-      <TouchableOpacity
-        style={{
-          position: "absolute",
-          right: moderateScale(16),
-          bottom: insets.bottom + moderateScale(80),
-          width: moderateScale(56),
-          height: moderateScale(56),
-          borderRadius: moderateScale(28),
-          backgroundColor: theme.colors.primary,
-          justifyContent: "center",
-          alignItems: "center",
-          zIndex: 1000,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.2,
-          shadowRadius: 4,
-          elevation: 6,
-        }}
-        onPress={() => setTestCategoryModalVisible(true)}
-        activeOpacity={0.8}
-      >
-        <Text style={{
-          color: "#ffffff",
-          fontSize: moderateScale(12),
-          fontWeight: "600",
-        }}>
-          TEST
-        </Text>
-      </TouchableOpacity>
 
         </SafeAreaView>
     );

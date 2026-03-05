@@ -661,7 +661,6 @@ const TodaysPickScreen: React.FC = () => {
   }, [isEventPlannerCategory, selectedServiceFilter, serviceFilterKeywords]);
 
 
-  // Helper function to batch AsyncStorage reads
   const getRecentDaysBatch = useCallback(async (today: Date, categoryPrefix: string): Promise<string[]> => {
     const keys: string[] = [];
     for (let i = 0; i < 7; i++) {
@@ -702,6 +701,18 @@ const TodaysPickScreen: React.FC = () => {
             const calendarPosters = cachedPosters.filter(p => p.category === 'Festive Alerts');
             const hasOldWellnessData = cachedPosters.some(p => p.category === 'Wellness Awareness');
             
+            // Debug calendar posters
+            console.log('📅 [TodaysPickScreen] Calendar posters from cache:', {
+              totalPosters: cachedPosters.length,
+              calendarPosters: calendarPosters.length,
+              calendarPosterDetails: calendarPosters.map(p => ({
+                id: p.id,
+                name: p.name,
+                thumbnail: p.thumbnail,
+                category: p.category
+              }))
+            });
+            
             // If cache has old wellness data or no calendar posters, clear cache and fetch fresh
             if (hasOldWellnessData || calendarPosters.length === 0) {
               console.log('🔄 [TodaysPickScreen] Cache is outdated (has wellness or no calendar), clearing cache and fetching fresh data');
@@ -716,7 +727,6 @@ const TodaysPickScreen: React.FC = () => {
               const motivationalPosters = cachedPosters.filter(p => p.category === 'Motivational');
               const businessPosters = cachedPosters.filter(p => p.category === 'Business');
               const marketingTipsPosters = cachedPosters.filter(p => p.category === 'Business Marketing Tips');
-              const calendarPosters = cachedPosters.filter(p => p.category === 'Festive Alerts');
 
               // Print response of 4 categories from cached data
               console.log('📊 [TodaysPickScreen] 4 Categories Response (CACHED):');
@@ -792,6 +802,13 @@ const TodaysPickScreen: React.FC = () => {
         business: businessResponse.status,
         marketingTips: marketingTipsByCategory.status,
         calendar: calendarResponse.status,
+      });
+      
+      // Debug calendar response specifically
+      console.log('📅 [TodaysPickScreen] Calendar API Response:', {
+        status: calendarResponse.status,
+        data: calendarResponse.status === 'fulfilled' ? calendarResponse.value : calendarResponse.reason,
+        dateString,
       });
       
       // Print detailed API responses
@@ -992,7 +1009,7 @@ const TodaysPickScreen: React.FC = () => {
                     id: selectedCalendar.id,
                     name: selectedCalendar.name || selectedCalendar.title || 'Calendar Poster',
                     thumbnail: selectedCalendar.thumbnail,
-                    category: 'Calendar/Festive',
+                    category: 'Festive Alerts',
                     downloads: selectedCalendar.downloads || 0,
                     isDownloaded: selectedCalendar.isDownloaded || false,
                     tags: selectedCalendar.tags || [],

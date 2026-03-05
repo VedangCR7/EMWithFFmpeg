@@ -126,9 +126,9 @@ export type MainStackParamList = {
   MyPosters: undefined;
   HelpSupport: { scrollToFAQ?: boolean } | undefined;
   TodaysPick: undefined;
-  TestScreen: {
-    selectedCategory: string;
-  };
+  Templates: undefined;
+  Greetings: undefined;
+  Profile: undefined;
 };
 
 export type TabParamList = {
@@ -168,7 +168,6 @@ import AboutUsScreen from '../screens/AboutUsScreen';
 import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 import HelpSupportScreen from '../screens/HelpSupportScreen';
 import TodaysPickScreen from '../screens/TodaysPickScreen';
-import TestScreen from '../screens/TestScreen';
 import LinearGradient from 'react-native-linear-gradient';
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -269,11 +268,6 @@ const TabNavigator = () => {
       <MainStack.Screen 
         name="TodaysPick" 
         component={TodaysPickScreen}
-        options={{ headerShown: false }}
-      />
-      <MainStack.Screen 
-        name="TestScreen" 
-        component={TestScreen}
         options={{ headerShown: false }}
       />
     </MainStack.Navigator>
