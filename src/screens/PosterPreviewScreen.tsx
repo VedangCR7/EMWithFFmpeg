@@ -126,6 +126,8 @@ interface PosterPreviewScreenProps {
         uri: string;
         title?: string;
         description?: string;
+        id?: string;
+        templateId?: string;
       };
       selectedLanguage: string;
       selectedTemplateId: string;
@@ -196,6 +198,7 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
   const [imageLoadError, setImageLoadError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   // Debug safe area values
   console.log('Safe area insets:', {
@@ -353,8 +356,14 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
        return;
      }
 
+     if (isDownloading) {
+       console.log('🔄 Download already in progress, skipping');
+       return;
+     }
+
      try {
        setIsProcessing(true);
+       setIsDownloading(true);
        
        console.log('=== DIRECT DOWNLOAD START ===');
        console.log('CapturedImageUri type:', typeof capturedImageUri);
@@ -477,6 +486,7 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
        );
      } finally {
        setIsProcessing(false);
+       setIsDownloading(false);
      }
    };
 
@@ -493,7 +503,7 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
     },
     previewTitle: {
       fontSize: dynamicModerateScale(11),
-      fontWeight: '700',
+      fontWeight: 700 as const,
       color: theme?.colors?.text || '#333333',
       marginBottom: dynamicModerateScale(1.5),
     },
@@ -539,16 +549,16 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
     editButtonText: {
       color: theme?.colors?.textSecondary || '#666666',
       fontSize: dynamicModerateScale(8.5),
-      fontWeight: '600',
+      fontWeight: '600' as const,
     },
     loadingText: {
       fontSize: dynamicModerateScale(9),
       color: theme?.colors?.textSecondary || '#666666',
-      fontWeight: '500',
+      fontWeight: '500' as const,
     },
     errorText: {
       fontSize: dynamicModerateScale(10),
-      fontWeight: '600',
+      fontWeight: '600' as const,
       color: '#ff6b6b',
       marginTop: dynamicModerateScale(6),
       marginBottom: dynamicModerateScale(2),
@@ -607,8 +617,8 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
         ) : imageLoadError ? (
           <View style={styles.errorContainer}>
             <Icon name="error" size={getIconSize(32)} color="#ff6b6b" />
-            <Text style={themeStyles.errorText}>Failed to load poster image</Text>
-            <Text style={themeStyles.errorSubtext}>Using fallback image</Text>
+            <Text style={styles.errorText}>Failed to load poster image</Text>
+            <Text style={styles.errorSubtext}>Using fallback image</Text>
             <Image
               source={{ uri: selectedImage.uri }}
               style={[styles.directPosterImage, { 
@@ -629,7 +639,7 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
                 alignSelf: 'center',
                 marginTop: responsiveSpacing.sm,
               }]}>
-                <Text style={themeStyles.loadingText}>Loading poster...</Text>
+                <Text style={styles.loadingText}>Loading poster...</Text>
               </View>
             )}
             <Image
@@ -660,7 +670,7 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
 
              {/* Action Buttons */}
        <View style={[
-         themeStyles.actionContainer, 
+         styles.actionContainer, 
          { 
            paddingBottom: Math.max(insets.bottom + responsiveSpacing.xs, responsiveSpacing.md)
          }
@@ -685,7 +695,7 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
           <TouchableOpacity
             style={styles.actionButton}
             onPress={downloadPoster}
-            disabled={isProcessing}
+            disabled={isProcessing || isDownloading}
           >
             <LinearGradient
               colors={isProcessing ? ['#cccccc', '#999999'] : ['#28a745', '#20c997']}
@@ -700,10 +710,10 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
         </View>
         
         <TouchableOpacity
-          style={[themeStyles.editButton, { marginBottom: moderateScale(3) }]}
+          style={[styles.editButton, { marginBottom: moderateScale(3) }]}
           onPress={() => navigation.goBack()}
         >
-          <Text style={themeStyles.editButtonText}>Back to Editor</Text>
+          <Text style={styles.editButtonText}>Back to Editor</Text>
         </TouchableOpacity>
       </View>
       
@@ -738,7 +748,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: moderateScale(12),
-    fontWeight: '700',
+    fontWeight: 700,
     color: '#333333',
   },
   headerSubtitle: {
@@ -759,7 +769,7 @@ const styles = StyleSheet.create({
   },
   previewTitle: {
     fontSize: moderateScale(11),
-    fontWeight: '700',
+    fontWeight: 700,
     color: '#333333',
     marginBottom: moderateScale(1.5),
   },
@@ -824,7 +834,7 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: moderateScale(9),
     color: '#666666',
-    fontWeight: '500',
+    fontWeight: 500,
   },
   errorContainer: {
     alignItems: 'center',
@@ -833,7 +843,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: moderateScale(10),
-    fontWeight: '600',
+    fontWeight: 600,
     color: '#ff6b6b',
     marginTop: moderateScale(6),
     marginBottom: moderateScale(2),
@@ -1033,47 +1043,6 @@ const styles = StyleSheet.create({
     borderColor: '#42a5f5',
     borderRadius: 20,
   },
-  posterImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: moderateScale(10),
-    alignSelf: 'center',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    zIndex: 1,
-  },
-  loadingText: {
-    fontSize: moderateScale(11),
-    color: '#666666',
-    fontWeight: '500',
-  },
-  errorContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: moderateScale(12),
-  },
-  errorText: {
-    fontSize: moderateScale(12),
-    fontWeight: '600',
-    color: '#ff6b6b',
-    marginTop: moderateScale(8),
-    marginBottom: moderateScale(3),
-  },
-  errorSubtext: {
-    fontSize: moderateScale(10),
-    color: '#666666',
-    marginBottom: moderateScale(10),
-  },
   actionContainer: {
     paddingHorizontal: moderateScale(4),
     paddingTop: moderateScale(4),
@@ -1103,7 +1072,7 @@ const styles = StyleSheet.create({
   shareButtonText: {
     color: '#ffffff',
     fontSize: moderateScale(9.5),
-    fontWeight: '600',
+    fontWeight: 600,
     marginLeft: moderateScale(2.5),
   },
   saveButtonGradient: {
@@ -1116,7 +1085,7 @@ const styles = StyleSheet.create({
   saveButtonText: {
     color: '#ffffff',
     fontSize: moderateScale(9.5),
-    fontWeight: '600',
+    fontWeight: 600,
     marginLeft: moderateScale(2.5),
   },
   editButton: {
@@ -1132,7 +1101,7 @@ const styles = StyleSheet.create({
   editButtonText: {
     color: '#666666',
     fontSize: moderateScale(10),
-    fontWeight: '600',
+    fontWeight: 600,
   },
 });
 

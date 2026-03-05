@@ -32,6 +32,7 @@ export interface BusinessCategoryPostersResponse {
 class BusinessCategoryPostersApiService {
   private postersCache: Map<string, { data: BusinessCategoryPoster[]; timestamp: number }> = new Map();
   private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+  private isDownloading = false;
 
   /**
    * Clear cache for a specific category or all cache
@@ -313,10 +314,18 @@ class BusinessCategoryPostersApiService {
    */
   async downloadPoster(posterId: string): Promise<{ success: boolean; message: string; downloadUrl?: string }> {
     try {
+      if (this.isDownloading) {
+        console.log('🔄 API download already in progress, skipping');
+        return { success: false, message: 'Download already in progress' };
+      }
+
+      this.isDownloading = true;
+
       const currentUser = authService.getCurrentUser();
       const userId = currentUser?.id;
       
       if (!userId) {
+        this.isDownloading = false;
         throw new Error('User not authenticated');
       }
 
@@ -330,15 +339,18 @@ class BusinessCategoryPostersApiService {
 
       if (downloadResponse.data.success) {
         logger.log('✅ Poster download tracked successfully:', posterId);
+        this.isDownloading = false;
         return { 
           success: true, 
           message: 'Poster download tracked successfully',
           downloadUrl: `https://example.com/posters/${posterId}.jpg`
         };
       } else {
+        this.isDownloading = false;
         throw new Error(downloadResponse.data.error || 'Failed to track download');
       }
     } catch (error: any) {
+      this.isDownloading = false;
       logger.error('❌ Error downloading poster:', error);
       return { success: false, message: error.message || 'Failed to download poster' };
     }

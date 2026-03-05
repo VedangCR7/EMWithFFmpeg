@@ -40,6 +40,20 @@ class DownloadedPostersService {
         }
       }
 
+      // Check if poster already exists to prevent duplicates
+      if (poster.templateId && userId) {
+        const isAlreadyDownloaded = await this.isPosterDownloaded(poster.templateId, userId);
+        if (isAlreadyDownloaded) {
+          console.log('🔄 Duplicate poster prevented locally - templateId:', poster.templateId, 'userId:', userId);
+          // Return the existing poster instead of creating a new one
+          const existingPosters = await this.getDownloadedPosters(userId);
+          const existingPoster = existingPosters.find(p => p.templateId === poster.templateId);
+          if (existingPoster) {
+            return existingPoster;
+          }
+        }
+      }
+
       // Also save to local storage for offline access
       const existingPosters = await this.getAllDownloadedPosters();
       
