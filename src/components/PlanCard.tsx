@@ -20,15 +20,17 @@ interface PlanCardProps {
   };
   isSelected: boolean;
   onSelect: () => void;
+  isSinglePlan?: boolean;
 }
 
-const PlanCard: React.FC<PlanCardProps> = ({ plan, isSelected, onSelect }) => {
+const PlanCard: React.FC<PlanCardProps> = ({ plan, isSelected, onSelect, isSinglePlan = false }) => {
   const { theme } = useTheme();
 
   return (
     <TouchableOpacity
       style={[
         styles.planCard,
+        isSinglePlan && styles.singlePlanCard,
         {
           backgroundColor: theme.colors.cardBackground,
           borderColor: isSelected ? '#667eea' : theme.colors.border,
@@ -97,6 +99,11 @@ const styles = StyleSheet.create({
     elevation: 5,
     position: 'relative',
     minHeight: 120,
+  },
+  singlePlanCard: {
+    maxWidth: '90%',
+    width: '90%',
+    alignSelf: 'center',
   },
   popularBadge: {
     position: 'absolute',

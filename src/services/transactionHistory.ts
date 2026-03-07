@@ -96,17 +96,11 @@ class TransactionHistoryService {
               type = 'subscription';
             }
 
-            const planName =
-              txn.planName ||
-              (type === 'business_profile'
-                ? 'Business Profile'
-                : plan === 'yearly'
-                  ? 'Yearly Pro'
-                  : 'Quarterly Pro');
-
-            const description =
-              txn.description ||
-              (type === 'business_profile' ? 'Business Profile Payment' : `${planName} Subscription`);
+            // Use dynamic planName from backend, avoid hardcoded values
+            const planName = txn.planName || txn.description || 'Payment';
+            
+            // Use dynamic description from backend, avoid hardcoded values
+            const description = txn.description || planName || 'Payment';
               
             return {
               id: txn.id,

@@ -124,6 +124,10 @@ const SubscriptionScreen: React.FC = () => {
   // Filter out promo plans from purchasable plans
   const purchasablePlans = contextPlans.filter(plan => plan.name !== "PROMO");
   
+  // Detect number of plans for layout adjustments
+  const planCount = purchasablePlans.length;
+  const isSinglePlan = planCount === 1;
+  
   // Use API plan data from context, always render plans regardless of subscription status
   const getSelectedPlan = () => {
     if (!selectedPlanId) return null;
@@ -758,17 +762,22 @@ const SubscriptionScreen: React.FC = () => {
         )}
 
         {/* Comparison Cards */}
-        <View style={[styles.comparisonContainer, {
-          flexDirection: getComparisonCardLayout() as 'row' | 'column',
-          gap: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(8),
-          marginBottom: dynamicModerateScale(16),
-        }]}>
+        <View style={[
+          styles.comparisonContainer,
+          isSinglePlan && styles.singlePlanContainer,
+          {
+            flexDirection: getComparisonCardLayout() as 'row' | 'column',
+            gap: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(8),
+            marginBottom: dynamicModerateScale(16),
+          }
+        ]}>
           {purchasablePlans.map((plan: any) => (
             <PlanCard 
               key={plan.id}
               plan={plan}
               isSelected={selectedPlanId === plan.id}
               onSelect={() => setSelectedPlanId(plan.id)}
+              isSinglePlan={isSinglePlan}
             />
           ))}
         </View>
@@ -1074,6 +1083,10 @@ const styles = StyleSheet.create({
   currentSubscriptionSubtitle: {
   },
   comparisonContainer: {
+  },
+  singlePlanContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   planCard: {
     flex: 1,

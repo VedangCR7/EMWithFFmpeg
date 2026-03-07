@@ -265,7 +265,7 @@ const TransactionHistoryScreen: React.FC = () => {
             fontSize: isTabletDevice ? dynamicModerateScale(11) : dynamicModerateScale(10),
             marginBottom: dynamicModerateScale(2),
           }]}>
-            {item.type === 'business_profile' ? 'Business Profile Payment' : item.planName || 'Subscription Payment'}
+            {item.planName || item.description || 'Payment'}
           </Text>
           <Text style={[styles.transactionDate, { 
             color: theme.colors.textSecondary,
