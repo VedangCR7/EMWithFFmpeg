@@ -41,6 +41,7 @@ import businessCategoriesService, { BusinessCategory } from '../services/busines
 import businessProfileService, { BusinessProfile } from '../services/businessProfile';
 import calendarApi, { CalendarPoster } from '../services/calendarApi';
 import { useTheme } from '../context/ThemeContext';
+import { useSubscription } from '../contexts/SubscriptionContext';
 import authService from '../services/auth';
 import { performanceMonitor } from '../utils/performanceMonitor';
 import { requestDeduplication } from '../utils/requestDeduplication';
@@ -625,6 +626,7 @@ const convertBusinessPosterToTemplate = (poster: any, categoryName: string): Tem
 
 const HomeScreen: React.FC = React.memo(() => {
   const { isDarkMode, theme } = useTheme();
+  const { refreshSubscription } = useSubscription();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<StackNavigationProp<MainStackParamList>>();
   
@@ -725,7 +727,7 @@ const HomeScreen: React.FC = React.memo(() => {
   // Refresh business profiles when screen comes into focus (e.g., returning from BusinessProfilesScreen)
   useFocusEffect(
     useCallback(() => {
-      console.log('=��� [HOMESCREEN] Screen focused - refreshing business profiles...');
+      console.log('🔄 [HOMESCREEN] Screen focused - refreshing business profiles and subscription...');
       const currentUserId = userProfile?.id || authService.getCurrentUser()?.id;
       if (currentUserId) {
         const loadProfiles = async () => {
@@ -745,8 +747,12 @@ const HomeScreen: React.FC = React.memo(() => {
           }
         };
         loadProfiles();
+        
+        // Also refresh subscription status
+        console.log('🔄 SUBSCRIPTION_STATUS_FETCH - HomeScreen focused, refreshing subscription');
+        refreshSubscription(true);
       }
-    }, [userProfile?.id, selectedBusinessProfileId])
+    }, [userProfile?.id, selectedBusinessProfileId, refreshSubscription])
   );
 
   const userName = useMemo(() => {

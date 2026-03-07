@@ -71,7 +71,7 @@ const CACHE_CONFIG: Array<{
   },
   // Subscription Plans - change infrequently
   {
-    pattern: '/api/mobile/subscriptions/plans',
+    pattern: '/api/mobile/subscription/plans',
     key: 'subscription_plans',
     ttl: 15 * 60 * 1000, // 15 minutes
     enabled: true,

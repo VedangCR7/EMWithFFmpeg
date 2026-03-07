@@ -13,7 +13,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import RazorpayCheckout from 'react-native-razorpay';
@@ -21,10 +21,12 @@ import { RAZORPAY_KEY_ID } from '@env';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import PaymentErrorModal from '../components/PaymentErrorModal';
+import PlanCard from '../components/PlanCard';
 import { useTheme } from '../context/ThemeContext';
 import subscriptionApi, { SubscriptionPlan, SubscriptionStatus } from '../services/subscriptionApi';
 import authService from '../services/auth';
 import api from '../services/api';
+import cacheService from '../services/cacheService';
 
 // Compact spacing multiplier to reduce all spacing (matching HomeScreen)
 const COMPACT_MULTIPLIER = 0.5;
@@ -63,7 +65,7 @@ const responsiveFontSize = {
 const SubscriptionScreen: React.FC = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const { isSubscribed, setIsSubscribed, addTransaction, transactionStats, refreshSubscription } = useSubscription();
+  const { isSubscribed, subscriptionStatus: contextSubscriptionStatus, plans: contextPlans, refreshSubscription, refreshPlans, addTransaction, setIsSubscribed, transactionStats, isLoading } = useSubscription();
   const { theme } = useTheme();
   
   // Dynamic dimensions for responsive layout (matching HomeScreen)
@@ -116,53 +118,20 @@ const SubscriptionScreen: React.FC = () => {
     title: '',
     message: '',
   });
-  const [selectedPlan] = useState<'quarterly'>('quarterly');
-  const [apiPlans, setApiPlans] = useState<SubscriptionPlan[]>([]);
-  const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus | null>(null);
-  const [apiLoading, setApiLoading] = useState(false);
-  const [apiError, setApiError] = useState<string | null>(null);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [paymentInProgress, setPaymentInProgress] = useState(false);
 
-  // Subscription plans configuration
-  const plans = {
-    quarterly: {
-      name: 'Quarterly Pro',
-      price: '₹599',
-      originalPrice: '₹1,815',
-      savings: '67% OFF',
-      period: '3 months',
-      features: [
-        'Unlimited poster creation',
-        'Premium templates',
-        'No watermarks',
-        'High-resolution exports',
-        'Priority support',
-        'Custom branding',
-        'Advanced editing tools',
-        'Cloud storage',
-      ],
-    },
+  // Filter out promo plans from purchasable plans
+  const purchasablePlans = contextPlans.filter(plan => plan.name !== "PROMO");
+  
+  // Use API plan data from context, always render plans regardless of subscription status
+  const getSelectedPlan = () => {
+    if (!selectedPlanId) return null;
+    return purchasablePlans.find(plan => plan.id === selectedPlanId);
   };
-
-  // Use API plan data if available, otherwise fallback to hardcoded
-  // Always use ₹599 as the price regardless of API response
-  const currentPlan = apiPlans.length > 0 && apiPlans[0] 
-    ? {
-        name: apiPlans[0].name,
-        price: '₹599', // Always use ₹599
-        originalPrice: `₹${Math.round(599 / 0.33)}`, // Calculate from ₹599
-        savings: '67% OFF',
-        period: apiPlans[0].duration || '3 months',
-        features: (apiPlans[0].features || plans[selectedPlan].features).filter(
-          (feature: string) => !feature.toLowerCase().includes('bulk download')
-        ),
-      }
-    : {
-        ...plans[selectedPlan],
-        features: plans[selectedPlan].features.filter(
-          (feature: string) => !feature.toLowerCase().includes('bulk download')
-        ),
-      };
+  
+  const selectedPlan = getSelectedPlan();
+  const defaultPlan = purchasablePlans.length > 0 ? purchasablePlans[0] : null;
 
   const isStatusActive = (status: SubscriptionStatus | null) => {
     if (!status) {
@@ -174,59 +143,33 @@ const SubscriptionScreen: React.FC = () => {
     const expiryDate = status.expiryDate || status.endDate;
     const isNotExpired = expiryDate ? new Date(expiryDate) > new Date() : true;
 
-    return (status.isActive || normalizedStatus === 'active') && hasValidPlan && isNotExpired;
+    // Ensure both isActive === true AND status === 'active' AND not expired
+    return status.isActive === true && normalizedStatus === 'active' && hasValidPlan && isNotExpired;
   };
 
-  // Load subscription data from API
-  const loadSubscriptionData = useCallback(async () => {
-    setApiLoading(true);
-    setApiError(null);
-    
-    try {
-      console.log('Loading subscription data from API...');
+  // Refresh subscription when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('🔄 SUBSCRIPTION_STATUS_FETCH - SubscriptionScreen focused, refreshing subscription');
+      refreshSubscription();
+      refreshPlans();
       
-      // Load subscription plans and status in parallel
-      const [plansResponse, statusResponse] = await Promise.allSettled([
-        subscriptionApi.getPlans(),
-        subscriptionApi.getStatus(),
-      ]);
-      
-      // Handle plans response
-      if (plansResponse.status === 'fulfilled') {
-        console.log('✅ Subscription plans loaded from API:', plansResponse.value.data);
-        setApiPlans(plansResponse.value.data);
-      } else {
-        console.log('❌ Failed to load plans from API, using mock data');
-        setApiError('Failed to load subscription plans');
+      // Set default selected plan when plans load
+      if (!selectedPlanId && purchasablePlans.length > 0) {
+        setSelectedPlanId(purchasablePlans[0].id);
       }
-      
-      // Handle status response
-      if (statusResponse.status === 'fulfilled') {
-        console.log('✅ Subscription status loaded from API:', statusResponse.value.data);
-        setSubscriptionStatus(statusResponse.value.data);
-        setIsSubscribed(isStatusActive(statusResponse.value.data));
-      } else {
-        console.log('❌ Failed to load status from API, using local state');
-        setApiError('Failed to load subscription status');
-      }
-      
-    } catch (error) {
-      console.error('Error loading subscription data:', error);
-      setApiError('Network error - using offline mode');
-    } finally {
-      setApiLoading(false);
-    }
-  }, []);
-
-  // Load data on component mount
-  useEffect(() => {
-    loadSubscriptionData();
-  }, [loadSubscriptionData]);
+    }, [refreshSubscription, refreshPlans, selectedPlanId, purchasablePlans.length])
+  );
 
   // Helper function to show error modal
   const showErrorModal = (title: string, message: string) => {
     setErrorModalData({ title, message });
     setIsErrorModalVisible(true);
+  };
+
+  // Handle plan selection
+  const handlePlanSelect = (plan: any) => {
+    setSelectedPlanId(plan.id);
   };
 
   // Report payment failure to backend (non-blocking)
@@ -296,36 +239,25 @@ const SubscriptionScreen: React.FC = () => {
 
     try {
       // Validate Razorpay configuration
-      if (!currentPlan) {
-        throw new Error('Current plan not found');
+      if (!selectedPlan) {
+        throw new Error('No plan selected');
       }
       
       console.log('🚀 Starting payment process...');
-      console.log('📋 Current plan:', currentPlan);
+      console.log('📋 Selected plan:', selectedPlan);
       console.log('👤 Current user:', currentUser);
-      
-      const preferredPlan =
-        apiPlans.find(plan => plan.id === 'quarterly_pro') ||
-        apiPlans.find(plan => plan.name === currentPlan.name) ||
-        apiPlans[0];
 
-      const backendPlanId = preferredPlan?.id || 'quarterly_pro';
-      const planPriceFromApiRaw = preferredPlan?.price;
-      const planPriceFromApi =
-        typeof planPriceFromApiRaw === 'number'
-          ? planPriceFromApiRaw
-          : Number(planPriceFromApiRaw);
-      const uiPriceCandidateRaw = Number(String(currentPlan.price).replace(/[^\d.]/g, ''));
+      const planPriceFromApi = selectedPlan.price;
+      const uiPriceCandidateRaw = Number(String(selectedPlan.price).replace(/[^\d.]/g, ''));
       const uiPriceCandidate =
         Number.isFinite(uiPriceCandidateRaw) && uiPriceCandidateRaw > 0 ? uiPriceCandidateRaw : NaN;
 
-      // Ensure payment amount is always 599
-      const normalizedPlanAmountRupees = 599;
+      // Use actual plan price from API
+      const normalizedPlanAmountRupees = planPriceFromApi;
 
       // Create payment order with backend to obtain order ID and amount
       orderDetails = await subscriptionApi.createPaymentOrder({
-        planId: backendPlanId,
-        amount: normalizedPlanAmountRupees,
+        planId: selectedPlan.id,
         currency: 'INR',
       });
 
@@ -377,7 +309,7 @@ const SubscriptionScreen: React.FC = () => {
 
       // Real Razorpay integration
       const options = {
-        description: `${currentPlan.name} Subscription`,
+        description: `${selectedPlan.name} Subscription`,
         currency: 'INR',
         key: resolvedKey,
         amount: amountInPaise,
@@ -451,6 +383,9 @@ const SubscriptionScreen: React.FC = () => {
           console.log('💳 Payment success response:', response);
           
           try {
+            // Get current user for transaction metadata
+            const currentUserForTransaction = authService.getCurrentUser();
+            
             // Record transaction first
             console.log('📝 Recording transaction...');
             await addTransaction({
@@ -460,30 +395,57 @@ const SubscriptionScreen: React.FC = () => {
               currency: 'INR',
               status: 'success',
               plan: selectedPlan,
-              planName: currentPlan.name,
-              description: `${currentPlan.name} Subscription`,
+              planName: selectedPlan.name,
+              description: `${selectedPlan.name} Subscription`,
               method: 'razorpay',
               metadata: {
-                email: currentUser?.email || 'user@example.com',
-                contact: currentUser?.phoneNumber || '9999999999',
-                name: currentUser?.name || 'User Name',
+                email: currentUserForTransaction?.email || 'user@example.com',
+                contact: currentUserForTransaction?.phoneNumber || '9999999999',
+                name: currentUserForTransaction?.name || 'User Name',
               },
             });
             console.log('✅ Transaction recorded');
             
             // Verify payment with backend and activate subscription
             console.log('🔄 Activating subscription...');
-            const latestStatus = await verifyPaymentAndActivateSubscription(response, {
-              planId: backendPlanId,
+            
+            const currency = 'INR';
+            
+            // Step 1: Verify payment first
+            const verifyResult = await subscriptionApi.verifyPayment({
+              orderId: response.razorpay_order_id,
+              paymentId: response.razorpay_payment_id,
+              signature: response.razorpay_signature,
               amount: amountInRupees,
               amountPaise: amountInPaise,
-              currency: 'INR',
-              user: currentUser,
+              currency,
+              planId: selectedPlan.id,
+              email: currentUserForTransaction?.email,
+              contact: currentUserForTransaction?.phoneNumber,
             });
-            console.log('✅ Subscription activated with backend');
-
+            console.log('✅ PAYMENT_SUCCESS - Payment verified:', verifyResult);
+            
+            // Step 2: Clear subscription cache immediately
+            const currentUserForCache = authService.getCurrentUser();
+            const userId = currentUserForCache?.id;
+            if (userId) {
+              await cacheService.clear(`subscription_status_${userId}`);
+              console.log('🗑️ Subscription cache cleared for user:', userId);
+            }
+            
+            // Step 3: Fetch updated subscription status
+            const statusResponse = await subscriptionApi.getStatus();
+            const latestStatus = statusResponse.data;
+            console.log('✅ SUBSCRIPTION_UPDATED - Latest status:', latestStatus);
+            
+            // Step 4: Update context (context handles state updates)
             const active = isStatusActive(latestStatus);
+            setIsSubscribed(active);
 
+            // Step 5: Ensure shared context is refreshed without cache
+            await refreshSubscription(true);
+            
+            // Step 6: Show success message and navigate
             if (active) {
               if (Platform.OS === 'android') {
                 ToastAndroid.show('🎉 Payment successful! Welcome to Pro!', ToastAndroid.LONG);
@@ -562,8 +524,8 @@ const SubscriptionScreen: React.FC = () => {
             currency: 'INR',
             status: 'failed',
             plan: selectedPlan,
-            planName: currentPlan.name,
-            description: `${currentPlan.name} Subscription - Failed`,
+            planName: selectedPlan.name,
+            description: `${selectedPlan.name} Subscription - Failed`,
             method: 'razorpay',
             metadata: {
               email: currentUser?.email || 'user@example.com',
@@ -646,9 +608,8 @@ const SubscriptionScreen: React.FC = () => {
       }
       
       // Call subscription API to activate subscription
-      // Note: Backend uses 'quarterly_pro', frontend displays as "Quarterly Pro" (promotional 3-month plan)
       const subscriptionResponse = await subscriptionApi.subscribe({
-        planId,  // Backend expects quarterly_pro for Quarterly Pro plan
+        planId,  // Use the actual plan ID from backend
         paymentMethod: 'razorpay',
         autoRenew: true,
       });
@@ -658,7 +619,6 @@ const SubscriptionScreen: React.FC = () => {
       // Refresh subscription status from backend
       const statusResponse = await subscriptionApi.getStatus();
       const latestStatus = statusResponse.data;
-      setSubscriptionStatus(latestStatus);
       const active = isStatusActive(latestStatus);
       setIsSubscribed(active);
 
@@ -668,32 +628,18 @@ const SubscriptionScreen: React.FC = () => {
       return latestStatus;
       
     } catch (error) {
-      console.error('❌ Error verifying payment and activating subscription:', error);
-      throw error; // Re-throw to handle in payment handler
+      console.error('❌ Payment verification and subscription activation failed:', error);
+      
+      // Return a failure status
+      return {
+        isActive: false,
+        plan: null,
+        expiryDate: null,
+        autoRenew: false,
+        status: 'inactive' as const
+      };
     }
   };
-
-  const FeatureItem = ({ text, included = true }: { text: string; included?: boolean }) => (
-    <View style={[styles.featureItem, {
-      gap: dynamicModerateScale(6),
-    }]}>
-      <Icon 
-        name={included ? 'check-circle' : 'remove-circle'} 
-        size={getIconSize(14)} 
-        color={included ? '#28a745' : '#dc3545'} 
-      />
-      <Text style={[
-        styles.featureText, 
-        { 
-          color: theme.colors.text,
-          fontSize: dynamicModerateScale(9),
-        },
-        !included && { color: theme.colors.textSecondary }
-      ]}>
-        {text}
-      </Text>
-    </View>
-  );
 
   return (
     <View style={[styles.container, { 
@@ -738,7 +684,7 @@ const SubscriptionScreen: React.FC = () => {
            <View style={[styles.statusContainer, {
              marginTop: dynamicModerateScale(4),
            }]}>
-            {apiLoading ? (
+            {isLoading ? (
               <View style={[styles.loadingBadge, {
                 paddingHorizontal: isTabletDevice ? dynamicModerateScale(10) : dynamicModerateScale(8),
                 paddingVertical: isTabletDevice ? dynamicModerateScale(3) : dynamicModerateScale(2),
@@ -750,17 +696,7 @@ const SubscriptionScreen: React.FC = () => {
                   marginLeft: dynamicModerateScale(3),
                 }]}>Loading...</Text>
               </View>
-            ) : apiError ? (
-              <View style={[styles.errorBadge, {
-                paddingHorizontal: isTabletDevice ? dynamicModerateScale(10) : dynamicModerateScale(8),
-                paddingVertical: isTabletDevice ? dynamicModerateScale(3) : dynamicModerateScale(2),
-                borderRadius: dynamicModerateScale(8),
-              }]}>
-                <Text style={[styles.errorBadgeText, {
-                  fontSize: dynamicModerateScale(7),
-                }]}>OFFLINE MODE</Text>
-              </View>
-            ):null}
+            ) : null}
            </View>
          </View>
         <View style={[styles.headerSpacer, { width: dynamicModerateScale(36) }]} />
@@ -775,7 +711,7 @@ const SubscriptionScreen: React.FC = () => {
       >
 
         {/* Current Subscription Status (if subscribed) */}
-        {isSubscribed && subscriptionStatus && (
+        {isSubscribed && contextSubscriptionStatus && (
           <View style={[styles.currentSubscriptionCard, { 
             backgroundColor: theme.colors.cardBackground,
             marginBottom: dynamicModerateScale(12),
@@ -795,7 +731,7 @@ const SubscriptionScreen: React.FC = () => {
                   fontSize: dynamicModerateScale(12),
                   marginBottom: dynamicModerateScale(2),
                 }]}>
-                  {subscriptionStatus.planName || 'Pro Subscription'}
+                  {contextSubscriptionStatus.planName || 'Pro Subscription'}
                 </Text>
                 <Text style={[styles.currentSubscriptionSubtitle, { 
                   color: theme.colors.textSecondary,
@@ -803,7 +739,7 @@ const SubscriptionScreen: React.FC = () => {
                   lineHeight: dynamicModerateScale(14),
                 }]}>
                   {(() => {
-                    const expiryDate = subscriptionStatus.expiryDate || subscriptionStatus.endDate;
+                    const expiryDate = contextSubscriptionStatus.expiryDate || contextSubscriptionStatus.endDate;
                     if (expiryDate) {
                       const daysRemaining = Math.ceil((new Date(expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
                       const expiryDateFormatted = new Date(expiryDate).toLocaleDateString('en-IN', {
@@ -827,68 +763,14 @@ const SubscriptionScreen: React.FC = () => {
           gap: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(8),
           marginBottom: dynamicModerateScale(16),
         }]}>
-          <View style={[styles.proCard, { 
-            backgroundColor: theme.colors.cardBackground,
-            borderRadius: dynamicModerateScale(12),
-            padding: isTabletDevice ? dynamicModerateScale(16) : dynamicModerateScale(12),
-            borderWidth: 1.5,
-            minHeight: isTabletDevice ? dynamicModerateScale(280) : dynamicModerateScale(220),
-          }]}>
-            <View style={[styles.proBadge, {
-              top: isTabletDevice ? dynamicModerateScale(-10) : dynamicModerateScale(-8),
-              paddingHorizontal: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(10),
-              paddingVertical: isTabletDevice ? dynamicModerateScale(5) : dynamicModerateScale(4),
-              borderRadius: dynamicModerateScale(10),
-            }]}>
-              <Text style={[styles.proBadgeText, {
-                fontSize: dynamicModerateScale(9),
-              }]}>PRO</Text>
-            </View>
-            
-            <View style={[styles.planHeader, {
-              marginBottom: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(10),
-            }]}>
-              <Text style={[styles.planName, { 
-                color: theme.colors.text,
-                fontSize: dynamicModerateScale(14),
-                marginBottom: dynamicModerateScale(4),
-              }]}>Pro</Text>
-              <View style={styles.priceContainer}>
-                <Text style={[styles.planPrice, {
-                  fontSize: dynamicModerateScale(20),
-                }]}>{currentPlan.price}</Text>
-                <Text style={[styles.originalPrice, { 
-                  color: theme.colors.textSecondary,
-                  fontSize: dynamicModerateScale(10),
-                  marginTop: dynamicModerateScale(2),
-                }]}>{currentPlan.originalPrice}</Text>
-                <View style={[styles.savingsBadge, {
-                  top: dynamicModerateScale(-8),
-                  right: dynamicModerateScale(-24),
-                  paddingHorizontal: dynamicModerateScale(6),
-                  paddingVertical: dynamicModerateScale(2),
-                  borderRadius: dynamicModerateScale(8),
-                }]}>
-                  <Text style={[styles.savingsText, {
-                    fontSize: dynamicModerateScale(7),
-                  }]}>{currentPlan.savings}</Text>
-                </View>
-              </View>
-              <Text style={[styles.planPeriod, { 
-                color: theme.colors.textSecondary,
-                fontSize: dynamicModerateScale(9),
-                marginTop: dynamicModerateScale(2),
-              }]}>per {currentPlan.period}</Text>
-            </View>
-            
-            <View style={[styles.featuresList, {
-              gap: dynamicModerateScale(6),
-            }]}>
-              {currentPlan.features.map((feature: string, index: number) => (
-                <FeatureItem key={index} text={feature} included={true} />
-              ))}
-            </View>
-          </View>
+          {purchasablePlans.map((plan: any) => (
+            <PlanCard 
+              key={plan.id}
+              plan={plan}
+              isSelected={selectedPlanId === plan.id}
+              onSelect={() => setSelectedPlanId(plan.id)}
+            />
+          ))}
         </View>
 
         {/* Benefits Section */}
@@ -1069,7 +951,9 @@ const SubscriptionScreen: React.FC = () => {
                  ? 'Already Pro' 
                  : isProcessing || paymentInProgress
                    ? 'Processing...' 
-                   : `Upgrade to Pro - ${currentPlan.price}`
+                   : selectedPlan 
+                     ? `Upgrade to Pro - ₹${selectedPlan.price}`
+                     : 'Select a Plan'
                }
              </Text>
           </LinearGradient>

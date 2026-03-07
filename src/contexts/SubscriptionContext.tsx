@@ -8,6 +8,7 @@ interface SubscriptionContextType {
   setIsSubscribed: (value: boolean) => void;
   subscriptionStatus: SubscriptionStatus | null;
   isLoading: boolean;
+  plans: any[]; // Add plans state
   transactions: Transaction[];
   transactionStats: {
     total: number;
@@ -19,6 +20,7 @@ interface SubscriptionContextType {
     yearlySubscriptions: number;
   };
   refreshSubscription: (force?: boolean) => Promise<void>;
+  refreshPlans: () => Promise<void>; // Add refresh plans method
   refreshTransactions: () => Promise<void>;
   addTransaction: (transaction: Omit<Transaction, 'id' | 'timestamp'>) => Promise<Transaction>;
   clearTransactions: () => Promise<void>;
@@ -36,6 +38,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [plans, setPlans] = useState<any[]>([]); // Add plans state
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [transactionStats, setTransactionStats] = useState({
     total: 0,
@@ -68,6 +71,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       // Clear all subscription state
       setIsSubscribed(false);
       setSubscriptionStatus(null);
+      setPlans([]); // Clear plans
       setTransactions([]);
       setTransactionStats({
         total: 0,
@@ -86,6 +90,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       if (newUserId) {
         console.log('✅ New user detected, fetching subscription data for:', newUserId);
         refreshSubscription();
+        refreshPlans(); // Fetch plans
         refreshTransactions();
       } else {
         console.log('⚠️ User logged out, subscription state cleared');
@@ -100,6 +105,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
     
     if (currentUser?.id) {
       refreshSubscription();
+      refreshPlans(); // Fetch plans
       refreshTransactions();
     }
   }, []);
@@ -143,7 +149,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       
       isRefreshingRef.current = true;
       setIsLoading(true);
-      console.log('🔄 Refreshing subscription status...');
+      console.log('🔄 SUBSCRIPTION_STATUS_FETCH - Refreshing subscription status...');
       
       const currentUser = authService.getCurrentUser();
       const userId = currentUser?.id;
@@ -154,6 +160,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
         console.log('⚠️ No user ID available, clearing subscription state');
         setIsSubscribed(false);
         setSubscriptionStatus(null);
+        setPlans([]); // Clear plans
         setTransactions([]);
         setTransactionStats({
           total: 0,
@@ -177,23 +184,31 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
         // Check if subscription is active and not expired
         // Make status check case-insensitive
         const normalizedStatus = status.status?.toLowerCase();
-        const hasValidPlan = status.planId || status.plan || status.planName;
         const isNotExpired = status.expiryDate ? new Date(status.expiryDate) > new Date() : 
                             status.endDate ? new Date(status.endDate) > new Date() : true;
         
-        const isActive = (status.isActive || normalizedStatus === 'active') && 
-          hasValidPlan &&
-          isNotExpired;
+        // Ensure both isActive === true AND status === 'active' AND notExpired
+        // Note: hasValidPlan check removed - inactive users may not have plan data
+        const isActive = status.isActive === true && normalizedStatus === 'active' && isNotExpired;
         
         setIsSubscribed(Boolean(isActive));
         setSubscriptionStatus(status);
         lastRefreshTimeRef.current = now;
         
+        console.log('✅ SUBSCRIPTION_UPDATED - Subscription status updated:', {
+          isActive: Boolean(isActive),
+          normalizedStatus,
+          isNotExpired,
+          planId: status.planId,
+          planName: status.planName,
+          expiryDate: status.expiryDate,
+          endDate: status.endDate
+        });
+        
         console.log('🔐 Subscription access:', isActive ? 'GRANTED ✅' : 'DENIED ❌');
         console.log('🔍 Status details:', {
           isActive: status.isActive,
           normalizedStatus,
-          hasValidPlan,
           isNotExpired,
           planId: status.planId,
           planName: status.planName,
@@ -219,6 +234,25 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       isRefreshingRef.current = false;
       lastRefreshTimeRef.current = Date.now();
       console.log('✅ Subscription refresh completed');
+    }
+  }, []);
+
+  // Refresh plans from backend
+  const refreshPlans = useCallback(async () => {
+    try {
+      console.log('🔄 Refreshing subscription plans...');
+      const response = await subscriptionApi.getPlans();
+      
+      if (response.success) {
+        setPlans(response.data || []);
+        console.log('✅ Plans refreshed successfully:', response.data?.length || 0, 'plans');
+      } else {
+        console.log('⚠️ Failed to fetch plans, using empty array');
+        setPlans([]);
+      }
+    } catch (error) {
+      console.error('❌ Error refreshing plans:', error);
+      setPlans([]);
     }
   }, []);
 
@@ -283,6 +317,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
     console.log('🧹 Clearing all subscription data...');
     setIsSubscribed(false);
     setSubscriptionStatus(null);
+    setPlans([]); // Clear plans
     setTransactions([]);
     setTransactionStats({
       total: 0,
@@ -313,8 +348,10 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
 
     // Check if subscription status is active (case-insensitive)
     const normalizedStatus = subscriptionStatus.status?.toLowerCase();
-    if (normalizedStatus !== 'active') {
-      console.log(`🔒 Premium access denied for feature: ${feature} (subscription status: ${normalizedStatus})`);
+    
+    // Ensure both isActive === true AND status === 'active'
+    if (subscriptionStatus.isActive !== true || normalizedStatus !== 'active') {
+      console.log(`🔒 Premium access denied for feature: ${feature} (subscription status: isActive=${subscriptionStatus.isActive}, status=${normalizedStatus})`);
       return false;
     }
 
@@ -328,9 +365,11 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       setIsSubscribed,
       subscriptionStatus,
       isLoading,
+      plans, // Add plans
       transactions,
       transactionStats,
       refreshSubscription,
+      refreshPlans, // Add refreshPlans
       refreshTransactions,
       addTransaction,
       clearTransactions,

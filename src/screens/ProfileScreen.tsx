@@ -75,6 +75,7 @@ const responsiveFontSize = {
 
 const ProfileScreen: React.FC = () => {
   const currentUser = authService.getCurrentUser();
+  const { refreshSubscription } = useSubscription();
   
   // Dynamic dimensions for responsive layout (matching HomeScreen)
   const [dimensions, setDimensions] = useState(() => {
@@ -396,6 +397,10 @@ const ProfileScreen: React.FC = () => {
             console.log('⚠️ No user ID available for loading profile data');
             return;
           }
+          
+          // Also refresh subscription status
+          console.log('🔄 SUBSCRIPTION_STATUS_FETCH - ProfileScreen focused, refreshing subscription');
+          refreshSubscription(true);
 
           // Check cache validity unless force refresh
           if (!forceRefresh) {

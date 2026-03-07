@@ -57,7 +57,6 @@ export interface SubscriptionResponse {
 
 export interface CreatePaymentOrderParams {
   planId: string;
-  amount?: number;
   currency?: string;
 }
 
@@ -83,7 +82,7 @@ class SubscriptionApiService {
   // Get subscription plans
   async getPlans(): Promise<PlansResponse> {
     try {
-      const response = await api.get('/api/mobile/subscriptions/plans');
+      const response = await api.get('/api/mobile/subscription/plans');
       
       // Check if response has the expected structure
       const plans = response.data?.data?.plans || response.data?.plans || [];
@@ -97,17 +96,30 @@ class SubscriptionApiService {
         };
       }
       
+      console.log("Subscription plans API response:", response.data);
+      
       // Transform the response to match expected format
-      const transformedData = plans.map((plan: any) => ({
-        id: plan.id,
-        name: plan.name,
-        description: plan.features?.join(', ') || plan.description || '',
-        price: plan.price,
-        currency: 'INR',
-        duration: plan.period || plan.duration,
-        features: plan.features || [],
-        isPopular: plan.id === 'yearly_pro'
-      }));
+      const transformedData = plans.map((plan: any) => {
+        // Safe parsing of features to handle array, string, or null/undefined
+        const parsedFeatures = Array.isArray(plan.features)
+          ? plan.features
+          : typeof plan.features === "string"
+            ? plan.features.split(',').map((f: string) => f.trim()).filter((f: string) => f)
+            : [];
+        
+        return {
+          id: plan.id || '',
+          name: plan.name || '',
+          description: plan.description || parsedFeatures.join(', ') || '',
+          price: typeof plan.price === 'number' ? plan.price : 0,
+          currency: plan.currency || 'INR',
+          duration: plan.period || plan.duration || 'monthly',
+          features: parsedFeatures,
+          isPopular: plan.originalPrice && plan.originalPrice > plan.price // Popular if has discount
+        };
+      });
+      
+      console.log("Parsed subscription plans:", transformedData);
 
       return {
         success: true,
@@ -135,17 +147,13 @@ class SubscriptionApiService {
         userId,
       };
 
-      if (typeof params.amount === 'number') {
-        payload.amount = params.amount;
-      }
-
       if (params.currency) {
         payload.currency = params.currency;
       }
 
       console.log('🧾 Creating Razorpay order with payload:', payload);
 
-      const response = await api.post('/api/mobile/subscriptions/create-order', payload);
+      const response = await api.post('/api/mobile/subscription/create-order', payload);
       const responseData = response.data?.data ?? response.data;
       const data =
         responseData?.order ??
@@ -164,7 +172,7 @@ class SubscriptionApiService {
           ? data.amount
           : typeof data?.amount === 'string'
             ? Number(data.amount)
-            : params.amount ?? 0;
+            : 0; // Backend will always provide amount
 
       const rawAmountInPaise =
         typeof data?.amountInPaise === 'number'
@@ -237,7 +245,7 @@ class SubscriptionApiService {
       
       // Try to call the backend API first
       try {
-        const response = await api.post('/api/mobile/subscriptions/subscribe', {
+        const response = await api.post('/api/mobile/subscription/subscribe', {
           planId: data.planId,
           paymentMethod: data.paymentMethod,
           autoRenew: data.autoRenew,
@@ -291,7 +299,7 @@ class SubscriptionApiService {
 
       // Use cache service with user-specific key
       const cacheKey = `subscription_status_${userId}`;
-      const CACHE_TTL = 3 * 60 * 1000; // 3 minutes
+      const CACHE_TTL = 10 * 1000; // 10 seconds
 
       return await cacheService.getOrFetch(
         cacheKey,
@@ -300,36 +308,73 @@ class SubscriptionApiService {
           
           // Try to get status from backend first
           try {
-            const response = await api.get('/api/mobile/subscriptions/status');
+            const response = await api.get('/api/mobile/subscription/status');
             
             console.log('📊 Subscription API response:', response.data);
+            console.log('🔍 Raw subscription data:', JSON.stringify(response.data, null, 2));
             
             // Check if response has the expected structure
             if (response.data.success) {
-              // Transform the response to match expected format
-              const subscriptionData = response.data.data;
+              // Safely parse subscription data with null checks
+              const subscriptionData = response.data?.data ?? null;
+              console.log("Parsed subscription:", subscriptionData);
+              console.log("Subscription fields check:", {
+                hasIsActive: !!subscriptionData?.isActive,
+                isActive: subscriptionData?.isActive,
+                hasStatus: !!subscriptionData?.status,
+                status: subscriptionData?.status,
+                hasDaysRemaining: !!subscriptionData?.daysRemaining,
+                daysRemaining: subscriptionData?.daysRemaining,
+                hasExpiryDate: !!subscriptionData?.expiryDate,
+                expiryDate: subscriptionData?.expiryDate,
+                hasEndDate: !!subscriptionData?.endDate,
+                endDate: subscriptionData?.endDate,
+                hasPlan: !!subscriptionData?.plan,
+                plan: subscriptionData?.plan,
+                hasPlanId: !!subscriptionData?.planId,
+                planId: subscriptionData?.planId
+              });
+              
+              // Return default if subscription data is null/undefined
+              if (!subscriptionData) {
+                return {
+                  success: true,
+                  data: {
+                    isActive: false,
+                    plan: null,
+                    expiryDate: null,
+                    autoRenew: false,
+                    status: "inactive"
+                  },
+                  message: 'No subscription data found'
+                };
+              }
               
               return {
                 success: true,
                 data: {
-                  isActive: subscriptionData.isActive || (subscriptionData.status === 'active' && subscriptionData.daysRemaining > 0),
-                  plan: subscriptionData.plan && subscriptionData.plan !== 'free' ? {
-                    id: subscriptionData.plan === 'quarterly_pro' ? 'quarterly_pro' : 'yearly_pro',
-                    name: subscriptionData.plan === 'quarterly_pro' ? 'Quarterly Pro' : 'Yearly Pro',
+                  isActive: Boolean(subscriptionData?.isActive && subscriptionData?.status === 'active' && 
+                    (subscriptionData?.daysRemaining > 0 || 
+                     (subscriptionData?.expiryDate && new Date(subscriptionData.expiryDate) > new Date()) ||
+                     (subscriptionData?.endDate && new Date(subscriptionData.endDate) > new Date()) ||
+                     (!subscriptionData?.expiryDate && !subscriptionData?.endDate))),
+                  plan: subscriptionData?.plan && subscriptionData.plan !== 'free' ? {
+                    id: subscriptionData.planId || subscriptionData.plan || 'unknown',
+                    name: subscriptionData.planName || subscriptionData.plan || 'Unknown Plan',
                     description: 'Premium subscription',
-                    price: subscriptionData.plan === 'quarterly_pro' ? 1 : 1999,
+                    price: 0, // Price not needed for status display
                     currency: 'INR',
-                    duration: subscriptionData.plan === 'quarterly_pro' ? 'quarterly' : 'yearly',
+                    duration: 'unknown',
                     features: [],
-                    isPopular: subscriptionData.plan === 'yearly_pro'
+                    isPopular: false
                   } : null,
-                  planId: subscriptionData.planId || (subscriptionData.plan !== 'free' ? subscriptionData.plan : null),
-                  planName: subscriptionData.planName || (subscriptionData.plan !== 'free' ? (subscriptionData.plan === 'quarterly_pro' ? 'Quarterly Pro' : 'Yearly Pro') : null),
-                  startDate: subscriptionData.startDate,
-                  endDate: subscriptionData.endDate,
-                  expiryDate: subscriptionData.expiryDate || subscriptionData.endDate,
-                  autoRenew: subscriptionData.autoRenew || true,
-                  status: subscriptionData.status
+                  planId: subscriptionData?.planId || (subscriptionData?.plan !== 'free' ? subscriptionData?.plan : null),
+                  planName: subscriptionData?.planName || subscriptionData?.plan || null,
+                  startDate: subscriptionData?.startDate,
+                  endDate: subscriptionData?.endDate,
+                  expiryDate: subscriptionData?.expiryDate || subscriptionData?.endDate,
+                  autoRenew: Boolean(subscriptionData?.autoRenew),
+                  status: subscriptionData?.status || 'inactive'
                 },
                 message: 'Status fetched successfully'
               };
@@ -394,8 +439,8 @@ class SubscriptionApiService {
         success: true,
         data: {
           isActive: true,
-          planId: 'quarterly_pro',
-          planName: 'Quarterly Pro',
+          planId: undefined, // Will be determined by backend
+          planName: undefined, // Will be determined by backend
           endDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
           expiryDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
           autoRenew: true,
@@ -430,7 +475,7 @@ class SubscriptionApiService {
       }
 
 
-      const response = await api.get('/api/mobile/subscriptions/history');
+      const response = await api.get('/api/mobile/subscription/history');
       
       console.log('📡 Subscription history API response:', JSON.stringify(response.data, null, 2));
       
@@ -452,8 +497,8 @@ class SubscriptionApiService {
       // Transform the response to match expected format
       const transformedData = paymentsArray.map((payment: any) => ({
         id: payment.id,
-        planId: payment.plan,
-        planName: payment.plan === 'quarterly_pro' ? 'Quarterly Pro' : 'Yearly Pro',
+        planId: payment.plan || 'unknown',
+        planName: payment.planName || payment.plan || 'Unknown Plan',
         amount: payment.amount,
         currency: payment.currency,
         status: payment.status.toLowerCase(),
@@ -495,7 +540,7 @@ class SubscriptionApiService {
 
       console.log('Cancelling subscription for user:', userId);
       
-      const response = await api.post('/api/mobile/subscriptions/cancel');
+      const response = await api.post('/api/mobile/subscription/cancel');
       
       // Clear cache after cancellation
       this.clearStatusCache(userId);
@@ -564,7 +609,7 @@ class SubscriptionApiService {
 
       console.log('📨 Sending verify-payment payload:', payload);
 
-      const response = await api.post('/api/mobile/subscriptions/verify-payment', payload);
+      const response = await api.post('/api/mobile/subscription/verify-payment', payload);
       
       console.log('✅ Payment verified successfully:', response.data);
       
