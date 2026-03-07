@@ -11,6 +11,7 @@ import {
   Easing,
   Modal,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useTheme } from '../context/ThemeContext';
 import OptimizedImage from './OptimizedImage';
@@ -629,12 +630,42 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
     handleDateSelect(todayDate);
   }, [upcomingDates, handleDateSelect, formatDateKey]);
 
-  const handlePosterPress = useCallback((poster: Template, dateString: string) => {
+  const handlePosterPress = useCallback(async (poster: Template, dateString: string) => {
+    // Get business profile data for consistent branding
+    const getBusinessProfileData = async () => {
+      try {
+        const profileId = await AsyncStorage.getItem('selectedBusinessProfileId');
+        const profileName = await AsyncStorage.getItem('selectedBusinessProfileName');
+        const profileCategory = await AsyncStorage.getItem('selectedBusinessProfileCategory');
+        
+        return {
+          selectedBusinessProfileId: profileId,
+          selectedBusinessProfile: profileId && profileName ? {
+            id: profileId,
+            name: profileName,
+            category: profileCategory
+          } : null,
+          businessCategory: profileCategory || undefined
+        };
+      } catch (error) {
+        console.warn('Error loading business profile data:', error);
+        return {
+          selectedBusinessProfileId: null,
+          selectedBusinessProfile: null,
+          businessCategory: undefined
+        };
+      }
+    };
+
+    const businessProfileData = await getBusinessProfileData();
     navigation.navigate('PosterPlayer', {
       selectedPoster: poster,
       relatedPosters: selectedDatePosters.filter(p => p.id !== poster.id),
       calendarDate: dateString,
       originScreen: 'Calendar',
+      selectedBusinessProfile: businessProfileData.selectedBusinessProfile,
+      selectedBusinessProfileId: businessProfileData.selectedBusinessProfileId,
+      businessCategory: businessProfileData.businessCategory,
     });
   }, [navigation, selectedDatePosters]);
 
@@ -825,7 +856,7 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
             ];
 
             if (isCurrentDay) {
-              dayCellStyles.push(styles.currentDayCell, styles.dayCellFill);
+              dayCellStyles.push(styles.currentDayCell);
             }
 
             if (isSelected) {
@@ -1024,6 +1055,7 @@ const styles = StyleSheet.create({
   currentDayCell: {
     borderWidth: 0,
     borderColor: 'transparent',
+    backgroundColor: 'transparent',
   },
   dayCellFill: {
     width: '100%',
