@@ -60,6 +60,7 @@ export type MainStackParamList = {
     };
     selectedLanguage: string;
     selectedTemplateId: string;
+    selectedBusinessProfile?: any;
   };
   PosterPlayer: {
     selectedPoster: any;
@@ -71,6 +72,8 @@ export type MainStackParamList = {
     originScreen?: string;
     posterLimit?: number;
     calendarDate?: string;
+    selectedBusinessProfile?: any;
+    selectedBusinessProfileId?: string;
   };
   AboutUs: undefined;
   PrivacyPolicy: undefined;

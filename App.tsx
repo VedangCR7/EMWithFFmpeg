@@ -12,6 +12,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import AppNavigator from './src/navigation/AppNavigator';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { SubscriptionProvider } from './src/contexts/SubscriptionContext';
+import { BusinessProfileProvider } from './src/context/BusinessProfileContext';
 import TokenExpirationHandler from './src/components/TokenExpirationHandler';
 import { queryClient } from './src/config/queryClient';
 
@@ -66,10 +67,12 @@ const App: React.FC = () => {
       <QueryClientProvider client={queryClient}>
         <SafeAreaProvider>
           <ThemeProvider>
-            <SubscriptionProvider>
-              <AppNavigator />
-              <TokenExpirationHandler />
-            </SubscriptionProvider>
+            <BusinessProfileProvider>
+              <SubscriptionProvider>
+                <AppNavigator />
+                <TokenExpirationHandler />
+              </SubscriptionProvider>
+            </BusinessProfileProvider>
           </ThemeProvider>
         </SafeAreaProvider>
       </QueryClientProvider>

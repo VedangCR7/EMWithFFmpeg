@@ -384,13 +384,23 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
   const { isDarkMode, theme } = useTheme();
   const { selectedBusinessProfile: globalSelectedProfile } = useBusinessProfile();
   
-  // Determine active business profile with fallback priority:
-  // 1️⃣ Context profile (global state)
-  // 2️⃣ Navigation param 
-  // 3️⃣ AsyncStorage (loaded in useBusinessProfile)
+  // Determine active business profile with safe priority logic:
+  // 1️⃣ Context profile (global state) - PRIMARY SOURCE OF TRUTH
+  // 2️⃣ Navigation param - FALLBACK ONLY
+  // 3️⃣ Null if neither available
   const activeBusinessProfile = useMemo(() => {
-    return globalSelectedProfile || selectedBusinessProfileParam;
+    return globalSelectedProfile ?? selectedBusinessProfileParam ?? null;
   }, [globalSelectedProfile, selectedBusinessProfileParam]);
+  
+  // Debug logging for active profile changes
+  useEffect(() => {
+    console.log("📊 [POSTER EDITOR] Active profile:", activeBusinessProfile?.name || 'None');
+    console.log("📊 [POSTER EDITOR] Profile source:", {
+      globalSelectedProfile: globalSelectedProfile?.name || 'None',
+      selectedBusinessProfileParam: selectedBusinessProfileParam?.name || 'None',
+      activeProfile: activeBusinessProfile?.name || 'None'
+    });
+  }, [activeBusinessProfile, globalSelectedProfile, selectedBusinessProfileParam]);
   
   // Get high quality image URL for editor (replace thumbnail params with high quality)
   const getHighQualityImageUrl = (imageUri: string): string => {
@@ -1283,24 +1293,8 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     }
   };
 
-  // Save selected profile to AsyncStorage when it changes
-  useEffect(() => {
-    if (activeBusinessProfile) {
-      const saveSelectedProfile = async () => {
-        try {
-          const userId = await AsyncStorage.getItem('userId');
-          if (userId) {
-            await AsyncStorage.setItem('selectedBusinessProfileId', activeBusinessProfile.id);
-            await AsyncStorage.setItem('selectedBusinessProfileUserId', userId);
-            console.log('✅ Saved selected business profile:', activeBusinessProfile.name);
-          }
-        } catch (error) {
-          console.error('Error saving selected business profile:', error);
-        }
-      };
-      saveSelectedProfile();
-    }
-  }, [activeBusinessProfile]);
+  // Note: AsyncStorage operations for business profile are now handled by BusinessProfileContext
+  // This prevents duplicate saves and ensures single source of truth
 
   // Helper function to safely apply business profile and prevent duplicates
   const applyProfileSafely = useCallback((profile: BusinessProfile) => {
@@ -1323,9 +1317,17 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
 
   // Apply active business profile when it changes
   useEffect(() => {
+    console.log('🔍 [POSTER EDITOR] Business profile check:', {
+      activeBusinessProfile: activeBusinessProfile?.name || 'None',
+      hasProfile: !!activeBusinessProfile,
+      currentLayers: layers.length
+    });
+    
     if (activeBusinessProfile) {
       applyProfileSafely(activeBusinessProfile);
       console.log('✅ [POSTER EDITOR] Applied active business profile:', activeBusinessProfile.name);
+    } else {
+      console.log('⚠️ [POSTER EDITOR] No active business profile available');
     }
   }, [activeBusinessProfile, applyProfileSafely]);
 
@@ -2913,7 +2915,10 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                 }
               </Text>
               <Text style={[styles.instructionsText, { marginTop: 10, fontSize: 12, color: '#ff6b6b' }]}>
-                DEBUG: layers.length={layers.length}, loadingProfiles={loadingProfiles}, businessProfiles.length={businessProfiles.length}
+                {businessProfiles.length === 0 
+                  ? 'Please create a business profile first to generate poster content.' 
+                  : 'No content applied. Try selecting a different business profile.'
+                }
               </Text>
             </View>
           )}
