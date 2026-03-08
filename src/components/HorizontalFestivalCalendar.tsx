@@ -11,9 +11,9 @@ import {
   Easing,
   Modal,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useTheme } from '../context/ThemeContext';
+import { useBusinessProfile } from '../context/BusinessProfileContext';
 import OptimizedImage from './OptimizedImage';
 import { Template } from '../services/dashboard';
 import calendarApi from '../services/calendarApi';
@@ -351,6 +351,7 @@ interface HorizontalFestivalCalendarProps {
 
 const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({ refreshKey = 0 }) => {
   const { theme } = useTheme();
+  const { selectedBusinessProfile } = useBusinessProfile();
   const navigation = useNavigation<StackNavigationProp<MainStackParamList>>();
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedDatePosters, setSelectedDatePosters] = useState<Template[]>([]);
@@ -631,43 +632,17 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
   }, [upcomingDates, handleDateSelect, formatDateKey]);
 
   const handlePosterPress = useCallback(async (poster: Template, dateString: string) => {
-    // Get business profile data for consistent branding
-    const getBusinessProfileData = async () => {
-      try {
-        const profileId = await AsyncStorage.getItem('selectedBusinessProfileId');
-        const profileName = await AsyncStorage.getItem('selectedBusinessProfileName');
-        const profileCategory = await AsyncStorage.getItem('selectedBusinessProfileCategory');
-        
-        return {
-          selectedBusinessProfileId: profileId,
-          selectedBusinessProfile: profileId && profileName ? {
-            id: profileId,
-            name: profileName,
-            category: profileCategory
-          } : null,
-          businessCategory: profileCategory || undefined
-        };
-      } catch (error) {
-        console.warn('Error loading business profile data:', error);
-        return {
-          selectedBusinessProfileId: null,
-          selectedBusinessProfile: null,
-          businessCategory: undefined
-        };
-      }
-    };
-
-    const businessProfileData = await getBusinessProfileData();
+    // Use global business profile for consistent branding
     navigation.navigate('PosterPlayer', {
       selectedPoster: poster,
       relatedPosters: selectedDatePosters.filter(p => p.id !== poster.id),
       calendarDate: dateString,
       originScreen: 'Calendar',
-      selectedBusinessProfile: businessProfileData.selectedBusinessProfile,
-      selectedBusinessProfileId: businessProfileData.selectedBusinessProfileId,
-      businessCategory: businessProfileData.businessCategory,
+      selectedBusinessProfile: selectedBusinessProfile,
+      selectedBusinessProfileId: selectedBusinessProfile?.id,
+      businessCategory: selectedBusinessProfile?.category,
     });
-  }, [navigation, selectedDatePosters]);
+  }, [navigation, selectedDatePosters, selectedBusinessProfile]);
 
   const renderPosterCard = useCallback(({ item }: { item: Template }) => {
     return (

@@ -39,10 +39,12 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { PanGestureHandler, State, PinchGestureHandler } from 'react-native-gesture-handler';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import businessProfileService, { BusinessProfile } from '../services/businessProfile';
 import authService from '../services/auth';
 import { GOOGLE_FONTS, getFontsByCategory, SYSTEM_FONTS, getFontFamily } from '../services/fontService';
 import { useSubscription } from '../contexts/SubscriptionContext';
+import { useBusinessProfile } from '../context/BusinessProfileContext';
 import Watermark from '../components/Watermark';
 import { useTheme } from '../context/ThemeContext';
 import PremiumTemplateModal from '../components/PremiumTemplateModal';
@@ -369,6 +371,7 @@ interface PosterEditorScreenProps {
       };
       selectedLanguage: string;
       selectedTemplateId: string;
+      selectedBusinessProfile?: any;
     };
   };
 }
@@ -376,9 +379,18 @@ interface PosterEditorScreenProps {
 const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const { selectedImage, selectedLanguage, selectedTemplateId } = route.params;
+  const { selectedImage, selectedLanguage, selectedTemplateId, selectedBusinessProfile: selectedBusinessProfileParam } = route.params;
   const { isSubscribed, checkPremiumAccess, refreshSubscription } = useSubscription();
   const { isDarkMode, theme } = useTheme();
+  const { selectedBusinessProfile: globalSelectedProfile } = useBusinessProfile();
+  
+  // Determine active business profile with fallback priority:
+  // 1️⃣ Context profile (global state)
+  // 2️⃣ Navigation param 
+  // 3️⃣ AsyncStorage (loaded in useBusinessProfile)
+  const activeBusinessProfile = useMemo(() => {
+    return globalSelectedProfile || selectedBusinessProfileParam;
+  }, [globalSelectedProfile, selectedBusinessProfileParam]);
   
   // Get high quality image URL for editor (replace thumbnail params with high quality)
   const getHighQualityImageUrl = (imageUri: string): string => {
@@ -1067,7 +1079,6 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
 
   // State for business profiles
   const [businessProfiles, setBusinessProfiles] = useState<BusinessProfile[]>([]);
-  const [selectedBusinessProfile, setSelectedBusinessProfile] = useState<BusinessProfile | null>(null);
   const [showProfileSelectionModal, setShowProfileSelectionModal] = useState(false);
   const [loadingProfiles, setLoadingProfiles] = useState(true);
 
@@ -1234,7 +1245,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     ]).start();
   }, []);
 
-  // Fetch business profiles - now user-specific
+  // Fetch business profiles - simplified since context handles AsyncStorage
   const fetchBusinessProfiles = async () => {
     try {
       setLoadingProfiles(true);
@@ -1258,14 +1269,8 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
         setBusinessProfiles(profiles);
         console.log('✅ Loaded user-specific business profiles:', profiles.length);
         
-        if (profiles.length === 1) {
-          // If only one profile, auto-select it
-          setSelectedBusinessProfile(profiles[0]);
-          applyBusinessProfileToPoster(profiles[0]);
-        } else if (profiles.length > 1) {
-          // If multiple profiles, show selection modal
-          setShowProfileSelectionModal(true);
-        }
+        // Context will handle profile selection and AsyncStorage
+        // No need to manually apply profiles here
       } else {
         console.log('⚠️ No user-specific business profiles found');
         setShowConnectionErrorModal(true);
@@ -1278,9 +1283,54 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     }
   };
 
+  // Save selected profile to AsyncStorage when it changes
+  useEffect(() => {
+    if (activeBusinessProfile) {
+      const saveSelectedProfile = async () => {
+        try {
+          const userId = await AsyncStorage.getItem('userId');
+          if (userId) {
+            await AsyncStorage.setItem('selectedBusinessProfileId', activeBusinessProfile.id);
+            await AsyncStorage.setItem('selectedBusinessProfileUserId', userId);
+            console.log('✅ Saved selected business profile:', activeBusinessProfile.name);
+          }
+        } catch (error) {
+          console.error('Error saving selected business profile:', error);
+        }
+      };
+      saveSelectedProfile();
+    }
+  }, [activeBusinessProfile]);
+
+  // Helper function to safely apply business profile and prevent duplicates
+  const applyProfileSafely = useCallback((profile: BusinessProfile) => {
+    if (!profile) {
+      console.log('⚠️ [POSTER EDITOR] No profile provided to applyProfileSafely');
+      return;
+    }
+
+    console.log('🔄 [POSTER EDITOR] Applying business profile:', profile.name);
+    console.log('📋 [POSTER EDITOR] Profile details:', {
+      id: profile.id,
+      name: profile.name,
+      category: profile.category,
+      hasLogo: !!(profile.companyLogo || profile.logo)
+    });
+    // Note: We don't update local state here since we're using global context
+    // The context will handle state updates
+    applyBusinessProfileToPoster(profile);
+  }, [activeBusinessProfile]);
+
+  // Apply active business profile when it changes
+  useEffect(() => {
+    if (activeBusinessProfile) {
+      applyProfileSafely(activeBusinessProfile);
+      console.log('✅ [POSTER EDITOR] Applied active business profile:', activeBusinessProfile.name);
+    }
+  }, [activeBusinessProfile, applyProfileSafely]);
+
   // Apply business profile data to poster
   const applyBusinessProfileToPoster = (profile: BusinessProfile) => {
-    setSelectedBusinessProfile(profile);
     setShowProfileSelectionModal(false);
     
     // Clear original layers when changing business profile so new positions become the baseline
@@ -1539,6 +1589,19 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
 
     setLayers(newLayers);
     
+    console.log('✅ [BUSINESS PROFILE APPLIED] Layers created:', {
+      totalLayers: newLayers.length,
+      profileName: profile.name,
+      hasLogo: !!(profile.companyLogo || profile.logo),
+      hasCompany: !!profile.name,
+      hasPhone: !!profile.phone,
+      hasEmail: !!profile.email,
+      hasWebsite: !!profile.website,
+      hasCategory: !!profile.category,
+      hasAddress: !!profile.address,
+      layerIds: newLayers.map(l => l.id)
+    });
+    
     // Initialize animated values for new layers
     newLayers.forEach(layer => {
       if (!layerAnimations[layer.id]) {
@@ -1558,9 +1621,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
 
   // Handle business profile selection
   const handleProfileSelection = (profile: BusinessProfile) => {
-    setSelectedBusinessProfile(profile);
-    setShowProfileSelectionModal(false);
-    applyBusinessProfileToPoster(profile);
+    applyProfileSafely(profile);
   };
 
   // Toggle field visibility
@@ -2114,12 +2175,12 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
   }, [applyTemplateStylesToLayers]);
 
   useEffect(() => {
-    if (!initialTemplateApplied && layers.length > 0) {
+    if (!initialTemplateApplied && layers.length > 0 && !activeBusinessProfile) {
       const defaultTemplate = TEMPLATE_OPTIONS[0]?.id || 'business';
       setInitialTemplateApplied(true);
       applyTemplate(defaultTemplate);
     }
-  }, [applyTemplate, initialTemplateApplied, layers.length]);
+  }, [applyTemplate, initialTemplateApplied, layers.length, activeBusinessProfile]);
 
   // Update layer position
   const updateLayerPosition = useCallback((layerId: string, position: { x: number; y: number }) => {
@@ -2657,7 +2718,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                   selectedImage: selectedImage,
                   selectedLanguage: selectedLanguage,
                   selectedTemplateId: selectedTemplateId,
-                  selectedBusinessProfile: selectedBusinessProfile,
+                  selectedBusinessProfile: activeBusinessProfile,
                   isSubscribed: isSubscribed, // Pass subscription status to preview
                 });
               } else {
@@ -2671,7 +2732,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                   selectedImage: selectedImage,
                   selectedLanguage: selectedLanguage,
                   selectedTemplateId: selectedTemplateId,
-                  selectedBusinessProfile: selectedBusinessProfile,
+                  selectedBusinessProfile: activeBusinessProfile,
                   isSubscribed: isSubscribed, // Pass subscription status to preview
                 });
               }
@@ -2687,7 +2748,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                 selectedImage: selectedImage,
                 selectedLanguage: selectedLanguage,
                 selectedTemplateId: selectedTemplateId,
-                selectedBusinessProfile: selectedBusinessProfile,
+                selectedBusinessProfile: globalSelectedProfile,
                 isSubscribed: isSubscribed, // Pass subscription status to preview
               });
             }
@@ -2850,6 +2911,9 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                   ? 'No business profiles found. Please create a business profile first.'
                   : 'Business profile data has been applied to your poster'
                 }
+              </Text>
+              <Text style={[styles.instructionsText, { marginTop: 10, fontSize: 12, color: '#ff6b6b' }]}>
+                DEBUG: layers.length={layers.length}, loadingProfiles={loadingProfiles}, businessProfiles.length={businessProfiles.length}
               </Text>
             </View>
           )}

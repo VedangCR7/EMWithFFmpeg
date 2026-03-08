@@ -15,6 +15,7 @@ import {
   InteractionManager,
   Animated,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -23,6 +24,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MainStackParamList } from '../navigation/AppNavigator';
 import { Template } from '../services/dashboard';
 import { useTheme } from '../context/ThemeContext';
+import { useBusinessProfile } from '../context/BusinessProfileContext';
+import businessProfileService, { BusinessProfile } from '../services/businessProfile';
+import authService from '../services/auth';
 import OptimizedImage from '../components/OptimizedImage';
 import LazyFullImage from '../components/LazyFullImage';
 import businessCategoryPostersApi from '../services/businessCategoryPostersApi';
@@ -310,6 +314,8 @@ const PosterPlayerScreen: React.FC = () => {
     posterLimit,
     calendarDate,
     templateSource,
+    selectedBusinessProfile: initialBusinessProfile,
+    selectedBusinessProfileId: initialBusinessProfileId,
   } = route.params;
   
   // Track previous initialPoster ID to detect when a different poster is selected
@@ -412,7 +418,18 @@ const PosterPlayerScreen: React.FC = () => {
   const userManuallySelectedLanguageRef = useRef<boolean>(false); // Track if user manually selected a language (including "All")
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const [selectedServiceFilter, setSelectedServiceFilter] = useState<string | null>(null);
-  const [isBusinessProfileReminderVisible, setIsBusinessProfileReminderVisible] = useState(false);
+  
+  // Business profile state
+  const [userBusinessProfiles, setUserBusinessProfiles] = useState<BusinessProfile[]>([]);
+  const { selectedBusinessProfile: globalSelectedProfile, setSelectedBusinessProfile } = useBusinessProfile();
+  
+  // Determine active business profile with fallback priority:
+  // 1️⃣ Context profile (global state)
+  // 2️⃣ Navigation param 
+  // 3️⃣ AsyncStorage (loaded in useBusinessProfile)
+  const activeBusinessProfile = useMemo(() => {
+    return globalSelectedProfile || initialBusinessProfile;
+  }, [globalSelectedProfile, initialBusinessProfile]);
   
   // Determine if we should show subscription message instead of language buttons
   // Only for business categories coming from HomeScreen (templateSource: 'professional' and businessCategory provided)
@@ -424,6 +441,45 @@ const PosterPlayerScreen: React.FC = () => {
   // State for service filter specific templates
   const [serviceFilterTemplates, setServiceFilterTemplates] = useState<Record<string, Template[]>>({});
   const [isLoadingServiceFilter, setIsLoadingServiceFilter] = useState<Record<string, boolean>>({});
+
+  // Business profile logic is handled by useBusinessProfile context
+
+  // Load business profiles - simplified since context handles AsyncStorage
+  useEffect(() => {
+    const loadBusinessProfileData = async () => {
+      try {
+        const currentUserId = authService.getCurrentUser()?.id;
+        if (!currentUserId) return;
+
+        // Load user business profiles
+        const profiles = await businessProfileService.getUserBusinessProfiles(currentUserId);
+        setUserBusinessProfiles(profiles);
+
+        // Context will handle profile selection and AsyncStorage
+        // No need to manually apply profiles here
+      } catch (error) {
+        console.error('Error loading business profile data:', error);
+      }
+    };
+
+    loadBusinessProfileData();
+  }, []);
+
+  // Apply route param profiles to context when available
+  useEffect(() => {
+    if (initialBusinessProfile) {
+      // If a business profile is passed in route params, use it
+      setSelectedBusinessProfile(initialBusinessProfile);
+      console.log('✅ [POSTER PLAYER] Updated business profile from route params:', initialBusinessProfile.name);
+    } else if (initialBusinessProfileId) {
+      // If only an ID is passed, find and use that profile
+      const profile = userBusinessProfiles.find(p => p.id === initialBusinessProfileId);
+      if (profile) {
+        setSelectedBusinessProfile(profile);
+        console.log('✅ [POSTER PLAYER] Updated business profile ID from route params:', initialBusinessProfileId);
+      }
+    }
+  }, [initialBusinessProfile, initialBusinessProfileId, userBusinessProfiles, setSelectedBusinessProfile]);
 
   // Get high quality image URL for preview (full quality, maximum resolution)
   const getHighQualityImageUrl = (poster: Template): string => {
@@ -2897,28 +2953,12 @@ const PosterPlayerScreen: React.FC = () => {
       },
       selectedLanguage: selectedLanguage,
       selectedTemplateId: currentPoster.id,
+      selectedBusinessProfile: activeBusinessProfile,
     });
   }, [navigation, currentPoster, selectedLanguage, getHighQualityImageUrl]);
 
   const handleNextPress = useCallback(() => {
-    if (businessCategory) {
-      setIsBusinessProfileReminderVisible(true);
-      return;
-    }
-    navigateToPosterEditor();
-  }, [businessCategory, navigateToPosterEditor]);
-
-  const handleBusinessProfileReminderClose = useCallback(() => {
-    setIsBusinessProfileReminderVisible(false);
-  }, []);
-
-  const handleBusinessProfileAddPress = useCallback(() => {
-    setIsBusinessProfileReminderVisible(false);
-    navigation.navigate('BusinessProfiles');
-  }, [navigation]);
-
-  const handleBusinessProfileContinue = useCallback(() => {
-    setIsBusinessProfileReminderVisible(false);
+    // Use selected business profile directly, no modal needed
     navigateToPosterEditor();
   }, [navigateToPosterEditor]);
 
@@ -3294,38 +3334,6 @@ const PosterPlayerScreen: React.FC = () => {
          {/* Safe Area Bottom Spacing */}
          <View style={{ height: insets.bottom }} />
        </LinearGradient>
-
-      <Modal
-        visible={isBusinessProfileReminderVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={handleBusinessProfileReminderClose}
-      >
-        <View style={styles.businessProfileModalOverlay}>
-          <View style={styles.businessProfileModalContent}>
-            <Text style={styles.businessProfileModalTitle}>Add More Business Profiles</Text>
-            <Text style={styles.businessProfileModalSubtitle}>
-              Create additional business profiles to unlock more tailored poster suggestions.
-            </Text>
-            <View style={styles.businessProfileModalActions}>
-              <TouchableOpacity
-                style={[styles.businessProfileModalButton, styles.businessProfileModalSecondary]}
-                onPress={handleBusinessProfileAddPress}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.businessProfileModalSecondaryText}>Add Profile</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.businessProfileModalButton, styles.businessProfileModalPrimary]}
-                onPress={handleBusinessProfileContinue}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.businessProfileModalPrimaryText}>Continue</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
      </View>
    );
 };
@@ -3954,84 +3962,11 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(10),
     fontWeight: '600',
     color: '#666666',
-  },
-  languageFilterButtonTextSelected: {
-    color: '#ffffff',
-    fontWeight: '700',
-  },
-  businessProfileModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: moderateScale(24),
-  },
-  businessProfileModalContent: {
-    width: '100%',
-    maxWidth: 360,
-    backgroundColor: '#ffffff',
-    borderRadius: moderateScale(16),
-    paddingVertical: moderateScale(24),
-    paddingHorizontal: moderateScale(20),
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  businessProfileModalTitle: {
-    fontSize: moderateScale(16),
-    fontWeight: '700',
-    color: '#333333',
-    marginBottom: moderateScale(8),
-    textAlign: 'center',
-  },
-  businessProfileModalSubtitle: {
-    fontSize: moderateScale(12),
-    color: '#666666',
-    textAlign: 'center',
-    marginBottom: moderateScale(20),
-    lineHeight: moderateScale(18),
-  },
-  businessProfileModalActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: moderateScale(10),
-  },
-  businessProfileModalButton: {
-    flex: 1,
-    paddingVertical: moderateScale(10),
-    borderRadius: moderateScale(25),
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  businessProfileModalSecondary: {
-    borderWidth: 1,
-    borderColor: '#667eea',
-    backgroundColor: '#ffffff',
-  },
-  businessProfileModalSecondaryText: {
-    color: '#667eea',
-    fontSize: moderateScale(12),
-    fontWeight: '600',
-  },
-  businessProfileModalPrimary: {
-    backgroundColor: '#667eea',
-  },
-  businessProfileModalPrimaryText: {
-    color: '#ffffff',
-    fontSize: moderateScale(12),
-    fontWeight: '600',
-  },
-  // Enhanced skeleton loader styles with shimmer animation
-  skeletonContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
     overflow: 'hidden',
     borderRadius: moderateScale(8),
+  },
+  languageFilterButtonTextSelected: {
+    color: '#FFFFFF',
   },
   skeletonShimmer: {
     position: 'absolute',
