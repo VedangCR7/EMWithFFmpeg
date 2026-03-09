@@ -178,8 +178,17 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       const response = await subscriptionApi.getStatus();
       
       if (response.success) {
-        const status = response.data;
+        const status = response.data ?? response;
+        console.log("SUBSCRIPTION_CONTEXT_INPUT", status);
         console.log('✅ Subscription status fetched:', JSON.stringify(status, null, 2));
+        
+        console.log("SUBSCRIPTION_CONTEXT_STATUS", status);
+        console.log("SUBSCRIPTION_CONTEXT_FIELDS", {
+          isActive: status?.isActive,
+          planId: status?.planId,
+          planName: status?.planName,
+          expiryDate: status?.expiryDate
+        });
         
         // Check if subscription is active and not expired
         // Make status check case-insensitive
@@ -187,16 +196,34 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
         const isNotExpired = status.expiryDate ? new Date(status.expiryDate) > new Date() : 
                             status.endDate ? new Date(status.endDate) > new Date() : true;
         
-        // Ensure both isActive === true AND status === 'active' AND notExpired
-        // Note: hasValidPlan check removed - inactive users may not have plan data
-        const isActive = status.isActive === true && normalizedStatus === 'active' && isNotExpired;
+        console.log('SUBSCRIPTION_CONTEXT_PARSING:', {
+          'status.isActive': status.isActive,
+          'status.status': status.status,
+          'normalizedStatus': normalizedStatus,
+          'status.expiryDate': status.expiryDate,
+          'status.endDate': status.endDate,
+          'isNotExpired': isNotExpired,
+          'status.planId': status.planId,
+          'status.planName': status.planName
+        });
         
-        setIsSubscribed(Boolean(isActive));
+        // Safer access logic - check isActive and expiry
+        const accessGranted =
+          Boolean(status?.isActive) &&
+          (!status?.expiryDate || new Date(status.expiryDate) > new Date());
+        
+        console.log("ACCESS_CHECK_RESULT", {
+          isActive: status?.isActive,
+          expiryDate: status?.expiryDate,
+          accessGranted
+        });
+        
+        setIsSubscribed(Boolean(accessGranted));
         setSubscriptionStatus(status);
         lastRefreshTimeRef.current = now;
         
         console.log('✅ SUBSCRIPTION_UPDATED - Subscription status updated:', {
-          isActive: Boolean(isActive),
+          isActive: Boolean(accessGranted),
           normalizedStatus,
           isNotExpired,
           planId: status.planId,
@@ -205,7 +232,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
           endDate: status.endDate
         });
         
-        console.log('🔐 Subscription access:', isActive ? 'GRANTED ✅' : 'DENIED ❌');
+        console.log('🔐 Subscription access:', accessGranted ? 'GRANTED ✅' : 'DENIED ❌');
         console.log('🔍 Status details:', {
           isActive: status.isActive,
           normalizedStatus,
@@ -334,6 +361,12 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
 
   // Check if user has premium access for a specific feature
   const checkPremiumAccess = useCallback((feature: string): boolean => {
+    console.log(`PREMIUM_ACCESS_CHECK - Feature: ${feature}`, {
+      'isSubscribed': isSubscribed,
+      'subscriptionStatus': subscriptionStatus,
+      'hasSubscriptionStatus': !!subscriptionStatus
+    });
+
     if (!isSubscribed || !subscriptionStatus) {
       console.log(`🔒 Premium access denied for feature: ${feature} (not subscribed)`);
       return false;
@@ -341,13 +374,30 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
 
     // Check if subscription is expired (check both expiryDate and endDate)
     const expiryDate = subscriptionStatus.expiryDate || subscriptionStatus.endDate;
-    if (expiryDate && new Date(expiryDate) <= new Date()) {
+    const isExpired = expiryDate && new Date(expiryDate) <= new Date();
+    
+    console.log(`PREMIUM_ACCESS_EXPIRY_CHECK - Feature: ${feature}`, {
+      'expiryDate': expiryDate,
+      'currentDate': new Date(),
+      'isExpired': isExpired,
+      'expiryCheck': expiryDate ? `${new Date(expiryDate)} <= ${new Date()}` : 'no expiry date'
+    });
+
+    if (isExpired) {
       console.log(`🔒 Premium access denied for feature: ${feature} (subscription expired on ${expiryDate})`);
       return false;
     }
 
     // Check if subscription status is active (case-insensitive)
     const normalizedStatus = subscriptionStatus.status?.toLowerCase();
+    
+    console.log(`PREMIUM_ACCESS_STATUS_CHECK - Feature: ${feature}`, {
+      'subscriptionStatus.isActive': subscriptionStatus.isActive,
+      'subscriptionStatus.status': subscriptionStatus.status,
+      'normalizedStatus': normalizedStatus,
+      'isActiveCheck': subscriptionStatus.isActive === true,
+      'statusCheck': normalizedStatus === 'active'
+    });
     
     // Ensure both isActive === true AND status === 'active'
     if (subscriptionStatus.isActive !== true || normalizedStatus !== 'active') {

@@ -311,12 +311,31 @@ class SubscriptionApiService {
             const response = await api.get('/api/mobile/subscription/status');
             
             console.log('📊 Subscription API response:', response.data);
+            console.log('SUBSCRIPTION_RAW_API_RESPONSE', response.data);
             console.log('🔍 Raw subscription data:', JSON.stringify(response.data, null, 2));
             
             // Check if response has the expected structure
             if (response.data.success) {
-              // Safely parse subscription data with null checks
-              const subscriptionData = response.data?.data ?? null;
+              // ISSUE: Backend returns response.data.subscription, not response.data.data
+              const subscriptionData = response.data?.subscription ?? response.data?.data ?? null;
+              console.log("SUBSCRIPTION_API_PARSING - Checking response structure:", {
+                'response.data.subscription': response.data?.subscription,
+                'response.data.data': response.data?.data,
+                'final_subscriptionData': subscriptionData
+              });
+              console.log("SUBSCRIPTION_PARSED_DATA", subscriptionData);
+              
+              if (!subscriptionData) {
+                console.warn("SUBSCRIPTION_STATUS_EMPTY_RESPONSE");
+              }
+              
+              console.log("SUBSCRIPTION_FIELDS", {
+                planId: subscriptionData?.planId,
+                planName: subscriptionData?.planName,
+                expiryDate: subscriptionData?.expiryDate,
+                isActive: subscriptionData?.isActive
+              });
+              
               console.log("Parsed subscription:", subscriptionData);
               console.log("Subscription fields check:", {
                 hasIsActive: !!subscriptionData?.isActive,
@@ -353,28 +372,12 @@ class SubscriptionApiService {
               return {
                 success: true,
                 data: {
-                  isActive: Boolean(subscriptionData?.isActive && subscriptionData?.status === 'active' && 
-                    (subscriptionData?.daysRemaining > 0 || 
-                     (subscriptionData?.expiryDate && new Date(subscriptionData.expiryDate) > new Date()) ||
-                     (subscriptionData?.endDate && new Date(subscriptionData.endDate) > new Date()) ||
-                     (!subscriptionData?.expiryDate && !subscriptionData?.endDate))),
-                  plan: subscriptionData?.plan && subscriptionData.plan !== 'free' ? {
-                    id: subscriptionData.planId || subscriptionData.plan || 'unknown',
-                    name: subscriptionData.planName || subscriptionData.plan || 'Unknown Plan',
-                    description: 'Premium subscription',
-                    price: 0, // Price not needed for status display
-                    currency: 'INR',
-                    duration: 'unknown',
-                    features: [],
-                    isPopular: false
-                  } : null,
-                  planId: subscriptionData?.planId || (subscriptionData?.plan !== 'free' ? subscriptionData?.plan : null),
-                  planName: subscriptionData?.planName || subscriptionData?.plan || null,
-                  startDate: subscriptionData?.startDate,
-                  endDate: subscriptionData?.endDate,
-                  expiryDate: subscriptionData?.expiryDate || subscriptionData?.endDate,
+                  isActive: Boolean(subscriptionData?.isActive),
+                  planId: subscriptionData?.planId ?? null,
+                  planName: subscriptionData?.planName ?? null,
+                  expiryDate: subscriptionData?.expiryDate ?? null,
                   autoRenew: Boolean(subscriptionData?.autoRenew),
-                  status: subscriptionData?.status || 'inactive'
+                  status: subscriptionData?.isActive ? "active" : "inactive"
                 },
                 message: 'Status fetched successfully'
               };

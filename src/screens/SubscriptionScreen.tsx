@@ -246,10 +246,22 @@ const SubscriptionScreen: React.FC = () => {
       if (!selectedPlan) {
         throw new Error('No plan selected');
       }
+
+      // Validate plan ID exists and is from API
+      if (!selectedPlan.id) {
+        throw new Error('Invalid plan selected - missing plan ID');
+      }
+
+      // Verify plan exists in purchasable plans list
+      const isValidPlan = purchasablePlans.some(plan => plan.id === selectedPlan.id);
+      if (!isValidPlan) {
+        throw new Error('Invalid plan selected - plan not found in available plans');
+      }
       
       console.log('🚀 Starting payment process...');
       console.log('📋 Selected plan:', selectedPlan);
       console.log('👤 Current user:', currentUser);
+      console.log('✅ Plan validation passed - Plan ID:', selectedPlan.id);
 
       const planPriceFromApi = selectedPlan.price;
       const uiPriceCandidateRaw = Number(String(selectedPlan.price).replace(/[^\d.]/g, ''));
@@ -390,25 +402,8 @@ const SubscriptionScreen: React.FC = () => {
             // Get current user for transaction metadata
             const currentUserForTransaction = authService.getCurrentUser();
             
-            // Record transaction first
-            console.log('📝 Recording transaction...');
-            await addTransaction({
-              paymentId: response.razorpay_payment_id || 'pay_' + Date.now(),
-              orderId: response.razorpay_order_id || 'order_' + Date.now(),
-              amount: amountInRupees,
-              currency: 'INR',
-              status: 'success',
-              plan: selectedPlan,
-              planName: selectedPlan.name,
-              description: `${selectedPlan.name} Subscription`,
-              method: 'razorpay',
-              metadata: {
-                email: currentUserForTransaction?.email || 'user@example.com',
-                contact: currentUserForTransaction?.phoneNumber || '9999999999',
-                name: currentUserForTransaction?.name || 'User Name',
-              },
-            });
-            console.log('✅ Transaction recorded');
+            // Backend creates transactions during verify-payment
+            console.log('📝 Backend will create transaction during verify-payment...');
             
             // Verify payment with backend and activate subscription
             console.log('🔄 Activating subscription...');
@@ -512,38 +507,9 @@ const SubscriptionScreen: React.FC = () => {
         step: error.step,
         reason: error.reason
       });
-      // Record failed transaction only for actual errors, not cancellation
-      if (error.code === 'PAYMENT_CANCELLED') {
-        // Do not record transaction for user cancellation
-        // Report failure to backend for analytics
-        if (orderDetails?.orderId) {
-          reportPaymentFailure(orderDetails.orderId, 'FAILED');
-        }
-      } else {
-        try {
-          await addTransaction({
-            paymentId: 'pay_failed_' + Date.now(),
-            orderId: 'order_failed_' + Date.now(),
-            amount: amountInRupees,
-            currency: 'INR',
-            status: 'failed',
-            plan: selectedPlan,
-            planName: selectedPlan.name,
-            description: `${selectedPlan.name} Subscription - Failed`,
-            method: 'razorpay',
-            metadata: {
-              email: currentUser?.email || 'user@example.com',
-              contact: currentUser?.phoneNumber || '9999999999',
-              name: currentUser?.name || 'User Name',
-            },
-          });
-          // Report failure to backend
-          if (orderDetails?.orderId) {
-            reportPaymentFailure(orderDetails.orderId, 'FAILED');
-          }
-        } catch (txnError) {
-          console.error('Error recording failed transaction:', txnError);
-        }
+      // Report failure to backend for analytics
+      if (orderDetails?.orderId) {
+        reportPaymentFailure(orderDetails.orderId, 'FAILED');
       }
       
       if (error.code === 'PAYMENT_CANCELLED') {
