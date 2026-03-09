@@ -1120,8 +1120,10 @@ const ProfileScreen: React.FC = () => {
       setAlternatePhoneValidationError(''); // Clear error if empty (optional field)
     }
 
-    if (!editFormData.category.trim()) {
-      Alert.alert('Error', 'Business category is required');
+    // Business category is optional - only validate if user is actually setting it
+    // This allows users to update other profile details without being forced to select a category
+    if (editFormData.category.trim() && editFormData.category.trim().length < 2) {
+      Alert.alert('Error', 'Business category must be at least 2 characters long if provided');
       return;
     }
 
@@ -1159,7 +1161,7 @@ const ProfileScreen: React.FC = () => {
         email: editFormData.email.trim(),
         phone: editFormData.phone.trim(),
         description: editFormData.description.trim() || null,
-        category: editFormData.category.trim(),
+        category: editFormData.category.trim() || null, // Send null if empty to allow clearing
         address: editFormData.address.trim() || null,
         alternatePhone: editFormData.alternatePhone.trim() || null, // Send null to clear
         website: editFormData.website.trim() || null,

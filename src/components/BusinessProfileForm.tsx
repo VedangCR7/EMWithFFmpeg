@@ -499,13 +499,13 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
           >
             {/* Company Information */}
             <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: isDarkMode ? '#ffffff' : '#1a1a1a' }]}>Company Information</Text>
+              <Text style={[styles.sectionTitle, { color: isDarkMode ? '#ffffff' : '#1a1a1a' }]}>Company Information *</Text>
               
                              <FloatingInput
                  value={formData.name}
                  onChangeText={(value) => handleInputChange('name', value)}
                  field="name"
-                 placeholder="Enter company name"
+                 placeholder="Enter company name *"
                  focusedField={focusedField}
                  setFocusedField={setFocusedField}
                  theme={theme}
