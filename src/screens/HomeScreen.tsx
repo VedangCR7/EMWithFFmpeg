@@ -41,7 +41,6 @@ import businessCategoriesService, { BusinessCategory } from '../services/busines
 import businessProfileService, { BusinessProfile } from '../services/businessProfile';
 import calendarApi, { CalendarPoster } from '../services/calendarApi';
 import { useTheme } from '../context/ThemeContext';
-import { useBusinessProfile } from '../context/BusinessProfileContext';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import authService from '../services/auth';
 import { performanceMonitor } from '../utils/performanceMonitor';
@@ -628,7 +627,6 @@ const convertBusinessPosterToTemplate = (poster: any, categoryName: string): Tem
 const HomeScreen: React.FC = React.memo(() => {
   const { isDarkMode, theme } = useTheme();
   const { refreshSubscription } = useSubscription();
-  const { selectedBusinessProfile, setSelectedBusinessProfile } = useBusinessProfile();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<StackNavigationProp<MainStackParamList>>();
   
@@ -704,16 +702,8 @@ const HomeScreen: React.FC = React.memo(() => {
         
         if (resolvedProfileId) {
           setSelectedBusinessProfileId(resolvedProfileId);
-          
-          // Sync BusinessProfileContext with stored profile
-          const resolvedProfile = profiles.find(p => p.id === resolvedProfileId);
-          if (resolvedProfile) {
-            setSelectedBusinessProfile(resolvedProfile);
-            console.log('✅ [HOMESCREEN] Synced context with stored profile:', resolvedProfile.name);
-          }
         } else {
           setSelectedBusinessProfileId(null);
-          setSelectedBusinessProfile(null); // Clear context when no profile
         }
       } catch (error) {
         if (__DEV__) {
@@ -767,14 +757,17 @@ const HomeScreen: React.FC = React.memo(() => {
 
   const userName = useMemo(() => {
     return (
-      selectedBusinessProfile?.name ||
       userProfile?.displayName ||
       userProfile?.name ||
       userProfile?.companyName ||
       userProfile?.username ||
-      "User"
+      'User'
     );
-  }, [selectedBusinessProfile, userProfile]);
+  }, [userProfile]);
+  const selectedBusinessProfile = useMemo(
+    () => userBusinessProfiles.find(profile => profile.id === selectedBusinessProfileId) || null,
+    [userBusinessProfiles, selectedBusinessProfileId]
+  );
   const userInitials = useMemo(() => 
     userName
       .split(' ')
@@ -782,19 +775,18 @@ const HomeScreen: React.FC = React.memo(() => {
       .join('')
       .toUpperCase()
       .slice(0, 2),
-  [userName, selectedBusinessProfile]
+    [userName]
   );
   const userAvatarUri = useMemo(() => {
     return (
-      selectedBusinessProfile?.logo ||
-      selectedBusinessProfile?.companyLogo ||
-      selectedBusinessProfile?.banner ||
       userProfile?.photo ||
       userProfile?.photoURL ||
+      userProfile?.logo ||
+      userProfile?.companyLogo ||
       userProfile?.avatar ||
       null
     );
-  }, [selectedBusinessProfile, userProfile]);
+  }, [userProfile]);
   useEffect(() => {
     const currentUserId = userProfile?.id || authService.getCurrentUser()?.id;
     if (selectedBusinessProfileId && currentUserId) {
@@ -3096,15 +3088,10 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
   }, [userBusinessProfiles.length, isBusinessProfileDropdownVisible, closeBusinessProfileDropdown]);
 
   const handleBusinessProfileSelect = useCallback((profileId: string) => {
-    const profile = userBusinessProfiles.find(p => p.id === profileId);
-    if (profile) {
-      setSelectedBusinessProfile(profile);
-      console.log("[HOMESCREEN] Selected business profile:", profile?.name);
-    }
     setSelectedBusinessProfileId(profileId);
     closeBusinessProfileDropdown();
     businessCategoryPostersApi.clearCache();
-  }, [userBusinessProfiles, setSelectedBusinessProfile, closeBusinessProfileDropdown]);
+  }, [closeBusinessProfileDropdown]);
 
   const handleWhatsAppPress = useCallback(async () => {
     try {

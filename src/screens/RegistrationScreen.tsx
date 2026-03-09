@@ -158,6 +158,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [phoneValidationError, setPhoneValidationError] = useState<string>('');
   const [alternatePhoneValidationError, setAlternatePhoneValidationError] = useState<string>('');
+  const [passwordValidationErrors, setPasswordValidationErrors] = useState<string[]>([]);
   const [categories, setCategories] = useState<BusinessCategory[]>([]);
   const [subcategories, setSubcategories] = useState<BusinessCategory[]>([]);
   const [isLoadingCategories, setIsLoadingCategories] = useState<boolean>(true);
@@ -337,14 +338,62 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
     }
   };
 
-  // Validate phone with real-time digit count feedback (exactly 10 digits)
+  // Validate phone with real-time digit count feedback and starting digit check
   const validatePhone = (phone: string): string => {
     if (!phone || !phone.trim()) return ''; // Empty is OK for optional fields
     const digits = phone.trim().replace(/\D/g, ''); // Remove non-digits
     if (digits.length === 0) return '';
     if (digits.length < 10) return `Phone must be 10 digits (currently ${digits.length})`;
     if (digits.length > 10) return `Phone must be 10 digits (currently ${digits.length})`;
+    if (!/^[6-9]\d{9}$/.test(digits)) return 'Please enter a valid Indian mobile number starting with 6-9';
     return ''; // Valid
+  };
+
+  // Strong password validation with all requirements
+  const validatePasswordStrength = (password: string): string[] => {
+    const errors: string[] = [];
+    
+    if (!password || password.trim().length === 0) {
+      errors.push('Password is required');
+      return errors;
+    }
+    
+    // Minimum 8 characters
+    if (password.length < 8) {
+      errors.push('Minimum 8 characters required');
+    }
+    
+    // At least 1 uppercase letter
+    if (!/[A-Z]/.test(password)) {
+      errors.push('At least 1 uppercase letter (A-Z)');
+    }
+    
+    // At least 1 lowercase letter
+    if (!/[a-z]/.test(password)) {
+      errors.push('At least 1 lowercase letter (a-z)');
+    }
+    
+    // At least 1 number
+    if (!/\d/.test(password)) {
+      errors.push('At least 1 number (0-9)');
+    }
+    
+    // At least 1 special character
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+      errors.push('At least 1 special character (! @ # $ % ^ & * etc.)');
+    }
+    
+    // Maximum 50 characters
+    if (password.length > 50) {
+      errors.push('Password must not exceed 50 characters');
+    }
+    
+    // Password should not be same as email or company name
+    if (password === formData.email || password === formData.name) {
+      errors.push('Password should not be the same as your email or company name');
+    }
+    
+    return errors;
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -389,28 +438,22 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
       return;
     }
 
-    // Real-time alternate phone validation with digit count
-    if (field === 'alternatePhone') {
-      // Only allow digits
-      const digitsOnly = value.replace(/\D/g, '');
+    // Real-time password validation with all requirements
+    if (field === 'password') {
       setFormData(prev => ({
         ...prev,
-        [field]: digitsOnly,
+        [field]: value,
       }));
 
-      // Validate as user types (optional field)
-      if (digitsOnly.trim()) {
-        const error = validatePhone(digitsOnly);
-        setAlternatePhoneValidationError(error);
-      } else {
-        setAlternatePhoneValidationError(''); // Clear error if empty
-      }
+      // Validate password in real-time and show all errors
+      const errors = validatePasswordStrength(value);
+      setPasswordValidationErrors(errors);
 
-      // Clear form validation error
-      if (validationErrors.alternatePhone) {
+      // Clear form validation error when user starts typing
+      if (validationErrors.password) {
         setValidationErrors(prev => ({
           ...prev,
-          alternatePhone: '',
+          password: '',
         }));
       }
       return;
@@ -491,17 +534,10 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
       }
     }
 
-    // Password validation
-    if (!formData.password.trim()) {
-      errors.password = 'Password is required to secure your account';
-    } else if (formData.password.length < 6) {
-      errors.password = 'Password must be at least 6 characters for security';
-    } else if (formData.password.length > 50) {
-      errors.password = 'Password must not exceed 50 characters';
-    } else if (!/(?=.*[a-zA-Z])/.test(formData.password)) {
-      errors.password = 'Password must contain at least one letter';
-    } else if (formData.password === formData.email || formData.password === formData.name) {
-      errors.password = 'Password should not be the same as your email or company name';
+    // Password validation with strong policy
+    const passwordErrors = validatePasswordStrength(formData.password);
+    if (passwordErrors.length > 0) {
+      errors.password = passwordErrors.join('. ');
     }
 
     // Category validation
@@ -1005,7 +1041,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                       </Text>
                     </View>
                   ) : null}
-                  {!phoneValidationError && formData.phone.trim() && formData.phone.replace(/\D/g, '').length === 10 ? (
+                  {!phoneValidationError && formData.phone.trim() && formData.phone.replace(/\D/g, '').length === 10 && /^[6-9]\d{9}$/.test(formData.phone) ? (
                     <View style={styles.successContainer}>
                       <Icon name="check-circle" size={16} color="#4CAF50" />
                       <Text style={[styles.successText, { color: '#4CAF50' }]}>
@@ -1055,7 +1091,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                       </Text>
                     </View>
                   ) : null}
-                  {!alternatePhoneValidationError && formData.alternatePhone && formData.alternatePhone.trim() && formData.alternatePhone.replace(/\D/g, '').length === 10 ? (
+                  {!alternatePhoneValidationError && formData.alternatePhone && formData.alternatePhone.trim() && formData.alternatePhone.replace(/\D/g, '').length === 10 && /^[6-9]\d{9}$/.test(formData.alternatePhone) ? (
                     <View style={styles.successContainer}>
                       <Icon name="check-circle" size={16} color="#4CAF50" />
                       <Text style={[styles.successText, { color: '#4CAF50' }]}>
@@ -1143,7 +1179,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                         styles.passwordInput,
                         {
                           color: theme.colors.text,
-                          borderColor: validationErrors.password ? theme.colors.error : (focusedField === 'password' ? theme.colors.primary : theme.colors.border),
+                          borderColor: (passwordValidationErrors.length > 0 && formData.password) || validationErrors.password ? theme.colors.error : (focusedField === 'password' ? theme.colors.primary : theme.colors.border),
                           backgroundColor: theme.colors.inputBackground,
                         }
                       ]}
@@ -1168,6 +1204,62 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                       />
                     </TouchableOpacity>
                   </View>
+                  
+                  {/* Password Requirements Hint */}
+                  <View style={styles.passwordRequirementsContainer}>
+                    <Text style={[styles.passwordRequirementsTitle, { color: theme.colors.textSecondary }]}>
+                      Password Requirements:
+                    </Text>
+                    <View style={styles.requirementsList}>
+                      <Text style={[styles.requirementItem, { color: formData.password.length >= 8 ? '#4CAF50' : theme.colors.textSecondary }]}>
+                        ✓ Minimum 8 characters
+                      </Text>
+                      <Text style={[styles.requirementItem, { color: /[A-Z]/.test(formData.password) ? '#4CAF50' : theme.colors.textSecondary }]}>
+                        ✓ At least 1 uppercase letter (A-Z)
+                      </Text>
+                      <Text style={[styles.requirementItem, { color: /[a-z]/.test(formData.password) ? '#4CAF50' : theme.colors.textSecondary }]}>
+                        ✓ At least 1 lowercase letter (a-z)
+                      </Text>
+                      <Text style={[styles.requirementItem, { color: /\d/.test(formData.password) ? '#4CAF50' : theme.colors.textSecondary }]}>
+                        ✓ At least 1 number (0-9)
+                      </Text>
+                      <Text style={[styles.requirementItem, { color: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(formData.password) ? '#4CAF50' : theme.colors.textSecondary }]}>
+                        ✓ At least 1 special character (! @ # $ % ^ & * etc.)
+                      </Text>
+                    </View>
+                  </View>
+                  
+                  {/* Show all password validation errors at once */}
+                  {passwordValidationErrors.length > 0 && formData.password && (
+                    <View style={styles.passwordErrorContainer}>
+                      <View style={styles.errorHeader}>
+                        <Icon name="error-outline" size={16} color={theme.colors.error} />
+                        <Text style={[styles.errorHeaderText, { color: theme.colors.error }]}>
+                          Password must meet all requirements:
+                        </Text>
+                      </View>
+                      {passwordValidationErrors.map((error, index) => (
+                        <View key={index} style={styles.errorItem}>
+                          <Icon name="remove-circle-outline" size={12} color={theme.colors.error} />
+                          <Text style={[styles.errorItemText, { color: theme.colors.error }]}>
+                            {error}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                  
+                  {/* Show success when password meets all requirements */}
+                  {passwordValidationErrors.length === 0 && formData.password && formData.password.length >= 8 && (
+                    <View style={styles.successContainer}>
+                      <Icon name="check-circle" size={16} color="#4CAF50" />
+                      <Text style={[styles.successText, { color: '#4CAF50' }]}>
+                        ✓ Strong password
+                      </Text>
+                    </View>
+                  )}
+                  
+                  {/* Show form validation error (if any) */}
                   {validationErrors.password && (
                     <View style={styles.errorContainer}>
                       <Icon name="error" size={16} color={theme.colors.error} />
@@ -1550,6 +1642,58 @@ const styles = StyleSheet.create({
     top: '50%',
     transform: [{ translateY: -11 }],
     padding: 4,
+  },
+  passwordErrorContainer: {
+    marginTop: Math.max(6, screenHeight * 0.007),
+    paddingHorizontal: Math.max(8, screenWidth * 0.02),
+    paddingVertical: Math.max(6, screenHeight * 0.007),
+    backgroundColor: 'rgba(244, 67, 54, 0.08)',
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#f44336',
+  },
+  errorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Math.max(4, screenHeight * 0.005),
+  },
+  errorHeaderText: {
+    fontSize: isSmallScreen ? 11 : 12,
+    fontWeight: '600',
+    marginLeft: 4,
+    flex: 1,
+  },
+  errorItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: Math.max(2, screenHeight * 0.003),
+  },
+  errorItemText: {
+    fontSize: isSmallScreen ? 10 : 11,
+    marginLeft: 4,
+    flex: 1,
+    lineHeight: isSmallScreen ? 13 : 14,
+  },
+  passwordRequirementsContainer: {
+    marginTop: Math.max(4, screenHeight * 0.005),
+    paddingHorizontal: Math.max(8, screenWidth * 0.02),
+    paddingVertical: Math.max(6, screenHeight * 0.007),
+    backgroundColor: 'rgba(102, 126, 234, 0.05)',
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#667eea',
+  },
+  passwordRequirementsTitle: {
+    fontSize: isSmallScreen ? 11 : 12,
+    fontWeight: '600',
+    marginBottom: Math.max(4, screenHeight * 0.005),
+  },
+  requirementsList: {
+    gap: Math.max(2, screenHeight * 0.003),
+  },
+  requirementItem: {
+    fontSize: isSmallScreen ? 10 : 11,
+    lineHeight: isSmallScreen ? 13 : 14,
   },
   logoSection: {
     marginBottom: Math.max(16, screenHeight * 0.02),

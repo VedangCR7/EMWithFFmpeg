@@ -555,8 +555,8 @@ const styles = StyleSheet.create({
     headerTitle: {
     fontWeight: 'bold',
     color: '#333333',
-    includeFontPadding: true,
-    paddingBottom: moderateScale(1),
+    includeFontPadding: false,
+    paddingBottom: moderateScale(2),
   },
   scrollView: {
     flex: 1,
@@ -579,13 +579,13 @@ const styles = StyleSheet.create({
   welcomeTitle: {
     fontWeight: 'bold',
     textAlign: 'center',
-    includeFontPadding: true,
-    paddingBottom: moderateScale(1),
+    includeFontPadding: false,
+    paddingBottom: moderateScale(2),
   },
   welcomeSubtitle: {
     textAlign: 'center',
-    includeFontPadding: true,
-    paddingBottom: moderateScale(1),
+    includeFontPadding: false,
+    paddingBottom: moderateScale(2),
   },
   section: {
     // Inline styles used
@@ -595,8 +595,8 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
-    includeFontPadding: true,
-    paddingBottom: moderateScale(1),
+    includeFontPadding: false,
+    paddingBottom: moderateScale(2),
   },
   contactGrid: {
     // Inline styles used
@@ -619,8 +619,8 @@ const styles = StyleSheet.create({
   },
   contactTitle: {
     fontWeight: '600',
-    includeFontPadding: true,
-    paddingBottom: moderateScale(1),
+    includeFontPadding: false,
+    paddingBottom: moderateScale(2),
   },
   contactDescription: {
     // Inline styles used
@@ -643,8 +643,8 @@ const styles = StyleSheet.create({
   faqQuestion: {
     flex: 1,
     fontWeight: '600',
-    includeFontPadding: true,
-    paddingBottom: moderateScale(1),
+    includeFontPadding: false,
+    paddingBottom: moderateScale(2),
   },
   faqAnswer: {
     // Inline styles used
@@ -661,21 +661,21 @@ const styles = StyleSheet.create({
   quickLinkText: {
     flex: 1,
     fontWeight: '500',
-    includeFontPadding: true,
-    paddingBottom: moderateScale(1),
+    includeFontPadding: false,
+    paddingBottom: moderateScale(2),
   },
   footer: {
     alignItems: 'center',
   },
   footerText: {
     textAlign: 'center',
-    includeFontPadding: true,
-    paddingBottom: moderateScale(1),
+    includeFontPadding: false,
+    paddingBottom: moderateScale(2),
   },
   footerVersion: {
     textAlign: 'center',
-    includeFontPadding: true,
-    paddingBottom: moderateScale(1),
+    includeFontPadding: false,
+    paddingBottom: moderateScale(2),
   },
 });
 

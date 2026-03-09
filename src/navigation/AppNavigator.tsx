@@ -51,7 +51,7 @@ export type RootStackParamList = {
 };
 
 export type MainStackParamList = {
-  MainTabs: undefined;
+  MainTabs: { screen?: keyof TabParamList } | undefined;
   PosterEditor: {
     selectedImage: {
       uri: string;
