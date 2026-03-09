@@ -308,8 +308,8 @@ const PrivacyPolicyScreen = () => {
       textShadowOffset: { width: 0, height: 1 },
       textShadowRadius: 2,
       lineHeight: moderateScale(isTablet ? 18 : 17),
-      includeFontPadding: true,
-      paddingBottom: moderateScale(1),
+      includeFontPadding: false,
+      paddingBottom: moderateScale(3),
     },
     scrollContainer: {
       flex: 1,
@@ -323,8 +323,9 @@ const PrivacyPolicyScreen = () => {
       textAlign: 'center',
       fontStyle: 'italic',
       fontWeight: '400', // Explicitly set to normal weight for content
-      lineHeight: moderateScale(isTablet ? 13 : 12),
-      includeFontPadding: true,
+      lineHeight: moderateScale(isTablet ? 13 * 1.45 : 12 * 1.45),
+      includeFontPadding: false,
+      paddingBottom: moderateScale(5),
     },
     cardWrapper: {
       position: 'relative',
@@ -359,15 +360,17 @@ const PrivacyPolicyScreen = () => {
       color: '#667eea',
       letterSpacing: 0.5,
       flex: 1,
-      lineHeight: moderateScale(isTablet ? 17 : 16),
-      includeFontPadding: true,
-      paddingBottom: moderateScale(1),
+      lineHeight: isTablet 
+        ? moderateScale(11 * 1.4)
+        : moderateScale(10) * 1.35,
+      includeFontPadding: false,
+      paddingBottom: moderateScale(2),
     },
     sectionContent: {
       fontSize: moderateScale(isTablet ? 8 : 7.5), // Fixed text size
-      lineHeight: moderateScale(isTablet ? 14 : 13),
+      lineHeight: moderateScale(isTablet ? 8 * 1.4 : 7.5 * 1.4),
       fontWeight: '400', // Explicitly set to normal weight for content
-      includeFontPadding: true,
+      includeFontPadding: false,
       // marginBottom uses dynamic scaling in inline styles
     },
     bulletPoint: {
@@ -383,18 +386,18 @@ const PrivacyPolicyScreen = () => {
       color: '#667eea',
       marginTop: moderateScale(2),
       fontWeight: '600',
-      lineHeight: moderateScale(isTablet ? 16 : 15),
-      includeFontPadding: true,
-      paddingBottom: moderateScale(1),
+      lineHeight: moderateScale(isTablet ? 9 * 1.45 : 8 * 1.45),
+      includeFontPadding: false,
+      paddingBottom: moderateScale(3),
       // Dynamic spacing applied inline
     },
     bulletText: {
       fontSize: moderateScale(isTablet ? 8 : 7.5), // Fixed text size
-      lineHeight: moderateScale(isTablet ? 14 : 13),
+      lineHeight: moderateScale(isTablet ? 8 * 1.4 : 7.5 * 1.4),
       fontWeight: '400', // Explicitly set to normal weight for content
       flex: 1,
-      includeFontPadding: true,
-      paddingBottom: moderateScale(1),
+      includeFontPadding: false,
+      paddingBottom: moderateScale(2),
     },
     highlight: {
       fontWeight: '400', // Explicitly set to normal weight for content subheadings
@@ -415,18 +418,18 @@ const PrivacyPolicyScreen = () => {
       color: '#667eea',
       textAlign: 'center',
       letterSpacing: 0.5,
-      lineHeight: moderateScale(isTablet ? 20 : 18),
-      includeFontPadding: true,
+      lineHeight: moderateScale(isTablet ? 20 * 1.4 : 18 * 1.4),
+      includeFontPadding: false,
       paddingBottom: moderateScale(2),
       // Dynamic spacing applied inline
     },
     contactText: {
       fontSize: moderateScale(isTablet ? 8 : 7.5), // Fixed text size
       textAlign: 'center',
-      lineHeight: moderateScale(isTablet ? 14 : 13),
+      lineHeight: moderateScale(isTablet ? 8 * 1.4 : 7.5 * 1.4),
       fontWeight: '400', // Explicitly set to normal weight for content
-      includeFontPadding: true,
-      paddingBottom: moderateScale(1),
+      includeFontPadding: false,
+      paddingBottom: moderateScale(2),
       // Dynamic spacing applied inline
     },
     emailLink: {
@@ -434,8 +437,8 @@ const PrivacyPolicyScreen = () => {
       textDecorationLine: 'underline',
       fontWeight: '700',
       fontSize: moderateScale(isTablet ? 10 : 9), // Fixed text size
-      lineHeight: moderateScale(isTablet ? 14 : 13),
-      includeFontPadding: true,
+      lineHeight: moderateScale(isTablet ? 10 * 1.45 : 9 * 1.45),
+      includeFontPadding: false,
     },
     heroSection: {
       alignItems: 'center',
@@ -448,16 +451,17 @@ const PrivacyPolicyScreen = () => {
       textShadowOffset: { width: 0, height: 1 },
       textShadowRadius: 2,
       letterSpacing: isTablet ? 1 : 0.5,
-      lineHeight: moderateScale(isTablet ? 24 : 22),
-      includeFontPadding: true,
-      paddingBottom: moderateScale(2),
+      lineHeight: moderateScale(isTablet ? 24 * 1.45 : 22 * 1.45),
+      includeFontPadding: false,
+      paddingBottom: moderateScale(3),
     },
     heroSubtitle: {
       textAlign: 'center',
       maxWidth: isTablet ? 700 : '100%',
       fontWeight: '400', // Explicitly set to normal weight for content
-      lineHeight: moderateScale(isTablet ? 16 : 15),
-      includeFontPadding: true,
+      lineHeight: moderateScale(isTablet ? 16 * 1.4 : 15 * 1.4),
+      includeFontPadding: false,
+      paddingBottom: moderateScale(2),
     },
     divider: {
       backgroundColor: 'rgba(0, 0, 0, 0.1)',
@@ -570,6 +574,11 @@ const PrivacyPolicyScreen = () => {
               }} />
               <Text style={[styles.sectionTitle, {
                 fontSize: isTabletDevice ? getFontSize(11) : getFontSize(10),
+                lineHeight: isTabletDevice
+                  ? dynamicModerateScale(11 * 1.4)
+                  : dynamicModerateScale(10 * 1.85),
+                includeFontPadding: false,
+                paddingBottom: moderateScale(2),
               }]}>Introduction</Text>
             </View>
             <Text style={[styles.sectionContent, {
@@ -606,6 +615,11 @@ const PrivacyPolicyScreen = () => {
               }} />
               <Text style={[styles.sectionTitle, {
                 fontSize: isTabletDevice ? getFontSize(11) : getFontSize(10),
+                lineHeight: isTabletDevice
+                  ? dynamicModerateScale(11 * 1.4)
+                  : dynamicModerateScale(10 * 1.85),
+                includeFontPadding: false,
+                paddingBottom: moderateScale(2),
               }]}>Information We Collect</Text>
             </View>
             
@@ -723,6 +737,11 @@ const PrivacyPolicyScreen = () => {
               <Icon name="settings" size={isTabletDevice ? getIconSize(20) : getIconSize(18)} color="#667eea" style={getIconStyle()} />
               <Text style={[styles.sectionTitle, {
                 fontSize: isTabletDevice ? getFontSize(11) : getFontSize(10),
+                lineHeight: isTabletDevice
+                  ? dynamicModerateScale(11 * 1.4)
+                  : dynamicModerateScale(10 * 1.85),
+                includeFontPadding: false,
+                paddingBottom: moderateScale(2),
               }]}>How We Use Your Information</Text>
             </View>
             <Text style={[styles.sectionContent, getContentStyle(), { 
@@ -764,6 +783,11 @@ const PrivacyPolicyScreen = () => {
               <Icon name="share" size={isTabletDevice ? getIconSize(20) : getIconSize(18)} color="#667eea" style={getIconStyle()} />
               <Text style={[styles.sectionTitle, {
                 fontSize: isTabletDevice ? getFontSize(11) : getFontSize(10),
+                lineHeight: isTabletDevice
+                  ? dynamicModerateScale(11 * 1.4)
+                  : dynamicModerateScale(10 * 1.85),
+                includeFontPadding: false,
+                paddingBottom: moderateScale(2),
               }]}>Information Sharing</Text>
             </View>
             <Text style={[styles.sectionContent, getContentStyle(), { 
@@ -797,6 +821,11 @@ const PrivacyPolicyScreen = () => {
               <Icon name="verified-user" size={isTabletDevice ? getIconSize(20) : getIconSize(18)} color="#667eea" style={getIconStyle()} />
               <Text style={[styles.sectionTitle, {
                 fontSize: isTabletDevice ? getFontSize(11) : getFontSize(10),
+                lineHeight: isTabletDevice
+                  ? dynamicModerateScale(11 * 1.4)
+                  : dynamicModerateScale(10 * 1.85),
+                includeFontPadding: false,
+                paddingBottom: moderateScale(2),
               }]}>Data Security</Text>
             </View>
             <Text style={[styles.sectionContent, getContentStyle(), { 
@@ -831,6 +860,11 @@ const PrivacyPolicyScreen = () => {
               <Icon name="account-circle" size={isTabletDevice ? getIconSize(20) : getIconSize(18)} color="#667eea" style={getIconStyle()} />
               <Text style={[styles.sectionTitle, {
                 fontSize: isTabletDevice ? getFontSize(11) : getFontSize(10),
+                lineHeight: isTabletDevice
+                  ? dynamicModerateScale(11 * 1.4)
+                  : dynamicModerateScale(10 * 1.85),
+                includeFontPadding: false,
+                paddingBottom: moderateScale(2),
               }]}>Your Rights and Choices</Text>
             </View>
             <Text style={[styles.sectionContent, getContentStyle(), { 
@@ -864,6 +898,11 @@ const PrivacyPolicyScreen = () => {
               <Icon name="cookie" size={isTabletDevice ? getIconSize(20) : getIconSize(18)} color="#667eea" style={getIconStyle()} />
               <Text style={[styles.sectionTitle, {
                 fontSize: isTabletDevice ? getFontSize(11) : getFontSize(10),
+                lineHeight: isTabletDevice
+                  ? dynamicModerateScale(11 * 1.4)
+                  : dynamicModerateScale(10 * 1.85),
+                includeFontPadding: false,
+                paddingBottom: moderateScale(2),
               }]}>Cookies and Tracking</Text>
             </View>
             <Text style={[styles.sectionContent, getContentStyle(), { 
@@ -883,6 +922,11 @@ const PrivacyPolicyScreen = () => {
               <Icon name="extension" size={isTabletDevice ? getIconSize(20) : getIconSize(18)} color="#667eea" style={getIconStyle()} />
               <Text style={[styles.sectionTitle, {
                 fontSize: isTabletDevice ? getFontSize(11) : getFontSize(10),
+                lineHeight: isTabletDevice
+                  ? dynamicModerateScale(11 * 1.4)
+                  : dynamicModerateScale(10 * 1.85),
+                includeFontPadding: false,
+                paddingBottom: moderateScale(2),
               }]}>Third-Party Services</Text>
             </View>
             <Text style={[styles.sectionContent, getContentStyle(), { 
@@ -919,6 +963,11 @@ const PrivacyPolicyScreen = () => {
               <Icon name="child-care" size={isTabletDevice ? getIconSize(20) : getIconSize(18)} color="#667eea" style={getIconStyle()} />
               <Text style={[styles.sectionTitle, {
                 fontSize: isTabletDevice ? getFontSize(11) : getFontSize(10),
+                lineHeight: isTabletDevice
+                  ? dynamicModerateScale(11 * 1.4)
+                  : dynamicModerateScale(10 * 1.85),
+                includeFontPadding: false,
+                paddingBottom: moderateScale(2),
               }]}>Children's Privacy</Text>
             </View>
             <Text style={[styles.sectionContent, getContentStyle(), { 
@@ -938,6 +987,11 @@ const PrivacyPolicyScreen = () => {
               <Icon name="update" size={isTabletDevice ? getIconSize(20) : getIconSize(18)} color="#667eea" style={getIconStyle()} />
               <Text style={[styles.sectionTitle, {
                 fontSize: isTabletDevice ? getFontSize(11) : getFontSize(10),
+                lineHeight: isTabletDevice
+                  ? dynamicModerateScale(11 * 1.4)
+                  : dynamicModerateScale(10 * 1.85),
+                includeFontPadding: false,
+                paddingBottom: moderateScale(2),
               }]}>Changes to This Privacy Policy</Text>
             </View>
             <Text style={[styles.sectionContent, getContentStyle(), { 
@@ -965,6 +1019,9 @@ const PrivacyPolicyScreen = () => {
             }} />
             <Text style={[styles.contactTitle, {
               marginBottom: dynamicModerateScale(6),
+              lineHeight: isTabletDevice ? dynamicModerateScale(14 * 1.4) : dynamicModerateScale(12 * 1.4),
+              includeFontPadding: false,
+              paddingBottom: moderateScale(2),
             }]}>Contact Us</Text>
             <Text style={[styles.contactText, {
               marginBottom: dynamicModerateScale(4),
