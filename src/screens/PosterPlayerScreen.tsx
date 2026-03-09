@@ -18,7 +18,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MainStackParamList } from '../navigation/AppNavigator';
@@ -418,6 +418,32 @@ const PosterPlayerScreen: React.FC = () => {
   const userManuallySelectedLanguageRef = useRef<boolean>(false); // Track if user manually selected a language (including "All")
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const [selectedServiceFilter, setSelectedServiceFilter] = useState<string | null>(null);
+  
+  // Auto-set language to "All" when navigating from MyBusiness tab
+  useEffect(() => {
+    console.log("PosterPlayer origin:", originScreen);
+    
+    const cameFromTab = originScreen === "MainTabs";
+    
+    if (
+      cameFromTab &&
+      !userManuallySelectedLanguageRef.current
+    ) {
+      console.log("🌐 MyBusiness tab opened → default language ALL");
+      setSelectedLanguage("all");
+    }
+  }, [originScreen]);
+  
+  // Reset language to "All" whenever PosterPlayerScreen becomes active
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('PosterPlayerScreen focused → resetting language to ALL');
+      
+      userManuallySelectedLanguageRef.current = false;
+      
+      setSelectedLanguage('all');
+    }, [])
+  );
   
   // Business profile state
   const [userBusinessProfiles, setUserBusinessProfiles] = useState<BusinessProfile[]>([]);
@@ -989,6 +1015,14 @@ const PosterPlayerScreen: React.FC = () => {
     } else {
       categoryName = 'Event Planner'; // fallback
     }
+    
+    // Reset language to "All" when switching to different business category
+    if (activeCategoryRef.current.type !== 'business' || activeCategoryRef.current.value !== categoryName) {
+      console.log('🔄 Business category changed → resetting language to ALL');
+      userManuallySelectedLanguageRef.current = false;
+      setSelectedLanguage('all');
+    }
+    
     activeCategoryRef.current = { type: 'business', value: categoryName };
 
     const fetchBusinessCategoryPosters = async () => {
@@ -1090,8 +1124,8 @@ const PosterPlayerScreen: React.FC = () => {
                 currentLanguage: selectedLanguage
               });
               
-              // Only auto-detect if user hasn't manually selected a language
-            if (!userManuallySelectedLanguageRef.current) {
+              // Only auto-detect if user hasn't manually selected a language AND language is not "all"
+            if (!userManuallySelectedLanguageRef.current && selectedLanguage !== 'all') {
               if (detectedLanguage) {
                 console.log('✅ [BUSINESS FETCH] Setting language to:', detectedLanguage);
                 setSelectedLanguage(detectedLanguage);
@@ -1123,11 +1157,20 @@ const PosterPlayerScreen: React.FC = () => {
 
     // Clear allTemplates immediately to prevent showing old posters in grid
     setAllTemplates([]);
+    
+    // Reset language to "All" when switching to different greeting category
+    if (activeCategoryRef.current.type !== 'greeting' || activeCategoryRef.current.value !== greetingCategory) {
+      console.log('🔄 Greeting category changed → resetting language to ALL');
+      userManuallySelectedLanguageRef.current = false;
+      setSelectedLanguage('all');
+    }
+    
     // Reset manual language selection when switching categories to allow auto-detection
     // Only reset if user hasn't manually selected a language
     if (!userManuallySelectedLanguageRef.current) {
       userManuallySelectedLanguageRef.current = false;
     }
+    
     // Track active category to prevent other useEffects from overwriting templates
     activeCategoryRef.current = { type: 'greeting', value: greetingCategory };
 
@@ -1992,7 +2035,7 @@ const PosterPlayerScreen: React.FC = () => {
                   willUpdate: detectedLanguage && detectedLanguage !== selectedLanguage
                 });
               
-              if (!userManuallySelectedLanguageRef.current) {
+              if (!userManuallySelectedLanguageRef.current && selectedLanguage !== 'all') {
                 if (detectedLanguage) {
                   console.log('✅ [GREETING FETCH] Setting language to:', detectedLanguage);
                   setSelectedLanguage(detectedLanguage);
@@ -2045,11 +2088,19 @@ const PosterPlayerScreen: React.FC = () => {
 
     // Clear allTemplates immediately to prevent showing old posters in grid
     setAllTemplates([]);
+    // Reset language to "All" when switching to different calendar date
+    if (activeCategoryRef.current.type !== 'calendar' || activeCategoryRef.current.value !== calendarDate) {
+      console.log('🔄 Calendar date changed → resetting language to ALL');
+      userManuallySelectedLanguageRef.current = false;
+      setSelectedLanguage('all');
+    }
+    
     // Reset manual language selection when switching categories to allow auto-detection
     // Only reset if user hasn't manually selected a language
     if (!userManuallySelectedLanguageRef.current) {
       userManuallySelectedLanguageRef.current = false;
     }
+    
     // Track active category to prevent other useEffects from overwriting templates
     activeCategoryRef.current = { type: 'calendar', value: calendarDate };
 
@@ -2296,7 +2347,7 @@ const PosterPlayerScreen: React.FC = () => {
     // If a language is detected, switch to it only if user hasn't manually selected
     // Always auto-detect based on the current poster's language
     // Only skip if we've already detected for this poster to avoid duplicate detection
-    if (detectedLanguage && lastAutoDetectedPosterIdRef.current !== initialPoster?.id && !userManuallySelectedLanguageRef.current) {
+    if (detectedLanguage && lastAutoDetectedPosterIdRef.current !== initialPoster?.id && !userManuallySelectedLanguageRef.current && selectedLanguage !== 'all') {
       console.log('✅ [INITIAL LANG DETECT] Setting language to:', detectedLanguage);
       setSelectedLanguage(detectedLanguage);
       lastAutoDetectedPosterIdRef.current = initialPoster?.id || null;
@@ -2312,8 +2363,8 @@ const PosterPlayerScreen: React.FC = () => {
   // This ensures language detection works when clicking category cards or calendar posters
   useEffect(() => {
     // Don't auto-detect if user manually selected "All" or any language
-    if (userManuallySelectedLanguageRef.current) {
-      console.log('🔍 [CURRENT LANG DETECT] Skipped - user manually selected language');
+    if (userManuallySelectedLanguageRef.current || selectedLanguage === 'all') {
+      console.log('🔍 [CURRENT LANG DETECT] Skipped - language is ALL or user manually selected');
       return;
     }
     
@@ -2389,7 +2440,7 @@ const PosterPlayerScreen: React.FC = () => {
     // If a language is detected and it's different from current selection, switch to it only if user hasn't manually selected
     // Always auto-detect based on the current poster's language
     // Only skip if we've already detected for this poster to avoid duplicate detection
-    if (detectedLanguage && lastAutoDetectedPosterIdRef.current !== currentPoster?.id && !userManuallySelectedLanguageRef.current) {
+    if (detectedLanguage && lastAutoDetectedPosterIdRef.current !== currentPoster?.id && !userManuallySelectedLanguageRef.current && selectedLanguage !== 'all') {
       console.log('✅ [CURRENT LANG DETECT] Setting language to:', detectedLanguage);
       setSelectedLanguage(detectedLanguage);
       lastAutoDetectedPosterIdRef.current = currentPoster?.id || null;
@@ -2607,7 +2658,7 @@ const PosterPlayerScreen: React.FC = () => {
     // Update filter to show posters matching the detected language only if user hasn't manually selected
     // This ensures the grid shows posters matching the selected poster's language
     if (detectedLanguage) {
-      if (detectedLanguage !== selectedLanguage && !userManuallySelectedLanguageRef.current) {
+      if (detectedLanguage !== selectedLanguage && !userManuallySelectedLanguageRef.current && selectedLanguage !== 'all') {
         console.log('✅ [HANDLE POSTER SELECT] Setting language to:', detectedLanguage);
         setSelectedLanguage(detectedLanguage);
       } else if (userManuallySelectedLanguageRef.current) {

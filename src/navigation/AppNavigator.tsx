@@ -137,7 +137,7 @@ export type MainStackParamList = {
 export type TabParamList = {
   Home: undefined;
   Templates: undefined;
-  PosterPlayer: undefined;
+  PosterPlayer: { originScreen?: string };
   Greetings: undefined;
   Profile: undefined;
 };
@@ -1119,6 +1119,7 @@ const MainTabNavigator = () => {
       <Tab.Screen 
         name="PosterPlayer" 
         component={PosterPlayerScreen}
+        initialParams={{ originScreen: "MainTabs" }}
         options={{
           title: 'My Business',
           tabBarStyle: { display: 'none' },
