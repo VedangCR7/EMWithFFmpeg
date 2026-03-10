@@ -298,7 +298,7 @@ const VideoEditorScreen: React.FC<VideoEditorScreenProps> = ({ route }) => {
   const [progressBarWidth, setProgressBarWidth] = useState(0);
 
   // State for video layers
-  const [layers, setLayers] = useState<VideoLayer[]>([]);
+  const [layers, setLayers] = useState<ComposerVideoLayer[]>([]);
   const [selectedLayer, setSelectedLayer] = useState<string | null>(null);
   const [showTextModal, setShowTextModal] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
@@ -352,7 +352,7 @@ const VideoEditorScreen: React.FC<VideoEditorScreenProps> = ({ route }) => {
   const [selectedFont, setSelectedFont] = useState('System');
   const [fontSearchQuery, setFontSearchQuery] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState('business');
-  const [originalLayers, setOriginalLayers] = useState<VideoLayer[]>([]);
+  const [originalLayers, setOriginalLayers] = useState<ComposerVideoLayer[]>([]);
   const [originalTemplate, setOriginalTemplate] = useState<string>('business');
 
   const [canvasDimensions, setCanvasDimensions] = useState({
@@ -1268,7 +1268,7 @@ const [videoDimensions, setVideoDimensions] = useState<{ width: number; height: 
         selectedTemplateId: 'custom',
       layers: layers,
         selectedProfile: selectedProfile,
-        processedVideoPath: processedVideoPath,
+        processedVideoPath: undefined,
         canvasData: {
           width: currentCanvasWidth,
           height: currentCanvasHeight,
@@ -1528,7 +1528,7 @@ const [videoDimensions, setVideoDimensions] = useState<{ width: number; height: 
     return videoCanvas;
   }, [layers, selectedProfile, videoDuration, currentCanvasWidth, currentCanvasHeight]);
 
-  const applyTemplateStylesToLayers = useCallback((templateType: string, targetLayers: VideoLayer[], canvasWidth: number, canvasHeight: number): VideoLayer[] => {
+  const applyTemplateStylesToLayers = useCallback((templateType: string, targetLayers: ComposerVideoLayer[], canvasWidth: number, canvasHeight: number): ComposerVideoLayer[] => {
     return targetLayers.map(layer => {
       if (layer.fieldType === 'footerBackground') {
         const templateStyles: Record<string, { backgroundColor: string; gradient?: string[] }> = {
@@ -1565,7 +1565,7 @@ const [videoDimensions, setVideoDimensions] = useState<{ width: number; height: 
           'ombre-galaxy': { backgroundColor: 'rgba(99, 102, 241, 0.9)', gradient: OMBRE_GRADIENTS['ombre-galaxy'] },
         };
 
-        const style = templateStyles[templateType] || templateStyles['business'];
+        const style = templateStyles[templateType] || templateStyles.business;
 
         return {
           ...layer,
@@ -1612,7 +1612,7 @@ const [videoDimensions, setVideoDimensions] = useState<{ width: number; height: 
           'ombre-galaxy': '#ffffff',
         };
 
-        const color = textColors[templateType] || textColors['business'];
+        const color = textColors[templateType] || textColors.business;
 
         return {
           ...layer,
@@ -1638,7 +1638,7 @@ const [videoDimensions, setVideoDimensions] = useState<{ width: number; height: 
     const scaleX = canvasWidth / POSTER_BASE_WIDTH;
     const scaleY = canvasHeight / POSTER_BASE_HEIGHT;
 
-    const newLayers: VideoLayer[] = [];
+    const newLayers: ComposerVideoLayer[] = [];
 
     const buildFooterLayers = (
       companyName: string | undefined,
@@ -1966,7 +1966,7 @@ const [videoDimensions, setVideoDimensions] = useState<{ width: number; height: 
 
   // Layer management
   const addTextLayer = () => {
-    const newLayer: VideoLayer = {
+    const newLayer: ComposerVideoLayer = {
       id: generateId(),
       type: 'text',
       content: 'New Text',
@@ -1985,7 +1985,7 @@ const [videoDimensions, setVideoDimensions] = useState<{ width: number; height: 
   };
 
   const addImageLayer = () => {
-    const newLayer: VideoLayer = {
+    const newLayer: ComposerVideoLayer = {
       id: generateId(),
       type: 'image',
       content: newImageUrl,
@@ -1999,7 +1999,7 @@ const [videoDimensions, setVideoDimensions] = useState<{ width: number; height: 
   };
 
   const addLogoLayer = () => {
-    const newLayer: VideoLayer = {
+    const newLayer: ComposerVideoLayer = {
       id: generateId(),
       type: 'logo',
       content: newLogoUrl,
@@ -2012,7 +2012,7 @@ const [videoDimensions, setVideoDimensions] = useState<{ width: number; height: 
     setNewLogoUrl('');
   };
 
-  const updateLayer = (layerId: string, updates: Partial<VideoLayer>) => {
+  const updateLayer = (layerId: string, updates: Partial<ComposerVideoLayer>) => {
     setLayers(layers.map(layer => 
       layer.id === layerId ? { ...layer, ...updates } : layer
     ));
@@ -2219,7 +2219,7 @@ const [videoDimensions, setVideoDimensions] = useState<{ width: number; height: 
 
   // Render functions
 const renderLayer = (
-  layer: VideoLayer,
+  layer: ComposerVideoLayer,
   index: number,
   options: { scaleX?: number; scaleY?: number; forceOpaqueBackground?: boolean } = {},
 ) => {
@@ -3864,6 +3864,9 @@ const styles = StyleSheet.create({
   controlsContainer: {
     flex: 0,
     paddingTop: 0,
+  },
+  controlsContent: {
+    paddingHorizontal: isLandscape ? (isTablet ? responsiveSpacing.sm : responsiveSpacing.xs) : (isUltraSmallScreen ? responsiveSpacing.xs : responsiveSpacing.sm),
   },
   // Field Toggle Section
   fieldToggleSection: {
