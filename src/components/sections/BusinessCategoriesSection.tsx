@@ -6,7 +6,7 @@
  */
 
 import React, { useRef, useCallback, useMemo } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { BusinessCategory } from '../../services/businessCategoriesService';
 import OptimizedImage from '../OptimizedImage';
 import LinearGradient from 'react-native-linear-gradient';
@@ -76,7 +76,7 @@ const BusinessCategoryCardItem: React.FC<BusinessCategoryCardItemProps> = React.
                   },
                 ]}
               >
-                {item.icon ? <Text style={styles.businessCategoryIcon}>{item.icon}</Text> : null}
+                <ActivityIndicator size="small" color={theme.colors.primary} />
               </View>
             )}
             <LinearGradient

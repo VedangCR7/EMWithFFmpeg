@@ -6,7 +6,7 @@
  */
 
 import React, { useCallback, useMemo } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import OptimizedImage from '../OptimizedImage';
 import LinearGradient from 'react-native-linear-gradient';
 import { moderateScale } from '../../utils/responsiveUtils';
@@ -54,11 +54,7 @@ const GreetingCategoryCard: React.FC<GreetingCategoryCardProps> = React.memo(({ 
                 { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.05)' },
               ]}
             >
-              {item.icon ? (
-                <Text style={styles.businessCategoryIcon}>
-                  {item.icon}
-                </Text>
-              ) : null}
+              <ActivityIndicator size="small" color={theme.colors.primary} />
             </View>
           )}
           <LinearGradient

@@ -239,7 +239,7 @@ const BusinessCategoryCardItem: React.FC<BusinessCategoryCardItemProps> = React.
                   },
                 ]}
               >
-                {item.icon ? <Text style={styles.businessCategoryIcon}>{item.icon}</Text> : null}
+                <ActivityIndicator size="small" color={theme.colors.primary} />
               </View>
             )}
             <LinearGradient
@@ -431,11 +431,7 @@ const GreetingCategoryCard: React.FC<GreetingCategoryCardProps> = React.memo(({ 
                 { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.05)' },
               ]}
             >
-              {item.icon ? (
-                <Text style={styles.businessCategoryIcon}>
-                  {item.icon}
-                </Text>
-              ) : null}
+              <ActivityIndicator size="small" color={theme.colors.primary} />
             </View>
           )}
           <LinearGradient
@@ -3868,7 +3864,7 @@ const HomeScreen: React.FC = React.memo(() => {
             />
           ) : (
             <View style={[styles.upcomingEventModalImage, { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.05)' }]}>
-              <Text style={styles.businessCategoryIcon}>{category.icon || category.name?.[0] || 'MB'}</Text>
+              <ActivityIndicator size="small" color={theme.colors.primary} />
             </View>
           )}
           <LinearGradient
