@@ -945,6 +945,16 @@ const TodaysPickScreen: React.FC = () => {
             try {
               const marketingTipsTemplates = marketingTipsByCategory.value;
               console.log(`📦 [Business Marketing Tips] Total templates available: ${marketingTipsTemplates.length}`);
+              
+              // Log each template's actual category for debugging
+              marketingTipsTemplates.forEach((template, index) => {
+                console.log(`🔍 [Business Marketing Tips] Template ${index + 1}:`, {
+                  id: template.id,
+                  name: template.name,
+                  category: template.category,
+                  thumbnail: template.thumbnail
+                });
+              });
 
               const recentDays = await getRecentDaysBatch(today, 'marketing_tips');
               console.log(`📅 [Business Marketing Tips] Recent days used: ${recentDays.length}`, recentDays);

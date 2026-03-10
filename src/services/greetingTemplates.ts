@@ -251,10 +251,21 @@ class GreetingTemplatesService {
         // This prevents templates from other categories (like business categories) from being returned
         if (templates.length > 0 && category) {
           const normalizedRequestedCategory = category.toLowerCase().trim();
+          console.log(`🔍 [getTemplatesByCategory] Requested category: "${normalizedRequestedCategory}"`);
+          console.log(`📋 [getTemplatesByCategory] Available templates: ${templates.length}`);
+          
           dataToMap = templates.filter((template: any) => {
             // ONLY check template.category field - ignore business_categories completely
             const templateCategory = (template.category || '').toLowerCase().trim();
             const matches = templateCategory === normalizedRequestedCategory;
+            
+            // Log each template for debugging
+            console.log(`🔍 [getTemplatesByCategory] Template ${template.id}:`, {
+              name: template.name || template.title,
+              templateCategory: templateCategory,
+              requested: normalizedRequestedCategory,
+              matches: matches
+            });
             
             // Log mismatches for debugging
             if (!matches && __DEV__) {
@@ -267,6 +278,8 @@ class GreetingTemplatesService {
             
             return matches;
           });
+          
+          console.log(`✅ [getTemplatesByCategory] Filtered to ${dataToMap.length} matching templates`);
         }
         
         // If no matching templates found, return businessCategoryImages for Business Marketing Tips
