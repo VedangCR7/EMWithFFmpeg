@@ -219,15 +219,16 @@ const templateContainsLanguage = (template: Template, languageId: string): boole
     return false;
   }
 
-  // Only treat as language-agnostic if no language info exists AND we're on default language (English)
-  // This prevents templates without language info from showing for all languages
+  // NEW UNIVERSAL LOGIC: Templates with ZERO language metadata are shown for ALL languages
   if (templateLanguages.length === 0 && tags.length === 0) {
-    // Show only for English (default language) if template has no language info
-    return normalizedLanguage === 'english';
+    if (__DEV__) {
+      console.log(`🌐 [Language Filter] UNIVERSAL: ${template.id} (No tags/lang)`);
+    }
+    return true; 
   }
 
-  // If we have language info but it doesn't match, return false
-  return false;
+  // Fallback: Default to English if no other match found
+  return normalizedLanguage === 'english';
 };
 
 const hexToRgba = (hexColor: string, alpha = 1): string => {
@@ -691,6 +692,11 @@ const TodaysPickScreen: React.FC = () => {
 
       // Load cached selections for TODAY first - if all exist, use them and skip API calls
       const cacheKey = `todays_pick_${dateString}`;
+      
+      // TEMPORARY: Clear cache once to force fresh API fetch with correct Business Marketing Tips
+      await AsyncStorage.removeItem(cacheKey).catch(() => { });
+      console.log("🧹 TODAYS_POSTERS_CACHE cleared to remove stale data");
+      
       const cachedTodayData = await AsyncStorage.getItem(cacheKey).catch(() => null);
 
       if (cachedTodayData) {
@@ -702,6 +708,18 @@ const TodaysPickScreen: React.FC = () => {
             // If not, it's old cache from before calendar integration - fetch fresh data
             const calendarPosters = cachedPosters.filter(p => p.category === 'Festive Alerts');
             const hasOldWellnessData = cachedPosters.some(p => p.category === 'Wellness Awareness');
+            
+            // Check if Business Marketing Tips are valid (not empty)
+            const marketingTipsPosters = cachedPosters.filter(p => p.category === 'Business Marketing Tips');
+            const marketingTipsValid = marketingTipsPosters && marketingTipsPosters.length > 0;
+
+            // Debug cache validation
+            console.log('🔍 [TodaysPickScreen] Cache validation', {
+              motivational: cachedPosters.filter(p => p.category === 'Motivational').length,
+              business: cachedPosters.filter(p => p.category === 'Business').length,
+              marketingTips: marketingTipsPosters.length,
+              calendar: calendarPosters.length
+            });
 
             // Debug calendar posters
             console.log('📅 [TodaysPickScreen] Calendar posters from cache:', {
@@ -715,20 +733,20 @@ const TodaysPickScreen: React.FC = () => {
               }))
             });
 
-            // If cache has old wellness data or no calendar posters, clear cache and fetch fresh
-            if (hasOldWellnessData || calendarPosters.length === 0) {
-              console.log('🔄 [TodaysPickScreen] Cache is outdated (has wellness or no calendar), clearing cache and fetching fresh data');
-              // Clear the outdated cache
-              await AsyncStorage.removeItem(cacheKey).catch(() => { });
-              // Fall through to fetch fresh data
-            } else {
+            // Check if all categories have data for cache to be valid
+            const motivationalPosters = cachedPosters.filter(p => p.category === 'Motivational');
+            const businessPosters = cachedPosters.filter(p => p.category === 'Business');
+            
+            if (
+              cachedPosters &&
+              motivationalPosters.length > 0 &&
+              businessPosters.length > 0 &&
+              calendarPosters.length > 0 &&
+              marketingTipsValid
+            ) {
               // Use cached data - no API calls needed
-              console.log('✅ [TodaysPickScreen] Using valid cached data with calendar posters');
+              console.log('✅ [TodaysPickScreen] Using valid cached data with all categories including marketing tips');
               const sectionsData: Array<{ title: string; data: Template[] }> = [];
-
-              const motivationalPosters = cachedPosters.filter(p => p.category === 'Motivational');
-              const businessPosters = cachedPosters.filter(p => p.category === 'Business');
-              const marketingTipsPosters = cachedPosters.filter(p => p.category === 'Business Marketing Tips');
 
               // Print response of 4 categories from cached data
               console.log('📊 [TodaysPickScreen] 4 Categories Response (CACHED):');
@@ -766,6 +784,13 @@ const TodaysPickScreen: React.FC = () => {
 
               setLoading(false);
               return; // Exit early - no API calls needed
+            } else {
+              // Cache is invalid - either has old wellness data, no calendar posters, or empty marketing tips
+              console.log('🔄 [TodaysPickScreen] Cache invalid because marketing tips are empty or missing other categories');
+              console.log('🔄 [TodaysPickScreen] Clearing cache and fetching fresh data');
+              // Clear the invalid cache
+              await AsyncStorage.removeItem(cacheKey).catch(() => { });
+              // Fall through to fetch fresh data
             }
           }
         } catch (error) {
@@ -944,32 +969,42 @@ const TodaysPickScreen: React.FC = () => {
           if (marketingTipsByCategory.status === 'fulfilled' && marketingTipsByCategory.value && marketingTipsByCategory.value.length > 0) {
             try {
               const marketingTipsTemplates = marketingTipsByCategory.value;
-              console.log(`📦 [Business Marketing Tips] Total templates available: ${marketingTipsTemplates.length}`);
+              console.log(`📦 [Business Marketing Tips] TOTAL FETCHED: ${marketingTipsTemplates.length}`);
               
               // Log each template's actual category for debugging
               marketingTipsTemplates.forEach((template, index) => {
-                console.log(`🔍 [Business Marketing Tips] Template ${index + 1}:`, {
+                console.log(`🔍 [Business Marketing Tips] Item ${index + 1}:`, {
                   id: template.id,
                   name: template.name,
-                  category: template.category,
-                  thumbnail: template.thumbnail
+                  category: template.category
                 });
               });
 
               const recentDays = await getRecentDaysBatch(today, 'marketing_tips');
-              console.log(`📅 [Business Marketing Tips] Recent days used: ${recentDays.length}`, recentDays);
+              console.log(`📅 [Business Marketing Tips] FILTERED OUT (Recent IDs):`, recentDays);
 
               const availableTemplates = marketingTipsTemplates.filter(t => !recentDays.includes(t.id));
-              const templatesToSelect = availableTemplates.length > 0 ? availableTemplates : marketingTipsTemplates;
+              let templatesToSelect = availableTemplates;
 
-              console.log(`🎯 [Business Marketing Tips] Templates to select from: ${templatesToSelect.length} (available: ${availableTemplates.length})`);
+              if (availableTemplates.length === 0 && marketingTipsTemplates.length > 0) {
+                console.log(`⚠️ [Business Marketing Tips] POOL EXHAUSTED. Resetting to use all ${marketingTipsTemplates.length} templates.`);
+                templatesToSelect = marketingTipsTemplates;
+              }
+
+              console.log(`🎯 [Business Marketing Tips] FINAL AVAILABLE COUNT: ${templatesToSelect.length}`);
 
               const selectedMarketingTip = selectDailyItem(templatesToSelect, dailySeed, 'marketing_tips');
               if (selectedMarketingTip) {
-                console.log(`✅ [Business Marketing Tips] Selected: ${selectedMarketingTip.name || selectedMarketingTip.id}`);
+                console.log(`✅ [Business Marketing Tips] SELECTED FOR TODAY:`, {
+                  id: selectedMarketingTip.id,
+                  name: selectedMarketingTip.name
+                });
 
                 const storageKey = `daily_marketing_tips_${dateString}`;
                 AsyncStorage.setItem(storageKey, selectedMarketingTip.id).catch(() => { });
+
+                // TEMPORARY: Verification log for fresh marketing tips fetch
+                console.log("📊 Fresh marketing tips fetched:", templatesToSelect.length);
 
                 return {
                   id: selectedMarketingTip.id,

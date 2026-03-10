@@ -1,5 +1,53 @@
 import api from './api';
 import cacheService from './cacheService';
+import logger from '../utils/logger';
+
+// Helper to normalize category strings for comparison
+function normalizeCategory(category?: string) {
+  return (category || "").toLowerCase().trim();
+}
+
+// Helper to detect marketing tip content based on title, name, description, and tags
+function isMarketingTip(image: any) {
+  const text = (
+    image.title ||
+    image.name ||
+    image.description ||
+    ""
+  ).toLowerCase();
+
+  const tags = (image.tags || []).join(" ").toLowerCase();
+
+  const marketingKeywords = [
+    "marketing",
+    "marketing tip",
+    "business tip",
+    "promotion",
+    "branding",
+    "customer",
+    "engagement",
+    "sales",
+    "strategy",
+    "advertising"
+  ];
+
+  return marketingKeywords.some(k =>
+    text.includes(k) || tags.includes(k)
+  );
+}
+
+// Helper to identify marketing-related categories with flexible matching
+export function isMarketingCategory(category?: string) {
+  if (!category) return false;
+  const normalized = category.toLowerCase().trim();
+
+  return (
+    normalized.includes('marketing') ||
+    normalized.includes('business marketing') ||
+    normalized.includes('marketing tips') ||
+    normalized.includes('business tips')
+  );
+}
 
 export interface GreetingTemplate {
   id: string;
@@ -17,6 +65,7 @@ export interface GreetingTemplate {
   downloads: number;
   isDownloaded: boolean;
   isPremium: boolean;
+  tags?: string[]; // Added tags field
 }
 
 export interface GreetingCategory {
@@ -237,42 +286,60 @@ class GreetingTemplatesService {
       
       const response = await api.get(apiUrl);
       
+      // STEP 1 & 6: Log raw response for debugging
+      console.log(`🔍 [getTemplatesByCategory] RAW RESPONSE for "${category}":`, JSON.stringify(response.data, null, 2));
+      
       if (response.data.success) {
-        // When category is provided, backend only returns templates (no businessCategoryImages)
-        // Always use templates for category-specific requests to ensure correct category matching
-        const templates = response.data.data?.templates || [];
-        const businessCategoryImages = response.data.data?.businessCategoryImages || [];
+        // STEP 2 & 3: Detect Response Shape & Normalize
+        // Look for templates in various possible locations
+        const rawData = response.data.data || response.data;
+        const templates = 
+          rawData.templates || 
+          rawData.posters || 
+          rawData.results || 
+          rawData.images || 
+          rawData.data || 
+          (Array.isArray(rawData) ? rawData : []);
+          
+        const businessCategoryImages = rawData.businessCategoryImages || [];
         
-        // For category-specific requests, ONLY use templates and filter to ensure category matches exactly
-        // Never use businessCategoryImages for category-specific requests
+        console.log(`📋 [getTemplatesByCategory] Normalized templates count: ${templates.length}`);
+        if (templates.length > 0) {
+          console.log(`🔍 [getTemplatesByCategory] First item keys:`, Object.keys(templates[0]));
+        }
+        
+        // For category-specific requests, prefer templates/posters and filter to ensure category matches
         let dataToMap = templates;
         
         // Additional safety: Filter templates to ensure they match the requested category EXACTLY
         // This prevents templates from other categories (like business categories) from being returned
         if (templates.length > 0 && category) {
           const normalizedRequestedCategory = category.toLowerCase().trim();
-          console.log(`🔍 [getTemplatesByCategory] Requested category: "${normalizedRequestedCategory}"`);
+          const requestedIsMarketing = isMarketingCategory(normalizedRequestedCategory);
+          console.log(`🔍 [getTemplatesByCategory] Requested category: "${normalizedRequestedCategory}" (isMarketing: ${requestedIsMarketing})`);
           console.log(`📋 [getTemplatesByCategory] Available templates: ${templates.length}`);
           
           dataToMap = templates.filter((template: any) => {
             // ONLY check template.category field - ignore business_categories completely
-            const templateCategory = (template.category || '').toLowerCase().trim();
-            const matches = templateCategory === normalizedRequestedCategory;
+            const rawCategory = template.category;
+            
+            // If item has no category info, assume it matches since we specifically requested this category
+            if (!rawCategory) return true;
+            
+            const templateCategory = String(rawCategory).toLowerCase().trim();
+            
+            // Use flexible matching if it's a marketing category, otherwise strict for others
+            const matches = requestedIsMarketing 
+              ? isMarketingCategory(templateCategory)
+              : templateCategory === normalizedRequestedCategory;
             
             // Log each template for debugging
-            console.log(`🔍 [getTemplatesByCategory] Template ${template.id}:`, {
-              name: template.name || template.title,
-              templateCategory: templateCategory,
-              requested: normalizedRequestedCategory,
-              matches: matches
-            });
-            
-            // Log mismatches for debugging
-            if (!matches && __DEV__) {
-              console.warn(`[getTemplatesByCategory] Template ${template.id} category mismatch:`, {
-                requested: normalizedRequestedCategory,
+            if (__DEV__ && matches) {
+              console.log(`🔍 [getTemplatesByCategory] Template ${template.id}:`, {
+                name: template.name || template.title,
                 templateCategory: templateCategory,
-                templateTitle: template.title
+                requested: normalizedRequestedCategory,
+                matches: matches
               });
             }
             
@@ -285,38 +352,77 @@ class GreetingTemplatesService {
         // If no matching templates found, return businessCategoryImages for Business Marketing Tips
         if (dataToMap.length === 0) {
           // For Business Marketing Tips category, return businessCategoryImages if no templates match
-          if (category.toLowerCase().trim() === 'business marketing tips') {
-            console.log('🖼️ [getTemplatesByCategory] No templates found, filtering businessCategoryImages for Business Marketing Tips:', businessCategoryImages.length);
+          if (isMarketingCategory(category)) {
+            console.log('🖼️ [getTemplatesByCategory] No templates found, analyzing businessCategoryImages:', businessCategoryImages.length);
+            
+            // Log all unique categories in businessCategoryImages
+            const uniqueCategories = [...new Set(businessCategoryImages.map((img: any) => img.category || 'Unknown'))];
+            console.log('📋 [getTemplatesByCategory] Categories found in businessCategoryImages:', uniqueCategories);
+            
+            // Log first 10 items with their categories
+            businessCategoryImages.slice(0, 10).forEach((img: any, index: number) => {
+              console.log(`🔍 [getTemplatesByCategory] BusinessImage ${index + 1}:`, {
+                id: img.id,
+                name: img.title || img.name,
+                category: img.category
+              });
+            });
+            
             // Filter businessCategoryImages to ensure they match the requested category EXACTLY
             const filteredBusinessImages = businessCategoryImages.filter((businessImage: any) => {
-              const businessImageCategory = (businessImage.category || '').toLowerCase().trim();
-              const matches = businessImageCategory === 'business marketing tips';
+              const requested = normalizeCategory(category);
+              const imageCategory = normalizeCategory(businessImage.category);
+              const imageTags = (businessImage.tags || []).map((tag: string) => normalizeCategory(tag));
+
+              const isMarketingRequest = requested === "business marketing tips";
+              
+              // Use correct category detection for Business Marketing Tips
+              const isMarketingImage =
+                businessImage.category === "Business Marketing Tips" ||
+                imageTags.includes("business marketing tips");
+
+              let allowImage = false;
+              
+              // Keep existing behavior for other categories (exact match)
+              if (requested === imageCategory) {
+                allowImage = true;
+              } else if (isMarketingRequest && isMarketingImage) {
+                // Only allow images specifically tagged as Business Marketing Tips
+                allowImage = true;
+              }
               
               // Log mismatches for debugging
-              if (!matches && __DEV__) {
+              if (!allowImage && __DEV__) {
                 console.warn(`[getTemplatesByCategory] BusinessImage ${businessImage.id} category mismatch:`, {
-                  requested: 'business marketing tips',
-                  businessImageCategory: businessImageCategory,
+                  requested: category,
+                  businessImageCategory: businessImage.category,
+                  businessImageTags: businessImage.tags,
                   businessImageTitle: businessImage.title
                 });
               }
               
-              return matches;
+              return allowImage;
             });
             
-            console.log(`🎯 [getTemplatesByCategory] Filtered ${filteredBusinessImages.length} business images for Business Marketing Tips from ${businessCategoryImages.length} total`);
+            console.log(`🎯 [getTemplatesByCategory] Filtered ${filteredBusinessImages.length} business images for ${category} from ${businessCategoryImages.length} total`);
+            
+            // Add debug log for marketing tips filtering
+            const isMarketingTipsRequest = normalizeCategory(category) === "business marketing tips";
+            if (isMarketingTipsRequest) {
+              console.log("Marketing tips filtered:", filteredBusinessImages.length);
+            }
             
             // Map filtered businessCategoryImages through the same URL conversion logic
             const mappedBusinessImages = filteredBusinessImages.map((backendTemplate: any) => {
-              const imageUrl = backendTemplate.url || backendTemplate.imageUrl || backendTemplate.thumbnail;
-              const thumbnailUrl = backendTemplate.thumbnailUrl || backendTemplate.url || backendTemplate.imageUrl;
+              const imageUrl = backendTemplate.url || backendTemplate.imageUrl || backendTemplate.posterUrl || backendTemplate.image || backendTemplate.poster || backendTemplate.thumbnail;
+              const thumbnailUrl = backendTemplate.thumbnailUrl || backendTemplate.url || backendTemplate.imageUrl || backendTemplate.posterUrl || backendTemplate.image || backendTemplate.poster;
               const optimized = this.getOptimizedImageUrls(imageUrl, thumbnailUrl);
 
               return {
                 id: backendTemplate.id,
                 name: backendTemplate.title || backendTemplate.name,
                 thumbnail: optimized.thumbnail,
-                category: backendTemplate.category || 'Business Marketing Tips',
+                category: backendTemplate.category || category,
                 categoryId: undefined,
                 content: {
                   text: backendTemplate.description || '',
@@ -328,6 +434,10 @@ class GreetingTemplatesService {
                 isPremium: backendTemplate.isPremium || false,
               };
             });
+            
+            // Add debug log for marketing tips images accepted
+            console.log("Marketing tips images accepted:", mappedBusinessImages.length);
+            
             return mappedBusinessImages;
           }
           return [];
@@ -335,8 +445,8 @@ class GreetingTemplatesService {
         
         // Map backend response to frontend format with URL conversion
         const mappedTemplates = dataToMap.map((backendTemplate: any) => {
-          const imageUrl = backendTemplate.url || backendTemplate.imageUrl || backendTemplate.thumbnail;
-          const thumbnailUrl = backendTemplate.thumbnailUrl || backendTemplate.url || backendTemplate.imageUrl;
+          const imageUrl = backendTemplate.url || backendTemplate.imageUrl || backendTemplate.posterUrl || backendTemplate.image || backendTemplate.poster || backendTemplate.thumbnail;
+          const thumbnailUrl = backendTemplate.thumbnailUrl || backendTemplate.url || backendTemplate.imageUrl || backendTemplate.posterUrl || backendTemplate.image || backendTemplate.poster;
           const optimized = this.getOptimizedImageUrls(imageUrl, thumbnailUrl);
 
           return {
@@ -397,22 +507,35 @@ class GreetingTemplatesService {
         const response = await api.get(endpoint);
         
         if (response.data.success) {
-          const templates = response.data.data?.templates || [];
-          const businessCategoryImages = response.data.data?.businessCategoryImages || [];
+          const rawData = response.data.data || response.data;
+          const templates = 
+            rawData.templates || 
+            rawData.posters || 
+            rawData.results || 
+            rawData.images || 
+            rawData.data || 
+            (Array.isArray(rawData) ? rawData : []);
+            
+          const businessCategoryImages = rawData.businessCategoryImages || [];
           
           let dataToMap: any[] = [];
           
           if (filters?.category) {
-            // Category filter: ONLY use templates and ensure they match the category exactly
+            // Category filter: ONLY use templates and ensure they match the category
             // Never use businessCategoryImages when category filter is applied
             const normalizedRequestedCategory = filters.category.toLowerCase().trim();
+            const requestedIsMarketing = isMarketingCategory(normalizedRequestedCategory);
+            
             dataToMap = templates.filter((template: any) => {
               // ONLY check template.category field - ignore business_categories completely
               const templateCategory = (template.category || '').toLowerCase().trim();
-              const matches = templateCategory === normalizedRequestedCategory;
+              
+              const matches = requestedIsMarketing 
+                ? isMarketingCategory(templateCategory)
+                : templateCategory === normalizedRequestedCategory;
               
               // Log mismatches for debugging
-              if (!matches && __DEV__) {
+              if (!matches && __DEV__ && (templateCategory.includes('marketing') || normalizedRequestedCategory.includes('marketing'))) {
                 console.warn(`[getTemplates] Template ${template.id} category mismatch:`, {
                   requested: normalizedRequestedCategory,
                   templateCategory: templateCategory,
@@ -433,8 +556,8 @@ class GreetingTemplatesService {
           
           // Map backend response to frontend format with URL conversion
           const mappedTemplates = dataToMap.map((backendTemplate: any) => {
-            const imageUrl = backendTemplate.url || backendTemplate.imageUrl || backendTemplate.thumbnail;
-            const thumbnailUrl = backendTemplate.thumbnailUrl || backendTemplate.url || backendTemplate.imageUrl;
+            const imageUrl = backendTemplate.url || backendTemplate.imageUrl || backendTemplate.posterUrl || backendTemplate.image || backendTemplate.poster || backendTemplate.thumbnail;
+            const thumbnailUrl = backendTemplate.thumbnailUrl || backendTemplate.url || backendTemplate.imageUrl || backendTemplate.posterUrl || backendTemplate.image || backendTemplate.poster;
             const optimized = this.getOptimizedImageUrls(imageUrl, thumbnailUrl);
 
             return {
@@ -490,8 +613,16 @@ class GreetingTemplatesService {
         const response = await api.get(`/api/mobile/greetings/templates?${params.toString()}`);
       
         if (response.data.success) {
-          const templates = response.data.data?.templates || [];
-          const businessCategoryImages = response.data.data?.businessCategoryImages || [];
+          const rawData = response.data.data || response.data;
+          const templates = 
+            rawData.templates || 
+            rawData.posters || 
+            rawData.results || 
+            rawData.images || 
+            rawData.data || 
+            (Array.isArray(rawData) ? rawData : []);
+            
+          const businessCategoryImages = rawData.businessCategoryImages || [];
           
           // For search queries, prefer templates over businessCategoryImages to ensure category accuracy
           // Backend may return businessCategoryImages for search, but we prioritize templates for better category matching
@@ -506,15 +637,19 @@ class GreetingTemplatesService {
             const fullUrl =
               backendTemplate.url ||
               backendTemplate.imageUrl ||
+              backendTemplate.posterUrl ||
+              backendTemplate.image ||
+              backendTemplate.poster ||
               backendTemplate.thumbnailUrl ||
-              backendTemplate.thumbnail ||
-              backendTemplate.image;
+              backendTemplate.thumbnail;
             const thumbnailUrl =
               backendTemplate.thumbnailUrl ||
               backendTemplate.url ||
               backendTemplate.imageUrl ||
-              backendTemplate.thumbnail ||
-              backendTemplate.image;
+              backendTemplate.posterUrl ||
+              backendTemplate.image ||
+              backendTemplate.poster ||
+              backendTemplate.thumbnail;
 
             const optimized = this.getOptimizedImageUrls(fullUrl, thumbnailUrl);
 
@@ -578,8 +713,16 @@ class GreetingTemplatesService {
         const response = await api.get(`/api/mobile/greetings/templates?${params.toString()}`);
       
         if (response.data.success) {
-          const templates = response.data.data?.templates || [];
-          const businessCategoryImages = response.data.data?.businessCategoryImages || [];
+          const rawData = response.data.data || response.data;
+          const templates = 
+            rawData.templates || 
+            rawData.posters || 
+            rawData.results || 
+            rawData.images || 
+            rawData.data || 
+            (Array.isArray(rawData) ? rawData : []);
+            
+          const businessCategoryImages = rawData.businessCategoryImages || [];
           
           // For search queries, prefer templates over businessCategoryImages to ensure category accuracy
           // Backend may return businessCategoryImages for search, but we prioritize templates for better category matching
@@ -594,15 +737,19 @@ class GreetingTemplatesService {
             const fullUrl =
               backendTemplate.url ||
               backendTemplate.imageUrl ||
+              backendTemplate.posterUrl ||
+              backendTemplate.image ||
+              backendTemplate.poster ||
               backendTemplate.thumbnailUrl ||
-              backendTemplate.thumbnail ||
-              backendTemplate.image;
+              backendTemplate.thumbnail;
             const thumbnailUrl =
               backendTemplate.thumbnailUrl ||
               backendTemplate.url ||
               backendTemplate.imageUrl ||
-              backendTemplate.thumbnail ||
-              backendTemplate.image;
+              backendTemplate.posterUrl ||
+              backendTemplate.image ||
+              backendTemplate.poster ||
+              backendTemplate.thumbnail;
 
             const optimized = this.getOptimizedImageUrls(fullUrl, thumbnailUrl);
 
