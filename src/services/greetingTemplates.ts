@@ -273,9 +273,28 @@ class GreetingTemplatesService {
         if (dataToMap.length === 0) {
           // For Business Marketing Tips category, return businessCategoryImages if no templates match
           if (category.toLowerCase().trim() === 'business marketing tips') {
-            console.log('🖼️ [getTemplatesByCategory] No templates found, returning businessCategoryImages:', businessCategoryImages.length);
-            // Map businessCategoryImages through the same URL conversion logic
-            const mappedBusinessImages = businessCategoryImages.map((backendTemplate: any) => {
+            console.log('🖼️ [getTemplatesByCategory] No templates found, filtering businessCategoryImages for Business Marketing Tips:', businessCategoryImages.length);
+            // Filter businessCategoryImages to ensure they match the requested category EXACTLY
+            const filteredBusinessImages = businessCategoryImages.filter((businessImage: any) => {
+              const businessImageCategory = (businessImage.category || '').toLowerCase().trim();
+              const matches = businessImageCategory === 'business marketing tips';
+              
+              // Log mismatches for debugging
+              if (!matches && __DEV__) {
+                console.warn(`[getTemplatesByCategory] BusinessImage ${businessImage.id} category mismatch:`, {
+                  requested: 'business marketing tips',
+                  businessImageCategory: businessImageCategory,
+                  businessImageTitle: businessImage.title
+                });
+              }
+              
+              return matches;
+            });
+            
+            console.log(`🎯 [getTemplatesByCategory] Filtered ${filteredBusinessImages.length} business images for Business Marketing Tips from ${businessCategoryImages.length} total`);
+            
+            // Map filtered businessCategoryImages through the same URL conversion logic
+            const mappedBusinessImages = filteredBusinessImages.map((backendTemplate: any) => {
               const imageUrl = backendTemplate.url || backendTemplate.imageUrl || backendTemplate.thumbnail;
               const thumbnailUrl = backendTemplate.thumbnailUrl || backendTemplate.url || backendTemplate.imageUrl;
               const optimized = this.getOptimizedImageUrls(imageUrl, thumbnailUrl);
