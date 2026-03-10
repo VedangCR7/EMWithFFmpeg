@@ -23,7 +23,7 @@ import {
   TextInput,
   Alert,
   StatusBar,
-  
+
   Image,
   FlatList,
   Animated,
@@ -124,7 +124,7 @@ const TEMPLATE_FOOTER_STYLES: Record<string, { backgroundColor: string; gradient
   'ombre-rose': { backgroundColor: 'rgba(190, 18, 60, 0.9)', gradient: ['#be123c', '#f472b6', '#fda4af'] },
   'ombre-galaxy': { backgroundColor: 'rgba(99, 102, 241, 0.9)', gradient: ['#6366f1', '#8b5cf6', '#06b6d4'] },
 };
-const TEXT_FIELD_KEYS = ['companyName','phone','email','website','category','address','services'];
+const TEXT_FIELD_KEYS = ['companyName', 'phone', 'email', 'website', 'category', 'address', 'services'];
 const TEMPLATE_OPTIONS = [
   { id: 'business', label: 'Business' },
   { id: 'event', label: 'Event' },
@@ -207,10 +207,10 @@ const responsiveFontSize = {
 const getResponsiveDimensions = (insets: any) => {
   const availableWidth = screenWidth - (insets.left + insets.right);
   const availableHeight = screenHeight - (insets.top + insets.bottom);
-  
+
   // Calculate square canvas dimensions based on screen size
   let canvasWidthRatio = 0.95;
-  
+
   if (isLandscape) {
     // Landscape mode - smaller square canvas
     canvasWidthRatio = isTablet ? 0.5 : 0.6;
@@ -230,11 +230,11 @@ const getResponsiveDimensions = (insets: any) => {
       canvasWidthRatio = 0.88;
     }
   }
-  
+
   // Make canvas square: width = height (1:1 aspect ratio for 1024x1024 images)
   const canvasWidth = Math.min(availableWidth * canvasWidthRatio, screenWidth * canvasWidthRatio);
   const canvasHeight = canvasWidth; // Square canvas!
-  
+
   return {
     canvasWidth,
     canvasHeight,
@@ -382,81 +382,70 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
   const { selectedImage, selectedLanguage, selectedTemplateId, selectedBusinessProfile: selectedBusinessProfileParam } = route.params;
   const { isSubscribed, checkPremiumAccess, refreshSubscription } = useSubscription();
   const { isDarkMode, theme } = useTheme();
-  const { selectedBusinessProfile: globalSelectedProfile } = useBusinessProfile();
-  
-  // Determine active business profile with safe priority logic:
-  // 1️⃣ Context profile (global state) - PRIMARY SOURCE OF TRUTH
-  // 2️⃣ Navigation param - FALLBACK ONLY
-  // 3️⃣ Null if neither available
-  const activeBusinessProfile = useMemo(() => {
-    return globalSelectedProfile ?? selectedBusinessProfileParam ?? null;
-  }, [globalSelectedProfile, selectedBusinessProfileParam]);
-  
+  const { selectedBusinessProfile } = useBusinessProfile();
+
+  const activeBusinessProfile = selectedBusinessProfile;
+
   // Debug logging for active profile changes
   useEffect(() => {
     console.log("📊 [POSTER EDITOR] Active profile:", activeBusinessProfile?.name || 'None');
-    console.log("📊 [POSTER EDITOR] Profile source:", {
-      globalSelectedProfile: globalSelectedProfile?.name || 'None',
-      selectedBusinessProfileParam: selectedBusinessProfileParam?.name || 'None',
-      activeProfile: activeBusinessProfile?.name || 'None'
-    });
-  }, [activeBusinessProfile, globalSelectedProfile, selectedBusinessProfileParam]);
-  
+  }, [activeBusinessProfile]);
+
   // Get high quality image URL for editor (replace thumbnail params with high quality)
   const getHighQualityImageUrl = (imageUri: string): string => {
     let url = imageUri;
-    
+
     // Remove any existing quality/size parameters
     url = url.replace(/[?&](quality|width|height|w|h|size)=[^&]*/gi, '');
-    
+
     // Add high quality parameters for editor
     const separator = url.includes('?') ? '&' : '?';
     return `${url}${separator}quality=high&width=2400`;
   };
-  
+
   // State for dynamic dimensions to handle orientation changes
   const [dimensions, setDimensions] = useState(() => {
     const { width, height } = Dimensions.get('window');
     return { width, height };
   });
-  
+
   // Listen for orientation changes and update dimensions
   useEffect(() => {
     const subscription = Dimensions.addEventListener('change', ({ window }) => {
       setDimensions({ width: window.width, height: window.height });
     });
-    
+
     return () => subscription?.remove();
   }, []);
-  
+
   const currentScreenWidth = dimensions.width;
   const currentScreenHeight = dimensions.height;
-  
+
   // Dynamic device detection that updates on rotation
   const isTabletDevice = useMemo(() => Math.min(currentScreenWidth, currentScreenHeight) >= 768, [currentScreenWidth, currentScreenHeight]);
   const isLandscapeMode = useMemo(() => currentScreenWidth > currentScreenHeight, [currentScreenWidth, currentScreenHeight]);
   const isPortraitMode = useMemo(() => currentScreenHeight > currentScreenWidth, [currentScreenWidth, currentScreenHeight]);
-  
+
   // Dynamic screen size breakpoints
   const isUltraSmallDevice = useMemo(() => currentScreenWidth < 360, [currentScreenWidth]);
   const isSmallDevice = useMemo(() => currentScreenWidth >= 360 && currentScreenWidth < 375, [currentScreenWidth]);
   const isMediumDevice = useMemo(() => currentScreenWidth >= 375 && currentScreenWidth < 414, [currentScreenWidth]);
   const isLargeDevice = useMemo(() => currentScreenWidth >= 414 && currentScreenWidth < 480, [currentScreenWidth]);
   const isXLargeDevice = useMemo(() => currentScreenWidth >= 480, [currentScreenWidth]);
-  
+
   // Dynamic responsive scaling functions (for theme styles that need to update on orientation change)
   const dynamicScale = (size: number) => (currentScreenWidth / 375) * size;
   const dynamicVerticalScale = (size: number) => (currentScreenHeight / 667) * size;
   const dynamicModerateScale = (size: number, factor = 0.5) => size + (dynamicScale(size) - size) * factor;
-  
+
   // Get responsive dimensions - dynamically calculated based on current screen size
   const responsiveDimensions = useMemo(() => {
     const availableWidth = currentScreenWidth - (insets.left + insets.right);
     const availableHeight = currentScreenHeight - (insets.top + insets.bottom);
-    
+
     // Calculate square canvas dimensions based on screen size
     let canvasWidthRatio = 0.95;
-    
+
     if (isLandscapeMode) {
       // Landscape mode - smaller square canvas
       canvasWidthRatio = isTabletDevice ? 0.5 : 0.6;
@@ -476,11 +465,11 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
         canvasWidthRatio = 0.88;
       }
     }
-    
+
     // Make canvas square: width = height (1:1 aspect ratio for 1024x1024 images)
     const canvasWidth = Math.min(availableWidth * canvasWidthRatio, currentScreenWidth * canvasWidthRatio);
     const canvasHeight = canvasWidth; // Square canvas!
-    
+
     return {
       canvasWidth,
       canvasHeight,
@@ -490,9 +479,9 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
       canvasHeightRatio: canvasWidthRatio // Same as width ratio for square
     };
   }, [currentScreenWidth, currentScreenHeight, isLandscapeMode, isTabletDevice, isUltraSmallDevice, isSmallDevice, isMediumDevice, isLargeDevice, insets]);
-  
+
   const { canvasWidth, canvasHeight, availableWidth, availableHeight } = responsiveDimensions;
-  
+
   // Dynamic responsive helper functions
   const getResponsiveIconSize = useCallback(() => {
     if (isLandscapeMode) {
@@ -500,14 +489,14 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     }
     return Math.max(11, (isUltraSmallDevice ? 14 : isSmallDevice ? 16 : isMediumDevice ? 18 : isLargeDevice ? 20 : 22) * 0.8);
   }, [isLandscapeMode, isTabletDevice, isUltraSmallDevice, isSmallDevice, isMediumDevice, isLargeDevice]);
-  
+
   const getResponsiveButtonSize = useCallback(() => {
     if (isLandscapeMode) {
       return Math.max(49, (isTabletDevice ? 80 : 70) * 0.7);
     }
     return Math.max(42, (isUltraSmallDevice ? 60 : isSmallDevice ? 65 : isMediumDevice ? 70 : isLargeDevice ? 75 : 80) * 0.7);
   }, [isLandscapeMode, isTabletDevice, isUltraSmallDevice, isSmallDevice, isMediumDevice, isLargeDevice]);
-  
+
   const canvasTopOffset = insets.top + moderateScale(12);
   const canvasBottomY = canvasTopOffset + canvasHeight;
   const fontModalSpacing = moderateScale(24);
@@ -1010,15 +999,15 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
 
   const themeStyles = getThemeStyles();
 
-  
-      // Ref for capturing the poster as image
-    const posterRef = useRef<ViewShot>(null);
-    const visibleCanvasRef = useRef<ViewShot>(null);
-  
 
-  
+  // Ref for capturing the poster as image
+  const posterRef = useRef<ViewShot>(null);
+  const visibleCanvasRef = useRef<ViewShot>(null);
 
-  
+
+
+
+
 
 
   // State for layers
@@ -1035,29 +1024,29 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
   const [showLogoModal, setShowLogoModal] = useState(false);
   const [showLogoUrlInput, setShowLogoUrlInput] = useState(false);
   const [selectedFontSize, setSelectedFontSize] = useState<number>(16);
-  
+
   // State for dragging
   const [draggedLayer, setDraggedLayer] = useState<string | null>(null);
-  
+
   // Animated values for each layer's position (not just translation)
   const layerAnimations = useRef<{ [key: string]: { x: Animated.Value; y: Animated.Value } }>({}).current;
-  
+
   // Translation values for dragging
   const translationValues = useRef<{ [key: string]: { x: Animated.Value; y: Animated.Value } }>({}).current;
-  
+
   // Scale values for zooming
   const scaleValues = useRef<{ [key: string]: Animated.Value }>({}).current;
-  
+
   // BorderRadius values for logo shape animation
   const borderRadiusValues = useRef<{ [key: string]: Animated.Value }>({}).current;
-  
+
   // Selection border radius values (borderRadius + 3)
   const selectionBorderRadiusValues = useRef<{ [key: string]: Animated.Value }>({}).current;
-  
+
   // State for field visibility
   // Logo, Company Name, Footer BG, phone (mobile number), email, and website are visible by default
   // All other fields must be manually toggled to show
-  const [visibleFields, setVisibleFields] = useState<{[key: string]: boolean}>({
+  const [visibleFields, setVisibleFields] = useState<{ [key: string]: boolean }>({
     logo: true,
     companyName: true,
     footerBackground: true,
@@ -1068,7 +1057,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     address: false,
     services: false,
   });
-  
+
   // Store original layers for frame removal
   const [originalLayers, setOriginalLayers] = useState<Layer[]>([]);
   const [originalTemplate, setOriginalTemplate] = useState<string>('business');
@@ -1259,26 +1248,26 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
   const fetchBusinessProfiles = async () => {
     try {
       setLoadingProfiles(true);
-      
+
       // Get current user ID
       const currentUser = authService.getCurrentUser();
       const userId = currentUser?.id;
-      
+
       if (!userId) {
         console.log('⚠️ No user ID available');
         setShowConnectionErrorModal(true);
         return;
       }
-      
+
       console.log('🔍 Fetching user-specific business profiles for user:', userId);
-      
+
       // Fetch user-specific business profiles
       const profiles = await businessProfileService.getUserBusinessProfiles(userId);
-      
+
       if (profiles.length > 0) {
         setBusinessProfiles(profiles);
         console.log('✅ Loaded user-specific business profiles:', profiles.length);
-        
+
         // Context will handle profile selection and AsyncStorage
         // No need to manually apply profiles here
       } else {
@@ -1322,7 +1311,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
       hasProfile: !!activeBusinessProfile,
       currentLayers: layers.length
     });
-    
+
     if (activeBusinessProfile) {
       applyProfileSafely(activeBusinessProfile);
       console.log('✅ [POSTER EDITOR] Applied active business profile:', activeBusinessProfile.name);
@@ -1334,11 +1323,11 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
   // Apply business profile data to poster
   const applyBusinessProfileToPoster = (profile: BusinessProfile) => {
     setShowProfileSelectionModal(false);
-    
+
     // Clear original layers when changing business profile so new positions become the baseline
     setOriginalLayers([]);
     console.log('🔄 [APPLY BUSINESS PROFILE] Cleared original layers for new profile:', profile.name);
-    
+
     // Auto-set template based on business profile category
     if (profile.category) {
       const categoryToTemplate: { [key: string]: string } = {
@@ -1372,31 +1361,31 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
         'Warm': 'sunset',
         'Cool': 'education',
       };
-      
+
       const template = categoryToTemplate[profile.category] || 'business';
       setSelectedTemplate(template);
       console.log(`Auto-setting template to '${template}' based on business category '${profile.category}'`);
     }
-    
-    // Generate content from business profile
-      // Create default layers from business profile
-      const newLayers: Layer[] = [];
 
-      // Add company logo on top right with responsive sizing
-      if (profile.companyLogo || profile.logo) {
-        const logoSize = Math.max(40, Math.min(80, canvasWidth * 0.15)); // Responsive logo size
-        const logoLayer: Layer = {
-          id: generateId(),
-          type: 'logo',
-          content: profile.companyLogo || profile.logo || 'https://via.placeholder.com/80x80/667eea/ffffff?text=LOGO',
-          position: { x: canvasWidth - 100, y: 20 }, // Keep same position
-          size: { width: logoSize, height: logoSize }, // Responsive size
-          rotation: 0,
-          zIndex: 10,
-          fieldType: 'logo',
-        };
-        newLayers.push(logoLayer);
-      }
+    // Generate content from business profile
+    // Create default layers from business profile
+    const newLayers: Layer[] = [];
+
+    // Add company logo on top right with responsive sizing
+    if (profile.companyLogo || profile.logo) {
+      const logoSize = Math.max(40, Math.min(80, canvasWidth * 0.15)); // Responsive logo size
+      const logoLayer: Layer = {
+        id: generateId(),
+        type: 'logo',
+        content: profile.companyLogo || profile.logo || 'https://via.placeholder.com/80x80/667eea/ffffff?text=LOGO',
+        position: { x: canvasWidth - 100, y: 20 }, // Keep same position
+        size: { width: logoSize, height: logoSize }, // Responsive size
+        rotation: 0,
+        zIndex: 10,
+        fieldType: 'logo',
+      };
+      newLayers.push(logoLayer);
+    }
 
     // Add company name on top left with responsive font size
     if (profile.name) {
@@ -1425,15 +1414,15 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     const footerPadding = 10; // Top and bottom padding
     const footerHeight = (contactLineHeight * 3) + (footerPadding * 2); // 3 lines + padding
     const footerY = canvasHeight - footerHeight;
-    
+
     // Responsive font sizes for footer elements
     const getResponsiveFooterFontSize = (baseSize: number) => {
       const scaleFactor = Math.min(canvasWidth / 400, canvasHeight / 600); // Scale based on canvas size
       return Math.max(baseSize * scaleFactor, baseSize * 0.8); // Minimum 80% of base size
     };
-    
+
     const footerTextSize = getResponsiveFooterFontSize(isTabletDevice ? 14 : 11);
-    
+
     // Footer background overlay for better readability
     const footerBackgroundLayer: Layer = {
       id: generateId(),
@@ -1458,7 +1447,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     // For 720x487 canvas: scaled positions
     const scaleX = canvasWidth / 720;
     const scaleY = canvasHeight / 487.2;
-    
+
     const leftColumnX = Math.round(20 * scaleX);
     const rightColumnX = Math.round(370 * scaleX);
 
@@ -1590,7 +1579,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     }
 
     setLayers(newLayers);
-    
+
     console.log('✅ [BUSINESS PROFILE APPLIED] Layers created:', {
       totalLayers: newLayers.length,
       profileName: profile.name,
@@ -1603,7 +1592,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
       hasAddress: !!profile.address,
       layerIds: newLayers.map(l => l.id)
     });
-    
+
     // Initialize animated values for new layers
     newLayers.forEach(layer => {
       if (!layerAnimations[layer.id]) {
@@ -1661,27 +1650,27 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
       };
     }
     ensureSnapOffsets(layerId);
-    
+
     return Animated.event(
       [{ nativeEvent: { translationX: translationValues[layerId].x, translationY: translationValues[layerId].y } }],
-      { 
+      {
         useNativeDriver: true,
         listener: (event: any) => {
           const { translationX, translationY } = event.nativeEvent;
-          
+
           // Get current layer
           const currentLayer = layers.find(layer => layer.id === layerId);
           if (!currentLayer) return;
-          
+
           // Get element dimensions
           const { width: elementWidth, height: elementHeight } = getLayerEffectiveSize(currentLayer);
           const effectiveWidth = elementWidth || 0;
           const effectiveHeight = elementHeight || 0;
-          
+
           // Calculate new position (current position + translation)
           let newX = currentLayer.position.x + translationX;
           let newY = currentLayer.position.y + translationY;
-          
+
           // Clamp positions so the entire element remains inside the canvas
           const maxX = Math.max(0, canvasWidth - effectiveWidth);
           const maxY = Math.max(0, canvasHeight - effectiveHeight);
@@ -1689,16 +1678,16 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
           newY = Math.max(0, Math.min(newY, maxY));
           newX = Number.isFinite(newX) ? newX : 0;
           newY = Number.isFinite(newY) ? newY : 0;
-          
+
           // Calculate clamped translation (new position - original position)
           const clampedTranslationX = newX - currentLayer.position.x;
           const clampedTranslationY = newY - currentLayer.position.y;
-          
+
           // Update animated values with clamped translations
           translationValues[layerId].x.setValue(clampedTranslationX);
           translationValues[layerId].y.setValue(clampedTranslationY);
           dragTranslationRef.current[layerId] = { x: clampedTranslationX, y: clampedTranslationY };
-          
+
           // Update alignment guides with clamped values
           if (alignmentFrameRef.current) {
             cancelAnimationFrame(alignmentFrameRef.current);
@@ -1730,22 +1719,22 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
         // Get current layer
         const currentLayer = layers.find(layer => layer.id === layerId);
         if (!currentLayer) return;
-        
+
         // Get clamped translation values (already clamped during drag)
         const clampedTranslation = dragTranslationRef.current[layerId] || { x: 0, y: 0 };
         const clampedTranslationX = clampedTranslation.x;
         const clampedTranslationY = clampedTranslation.y;
         const snapOffset = snapOffsetsLatest.current[layerId] || { x: 0, y: 0 };
-        
+
         // Get element dimensions
         const { width: elementWidth, height: elementHeight } = getLayerEffectiveSize(currentLayer);
         const effectiveWidth = elementWidth || 0;
         const effectiveHeight = elementHeight || 0;
-        
+
         // Calculate new position (current position + clamped translation + snap offset)
         let newX = currentLayer.position.x + clampedTranslationX + snapOffset.x;
         let newY = currentLayer.position.y + clampedTranslationY + snapOffset.y;
-        
+
         // Final clamp to ensure element stays within canvas bounds
         const maxX = Math.max(0, canvasWidth - effectiveWidth);
         const maxY = Math.max(0, canvasHeight - effectiveHeight);
@@ -1753,7 +1742,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
         newY = Math.max(0, Math.min(newY, maxY));
         newX = Number.isFinite(newX) ? newX : 0;
         newY = Number.isFinite(newY) ? newY : 0;
-        
+
         // Debug: Log the current position and field type
         console.log(`🎯 DEBUG: ${currentLayer.fieldType || 'Unknown Field'} moved to position:`);
         console.log(`   📍 X: ${newX.toFixed(1)}, Y: ${newY.toFixed(1)}`);
@@ -1761,14 +1750,14 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
         console.log(`   🏷️ Field Type: ${currentLayer.fieldType || 'Unknown'}`);
         console.log(`   📝 Content: ${currentLayer.content || 'No content'}`);
         console.log(`   🔧 Position: x: ${newX.toFixed(0)}, y: ${newY.toFixed(0)}`);
-        
+
         // Update the animated position values directly
         if (layerAnimations[layerId]) {
           layerAnimations[layerId].x.setValue(newX);
           layerAnimations[layerId].y.setValue(newY);
         }
         dragTranslationRef.current[layerId] = { x: 0, y: 0 };
-        
+
         // Update layer position in state
         setLayers(prev => prev.map(layer => {
           if (layer.id === layerId) {
@@ -1779,14 +1768,14 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
           }
           return layer;
         }));
-        
+
         // Reset translation values to 0 for next drag
         if (translationValues[layerId]) {
           translationValues[layerId].x.setValue(0);
           translationValues[layerId].y.setValue(0);
         }
         clearAlignmentGuides(layerId);
-        
+
         setDraggedLayer(null);
       }
     };
@@ -1798,7 +1787,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     if (!scaleValues[layerId]) {
       scaleValues[layerId] = new Animated.Value(1);
     }
-    
+
     return Animated.event(
       [{ nativeEvent: { scale: scaleValues[layerId] } }],
       { useNativeDriver: true }
@@ -1817,25 +1806,25 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
       } else if (event.nativeEvent.state === State.ACTIVE) {
         // Real-time scaling during pinch
         const { scale } = event.nativeEvent;
-        
+
         // Get current layer
         const currentLayer = layers.find(layer => layer.id === layerId);
         if (!currentLayer) return;
-        
+
         // Calculate new size with constraints
         const minScale = 0.2;
         const maxScale = 5.0;
         const constrainedScale = Math.max(minScale, Math.min(maxScale, scale));
-        
+
         const newWidth = currentLayer.size.width * constrainedScale;
         const newHeight = currentLayer.size.height * constrainedScale;
-        
+
         // Check boundaries
         const maxWidth = canvasWidth - currentLayer.position.x;
         const maxHeight = canvasHeight - currentLayer.position.y;
         const finalWidth = Math.min(newWidth, maxWidth);
         const finalHeight = Math.min(newHeight, maxHeight);
-        
+
         // Update layer size in state for real-time feedback
         setLayers(prev => prev.map(layer => {
           if (layer.id === layerId) {
@@ -1849,25 +1838,25 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
       } else if (event.nativeEvent.state === State.END) {
         // Finalize the scaling
         const { scale } = event.nativeEvent;
-        
+
         // Get current layer
         const currentLayer = layers.find(layer => layer.id === layerId);
         if (!currentLayer) return;
-        
+
         // Calculate new size with constraints
         const minScale = 0.2;
         const maxScale = 5.0;
         const constrainedScale = Math.max(minScale, Math.min(maxScale, scale));
-        
+
         const newWidth = currentLayer.size.width * constrainedScale;
         const newHeight = currentLayer.size.height * constrainedScale;
-        
+
         // Check boundaries
         const maxWidth = canvasWidth - currentLayer.position.x;
         const maxHeight = canvasHeight - currentLayer.position.y;
         const finalWidth = Math.min(newWidth, maxWidth);
         const finalHeight = Math.min(newHeight, maxHeight);
-        
+
         // Update layer size in state
         setLayers(prev => prev.map(layer => {
           if (layer.id === layerId) {
@@ -1878,7 +1867,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
           }
           return layer;
         }));
-        
+
         // Reset scale value to 1 for next pinch
         if (scaleValues[layerId]) {
           scaleValues[layerId].setValue(1);
@@ -1973,20 +1962,20 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
       };
 
       const result = await launchCamera(options);
-      
+
       // User cancelled
       if (result.didCancel) {
         console.log('User cancelled camera');
         return;
       }
-      
+
       // Error occurred
       if (result.errorCode) {
         console.error('Camera error code:', result.errorCode);
         Alert.alert('Camera Error', result.errorMessage || 'Failed to access camera');
         return;
       }
-      
+
       // Success - process image
       if (result.assets && result.assets[0] && result.assets[0].uri) {
         const imageUri = result.assets[0].uri;
@@ -2014,20 +2003,20 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
       };
 
       const result = await launchImageLibrary(options);
-      
+
       // User cancelled
       if (result.didCancel) {
         console.log('User cancelled image picker');
         return;
       }
-      
+
       // Error occurred
       if (result.errorCode) {
         console.error('Gallery error code:', result.errorCode);
         Alert.alert('Gallery Error', result.errorMessage || 'Failed to access gallery');
         return;
       }
-      
+
       // Success - process image
       if (result.assets && result.assets[0] && result.assets[0].uri) {
         const imageUri = result.assets[0].uri;
@@ -2056,7 +2045,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
         zIndex: layers.length,
         fieldType: 'logo',
       };
-      
+
       // Initialize animated values for the new layer
       if (!layerAnimations[layerId]) {
         layerAnimations[layerId] = {
@@ -2064,18 +2053,18 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
           y: new Animated.Value(20)
         };
       }
-      
+
       if (!translationValues[layerId]) {
         translationValues[layerId] = {
           x: new Animated.Value(0),
           y: new Animated.Value(0)
         };
       }
-      
+
       if (!scaleValues[layerId]) {
         scaleValues[layerId] = new Animated.Value(1);
       }
-      
+
       setLayers(prev => [...prev, newLayer]);
       setShowLogoModal(false);
       console.log('✅ Logo layer added from image:', imageUri);
@@ -2112,7 +2101,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
           }
         };
       }
-      
+
       // Update text colors for footer elements based on template
       if (['footerCompanyName', 'phone', 'email', 'website', 'category', 'address', 'services'].includes(layer.fieldType || '')) {
         const textColors = {
@@ -2148,7 +2137,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
           'ombre-rose': '#ffffff',
           'ombre-galaxy': '#ffffff',
         };
-        
+
         return {
           ...layer,
           style: {
@@ -2157,21 +2146,21 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
           }
         };
       }
-      
+
       return layer;
     });
   }, []);
 
   // Apply template to poster
   const applyTemplate = useCallback((templateType: string) => {
-    
+
     setSelectedTemplate(templateType);
     setShowTemplatesModal(false);
-    
+
     // Clear original layers when changing templates so new positions can be stored
     setOriginalLayers([]);
     console.log('🔄 [APPLY TEMPLATE] Cleared original layers for new template:', templateType);
-    
+
     // Apply different poster layouts and styles based on template
     setLayers(prev => applyTemplateStylesToLayers(templateType, prev));
   }, [applyTemplateStylesToLayers]);
@@ -2186,14 +2175,14 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
 
   // Update layer position
   const updateLayerPosition = useCallback((layerId: string, position: { x: number; y: number }) => {
-    setLayers(prev => prev.map(layer => 
+    setLayers(prev => prev.map(layer =>
       layer.id === layerId ? { ...layer, position } : layer
     ));
   }, []);
 
   // Update layer style
   const updateLayerStyle = useCallback((layerId: string, style: Partial<NonNullable<Layer['style']>>) => {
-    setLayers(prev => prev.map(layer => 
+    setLayers(prev => prev.map(layer =>
       layer.id === layerId ? { ...layer, style: { ...layer.style, ...style } } : layer
     ));
   }, []);
@@ -2235,7 +2224,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     }));
     // Modal stays open so user can continue trying different fonts
   }, [selectedLayer, selectedFontSize, getFontFamily]);
-  
+
   // Apply font size (selected layer or all text when none selected)
   const applyFontSize = useCallback((fontSize: number) => {
     setSelectedFontSize(fontSize);
@@ -2251,7 +2240,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
       return { ...layer, style: { ...layer.style, fontSize } };
     }));
   }, [selectedLayer]);
-  
+
   // Update selectedFontSize when a layer is selected
   useEffect(() => {
     if (selectedLayer) {
@@ -2265,12 +2254,12 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
   // Render layer
   const renderLayer = useCallback((layer: Layer) => {
     const isSelected = selectedLayer === layer.id;
-    
+
     // Check if layer should be visible based on field type
     if (layer.fieldType && !visibleFields[layer.fieldType]) {
       return null;
     }
-    
+
     // Initialize animated values for this layer if they don't exist
     if (!layerAnimations[layer.id]) {
       layerAnimations[layer.id] = {
@@ -2278,7 +2267,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
         y: new Animated.Value(layer.position.y)
       };
     }
-    
+
     // Initialize translation values for this layer if they don't exist
     if (!translationValues[layer.id]) {
       translationValues[layer.id] = {
@@ -2286,16 +2275,16 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
         y: new Animated.Value(0)
       };
     }
-    
+
     // Initialize borderRadius animated value for logos
     if (layer.type === 'logo' && !borderRadiusValues[layer.id]) {
-      const initialRadius = layer.isCircular 
-        ? Math.min(layer.size.width, layer.size.height) / 2 
+      const initialRadius = layer.isCircular
+        ? Math.min(layer.size.width, layer.size.height) / 2
         : 0;
       borderRadiusValues[layer.id] = new Animated.Value(initialRadius);
       selectionBorderRadiusValues[layer.id] = new Animated.Value(initialRadius + 3);
     }
-    
+
     ensureSnapOffsets(layer.id);
 
     const baseTransforms = [
@@ -2311,7 +2300,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
       zIndex: layer.zIndex,
       transform: baseTransforms,
     };
-    
+
     // Text layer style without fixed dimensions
     const textLayerStyle = {
       position: 'absolute' as const,
@@ -2327,19 +2316,19 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
       // Toggle circular/square shape for logos with smooth animation
       if (layer.type === 'logo') {
         const newIsCircular = !layer.isCircular;
-        const targetRadius = newIsCircular 
-          ? Math.min(layer.size.width, layer.size.height) / 2 
+        const targetRadius = newIsCircular
+          ? Math.min(layer.size.width, layer.size.height) / 2
           : 0;
-        
+
         // Initialize borderRadius value if it doesn't exist
         if (!borderRadiusValues[layer.id]) {
-          const currentRadius = layer.isCircular 
-            ? Math.min(layer.size.width, layer.size.height) / 2 
+          const currentRadius = layer.isCircular
+            ? Math.min(layer.size.width, layer.size.height) / 2
             : 0;
           borderRadiusValues[layer.id] = new Animated.Value(currentRadius);
           selectionBorderRadiusValues[layer.id] = new Animated.Value(currentRadius + 3);
         }
-        
+
         // Animate the borderRadius change
         const targetSelectionRadius = targetRadius + 3;
         Animated.parallel([
@@ -2354,8 +2343,8 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
             useNativeDriver: false,
           })
         ]).start();
-        
-        setLayers(prev => prev.map(l => 
+
+        setLayers(prev => prev.map(l =>
           l.id === layer.id ? { ...l, isCircular: newIsCircular } : l
         ));
       }
@@ -2370,7 +2359,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
           let gradientColors;
           let gradientStart;
           let gradientEnd;
-          
+
           if (isOmbreTemplate) {
             // Horizontal gradient for ombre templates
             const ombreGradients: { [key: string]: string[] } = {
@@ -2394,7 +2383,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
             gradientStart = { x: 0, y: 1 };
             gradientEnd = { x: 0, y: 0 };
           }
-          
+
           return (
             <Animated.View
               key={layer.id}
@@ -2424,7 +2413,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
             </Animated.View>
           );
         }
-        
+
         return (
           <Animated.View
             key={layer.id}
@@ -2474,12 +2463,12 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
         const animatedBorderRadius = layer.type === 'logo' && borderRadiusValues[layer.id]
           ? borderRadiusValues[layer.id]
           : 0;
-        
+
         // Selection border radius (borderRadius + 3 for logos)
         const animatedSelectionBorderRadius = layer.type === 'logo' && selectionBorderRadiusValues[layer.id]
           ? selectionBorderRadiusValues[layer.id]
           : 8;
-        
+
         return (
           <Animated.View
             style={[
@@ -2491,7 +2480,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
             <Animated.View
               style={[
                 styles.layerTouchable,
-                { 
+                {
                   overflow: 'hidden',
                   borderRadius: layer.type === 'logo' ? animatedBorderRadius : 0
                 }
@@ -2506,7 +2495,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                   source={{ uri: layer.content }}
                   style={[
                     styles.layerImage,
-                    { 
+                    {
                       borderRadius: layer.type === 'logo' ? animatedBorderRadius : 0
                     }
                   ]}
@@ -2569,24 +2558,24 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
   };
 
   return (
-    <Animated.View 
+    <Animated.View
       style={[
-        themeStyles.container, 
-        { 
+        themeStyles.container,
+        {
           opacity: fadeAnim,
           transform: [{ translateY: slideAnim }]
         }
       ]}
     >
-      <StatusBar 
-        barStyle="dark-content" 
-        backgroundColor="transparent" 
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="transparent"
         translucent={true}
       />
-      
+
       {/* Professional Header */}
       <View
-        style={[styles.header, { 
+        style={[styles.header, {
           paddingTop: insets.top + moderateScale(8),
           backgroundColor: theme?.colors?.surface || '#ffffff'
         }]}
@@ -2601,13 +2590,13 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.backButtonGradient}
-        >
-          <Text style={styles.backButtonText}>Back</Text>
+          >
+            <Text style={styles.backButtonText}>Back</Text>
           </LinearGradient>
         </TouchableOpacity>
         <View style={styles.headerContent}>
         </View>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.nextButton}
           activeOpacity={0.85}
           onPress={async () => {
@@ -2623,7 +2612,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
             setDraggedLayer(null);
             // Allow a brief tick for UI to update before capture
             await new Promise(resolve => setTimeout(resolve, 10));
-            
+
             // Test capture first
             console.log('=== TESTING VIEWSHOT CAPTURE ===');
             console.log('Canvas dimensions - Hidden:', { width: screenWidth * 0.98, height: screenHeight * 0.65 });
@@ -2644,7 +2633,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
               console.error('Test capture failed:', testError);
             }
             console.log('=== END TEST ===');
-            
+
             // Original capture logic
             console.log('Next button pressed - starting capture process');
             console.log('Poster ref available:', !!posterRef.current);
@@ -2658,7 +2647,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
             });
             const visibleTextFields = TEXT_FIELD_KEYS.filter(key => visibleFields[key] !== false);
             const missingTextForVisibleFields = visibleTextFields.length > 0 && visibleTextFields.every(fieldKey => {
-              const textLayer = layers.find(layer => 
+              const textLayer = layers.find(layer =>
                 layer.type === 'text' &&
                 layer.fieldType === fieldKey &&
                 visibleFields[fieldKey] !== false &&
@@ -2668,7 +2657,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
             });
             const shouldForceWatermark = !hasVisibleCustomLayers || missingTextForVisibleFields;
             setForceWatermarkCapture(shouldForceWatermark);
-            
+
             // Capture current animated positions before taking ViewShot
             const newCurrentPositions: { [key: string]: { x: number; y: number } } = {};
             layers.forEach(layer => {
@@ -2677,43 +2666,43 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                 const translationX = (translationValues[layer.id].x as any)._value || 0;
                 const baseY = (layerAnimations[layer.id].y as any)._value || 0;
                 const translationY = (translationValues[layer.id].y as any)._value || 0;
-                
+
                 newCurrentPositions[layer.id] = {
                   x: baseX + translationX,
                   y: baseY + translationY
                 };
-                
+
                 console.log(`Layer ${layer.id} current position:`, newCurrentPositions[layer.id]);
               }
             });
-            
+
             // Update both state and ref with current positions
             setCurrentPositions(newCurrentPositions);
             currentPositionsRef.current = newCurrentPositions;
-            
+
             // Log current layer positions for debugging
             console.log('Current layer positions:', newCurrentPositions);
-            
+
             try {
               if (visibleCanvasRef.current && visibleCanvasRef.current.capture) {
                 console.log('Attempting to capture visible canvas...');
-                
+
                 // Set capturing state to true to show watermark during capture
                 setIsCapturing(true);
-                
+
                 // Add a delay to ensure the canvas is fully rendered with watermark
                 await new Promise(resolve => setTimeout(resolve, 100));
-                
+
                 // Capture the visible canvas as an image
                 const uri = await visibleCanvasRef.current.capture();
                 console.log('Visible canvas captured successfully!');
                 console.log('Captured URI length:', uri?.length);
                 console.log('Captured URI starts with:', uri?.substring(0, 50));
-                
+
                 // Set capturing state back to false
                 setIsCapturing(false);
                 setForceWatermarkCapture(false);
-                
+
                 // Navigate to preview with the captured image and subscription status
                 (navigation as any).navigate('PosterPreview', {
                   capturedImageUri: uri,
@@ -2750,7 +2739,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                 selectedImage: selectedImage,
                 selectedLanguage: selectedLanguage,
                 selectedTemplateId: selectedTemplateId,
-                selectedBusinessProfile: globalSelectedProfile,
+                selectedBusinessProfile: activeBusinessProfile,
                 isSubscribed: isSubscribed, // Pass subscription status to preview
               });
             }
@@ -2761,195 +2750,195 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.nextButtonGradient}
-        >
-          <Text style={styles.nextButtonText}>Next</Text>
+          >
+            <Text style={styles.nextButtonText}>Next</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>
 
-                        {/* Canvas Container */}
-          <View style={styles.canvasContainer}>
-            {/* ViewShot wrapper for capturing the visible canvas */}
-            <ViewShot
-              ref={visibleCanvasRef}
-              style={[styles.viewShotContainer, { width: canvasWidth, height: canvasHeight, backgroundColor: 'transparent' }]}
-              options={{
-                format: 'png',
-                quality: 1.0,
-                result: 'tmpfile'
-              }}
+      {/* Canvas Container */}
+      <View style={styles.canvasContainer}>
+        {/* ViewShot wrapper for capturing the visible canvas */}
+        <ViewShot
+          ref={visibleCanvasRef}
+          style={[styles.viewShotContainer, { width: canvasWidth, height: canvasHeight, backgroundColor: 'transparent' }]}
+          options={{
+            format: 'png',
+            quality: 1.0,
+            result: 'tmpfile'
+          }}
+        >
+          {/* Visible Canvas for editing */}
+          <TouchableWithoutFeedback onPress={() => setSelectedLayer(null)}>
+            <View style={[
+              styles.canvas,
+              selectedTemplate !== 'business' && styles.canvasWithFrame,
+              selectedTemplate === 'business' && styles.businessFrame,
+              selectedTemplate === 'event' && styles.eventFrame,
+              selectedTemplate === 'restaurant' && styles.restaurantFrame,
+              selectedTemplate === 'fashion' && styles.fashionFrame,
+              selectedTemplate === 'real-estate' && styles.realEstateFrame,
+              selectedTemplate === 'education' && styles.educationFrame,
+              selectedTemplate === 'healthcare' && styles.healthcareFrame,
+              selectedTemplate === 'fitness' && styles.fitnessFrame,
+              selectedTemplate === 'wedding' && styles.weddingFrame,
+              selectedTemplate === 'birthday' && styles.birthdayFrame,
+              selectedTemplate === 'corporate' && styles.corporateFrame,
+              selectedTemplate === 'creative' && styles.creativeFrame,
+              selectedTemplate === 'minimal' && styles.minimalFrame,
+              selectedTemplate === 'luxury' && styles.luxuryFrame,
+              selectedTemplate === 'vintage' && styles.vintageFrame,
+              selectedTemplate === 'retro' && styles.retroFrame,
+              selectedTemplate === 'elegant' && styles.elegantFrame,
+              selectedTemplate === 'tech' && styles.techFrame,
+              selectedTemplate === 'ocean' && styles.oceanFrame,
+              selectedTemplate === 'sunset' && styles.sunsetFrame,
+              selectedTemplate === 'artistic' && styles.artisticFrame,
+              selectedTemplate === 'ombre-sunset' && styles.ombreSunsetFrame,
+              selectedTemplate === 'ombre-ocean' && styles.ombreOceanFrame,
+              selectedTemplate === 'ombre-purple' && styles.ombrePurpleFrame,
+              selectedTemplate === 'ombre-forest' && styles.ombreForestFrame,
+              selectedTemplate === 'ombre-fire' && styles.ombreFireFrame,
+              selectedTemplate === 'ombre-night' && styles.ombreNightFrame,
+              selectedTemplate === 'ombre-tropical' && styles.ombreTropicalFrame,
+              selectedTemplate === 'ombre-autumn' && styles.ombreAutumnFrame,
+              selectedTemplate === 'ombre-rose' && styles.ombreRoseFrame,
+              selectedTemplate === 'ombre-galaxy' && styles.ombreGalaxyFrame,
+              {
+                width: canvasWidth,
+                height: canvasHeight,
+                backgroundColor: '#ffffff'
+              },
+            ]}
             >
-              {/* Visible Canvas for editing */}
-              <TouchableWithoutFeedback onPress={() => setSelectedLayer(null)}>
-              <View style={[
-                styles.canvas,
-                selectedTemplate !== 'business' && styles.canvasWithFrame,
-                selectedTemplate === 'business' && styles.businessFrame,
-                selectedTemplate === 'event' && styles.eventFrame,
-                selectedTemplate === 'restaurant' && styles.restaurantFrame,
-                selectedTemplate === 'fashion' && styles.fashionFrame,
-                selectedTemplate === 'real-estate' && styles.realEstateFrame,
-                selectedTemplate === 'education' && styles.educationFrame,
-                selectedTemplate === 'healthcare' && styles.healthcareFrame,
-                selectedTemplate === 'fitness' && styles.fitnessFrame,
-                selectedTemplate === 'wedding' && styles.weddingFrame,
-                selectedTemplate === 'birthday' && styles.birthdayFrame,
-                selectedTemplate === 'corporate' && styles.corporateFrame,
-                selectedTemplate === 'creative' && styles.creativeFrame,
-                selectedTemplate === 'minimal' && styles.minimalFrame,
-                selectedTemplate === 'luxury' && styles.luxuryFrame,
-                selectedTemplate === 'vintage' && styles.vintageFrame,
-                selectedTemplate === 'retro' && styles.retroFrame,
-                selectedTemplate === 'elegant' && styles.elegantFrame,
-                selectedTemplate === 'tech' && styles.techFrame,
-                selectedTemplate === 'ocean' && styles.oceanFrame,
-                selectedTemplate === 'sunset' && styles.sunsetFrame,
-                selectedTemplate === 'artistic' && styles.artisticFrame,
-                selectedTemplate === 'ombre-sunset' && styles.ombreSunsetFrame,
-                selectedTemplate === 'ombre-ocean' && styles.ombreOceanFrame,
-                selectedTemplate === 'ombre-purple' && styles.ombrePurpleFrame,
-                selectedTemplate === 'ombre-forest' && styles.ombreForestFrame,
-                selectedTemplate === 'ombre-fire' && styles.ombreFireFrame,
-                selectedTemplate === 'ombre-night' && styles.ombreNightFrame,
-                selectedTemplate === 'ombre-tropical' && styles.ombreTropicalFrame,
-                selectedTemplate === 'ombre-autumn' && styles.ombreAutumnFrame,
-                selectedTemplate === 'ombre-rose' && styles.ombreRoseFrame,
-                selectedTemplate === 'ombre-galaxy' && styles.ombreGalaxyFrame,
-                { 
-                  width: canvasWidth, 
-                  height: canvasHeight,
-                  backgroundColor: '#ffffff'
-                },
-              ]}
->
-          {/* Background Image (always show the poster image) */}
-          <View style={styles.backgroundImageContainer}>
-            <Image
-              source={{ uri: getHighQualityImageUrl(selectedImage.uri), cache: 'force-cache' }}
-              style={styles.backgroundImage}
-              resizeMode="contain"
-            />
-          </View>
-          
-          
-          {/* Layers - rendered AFTER frame so they appear on top */}
-          {layers.map((layer) => {
-            if (layer.fieldType === 'footerBackground') {
-              return (
-                <View key={layer.id} pointerEvents="none">
-                  {renderLayer(layer)}
-                </View>
-              );
-            }
-            return (
-              <PinchGestureHandler
-                key={layer.id}
-                onGestureEvent={onPinchGestureEvent(layer.id)}
-                onHandlerStateChange={onPinchHandlerStateChange(layer.id)}
-              >
-                <Animated.View>
-                  <PanGestureHandler
-                    onGestureEvent={onPanGestureEvent(layer.id)}
-                    onHandlerStateChange={onHandlerStateChange(layer.id)}
+              {/* Background Image (always show the poster image) */}
+              <View style={styles.backgroundImageContainer}>
+                <Image
+                  source={{ uri: getHighQualityImageUrl(selectedImage.uri), cache: 'force-cache' }}
+                  style={styles.backgroundImage}
+                  resizeMode="contain"
+                />
+              </View>
+
+
+              {/* Layers - rendered AFTER frame so they appear on top */}
+              {layers.map((layer) => {
+                if (layer.fieldType === 'footerBackground') {
+                  return (
+                    <View key={layer.id} pointerEvents="none">
+                      {renderLayer(layer)}
+                    </View>
+                  );
+                }
+                return (
+                  <PinchGestureHandler
+                    key={layer.id}
+                    onGestureEvent={onPinchGestureEvent(layer.id)}
+                    onHandlerStateChange={onPinchHandlerStateChange(layer.id)}
                   >
                     <Animated.View>
-                      {renderLayer(layer)}
+                      <PanGestureHandler
+                        onGestureEvent={onPanGestureEvent(layer.id)}
+                        onHandlerStateChange={onHandlerStateChange(layer.id)}
+                      >
+                        <Animated.View>
+                          {renderLayer(layer)}
+                        </Animated.View>
+                      </PanGestureHandler>
                     </Animated.View>
-                  </PanGestureHandler>
-                </Animated.View>
-              </PinchGestureHandler>
-            );
-          })}
+                  </PinchGestureHandler>
+                );
+              })}
 
-          {alignmentGuides.vertical.map((xPos, index) => (
-            <View
-              key={`alignment-vertical-${index}`}
-              pointerEvents="none"
-              style={[
-                styles.alignmentGuideVertical,
-                {
-                  left: xPos - 0.5,
-                  height: canvasHeight
-                }
-              ]}
-            />
-          ))}
-          
-          {alignmentGuides.horizontal.map((yPos, index) => (
-            <View
-              key={`alignment-horizontal-${index}`}
-              pointerEvents="none"
-              style={[
-                styles.alignmentGuideHorizontal,
-                {
-                  top: yPos - 0.5,
-                  width: canvasWidth
-                }
-              ]}
-            />
-          ))}
-          
-          {/* Watermark Overlay - full screen transparent logo */}
-          {isCapturing && (!checkPremiumAccess('poster_export') || forceWatermarkCapture) && (
-            <View style={styles.fullscreenWatermarkOverlay}>
-              <Image
-                source={require('../assets/MainLogo/MB.png')}
-                style={styles.fullscreenWatermarkImage}
-                resizeMode="contain"
-              />
-            </View>
-          )}
-        </View>
-              </TouchableWithoutFeedback>
-            </ViewShot>
-          
-          
-          {/* Instructions */}
-          {layers.length === 0 && !loadingProfiles && (
-            <View style={styles.instructionsContainer}>
-              <Icon name="info" size={24} color="#667eea" />
-              <Text style={styles.instructionsText}>
-                {businessProfiles.length === 0 
-                  ? 'No business profiles found. Please create a business profile first.'
-                  : 'Business profile data has been applied to your poster'
-                }
-              </Text>
-              <Text style={[styles.instructionsText, { marginTop: 10, fontSize: 12, color: '#ff6b6b' }]}>
-                {businessProfiles.length === 0 
-                  ? 'Please create a business profile first to generate poster content.' 
-                  : 'No content applied. Try selecting a different business profile.'
-                }
-              </Text>
-            </View>
-          )}
+              {alignmentGuides.vertical.map((xPos, index) => (
+                <View
+                  key={`alignment-vertical-${index}`}
+                  pointerEvents="none"
+                  style={[
+                    styles.alignmentGuideVertical,
+                    {
+                      left: xPos - 0.5,
+                      height: canvasHeight
+                    }
+                  ]}
+                />
+              ))}
 
-          {/* Loading indicator */}
-          {loadingProfiles && (
-            <View style={styles.loadingContainer}>
-              <Icon name="hourglass-empty" size={24} color="#667eea" />
-              <Text style={styles.loadingText}>Loading business profiles...</Text>
+              {alignmentGuides.horizontal.map((yPos, index) => (
+                <View
+                  key={`alignment-horizontal-${index}`}
+                  pointerEvents="none"
+                  style={[
+                    styles.alignmentGuideHorizontal,
+                    {
+                      top: yPos - 0.5,
+                      width: canvasWidth
+                    }
+                  ]}
+                />
+              ))}
+
+              {/* Watermark Overlay - full screen transparent logo */}
+              {isCapturing && (!checkPremiumAccess('poster_export') || forceWatermarkCapture) && (
+                <View style={styles.fullscreenWatermarkOverlay}>
+                  <Image
+                    source={require('../assets/MainLogo/MB.png')}
+                    style={styles.fullscreenWatermarkImage}
+                    resizeMode="contain"
+                  />
+                </View>
+              )}
             </View>
-          )}
-        </View>
-        
-        
-        {/* Controls Container - Fixed layout with responsive heights */}
-        <View 
-          style={[
-            styles.controlsContainer, 
-            { 
-              paddingBottom: isUltraSmallScreen 
-                ? insets.bottom + 20 
-                : isSmallScreen 
-                  ? insets.bottom + 16 
-                  : Math.max(insets.bottom + responsiveSpacing.md, responsiveSpacing.lg)
-            }
-          ]}
-        >
-        
+          </TouchableWithoutFeedback>
+        </ViewShot>
+
+
+        {/* Instructions */}
+        {layers.length === 0 && !loadingProfiles && (
+          <View style={styles.instructionsContainer}>
+            <Icon name="info" size={24} color="#667eea" />
+            <Text style={styles.instructionsText}>
+              {businessProfiles.length === 0
+                ? 'No business profiles found. Please create a business profile first.'
+                : 'Business profile data has been applied to your poster'
+              }
+            </Text>
+            <Text style={[styles.instructionsText, { marginTop: 10, fontSize: 12, color: '#ff6b6b' }]}>
+              {businessProfiles.length === 0
+                ? 'Please create a business profile first to generate poster content.'
+                : 'No content applied. Try selecting a different business profile.'
+              }
+            </Text>
+          </View>
+        )}
+
+        {/* Loading indicator */}
+        {loadingProfiles && (
+          <View style={styles.loadingContainer}>
+            <Icon name="hourglass-empty" size={24} color="#667eea" />
+            <Text style={styles.loadingText}>Loading business profiles...</Text>
+          </View>
+        )}
+      </View>
+
+
+      {/* Controls Container - Fixed layout with responsive heights */}
+      <View
+        style={[
+          styles.controlsContainer,
+          {
+            paddingBottom: isUltraSmallScreen
+              ? insets.bottom + 20
+              : isSmallScreen
+                ? insets.bottom + 16
+                : Math.max(insets.bottom + responsiveSpacing.md, responsiveSpacing.lg)
+          }
+        ]}
+      >
+
         {/* Toolbar Below Canvas */}
         <View style={styles.bottomToolbar}>
-          <ScrollView 
+          <ScrollView
             horizontal={true}
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.toolbarScrollContent}
@@ -2966,7 +2955,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                 <Text style={styles.toolbarButtonText}>Text</Text>
               </LinearGradient>
             </TouchableOpacity>
-            
+
             <TouchableOpacity
               style={styles.toolbarButton}
               onPress={() => setShowFontStyleModal(true)}
@@ -2979,8 +2968,8 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                 <Text style={styles.toolbarButtonText}>Font</Text>
               </LinearGradient>
             </TouchableOpacity>
-            
-            
+
+
             {selectedLayer && (
               <TouchableOpacity
                 style={styles.toolbarButton}
@@ -2996,16 +2985,16 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
               </TouchableOpacity>
             )}
           </ScrollView>
-          </View>
-        
+        </View>
+
         {/* Field Toggle Buttons */}
         <View style={styles.fieldToggleSection}>
           <View style={styles.fieldToggleHeader}>
             <Text style={styles.fieldToggleTitle}>Toggle Fields</Text>
             <Text style={styles.fieldToggleSubtitle}>Click to show/hide elements</Text>
           </View>
-          <ScrollView 
-            style={styles.fieldToggleContent} 
+          <ScrollView
+            style={styles.fieldToggleContent}
             horizontal={true}
             showsHorizontalScrollIndicator={false}
             showsVerticalScrollIndicator={false}
@@ -3029,7 +3018,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                 Logo
               </Text>
             </TouchableOpacity>
-            
+
             <TouchableOpacity
               style={[styles.fieldToggleButton, visibleFields.companyName && styles.fieldToggleButtonActive]}
               onPress={() => toggleFieldVisibility('companyName')}
@@ -3039,7 +3028,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                 Company Name
               </Text>
             </TouchableOpacity>
-            
+
             <TouchableOpacity
               style={[styles.fieldToggleButton, visibleFields.phone && styles.fieldToggleButtonActive]}
               onPress={() => toggleFieldVisibility('phone')}
@@ -3049,7 +3038,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                 Phone
               </Text>
             </TouchableOpacity>
-            
+
             <TouchableOpacity
               style={[styles.fieldToggleButton, visibleFields.email && styles.fieldToggleButtonActive]}
               onPress={() => toggleFieldVisibility('email')}
@@ -3059,7 +3048,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                 Email
               </Text>
             </TouchableOpacity>
-            
+
             <TouchableOpacity
               style={[styles.fieldToggleButton, visibleFields.website && styles.fieldToggleButtonActive]}
               onPress={() => toggleFieldVisibility('website')}
@@ -3069,7 +3058,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                 Website
               </Text>
             </TouchableOpacity>
-            
+
             <TouchableOpacity
               style={[styles.fieldToggleButton, visibleFields.category && styles.fieldToggleButtonActive]}
               onPress={() => toggleFieldVisibility('category')}
@@ -3079,7 +3068,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                 Category
               </Text>
             </TouchableOpacity>
-            
+
             <TouchableOpacity
               style={[styles.fieldToggleButton, visibleFields.address && styles.fieldToggleButtonActive]}
               onPress={() => toggleFieldVisibility('address')}
@@ -3091,7 +3080,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
             </TouchableOpacity>
           </ScrollView>
         </View>
-        
+
         {/* Templates Section */}
         <View style={styles.templatesSection}>
           <View style={styles.templatesHeader}>
@@ -3137,8 +3126,8 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
             })}
           </ScrollView>
         </View>
-        
-        </View>
+
+      </View>
 
       {/* Business Profile Selection Modal */}
       <Modal
@@ -3263,7 +3252,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
               <Text style={styles.logoModalTitle}>Add Your Logo</Text>
               <Text style={styles.logoModalSubtitle}>Choose how you'd like to add your logo to the poster</Text>
             </View>
-            
+
             <View style={styles.logoOptionsContainer}>
               <TouchableOpacity
                 style={styles.logoOption}
@@ -3281,7 +3270,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                 <Text style={styles.logoOptionTitle}>Take Photo</Text>
 
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={styles.logoOption}
                 onPress={() => {
@@ -3296,12 +3285,12 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                   <Icon name="photo-library" size={32} color="#ffffff" />
                 </LinearGradient>
                 <Text style={styles.logoOptionTitle}>Choose from Gallery</Text>
-                
+
               </TouchableOpacity>
-              
+
 
             </View>
-            
+
             <TouchableOpacity
               style={styles.logoModalCloseButton}
               onPress={() => setShowLogoModal(false)}
@@ -3339,199 +3328,199 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                 height: fontModalMaxHeight
               }
             ]}>
-            {/* Modal Header */}
-            <View style={styles.fontModalHeader}>
-              <View>
-                <Text style={styles.modalTitle}>Font & Size</Text>
-                <Text style={styles.modalSubtitle}>
-                  {selectedLayer ? 'Customize selected text' : 'Choose a font style'}
-                </Text>
+              {/* Modal Header */}
+              <View style={styles.fontModalHeader}>
+                <View>
+                  <Text style={styles.modalTitle}>Font & Size</Text>
+                  <Text style={styles.modalSubtitle}>
+                    {selectedLayer ? 'Customize selected text' : 'Choose a font style'}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.fontModalCloseButton}
+                  onPress={() => setShowFontStyleModal(false)}
+                >
+                  <Icon name="close" size={getResponsiveIconSize()} color="#666666" />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity
-                style={styles.fontModalCloseButton}
-                onPress={() => setShowFontStyleModal(false)}
+
+              {/* Scrollable Content Container */}
+              <ScrollView
+                style={styles.fontModalScrollView}
+                contentContainerStyle={styles.fontModalScrollContent}
+                showsVerticalScrollIndicator={true}
+                nestedScrollEnabled={true}
               >
-                <Icon name="close" size={getResponsiveIconSize()} color="#666666" />
-              </TouchableOpacity>
-            </View>
-            
-            {/* Scrollable Content Container */}
-            <ScrollView 
-              style={styles.fontModalScrollView}
-              contentContainerStyle={styles.fontModalScrollContent}
-              showsVerticalScrollIndicator={true}
-              nestedScrollEnabled={true}
-            >
-              {/* Font Size Controls */}
-              <View style={styles.fontSizeControlsContainer}>
-                <View style={styles.fontSizeHeader}>
-                  <Icon name="format-size" size={getResponsiveIconSize()} color="#667eea" />
-                  <View style={styles.fontSizeHeaderTextGroup}>
-                    <Text style={styles.fontSizeLabel}>Font Size</Text>
-                    {!selectedLayer && (
-                      <Text style={styles.fontSizeHelperText}>No layer selected — applies to all text</Text>
-                    )}
+                {/* Font Size Controls */}
+                <View style={styles.fontSizeControlsContainer}>
+                  <View style={styles.fontSizeHeader}>
+                    <Icon name="format-size" size={getResponsiveIconSize()} color="#667eea" />
+                    <View style={styles.fontSizeHeaderTextGroup}>
+                      <Text style={styles.fontSizeLabel}>Font Size</Text>
+                      {!selectedLayer && (
+                        <Text style={styles.fontSizeHelperText}>No layer selected — applies to all text</Text>
+                      )}
+                    </View>
+                  </View>
+                  <View style={styles.fontSizeButtons}>
+                    {[10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 48].map(size => (
+                      <TouchableOpacity
+                        key={size}
+                        style={[
+                          styles.fontSizeButton,
+                          selectedFontSize === size && styles.fontSizeButtonActive
+                        ]}
+                        onPress={() => applyFontSize(size)}
+                      >
+                        <Text style={[
+                          styles.fontSizeButtonText,
+                          selectedFontSize === size && styles.fontSizeButtonTextActive
+                        ]}>
+                          {size}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
                   </View>
                 </View>
-                <View style={styles.fontSizeButtons}>
-                  {[10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 48].map(size => (
+
+                {/* Font Family Section */}
+                <View style={styles.fontFamilySection}>
+                  <View style={styles.fontFamilySectionHeader}>
+                    <Icon name="font-download" size={getResponsiveIconSize()} color="#667eea" />
+                    <Text style={styles.fontFamilySectionTitle}>Font Family</Text>
+                  </View>
+                </View>
+                {/* System Fonts Category */}
+                <View style={styles.fontCategorySection}>
+                  <Text style={styles.fontCategoryTitle}>System Fonts</Text>
+                  <View style={styles.fontCategoryGrid}>
                     <TouchableOpacity
-                      key={size}
-                      style={[
-                        styles.fontSizeButton,
-                        selectedFontSize === size && styles.fontSizeButtonActive
-                      ]}
-                      onPress={() => applyFontSize(size)}
-                    >
-                      <Text style={[
-                        styles.fontSizeButtonText,
-                        selectedFontSize === size && styles.fontSizeButtonTextActive
-                      ]}>
-                        {size}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-              
-              {/* Font Family Section */}
-              <View style={styles.fontFamilySection}>
-                <View style={styles.fontFamilySectionHeader}>
-                  <Icon name="font-download" size={getResponsiveIconSize()} color="#667eea" />
-                  <Text style={styles.fontFamilySectionTitle}>Font Family</Text>
-                </View>
-              </View>
-              {/* System Fonts Category */}
-              <View style={styles.fontCategorySection}>
-                <Text style={styles.fontCategoryTitle}>System Fonts</Text>
-                <View style={styles.fontCategoryGrid}>
-                  <TouchableOpacity
-                    style={styles.fontOptionButton}
-                    onPress={() => applyFontStyle(SYSTEM_FONTS.default)}
-                  >
-                    <Text style={[styles.fontPreviewText, { fontFamily: SYSTEM_FONTS.default }]}>Aa</Text>
-                    <Text style={styles.fontOptionName}>System</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity
-                    style={styles.fontOptionButton}
-                    onPress={() => applyFontStyle(SYSTEM_FONTS.serif)}
-                  >
-                    <Text style={[styles.fontPreviewText, { fontFamily: SYSTEM_FONTS.serif }]}>Aa</Text>
-                    <Text style={styles.fontOptionName}>Serif</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity
-                    style={styles.fontOptionButton}
-                    onPress={() => applyFontStyle(SYSTEM_FONTS.monospace)}
-                  >
-                    <Text style={[styles.fontPreviewText, { fontFamily: SYSTEM_FONTS.monospace }]}>Aa</Text>
-                    <Text style={styles.fontOptionName}>Monospace</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity
-                    style={styles.fontOptionButton}
-                    onPress={() => applyFontStyle(SYSTEM_FONTS.cursive)}
-                  >
-                    <Text style={[styles.fontPreviewText, { fontFamily: SYSTEM_FONTS.cursive }]}>Aa</Text>
-                    <Text style={styles.fontOptionName}>Cursive</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity
-                    style={styles.fontOptionButton}
-                    onPress={() => applyFontStyle(SYSTEM_FONTS.fantasy)}
-                  >
-                    <Text style={[styles.fontPreviewText, { fontFamily: SYSTEM_FONTS.fantasy }]}>Aa</Text>
-                    <Text style={styles.fontOptionName}>Fantasy</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-                
-              {/* Google Fonts - Sans-serif */}
-              <View style={styles.fontCategorySection}>
-                <Text style={styles.fontCategoryTitle}>Sans-Serif Fonts</Text>
-                <View style={styles.fontCategoryGrid}>
-                  {getFontsByCategory('sans-serif').slice(0, 6).map((font) => (
-                    <TouchableOpacity
-                      key={font.name}
                       style={styles.fontOptionButton}
-                      onPress={() => applyFontStyle(font.name)}
+                      onPress={() => applyFontStyle(SYSTEM_FONTS.default)}
                     >
-                      <Text style={[styles.fontPreviewText, { fontFamily: getFontFamily(font.name) }]}>Aa</Text>
-                      <Text style={styles.fontOptionName}>{font.displayName}</Text>
+                      <Text style={[styles.fontPreviewText, { fontFamily: SYSTEM_FONTS.default }]}>Aa</Text>
+                      <Text style={styles.fontOptionName}>System</Text>
                     </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-                
-              {/* Google Fonts - Serif */}
-              <View style={styles.fontCategorySection}>
-                <Text style={styles.fontCategoryTitle}>Serif Fonts</Text>
-                <View style={styles.fontCategoryGrid}>
-                  {getFontsByCategory('serif').slice(0, 4).map((font) => (
+
                     <TouchableOpacity
-                      key={font.name}
                       style={styles.fontOptionButton}
-                      onPress={() => applyFontStyle(font.name)}
+                      onPress={() => applyFontStyle(SYSTEM_FONTS.serif)}
                     >
-                      <Text style={[styles.fontPreviewText, { fontFamily: getFontFamily(font.name) }]}>Aa</Text>
-                      <Text style={styles.fontOptionName}>{font.displayName}</Text>
+                      <Text style={[styles.fontPreviewText, { fontFamily: SYSTEM_FONTS.serif }]}>Aa</Text>
+                      <Text style={styles.fontOptionName}>Serif</Text>
                     </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-                
-              {/* Google Fonts - Display */}
-              <View style={styles.fontCategorySection}>
-                <Text style={styles.fontCategoryTitle}>Display Fonts</Text>
-                <View style={styles.fontCategoryGrid}>
-                  {getFontsByCategory('display').slice(0, 4).map((font) => (
+
                     <TouchableOpacity
-                      key={font.name}
                       style={styles.fontOptionButton}
-                      onPress={() => applyFontStyle(font.name)}
+                      onPress={() => applyFontStyle(SYSTEM_FONTS.monospace)}
                     >
-                      <Text style={[styles.fontPreviewText, { fontFamily: getFontFamily(font.name) }]}>Aa</Text>
-                      <Text style={styles.fontOptionName}>{font.displayName}</Text>
+                      <Text style={[styles.fontPreviewText, { fontFamily: SYSTEM_FONTS.monospace }]}>Aa</Text>
+                      <Text style={styles.fontOptionName}>Monospace</Text>
                     </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-                
-              {/* Google Fonts - Handwriting */}
-              <View style={styles.fontCategorySection}>
-                <Text style={styles.fontCategoryTitle}>Handwriting Fonts</Text>
-                <View style={styles.fontCategoryGrid}>
-                  {getFontsByCategory('handwriting').slice(0, 4).map((font) => (
+
                     <TouchableOpacity
-                      key={font.name}
                       style={styles.fontOptionButton}
-                      onPress={() => applyFontStyle(font.name)}
+                      onPress={() => applyFontStyle(SYSTEM_FONTS.cursive)}
                     >
-                      <Text style={[styles.fontPreviewText, { fontFamily: getFontFamily(font.name) }]}>Aa</Text>
-                      <Text style={styles.fontOptionName}>{font.displayName}</Text>
+                      <Text style={[styles.fontPreviewText, { fontFamily: SYSTEM_FONTS.cursive }]}>Aa</Text>
+                      <Text style={styles.fontOptionName}>Cursive</Text>
                     </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-                
-              {/* Google Fonts - Monospace */}
-              <View style={styles.fontCategorySection}>
-                <Text style={styles.fontCategoryTitle}>Monospace Fonts</Text>
-                <View style={styles.fontCategoryGrid}>
-                  {getFontsByCategory('monospace').slice(0, 2).map((font) => (
+
                     <TouchableOpacity
-                      key={font.name}
                       style={styles.fontOptionButton}
-                      onPress={() => applyFontStyle(font.name)}
+                      onPress={() => applyFontStyle(SYSTEM_FONTS.fantasy)}
                     >
-                      <Text style={[styles.fontPreviewText, { fontFamily: getFontFamily(font.name) }]}>Aa</Text>
-                      <Text style={styles.fontOptionName}>{font.displayName}</Text>
+                      <Text style={[styles.fontPreviewText, { fontFamily: SYSTEM_FONTS.fantasy }]}>Aa</Text>
+                      <Text style={styles.fontOptionName}>Fantasy</Text>
                     </TouchableOpacity>
-                  ))}
+                  </View>
                 </View>
-              </View>
-            </ScrollView>
+
+                {/* Google Fonts - Sans-serif */}
+                <View style={styles.fontCategorySection}>
+                  <Text style={styles.fontCategoryTitle}>Sans-Serif Fonts</Text>
+                  <View style={styles.fontCategoryGrid}>
+                    {getFontsByCategory('sans-serif').slice(0, 6).map((font) => (
+                      <TouchableOpacity
+                        key={font.name}
+                        style={styles.fontOptionButton}
+                        onPress={() => applyFontStyle(font.name)}
+                      >
+                        <Text style={[styles.fontPreviewText, { fontFamily: getFontFamily(font.name) }]}>Aa</Text>
+                        <Text style={styles.fontOptionName}>{font.displayName}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Google Fonts - Serif */}
+                <View style={styles.fontCategorySection}>
+                  <Text style={styles.fontCategoryTitle}>Serif Fonts</Text>
+                  <View style={styles.fontCategoryGrid}>
+                    {getFontsByCategory('serif').slice(0, 4).map((font) => (
+                      <TouchableOpacity
+                        key={font.name}
+                        style={styles.fontOptionButton}
+                        onPress={() => applyFontStyle(font.name)}
+                      >
+                        <Text style={[styles.fontPreviewText, { fontFamily: getFontFamily(font.name) }]}>Aa</Text>
+                        <Text style={styles.fontOptionName}>{font.displayName}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Google Fonts - Display */}
+                <View style={styles.fontCategorySection}>
+                  <Text style={styles.fontCategoryTitle}>Display Fonts</Text>
+                  <View style={styles.fontCategoryGrid}>
+                    {getFontsByCategory('display').slice(0, 4).map((font) => (
+                      <TouchableOpacity
+                        key={font.name}
+                        style={styles.fontOptionButton}
+                        onPress={() => applyFontStyle(font.name)}
+                      >
+                        <Text style={[styles.fontPreviewText, { fontFamily: getFontFamily(font.name) }]}>Aa</Text>
+                        <Text style={styles.fontOptionName}>{font.displayName}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Google Fonts - Handwriting */}
+                <View style={styles.fontCategorySection}>
+                  <Text style={styles.fontCategoryTitle}>Handwriting Fonts</Text>
+                  <View style={styles.fontCategoryGrid}>
+                    {getFontsByCategory('handwriting').slice(0, 4).map((font) => (
+                      <TouchableOpacity
+                        key={font.name}
+                        style={styles.fontOptionButton}
+                        onPress={() => applyFontStyle(font.name)}
+                      >
+                        <Text style={[styles.fontPreviewText, { fontFamily: getFontFamily(font.name) }]}>Aa</Text>
+                        <Text style={styles.fontOptionName}>{font.displayName}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Google Fonts - Monospace */}
+                <View style={styles.fontCategorySection}>
+                  <Text style={styles.fontCategoryTitle}>Monospace Fonts</Text>
+                  <View style={styles.fontCategoryGrid}>
+                    {getFontsByCategory('monospace').slice(0, 2).map((font) => (
+                      <TouchableOpacity
+                        key={font.name}
+                        style={styles.fontOptionButton}
+                        onPress={() => applyFontStyle(font.name)}
+                      >
+                        <Text style={[styles.fontPreviewText, { fontFamily: getFontFamily(font.name) }]}>Aa</Text>
+                        <Text style={styles.fontOptionName}>{font.displayName}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              </ScrollView>
             </View>
           </View>
         </View>
@@ -3565,14 +3554,14 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
             themeStyles.deleteModalContainer,
             {
               backgroundColor: theme.colors.surface,
-              width: isTabletDevice 
-                ? screenWidth * 0.5 
-                : isLandscapeMode 
-                  ? screenWidth * 0.6 
-                  : isUltraSmallDevice 
-                    ? screenWidth * 0.92 
-                    : isSmallScreen 
-                      ? screenWidth * 0.9 
+              width: isTabletDevice
+                ? screenWidth * 0.5
+                : isLandscapeMode
+                  ? screenWidth * 0.6
+                  : isUltraSmallDevice
+                    ? screenWidth * 0.92
+                    : isSmallScreen
+                      ? screenWidth * 0.9
                       : screenWidth * 0.85,
               maxWidth: isTabletDevice ? 500 : 450,
               paddingHorizontal: isTabletDevice ? responsiveSpacing.xl : isLandscapeMode ? responsiveSpacing.lg : isUltraSmallDevice ? responsiveSpacing.md : responsiveSpacing.lg,
@@ -3581,22 +3570,22 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
           ]}>
             <View style={themeStyles.deleteModalHeader}>
               <View style={[
-                themeStyles.deleteIconContainer, 
-                { 
+                themeStyles.deleteIconContainer,
+                {
                   backgroundColor: '#ff444420',
                   marginBottom: isTabletDevice ? responsiveSpacing.md : responsiveSpacing.sm
                 }
               ]}>
-                <Icon 
-                  name="warning" 
-                  size={isTabletDevice ? 36 : isLandscapeMode ? 32 : isUltraSmallDevice ? 24 : 32} 
-                  color="#ff4444" 
+                <Icon
+                  name="warning"
+                  size={isTabletDevice ? 36 : isLandscapeMode ? 32 : isUltraSmallDevice ? 24 : 32}
+                  color="#ff4444"
                 />
               </View>
-              <Text 
+              <Text
                 style={[
-                  themeStyles.deleteModalTitle, 
-                  { 
+                  themeStyles.deleteModalTitle,
+                  {
                     color: theme.colors.text,
                     marginBottom: isTabletDevice ? responsiveSpacing.sm : responsiveSpacing.xs
                   }
@@ -3604,22 +3593,22 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
               >
                 Delete Element
               </Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[
-                  themeStyles.closeModalButton, 
+                  themeStyles.closeModalButton,
                   { backgroundColor: theme.colors.inputBackground }
                 ]}
                 onPress={() => setShowDeleteElementModal(false)}
                 activeOpacity={0.7}
               >
-                <Icon 
-                  name="close" 
-                  size={isTabletDevice ? 24 : isLandscapeMode ? 22 : isUltraSmallDevice ? 18 : 20} 
-                  color={theme.colors.textSecondary} 
+                <Icon
+                  name="close"
+                  size={isTabletDevice ? 24 : isLandscapeMode ? 22 : isUltraSmallDevice ? 18 : 20}
+                  color={theme.colors.textSecondary}
                 />
               </TouchableOpacity>
             </View>
-            
+
             <View style={[
               themeStyles.deleteModalContent,
               {
@@ -3628,8 +3617,8 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
               }
             ]}>
               <Text style={[
-                themeStyles.deleteModalMessage, 
-                { 
+                themeStyles.deleteModalMessage,
+                {
                   color: theme.colors.text,
                   fontSize: isTabletDevice ? 16 : isLandscapeMode ? 15 : isUltraSmallDevice ? 13 : 15,
                   lineHeight: isTabletDevice ? 24 : isLandscapeMode ? 22 : isUltraSmallDevice ? 18 : 22,
@@ -3638,17 +3627,17 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                 Are you sure you want to delete this element? This action cannot be undone.
               </Text>
             </View>
-            
+
             <View style={[
               themeStyles.deleteModalButtons,
               {
                 gap: isTabletDevice ? responsiveSpacing.md : isLandscapeMode ? responsiveSpacing.sm : isUltraSmallDevice ? responsiveSpacing.xs : responsiveSpacing.sm
               }
             ]}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[
-                  themeStyles.deleteModalCancelButton, 
-                  { 
+                  themeStyles.deleteModalCancelButton,
+                  {
                     backgroundColor: theme.colors.inputBackground,
                     paddingVertical: isTabletDevice ? 16 : isLandscapeMode ? 14 : isUltraSmallDevice ? 12 : 14,
                     borderRadius: isTabletDevice ? 12 : isLandscapeMode ? 10 : isUltraSmallDevice ? 8 : 10,
@@ -3657,8 +3646,8 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                 onPress={() => setShowDeleteElementModal(false)}
               >
                 <Text style={[
-                  themeStyles.deleteModalCancelText, 
-                  { 
+                  themeStyles.deleteModalCancelText,
+                  {
                     color: theme.colors.text,
                     fontSize: isTabletDevice ? 17 : isLandscapeMode ? 16 : isUltraSmallDevice ? 14 : 16,
                   }
@@ -3666,11 +3655,11 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                   Cancel
                 </Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity 
+
+              <TouchableOpacity
                 style={[
-                  themeStyles.deleteModalDeleteButton, 
-                  { 
+                  themeStyles.deleteModalDeleteButton,
+                  {
                     backgroundColor: '#ff4444',
                     paddingVertical: isTabletDevice ? 16 : isLandscapeMode ? 14 : isUltraSmallDevice ? 12 : 14,
                     borderRadius: isTabletDevice ? 12 : isLandscapeMode ? 10 : isUltraSmallDevice ? 8 : 10,
@@ -3718,37 +3707,37 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
           <View style={[
             themeStyles.modalContent,
             {
-              width: isTabletDevice 
-                ? screenWidth * 0.5 
-                : isLandscapeMode 
-                  ? screenWidth * 0.6 
-                  : isUltraSmallDevice 
-                    ? screenWidth * 0.92 
-                    : isSmallScreen 
-                      ? screenWidth * 0.9 
+              width: isTabletDevice
+                ? screenWidth * 0.5
+                : isLandscapeMode
+                  ? screenWidth * 0.6
+                  : isUltraSmallDevice
+                    ? screenWidth * 0.92
+                    : isSmallScreen
+                      ? screenWidth * 0.9
                       : screenWidth * 0.85,
               maxHeight: screenHeight * 0.4,
             }
           ]}>
             <View style={{ alignItems: 'center', marginBottom: responsiveSpacing.lg }}>
-              <View style={{ 
-                width: isTabletDevice ? 70 : isUltraSmallScreen ? 50 : 60, 
-                height: isTablet ? 70 : isUltraSmallScreen ? 50 : 60, 
-                borderRadius: isTablet ? 35 : isUltraSmallScreen ? 25 : 30, 
-                backgroundColor: '#fff0f0', 
-                justifyContent: 'center', 
+              <View style={{
+                width: isTabletDevice ? 70 : isUltraSmallScreen ? 50 : 60,
+                height: isTablet ? 70 : isUltraSmallScreen ? 50 : 60,
+                borderRadius: isTablet ? 35 : isUltraSmallScreen ? 25 : 30,
+                backgroundColor: '#fff0f0',
+                justifyContent: 'center',
                 alignItems: 'center',
                 marginBottom: responsiveSpacing.md
               }}>
-                <Icon 
-                  name="wifi-off" 
-                  size={isTabletDevice ? 36 : isUltraSmallDevice ? 24 : 32} 
-                  color="#ff4444" 
+                <Icon
+                  name="wifi-off"
+                  size={isTabletDevice ? 36 : isUltraSmallDevice ? 24 : 32}
+                  color="#ff4444"
                 />
               </View>
               <Text style={[
-                themeStyles.modalTitle, 
-                { 
+                themeStyles.modalTitle,
+                {
                   fontSize: isTabletDevice ? 24 : isUltraSmallDevice ? 18 : 20,
                   marginBottom: responsiveSpacing.sm,
                   textAlign: 'center'
@@ -3757,8 +3746,8 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                 Connection Error
               </Text>
               <Text style={[
-                themeStyles.modalSubtitle, 
-                { 
+                themeStyles.modalSubtitle,
+                {
                   fontSize: isTablet ? 15 : isUltraSmallScreen ? 12 : 14,
                   textAlign: 'center',
                   lineHeight: isTablet ? 22 : isUltraSmallScreen ? 16 : 20,
@@ -3906,14 +3895,14 @@ const styles = StyleSheet.create({
     padding: isLandscape ? (isTablet ? responsiveSpacing.sm : responsiveSpacing.xs) : (isUltraSmallScreen ? 1 : isSmallScreen ? 2 : responsiveSpacing.xs),
     paddingBottom: isLandscape ? (isTablet ? responsiveSpacing.sm : responsiveSpacing.xs) : (isUltraSmallScreen ? 1 : isSmallScreen ? 2 : responsiveSpacing.xs),
     marginBottom: isTablet ? responsiveSpacing.md : isLandscape ? responsiveSpacing.sm : isUltraSmallScreen ? responsiveSpacing.sm : responsiveSpacing.md,
-    maxHeight: isLandscape 
-      ? screenHeight * 0.65 
-      : isTablet 
+    maxHeight: isLandscape
+      ? screenHeight * 0.65
+      : isTablet
         ? screenHeight * 0.50
-        : isUltraSmallScreen 
-          ? screenHeight * 0.42 
-          : isSmallScreen 
-            ? screenHeight * 0.44 
+        : isUltraSmallScreen
+          ? screenHeight * 0.42
+          : isSmallScreen
+            ? screenHeight * 0.44
             : screenHeight * 0.45,
   },
   controlsContainer: {
@@ -3937,7 +3926,7 @@ const styles = StyleSheet.create({
     // These will be set dynamically based on responsive dimensions
     borderRadius: 0,
     shadowColor: '#000',
-    borderWidth:1,
+    borderWidth: 1,
     shadowOffset: {
       width: 0,
       height: 8,
@@ -4165,16 +4154,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: moderateScale(2),
   },
   modalTitle: {
-    fontSize: isLandscape 
-      ? (isTablet ? moderateScale(13) : moderateScale(12)) 
+    fontSize: isLandscape
+      ? (isTablet ? moderateScale(13) : moderateScale(12))
       : (isUltraSmallScreen ? moderateScale(11) : isSmallScreen ? moderateScale(12) : isTablet ? moderateScale(14) : moderateScale(13)),
     fontWeight: '700',
     color: '#333333',
     marginBottom: moderateScale(1),
   },
   modalSubtitle: {
-    fontSize: isLandscape 
-      ? (isTablet ? moderateScale(9.5) : moderateScale(9)) 
+    fontSize: isLandscape
+      ? (isTablet ? moderateScale(9.5) : moderateScale(9))
       : (isUltraSmallScreen ? moderateScale(8) : isSmallScreen ? moderateScale(8.5) : isTablet ? moderateScale(10) : moderateScale(9)),
     color: '#666666',
     marginBottom: moderateScale(1),
@@ -5852,11 +5841,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: isLandscape 
-      ? (isTablet ? moderateScale(7) : moderateScale(6)) 
+    marginBottom: isLandscape
+      ? (isTablet ? moderateScale(7) : moderateScale(6))
       : (isUltraSmallScreen ? moderateScale(5) : isSmallScreen ? moderateScale(5) : isTablet ? moderateScale(7) : moderateScale(6)),
-    paddingBottom: isLandscape 
-      ? (isTablet ? moderateScale(6) : moderateScale(5)) 
+    paddingBottom: isLandscape
+      ? (isTablet ? moderateScale(6) : moderateScale(5))
       : (isUltraSmallScreen ? moderateScale(4) : isSmallScreen ? moderateScale(5) : isTablet ? moderateScale(6) : moderateScale(5)),
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef',
@@ -5865,11 +5854,11 @@ const styles = StyleSheet.create({
     padding: moderateScale(3),
     borderRadius: moderateScale(14),
     backgroundColor: '#f8f9fa',
-    width: isLandscape 
-      ? (isTablet ? moderateScale(28) : moderateScale(26)) 
+    width: isLandscape
+      ? (isTablet ? moderateScale(28) : moderateScale(26))
       : (isUltraSmallScreen ? moderateScale(24) : isSmallScreen ? moderateScale(26) : isTablet ? moderateScale(28) : moderateScale(26)),
-    height: isLandscape 
-      ? (isTablet ? moderateScale(28) : moderateScale(26)) 
+    height: isLandscape
+      ? (isTablet ? moderateScale(28) : moderateScale(26))
       : (isUltraSmallScreen ? moderateScale(24) : isSmallScreen ? moderateScale(26) : isTablet ? moderateScale(28) : moderateScale(26)),
     justifyContent: 'center',
     alignItems: 'center',
@@ -5878,8 +5867,8 @@ const styles = StyleSheet.create({
   fontSizeControlsContainer: {
     backgroundColor: '#f8f9fa',
     borderRadius: moderateScale(6),
-    padding: isLandscape 
-      ? (isTablet ? moderateScale(10) : moderateScale(8)) 
+    padding: isLandscape
+      ? (isTablet ? moderateScale(10) : moderateScale(8))
       : (isUltraSmallScreen ? moderateScale(8) : isSmallScreen ? moderateScale(8) : isTablet ? moderateScale(10) : moderateScale(8)),
     marginBottom: moderateScale(8),
     borderWidth: 1,
@@ -5895,8 +5884,8 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
   },
   fontSizeLabel: {
-    fontSize: isLandscape 
-      ? (isTablet ? moderateScale(12) : moderateScale(11)) 
+    fontSize: isLandscape
+      ? (isTablet ? moderateScale(12) : moderateScale(11))
       : (isUltraSmallScreen ? moderateScale(10) : isSmallScreen ? moderateScale(10.5) : isTablet ? moderateScale(12) : moderateScale(11)),
     fontWeight: '700',
     color: '#333333',
@@ -5912,11 +5901,11 @@ const styles = StyleSheet.create({
     gap: isUltraSmallScreen ? moderateScale(3) : moderateScale(4),
   },
   fontSizeButton: {
-    paddingVertical: isLandscape 
-      ? (isTablet ? moderateScale(7) : moderateScale(6)) 
+    paddingVertical: isLandscape
+      ? (isTablet ? moderateScale(7) : moderateScale(6))
       : (isUltraSmallScreen ? moderateScale(5) : isSmallScreen ? moderateScale(5) : isTablet ? moderateScale(7) : moderateScale(6)),
-    paddingHorizontal: isLandscape 
-      ? (isTablet ? moderateScale(10) : moderateScale(8)) 
+    paddingHorizontal: isLandscape
+      ? (isTablet ? moderateScale(10) : moderateScale(8))
       : (isUltraSmallScreen ? moderateScale(6) : isSmallScreen ? moderateScale(7) : isTablet ? moderateScale(10) : moderateScale(8)),
     borderRadius: moderateScale(5),
     backgroundColor: '#ffffff',
@@ -5938,8 +5927,8 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   fontSizeButtonText: {
-    fontSize: isLandscape 
-      ? (isTablet ? moderateScale(11) : moderateScale(10)) 
+    fontSize: isLandscape
+      ? (isTablet ? moderateScale(11) : moderateScale(10))
       : (isUltraSmallScreen ? moderateScale(9) : isSmallScreen ? moderateScale(9.5) : isTablet ? moderateScale(11) : moderateScale(10)),
     fontWeight: '600',
     color: '#666666',
@@ -5961,21 +5950,21 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e9ecef',
   },
   fontFamilySectionTitle: {
-    fontSize: isLandscape 
-      ? (isTablet ? moderateScale(11) : moderateScale(10)) 
+    fontSize: isLandscape
+      ? (isTablet ? moderateScale(11) : moderateScale(10))
       : (isUltraSmallScreen ? moderateScale(9.5) : isSmallScreen ? moderateScale(10) : isTablet ? moderateScale(11) : moderateScale(10.5)),
     fontWeight: '700',
     color: '#333333',
   },
   // Font Category Section
   fontCategorySection: {
-    marginBottom: isLandscape 
-      ? (isTablet ? moderateScale(10) : moderateScale(8)) 
+    marginBottom: isLandscape
+      ? (isTablet ? moderateScale(10) : moderateScale(8))
       : (isUltraSmallScreen ? moderateScale(6) : isSmallScreen ? moderateScale(7) : isTablet ? moderateScale(10) : moderateScale(8)),
   },
   fontCategoryTitle: {
-    fontSize: isLandscape 
-      ? (isTablet ? moderateScale(10) : moderateScale(9)) 
+    fontSize: isLandscape
+      ? (isTablet ? moderateScale(10) : moderateScale(9))
       : (isUltraSmallScreen ? moderateScale(8.5) : isSmallScreen ? moderateScale(9) : isTablet ? moderateScale(10) : moderateScale(9.5)),
     fontWeight: '600',
     color: '#667eea',
@@ -5990,11 +5979,11 @@ const styles = StyleSheet.create({
   // Font Option Button
   fontOptionButton: {
     width: (() => {
-      const modalWidth = isLandscape 
-        ? (isTablet ? screenWidth * 0.65 : screenWidth * 0.75) 
+      const modalWidth = isLandscape
+        ? (isTablet ? screenWidth * 0.65 : screenWidth * 0.75)
         : (isUltraSmallScreen ? screenWidth * 0.95 : isSmallScreen ? screenWidth * 0.92 : isMediumScreen ? screenWidth * 0.88 : isLargeScreen ? screenWidth * 0.85 : isTablet ? screenWidth * 0.8 : screenWidth * 0.85);
-      const padding = isLandscape 
-        ? (isTablet ? 18 : 14) 
+      const padding = isLandscape
+        ? (isTablet ? 18 : 14)
         : (isUltraSmallScreen ? 10 : isSmallScreen ? 12 : isMediumScreen ? 14 : isLargeScreen ? 16 : isTablet ? 18 : 16);
       const gapSize = isUltraSmallScreen ? moderateScale(2.5) : moderateScale(3);
       const scrollPadding = moderateScale(2) * 2;
@@ -6004,8 +5993,8 @@ const styles = StyleSheet.create({
     })(),
     backgroundColor: '#ffffff',
     borderRadius: moderateScale(4),
-    padding: isLandscape 
-      ? (isTablet ? moderateScale(6) : moderateScale(5)) 
+    padding: isLandscape
+      ? (isTablet ? moderateScale(6) : moderateScale(5))
       : (isUltraSmallScreen ? moderateScale(4) : isSmallScreen ? moderateScale(4) : isTablet ? moderateScale(6) : moderateScale(5)),
     alignItems: 'center',
     borderWidth: 1,
@@ -6017,22 +6006,22 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   fontPreviewText: {
-    fontSize: isLandscape 
-      ? (isTablet ? moderateScale(16) : moderateScale(14)) 
+    fontSize: isLandscape
+      ? (isTablet ? moderateScale(16) : moderateScale(14))
       : (isUltraSmallScreen ? moderateScale(13) : isSmallScreen ? moderateScale(14) : isTablet ? moderateScale(18) : moderateScale(15)),
     fontWeight: '400',
     color: '#333333',
     marginBottom: moderateScale(1.5),
   },
   fontOptionName: {
-    fontSize: isLandscape 
-      ? (isTablet ? moderateScale(7) : moderateScale(6.5)) 
+    fontSize: isLandscape
+      ? (isTablet ? moderateScale(7) : moderateScale(6.5))
       : (isUltraSmallScreen ? moderateScale(6) : isSmallScreen ? moderateScale(6.5) : isTablet ? moderateScale(7.5) : moderateScale(7)),
     fontWeight: '600',
     color: '#666666',
     textAlign: 'center',
-    lineHeight: isLandscape 
-      ? (isTablet ? moderateScale(9) : moderateScale(8)) 
+    lineHeight: isLandscape
+      ? (isTablet ? moderateScale(9) : moderateScale(8))
       : (isUltraSmallScreen ? moderateScale(8) : isSmallScreen ? moderateScale(8) : isTablet ? moderateScale(9.5) : moderateScale(9)),
   },
   fullscreenWatermarkOverlay: {

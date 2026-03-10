@@ -21,6 +21,7 @@ import businessCategoryPostersApi, { BusinessCategoryPoster } from '../services/
 import ComingSoonModal from '../components/ComingSoonModal';
 import OptimizedImage from '../components/OptimizedImage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useBusinessProfile } from '../context/BusinessProfileContext';
 
 // Compact spacing multiplier to reduce all spacing (matching HomeScreen)
 const COMPACT_MULTIPLIER = 0.5;
@@ -81,27 +82,27 @@ const getResponsiveValue = (small: number, medium: number, large: number) => {
 const getPosterCardDimensions = (currentWidth: number, currentHeight?: number) => {
   // Responsive columns: 3-6 based on screen size
   const columns = getResponsiveValue(3, 4, 6); // 3 for small, 4 for medium, 6 for large/tablet
-  
+
   const dynamicScale = (size: number) => (currentWidth / 375) * size;
   const dynamicModerateScale = (size: number, factor = 0.5) => size + (dynamicScale(size) - size) * factor;
   const dynamicVerticalScale = (size: number) => ((currentHeight || screenHeight) / 667) * size;
-  
+
   // Horizontal padding for the entire row
   const horizontalPadding = dynamicModerateScale(8);
-  
+
   // Gap between cards
   const gap = dynamicModerateScale(3);
-  
+
   // Calculate available width (total screen width minus padding and gaps)
   const totalGaps = (columns - 1) * gap;
   const availableWidth = currentWidth - (horizontalPadding * 2) - totalGaps;
-  
+
   // Calculate card width to fit evenly
   const cardWidth = Math.floor(availableWidth / columns);
-  
+
   // More compact height (matching GreetingTemplatesScreen)
   const cardHeight = dynamicVerticalScale(60);
-  
+
   return { cardWidth, cardHeight, columns, gap };
 };
 
@@ -109,16 +110,16 @@ const MyBusinessScreen: React.FC = () => {
   const { theme, isDarkMode } = useTheme();
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
-  
+
   // Business category posters state
   const [businessCategoryPosters, setBusinessCategoryPosters] = useState<BusinessCategoryPoster[]>([]);
   const [postersLoading, setPostersLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [userBusinessCategory, setUserBusinessCategory] = useState<string>('General');
-  const [selectedBusinessProfile, setSelectedBusinessProfile] = useState<{name: string, category: string, subcategory: string} | null>(null);
+  const { selectedBusinessProfile } = useBusinessProfile();
   const [refreshing, setRefreshing] = useState(false);
   const [showComingSoonModal, setShowComingSoonModal] = useState(false);
-  
+
   // Dynamic dimensions for responsive layout (matching HomeScreen)
   const [dimensions, setDimensions] = useState(() => {
     const { width, height } = Dimensions.get('window');
@@ -136,58 +137,25 @@ const MyBusinessScreen: React.FC = () => {
 
   const currentScreenWidth = dimensions.width;
   const currentScreenHeight = dimensions.height;
-  
+
   // Dynamic responsive scaling functions
   const dynamicScale = (size: number) => (currentScreenWidth / 375) * size;
   const dynamicVerticalScale = (size: number) => (currentScreenHeight / 667) * size;
   const dynamicModerateScale = (size: number, factor = 0.5) => size + (dynamicScale(size) - size) * factor;
-  
+
   // Responsive icon sizes (compact - 60% of original)
   const getIconSize = (baseSize: number) => {
     return Math.max(10, Math.round(baseSize * (currentScreenWidth / 375) * 0.6));
   };
-  
+
   // Consistent button sizing across devices (clamped for small/big screens)
   const buttonSize = Math.max(26, Math.min(34, dynamicModerateScale(30)));
   const iconSize = Math.max(14, Math.min(20, getIconSize(18)));
   const buttonPadding = Math.max(4, Math.min(8, dynamicModerateScale(4)));
-  
+
   // Get dynamic dimensions with responsive columns
   const { cardWidth, cardHeight, columns, gap } = getPosterCardDimensions(currentScreenWidth, currentScreenHeight);
 
-  // Load selected business profile information
-  const loadSelectedBusinessProfile = useCallback(async () => {
-    try {
-      const profileId = await AsyncStorage.getItem('selectedBusinessProfileId');
-      const profileName = await AsyncStorage.getItem('selectedBusinessProfileName');
-      const profileCategory = await AsyncStorage.getItem('selectedBusinessProfileCategory');
-      const profileSubcategory = await AsyncStorage.getItem('selectedBusinessProfileSubcategory');
-      
-      console.log('🔍 [MY BUSINESS DEBUG] Loading profile data:', {
-        profileId,
-        profileName,
-        profileCategory,
-        profileSubcategory
-      });
-      
-      if (profileId && profileName) {
-        setSelectedBusinessProfile({
-          name: profileName,
-          category: profileCategory || 'General',
-          subcategory: profileSubcategory || ''
-        });
-        console.log('📋 [MY BUSINESS] Loaded selected profile:', {
-          name: profileName,
-          category: profileCategory,
-          subcategory: profileSubcategory
-        });
-      } else {
-        console.log('⚠️ [MY BUSINESS] No profile data found in AsyncStorage');
-      }
-    } catch (error) {
-      console.error('Error loading selected business profile:', error);
-    }
-  }, []);
 
   // Optimized load with cache support - fetch more posters to work around backend limit
   const loadBusinessCategoryPosters = useCallback(async (isRefresh: boolean = false) => {
@@ -195,31 +163,31 @@ const MyBusinessScreen: React.FC = () => {
     try {
       console.log('🔄 [MY BUSINESS] Starting to load posters...');
       console.log('📋 [MY BUSINESS] Current selected profile:', selectedBusinessProfile);
-      
+
       // Always force refresh on initial load to get latest posters
       // This ensures we don't show stale cached data
       const forceRefresh = !isRefresh; // Force refresh on initial load
-      
+
       // Clear cache to ensure fresh data
       if (forceRefresh) {
         businessCategoryPostersApi.clearCategoryCache(''); // Clear all cache
       }
-      
+
       // Try multiple approaches to get more posters since backend limits to 5 per request
-      const response = await businessCategoryPostersApi.getUserCategoryPosters(forceRefresh);
+      const response = await businessCategoryPostersApi.getUserCategoryPosters(forceRefresh, selectedBusinessProfile?.id);
       console.log('📦 [MY BUSINESS] Business poster endpoint response:', JSON.stringify(response, null, 2));
-      
+
       let allPosters: any[] = [];
       let userCategory = 'General';
-      
+
       if (response.success && response.data.posters) {
         allPosters = response.data.posters;
         userCategory = response.data.category;
-        
+
         // If we got less than 10 posters, try to get more by calling the API directly with different approaches
         if (allPosters.length < 10) {
           console.log('🔄 [MY BUSINESS] Got limited posters, trying to fetch more...');
-          
+
           try {
             // Try direct category fetch with higher limit
             const directResponse = await businessCategoryPostersApi.getPostersByCategory(userCategory, 50, true);
@@ -233,7 +201,7 @@ const MyBusinessScreen: React.FC = () => {
           } catch (error) {
             console.warn('⚠️ [MY BUSINESS] Direct fetch failed:', error);
           }
-          
+
           // Try with category variations if still less than 20
           if (allPosters.length < 20 && userCategory !== 'General') {
             try {
@@ -243,7 +211,7 @@ const MyBusinessScreen: React.FC = () => {
                 userCategory.replace(/\s+/g, ''),
                 userCategory.replace(/[^a-zA-Z0-9]/g, ' ')
               ];
-              
+
               for (const variation of variations.slice(0, 2)) { // Limit to 2 variations to avoid too many calls
                 if (variation !== userCategory) {
                   const varResponse = await businessCategoryPostersApi.getPostersByCategory(variation, 20, true);
@@ -261,12 +229,12 @@ const MyBusinessScreen: React.FC = () => {
           }
         }
       }
-      
+
       console.log(`📦 [MY BUSINESS] Final poster count: ${allPosters.length}`);
-      
+
       setBusinessCategoryPosters(allPosters);
       setUserBusinessCategory(userCategory);
-      
+
       // Hide initial loading after first fetch
       if (initialLoading) {
         setInitialLoading(false);
@@ -280,26 +248,24 @@ const MyBusinessScreen: React.FC = () => {
     } finally {
       setPostersLoading(false);
     }
-  }, [initialLoading]);
+  }, [initialLoading, selectedBusinessProfile]);
 
   useEffect(() => {
-    loadSelectedBusinessProfile();
     loadBusinessCategoryPosters();
-  }, [loadSelectedBusinessProfile, loadBusinessCategoryPosters]);
+  }, [loadBusinessCategoryPosters]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
       // Clear cache before refreshing
       businessCategoryPostersApi.clearCache();
-      await loadSelectedBusinessProfile();
       await loadBusinessCategoryPosters(true);
     } catch (error) {
       console.error('Error refreshing posters:', error);
     } finally {
       setRefreshing(false);
     }
-  }, [loadSelectedBusinessProfile, loadBusinessCategoryPosters]);
+  }, [loadBusinessCategoryPosters]);
 
   const handlePosterPress = (poster: BusinessCategoryPoster) => {
     // Convert BusinessCategoryPoster to Template format
@@ -352,7 +318,7 @@ const MyBusinessScreen: React.FC = () => {
     theme: any;
   }>(({ item, index, cardWidth, cardHeight, columns, gap, onPress, theme }) => {
     const isLastInRow = (index + 1) % columns === 0;
-    
+
     return (
       <View style={{ marginRight: isLastInRow ? 0 : gap }}>
         <TouchableOpacity
@@ -367,8 +333,8 @@ const MyBusinessScreen: React.FC = () => {
           onPress={() => onPress(item)}
           activeOpacity={0.8}
         >
-          <OptimizedImage 
-            uri={item.thumbnail} 
+          <OptimizedImage
+            uri={item.thumbnail}
             style={styles.posterImage}
             resizeMode="cover"
             showLoader={true}
@@ -419,16 +385,16 @@ const MyBusinessScreen: React.FC = () => {
   const pastelGradientLocations = [0, 0.25, 0.5, 0.75, 1];
 
   return (
-    <SafeAreaView 
+    <SafeAreaView
       style={[styles.container, { backgroundColor: '#D4DAF5' }]}
       edges={['top', 'left', 'right']}
     >
-      <StatusBar 
+      <StatusBar
         barStyle="dark-content"
-        backgroundColor="transparent" 
+        backgroundColor="transparent"
         translucent={true}
       />
-      
+
       <LinearGradient
         colors={pastelGradientColors}
         locations={pastelGradientLocations}
@@ -448,10 +414,10 @@ const MyBusinessScreen: React.FC = () => {
               }]}
               onPress={() => navigation.goBack()}
             >
-              <Icon 
-                name="arrow-back" 
-                size={iconSize} 
-                color={theme.colors.text} 
+              <Icon
+                name="arrow-back"
+                size={iconSize}
+                color={theme.colors.text}
               />
             </TouchableOpacity>
             <Text style={[styles.headerTitle, {
@@ -465,7 +431,7 @@ const MyBusinessScreen: React.FC = () => {
         </View>
 
         {/* Posters Section */}
-        <ScrollView 
+        <ScrollView
           style={styles.scrollView}
           contentContainerStyle={[styles.scrollContent, { paddingBottom: 80 + insets.bottom }]}
           refreshControl={
@@ -500,14 +466,14 @@ const MyBusinessScreen: React.FC = () => {
               )}
             </View>
             {postersLoading && (
-              <ActivityIndicator 
-                size="small" 
-                color={theme.colors.primary} 
+              <ActivityIndicator
+                size="small"
+                color={theme.colors.primary}
                 style={[styles.loadingIndicator, { marginLeft: dynamicModerateScale(4) }]}
               />
             )}
           </View>
-          
+
           {businessCategoryPosters.length > 0 ? (
             <FlatList
               key={`posters-${columns}-${currentScreenWidth}-${currentScreenHeight}`}
@@ -535,10 +501,10 @@ const MyBusinessScreen: React.FC = () => {
             <View style={[styles.emptyPostersContainer, {
               paddingVertical: dynamicModerateScale(20),
             }]}>
-              <Icon 
-                name="image" 
-                size={getIconSize(40)} 
-                color={isDarkMode ? 'rgba(255,255,255,0.7)' : 'rgba(51,51,51,0.7)'} 
+              <Icon
+                name="image"
+                size={getIconSize(40)}
+                color={isDarkMode ? 'rgba(255,255,255,0.7)' : 'rgba(51,51,51,0.7)'}
               />
               <Text style={[styles.emptyPostersText, {
                 fontSize: dynamicModerateScale(9),
@@ -547,7 +513,7 @@ const MyBusinessScreen: React.FC = () => {
                 lineHeight: dynamicModerateScale(14),
                 color: theme.colors.textSecondary,
               }]}>
-                {selectedBusinessProfile 
+                {selectedBusinessProfile
                   ? `No posters available for ${selectedBusinessProfile.name} (${selectedBusinessProfile.subcategory || selectedBusinessProfile.category})`
                   : `No posters available for ${userBusinessCategory} category`
                 }
@@ -571,7 +537,7 @@ const MyBusinessScreen: React.FC = () => {
           )}
         </ScrollView>
       </LinearGradient>
-      
+
       {/* Coming Soon Modal for Like Feature */}
       <ComingSoonModal
         visible={showComingSoonModal}

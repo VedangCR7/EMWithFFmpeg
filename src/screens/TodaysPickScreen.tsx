@@ -29,11 +29,12 @@ import greetingTemplatesService from '../services/greetingTemplates';
 import calendarApi from '../services/calendarApi';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import authService from '../services/auth';
+import { useBusinessProfile } from '../context/BusinessProfileContext';
 
 // Skeleton Animation Component
 const SkeletonLoader = ({ width, height, style }: { width: number; height: number; style?: any }) => {
   const shimmerAnim = useRef(new Animated.Value(0)).current;
-  
+
   useEffect(() => {
     const shimmerAnimation = Animated.loop(
       Animated.sequence([
@@ -50,7 +51,7 @@ const SkeletonLoader = ({ width, height, style }: { width: number; height: numbe
       ])
     );
     shimmerAnimation.start();
-    
+
     return () => shimmerAnimation.stop();
   }, []);
 
@@ -131,7 +132,7 @@ const extractLanguagesFromTags = (tags: unknown): string[] => {
       const wordBoundaryRegex = new RegExp(`\\b${keyword}\\b`, 'i');
       return normalizedTags.some(tag => wordBoundaryRegex.test(tag));
     });
-    
+
     if (matches) {
       acc.push(language);
     }
@@ -144,8 +145,8 @@ const extractLanguagesFromTags = (tags: unknown): string[] => {
 const mergeTemplateLanguages = (template: Template): Template => {
   const existingLanguages = Array.isArray(template.languages)
     ? template.languages
-        .filter((language): language is string => typeof language === 'string' && language.trim().length > 0)
-        .map(language => language.toLowerCase())
+      .filter((language): language is string => typeof language === 'string' && language.trim().length > 0)
+      .map(language => language.toLowerCase())
     : [];
 
   const tags = Array.isArray(template.tags) ? template.tags : [];
@@ -182,7 +183,7 @@ const templateContainsLanguage = (template: Template, languageId: string): boole
       .filter((tag): tag is string => typeof tag === 'string')
       .map(tag => tag.toLowerCase().trim());
     const keywords = LANGUAGE_KEYWORDS[normalizedLanguage] || [normalizedLanguage];
-    
+
     // Use word boundary matching to match full language names only
     // This prevents false positives like "Hiring" matching "hi"
     const hasLanguageKeyword = keywords.some(keyword => {
@@ -190,11 +191,11 @@ const templateContainsLanguage = (template: Template, languageId: string): boole
       const wordBoundaryRegex = new RegExp(`\\b${keyword}\\b`, 'i');
       return normalizedTags.some(tag => wordBoundaryRegex.test(tag));
     });
-    
+
     if (hasLanguageKeyword) {
       return true;
     }
-    
+
     // If tags exist but don't contain language keywords, check if we're looking for English
     // Templates without language tags should only show for English (default)
     if (normalizedLanguage === 'english') {
@@ -207,13 +208,13 @@ const templateContainsLanguage = (template: Template, languageId: string): boole
           return normalizedTags.some(tag => wordBoundaryRegex.test(tag));
         });
       });
-      
+
       // If no language keywords found at all, show for English (default)
       if (!hasAnyLanguageKeyword) {
         return true;
       }
     }
-    
+
     // If tags exist but don't match the requested language, don't show
     return false;
   }
@@ -266,9 +267,9 @@ interface RelatedPosterItemProps {
   overlayColors: string[];
 }
 
-const RelatedPosterItem: React.FC<RelatedPosterItemProps> = React.memo(({ 
-  item, 
-  cardWidth, 
+const RelatedPosterItem: React.FC<RelatedPosterItemProps> = React.memo(({
+  item,
+  cardWidth,
   cardHeight,
   imageUrl,
   onPress,
@@ -278,11 +279,11 @@ const RelatedPosterItem: React.FC<RelatedPosterItemProps> = React.memo(({
   const handlePress = useCallback(() => onPress(item), [item, onPress]);
 
   // Final safety check to ensure valid dimensions before rendering
-  const validCardWidth = (typeof cardWidth === 'number' && !isNaN(cardWidth) && isFinite(cardWidth) && cardWidth > 0) 
-    ? cardWidth 
+  const validCardWidth = (typeof cardWidth === 'number' && !isNaN(cardWidth) && isFinite(cardWidth) && cardWidth > 0)
+    ? cardWidth
     : 100;
-  const validCardHeight = (typeof cardHeight === 'number' && !isNaN(cardHeight) && isFinite(cardHeight) && cardHeight > 0) 
-    ? cardHeight 
+  const validCardHeight = (typeof cardHeight === 'number' && !isNaN(cardHeight) && isFinite(cardHeight) && cardHeight > 0)
+    ? cardHeight
     : 60;
 
   return (
@@ -320,29 +321,29 @@ const RelatedPosterItem: React.FC<RelatedPosterItemProps> = React.memo(({
 }, (prevProps, nextProps) => {
   // Custom comparison function for better performance
   // Return true if props are equal (skip re-render), false if different (re-render)
-  
+
   // Quick reference check first
   if (prevProps === nextProps) return true;
-  
+
   // Check item ID first (most likely to change)
   if (prevProps.item.id !== nextProps.item.id) return false;
-  
+
   // Check selection state (changes frequently)
   if (prevProps.isSelected !== nextProps.isSelected) return false;
-  
+
   // Check dimensions (rarely change)
   if (prevProps.cardWidth !== nextProps.cardWidth || prevProps.cardHeight !== nextProps.cardHeight) return false;
-  
+
   // Check computed values
   if (prevProps.imageUrl !== nextProps.imageUrl) return false;
-  
+
   // Check overlay colors array reference (should be stable)
   if (prevProps.overlayColors !== nextProps.overlayColors) {
     // Deep compare if reference changed
     if (prevProps.overlayColors.length !== nextProps.overlayColors.length) return false;
     if (prevProps.overlayColors.some((color, i) => color !== nextProps.overlayColors[i])) return false;
   }
-  
+
   // All props are equal, skip re-render
   return true;
 });
@@ -360,7 +361,7 @@ const TodaysPickScreen: React.FC = () => {
   const navigation = useNavigation<TodaysPickScreenNavigationProp>();
   const route = useRoute<TodaysPickScreenRouteProp>();
   const insets = useSafeAreaInsets();
-  
+
   // Track previous initialPoster ID to detect when a different poster is selected
   const prevInitialPosterIdRef = useRef<string | null>(null);
   const previewOverlayColors = useMemo(() => {
@@ -371,7 +372,7 @@ const TodaysPickScreen: React.FC = () => {
       hexToRgba(endColor, 0.85),
     ];
   }, [primaryColor, secondaryColor]);
-  
+
   // Dynamic dimensions for responsive layout
   const [dimensions, setDimensions] = useState(() => {
     const { width, height } = Dimensions.get('window');
@@ -389,11 +390,12 @@ const TodaysPickScreen: React.FC = () => {
 
   const screenWidth = dimensions.width;
   const screenHeight = dimensions.height;
-  
+  const { selectedBusinessProfile } = useBusinessProfile();
+
   // Dynamic device detection that updates on rotation
   const isTabletDevice = useMemo(() => screenWidth >= 768, [screenWidth]);
   const isLandscapeMode = useMemo(() => screenWidth > screenHeight, [screenWidth, screenHeight]);
-  
+
   // Responsive scaling functions with safety checks
   const scale = useCallback((size: number) => {
     if (!screenWidth || isNaN(screenWidth) || screenWidth <= 0) {
@@ -401,14 +403,14 @@ const TodaysPickScreen: React.FC = () => {
     }
     return (screenWidth / 375) * size;
   }, [screenWidth]);
-  
+
   const verticalScale = useCallback((size: number) => {
     if (!screenHeight || isNaN(screenHeight) || screenHeight <= 0) {
       return size; // Fallback to original size if screenHeight is invalid
     }
     return (screenHeight / 667) * size;
   }, [screenHeight]);
-  
+
   const moderateScale = useCallback((size: number, factor = 0.5) => {
     const scaled = scale(size);
     if (isNaN(scaled) || !isFinite(scaled)) {
@@ -416,7 +418,7 @@ const TodaysPickScreen: React.FC = () => {
     }
     return size + (scaled - size) * factor;
   }, [scale]);
-  
+
   // Handle optional route params - TodaysPickScreen doesn't require route params
   // Type assertion needed because TodaysPick route is defined as undefined but may receive PosterPlayer params
   const routeParams = (route.params || {}) as {
@@ -428,8 +430,8 @@ const TodaysPickScreen: React.FC = () => {
     posterLimit?: number;
     calendarDate?: string;
   };
-  const { 
-    selectedPoster: initialPosterParam, 
+  const {
+    selectedPoster: initialPosterParam,
     relatedPosters: initialRelatedPosters = [],
     businessCategory,
     greetingCategory,
@@ -437,7 +439,7 @@ const TodaysPickScreen: React.FC = () => {
     posterLimit,
     calendarDate,
   } = routeParams;
-  
+
   // Create a default placeholder poster if none is provided
   const defaultPoster: Template = useMemo(() => ({
     id: 'loading',
@@ -448,10 +450,10 @@ const TodaysPickScreen: React.FC = () => {
     isDownloaded: false,
     tags: [],
   }), []);
-  
+
   // Ensure initialPoster is always defined
   const initialPoster: Template = initialPosterParam || defaultPoster;
-  
+
   // Convert initialPoster to Template format if it's a GreetingTemplate
   // GreetingTemplates have content.background which should be used as thumbnail if thumbnail is missing
   const convertedInitialPoster = useMemo(() => {
@@ -464,17 +466,17 @@ const TodaysPickScreen: React.FC = () => {
     }
     return initialPoster;
   }, [initialPoster]);
-  
+
   // Original TodaysPickScreen state - restore original functionality
   const [todayPosters, setTodayPosters] = useState<Template[]>([]);
   const [sections, setSections] = useState<Array<{ title: string; data: Template[] }>>([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Keep PosterPlayerScreen state for layout compatibility - sync with todayPosters
   const [currentPoster, setCurrentPoster] = useState<Template>(convertedInitialPoster);
   const [allTemplates, setAllTemplates] = useState<Template[]>([]);
   const [selectedLanguage, setSelectedLanguage] = useState<string>('all');
-  
+
   // Daily shuffle seed based on date (ensures same selection per day, different each day)
   const getDailySeed = useCallback(() => {
     const today = new Date();
@@ -498,20 +500,20 @@ const TodaysPickScreen: React.FC = () => {
   // Select one item from array using daily seed
   const selectDailyItem = useCallback(<T,>(items: T[], seed: number, type: string = ''): T | null => {
     if (!items || items.length === 0) return null;
-    
+
     // Use type as additional seed variation to ensure different selection for different types
     const typeSeed = type.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
     const finalSeed = seed + typeSeed;
-    
+
     // Log for debugging daily selection consistency
     console.log(`🎲 [Daily Selection] Type: ${type}, Seed: ${seed}, TypeSeed: ${typeSeed}, FinalSeed: ${finalSeed}, Items: ${items.length}`);
-    
+
     const randomValue = seededRandom(finalSeed, 0);
     const randomIndex = Math.floor(randomValue * items.length);
     const selectedItem = items[randomIndex];
-    
+
     console.log(`🎯 [Daily Selection] Selected index: ${randomIndex}, Random value: ${randomValue}`);
-    
+
     return selectedItem;
   }, [seededRandom]);
   const lastAutoDetectedPosterIdRef = useRef<string | null>(null); // Track which poster triggered auto-detection to prevent duplicate detection
@@ -529,20 +531,20 @@ const TodaysPickScreen: React.FC = () => {
     if (previewUrl) {
       return previewUrl;
     }
-    
+
     // Check for content.background (used in greeting templates for full quality image)
     const contentBackground = (poster as any).content?.background;
     if (contentBackground) {
       return contentBackground;
     }
-    
+
     // Otherwise, enhance the thumbnail URL for maximum quality
     let url = poster.thumbnail;
-    
+
     if (!url) {
       return '';
     }
-    
+
     // For Cloudinary URLs, get maximum quality image
     if (url.includes('res.cloudinary.com') && url.includes('/upload/')) {
       try {
@@ -550,10 +552,10 @@ const TodaysPickScreen: React.FC = () => {
         if (!remainder) {
           return url; // Can't parse, return original
         }
-        
+
         // Split the remainder into parts
-          const parts = remainder.split('/');
-        
+        const parts = remainder.split('/');
+
         // Find the version number (starts with 'v' followed by digits)
         // This is the reliable way to identify the actual image path in Cloudinary URLs
         let versionIndex = -1;
@@ -563,21 +565,21 @@ const TodaysPickScreen: React.FC = () => {
             break;
           }
         }
-          
-          if (versionIndex >= 0) {
+
+        if (versionIndex >= 0) {
           // Extract everything from version onwards (this is the actual image path)
-            const versionAndPath = parts.slice(versionIndex).join('/');
-          
+          const versionAndPath = parts.slice(versionIndex).join('/');
+
           // Get maximum quality image for preview
           // Use 100% quality (q_100) for best possible quality
           // Calculate max width based on screen size (2x for retina/high DPI displays)
           const maxWidth = Math.max(Math.round(screenWidth * 2.5), 2400); // 2.5x for very high quality
-          
+
           // Use q_100 (100% quality) for maximum quality preview
           // c_limit preserves aspect ratio, w_ sets maximum width
           const highQualityTransform = `q_100,c_limit,w_${maxWidth}`;
           const highQualityUrl = `${prefix}/upload/${highQualityTransform}/${versionAndPath}`;
-          
+
           // Return high quality transform URL with 100% quality
           return highQualityUrl;
         } else {
@@ -598,20 +600,20 @@ const TodaysPickScreen: React.FC = () => {
         // Fall through to default handling
       }
     }
-    
+
     // If URL already contains 'thumbnailUrl' or 'thumbnail' in path, try to get full URL
     // by replacing /thumbnailUrl/ or /thumbnail/ with /url/ or removing it
     if (url.includes('/thumbnailUrl/') || url.includes('/thumbnail/')) {
       const fullUrl = url.replace(/\/thumbnailUrl\//g, '/url/').replace(/\/thumbnail\//g, '/images/');
       url = fullUrl;
     }
-    
+
     // For non-Cloudinary URLs, try to enhance quality
     // Remove any existing quality/size parameters first
     const urlWithoutParams = url.split('?')[0];
     const existingParams = url.includes('?') ? url.split('?')[1] : '';
     const params = new URLSearchParams(existingParams);
-    
+
     // Remove low-quality parameters
     params.delete('quality');
     params.delete('width');
@@ -619,11 +621,11 @@ const TodaysPickScreen: React.FC = () => {
     params.delete('w');
     params.delete('h');
     params.delete('size');
-    
+
     // Add high quality parameters
     params.set('quality', '100');
     params.set('width', '2400');
-    
+
     const paramString = params.toString();
     return paramString ? `${urlWithoutParams}?${paramString}` : urlWithoutParams;
   };
@@ -654,8 +656,8 @@ const TodaysPickScreen: React.FC = () => {
     const keywords = serviceFilterKeywords[selectedServiceFilter] || [];
     const templateTags = Array.isArray(template.tags)
       ? template.tags
-          .filter((tag): tag is string => typeof tag === 'string')
-          .map(tag => tag.toLowerCase())
+        .filter((tag): tag is string => typeof tag === 'string')
+        .map(tag => tag.toLowerCase())
       : [];
     return keywords.some(keyword => templateTags.some(tag => tag.includes(keyword)));
   }, [isEventPlannerCategory, selectedServiceFilter, serviceFilterKeywords]);
@@ -669,7 +671,7 @@ const TodaysPickScreen: React.FC = () => {
       const pastDateString = `${pastDate.getFullYear()}-${String(pastDate.getMonth() + 1).padStart(2, '0')}-${String(pastDate.getDate()).padStart(2, '0')}`;
       keys.push(`daily_${categoryPrefix}_${pastDateString}`);
     }
-    
+
     // Batch read all keys at once
     const values = await Promise.all(keys.map(key => AsyncStorage.getItem(key)));
     return values.filter((v): v is string => v !== null);
@@ -690,7 +692,7 @@ const TodaysPickScreen: React.FC = () => {
       // Load cached selections for TODAY first - if all exist, use them and skip API calls
       const cacheKey = `todays_pick_${dateString}`;
       const cachedTodayData = await AsyncStorage.getItem(cacheKey).catch(() => null);
-      
+
       if (cachedTodayData) {
         console.log('💾 [TodaysPickScreen] Found cached data, checking if valid...');
         try {
@@ -700,7 +702,7 @@ const TodaysPickScreen: React.FC = () => {
             // If not, it's old cache from before calendar integration - fetch fresh data
             const calendarPosters = cachedPosters.filter(p => p.category === 'Festive Alerts');
             const hasOldWellnessData = cachedPosters.some(p => p.category === 'Wellness Awareness');
-            
+
             // Debug calendar posters
             console.log('📅 [TodaysPickScreen] Calendar posters from cache:', {
               totalPosters: cachedPosters.length,
@@ -712,18 +714,18 @@ const TodaysPickScreen: React.FC = () => {
                 category: p.category
               }))
             });
-            
+
             // If cache has old wellness data or no calendar posters, clear cache and fetch fresh
             if (hasOldWellnessData || calendarPosters.length === 0) {
               console.log('🔄 [TodaysPickScreen] Cache is outdated (has wellness or no calendar), clearing cache and fetching fresh data');
               // Clear the outdated cache
-              await AsyncStorage.removeItem(cacheKey).catch(() => {});
+              await AsyncStorage.removeItem(cacheKey).catch(() => { });
               // Fall through to fetch fresh data
             } else {
               // Use cached data - no API calls needed
               console.log('✅ [TodaysPickScreen] Using valid cached data with calendar posters');
               const sectionsData: Array<{ title: string; data: Template[] }> = [];
-              
+
               const motivationalPosters = cachedPosters.filter(p => p.category === 'Motivational');
               const businessPosters = cachedPosters.filter(p => p.category === 'Business');
               const marketingTipsPosters = cachedPosters.filter(p => p.category === 'Business Marketing Tips');
@@ -734,7 +736,7 @@ const TodaysPickScreen: React.FC = () => {
               console.log('📊 [TodaysPickScreen] 2. Business Posters:', businessPosters.length, businessPosters.map(p => ({ id: p.id, name: p.name, thumbnail: p.thumbnail })));
               console.log('📊 [TodaysPickScreen] 3. Business Marketing Tips:', marketingTipsPosters.length, marketingTipsPosters.map(p => ({ id: p.id, name: p.name, thumbnail: p.thumbnail })));
               console.log('📊 [TodaysPickScreen] 4. Festive Alerts:', calendarPosters.length, calendarPosters.map(p => ({ id: p.id, name: p.name, thumbnail: p.thumbnail })));
-              
+
               if (businessPosters.length > 0) {
                 sectionsData.push({ title: 'Today\'s Business Post', data: businessPosters });
               }
@@ -749,19 +751,19 @@ const TodaysPickScreen: React.FC = () => {
               if (motivationalPosters.length > 0) {
                 sectionsData.push({ title: 'Today\'s Motivation Quotes', data: motivationalPosters });
               }
-              
+
               setSections(sectionsData);
               const singleMarketingTip = marketingTipsPosters.slice(0, 1);
               const orderedPosters = [...businessPosters, ...singleMarketingTip, ...calendarPosters, ...motivationalPosters];
               setTodayPosters(orderedPosters);
-              
+
               const templatesWithLanguages = orderedPosters.map((t: Template) => mergeTemplateLanguages(t));
               setAllTemplates(templatesWithLanguages);
-              
+
               if (templatesWithLanguages.length > 0) {
                 setCurrentPoster(templatesWithLanguages[0]);
               }
-              
+
               setLoading(false);
               return; // Exit early - no API calls needed
             }
@@ -771,16 +773,16 @@ const TodaysPickScreen: React.FC = () => {
           // Fall through to fetch fresh data
         }
       }
-      
+
       // No cache for today - fetch fresh data
       console.log('🔄 [TodaysPickScreen] No cache found, fetching fresh data');
       setLoading(true);
       const dailySeed = getDailySeed();
       console.log(`🎲 [TodaysPickScreen] Daily seed: ${dailySeed}`);
-      
+
       console.log(`📡 [TodaysPickScreen] Starting API calls for date: ${dateString}`);
       const startTime = Date.now();
-      
+
       const [
         motivationalTemplates,
         businessResponse,
@@ -788,14 +790,14 @@ const TodaysPickScreen: React.FC = () => {
         calendarResponse,
       ] = await Promise.allSettled([
         greetingTemplatesService.searchTemplates('motivational'),
-        businessCategoryPostersApi.getUserCategoryPosters(),
+        businessCategoryPostersApi.getUserCategoryPosters(false, selectedBusinessProfile?.id),
         greetingTemplatesService.getTemplatesByCategory('Business Marketing Tips', 200).catch(() => null),
         calendarApi.getPostersByDate(dateString),
       ]);
-      
+
       const endTime = Date.now();
       const totalTime = endTime - startTime;
-      
+
       console.log('✅ [TodaysPickScreen] All API calls completed', {
         totalTime: `${totalTime}ms`,
         motivational: motivationalTemplates.status,
@@ -803,17 +805,17 @@ const TodaysPickScreen: React.FC = () => {
         marketingTips: marketingTipsByCategory.status,
         calendar: calendarResponse.status,
       });
-      
+
       // Debug calendar response specifically
       console.log('📅 [TodaysPickScreen] Calendar API Response:', {
         status: calendarResponse.status,
         data: calendarResponse.status === 'fulfilled' ? calendarResponse.value : calendarResponse.reason,
         dateString,
       });
-      
+
       // Print detailed API responses
       console.log('🔍 [TodaysPickScreen] API RESPONSES:');
-      
+
       // 1. Motivational Templates Response
       console.log('📋 [MOTIVATIONAL API] Response:', {
         status: motivationalTemplates.status,
@@ -827,7 +829,7 @@ const TodaysPickScreen: React.FC = () => {
           reason: motivationalTemplates.status === 'rejected' ? motivationalTemplates.reason : 'Unknown error'
         }
       });
-      
+
       // 2. Business Category Posters Response
       console.log('📋 [BUSINESS API] Response:', {
         status: businessResponse.status,
@@ -842,7 +844,7 @@ const TodaysPickScreen: React.FC = () => {
           reason: businessResponse.status === 'rejected' ? businessResponse.reason : 'Unknown error'
         }
       });
-      
+
       // 3. Marketing Tips Response
       console.log('📋 [MARKETING TIPS API] Response:', {
         status: marketingTipsByCategory.status,
@@ -856,7 +858,7 @@ const TodaysPickScreen: React.FC = () => {
           reason: marketingTipsByCategory.status === 'rejected' ? marketingTipsByCategory.reason : 'No data'
         }
       });
-      
+
       // 4. Calendar API Response
       console.log('📋 [CALENDAR API] Response:', {
         status: calendarResponse.status,
@@ -883,12 +885,12 @@ const TodaysPickScreen: React.FC = () => {
               const recentDays = await getRecentDaysBatch(today, 'motivational');
               const availableTemplates = motivationalTemplates.value.filter(t => !recentDays.includes(t.id));
               const templatesToSelect = availableTemplates.length > 0 ? availableTemplates : motivationalTemplates.value;
-              
+
               const selectedMotivational = selectDailyItem(templatesToSelect, dailySeed, 'motivational');
               if (selectedMotivational) {
                 const storageKey = `daily_motivational_${dateString}`;
-                AsyncStorage.setItem(storageKey, selectedMotivational.id).catch(() => {});
-                
+                AsyncStorage.setItem(storageKey, selectedMotivational.id).catch(() => { });
+
                 return {
                   id: selectedMotivational.id,
                   name: selectedMotivational.name || 'Motivational Quote',
@@ -914,12 +916,12 @@ const TodaysPickScreen: React.FC = () => {
               const recentDays = await getRecentDaysBatch(today, 'business');
               const availablePosters = businessPosters.filter(p => !recentDays.includes(p.id));
               const postersToSelect = availablePosters.length > 0 ? availablePosters : businessPosters;
-              
+
               const selectedBusiness = selectDailyItem(postersToSelect, dailySeed, 'business');
               if (selectedBusiness) {
                 const storageKey = `daily_business_${dateString}`;
-                AsyncStorage.setItem(storageKey, selectedBusiness.id).catch(() => {});
-                
+                AsyncStorage.setItem(storageKey, selectedBusiness.id).catch(() => { });
+
                 return {
                   id: selectedBusiness.id,
                   name: selectedBusiness.title || 'Business Poster',
@@ -943,22 +945,22 @@ const TodaysPickScreen: React.FC = () => {
             try {
               const marketingTipsTemplates = marketingTipsByCategory.value;
               console.log(`📦 [Business Marketing Tips] Total templates available: ${marketingTipsTemplates.length}`);
-              
+
               const recentDays = await getRecentDaysBatch(today, 'marketing_tips');
               console.log(`📅 [Business Marketing Tips] Recent days used: ${recentDays.length}`, recentDays);
-              
+
               const availableTemplates = marketingTipsTemplates.filter(t => !recentDays.includes(t.id));
               const templatesToSelect = availableTemplates.length > 0 ? availableTemplates : marketingTipsTemplates;
-              
+
               console.log(`🎯 [Business Marketing Tips] Templates to select from: ${templatesToSelect.length} (available: ${availableTemplates.length})`);
-              
+
               const selectedMarketingTip = selectDailyItem(templatesToSelect, dailySeed, 'marketing_tips');
               if (selectedMarketingTip) {
                 console.log(`✅ [Business Marketing Tips] Selected: ${selectedMarketingTip.name || selectedMarketingTip.id}`);
-                
+
                 const storageKey = `daily_marketing_tips_${dateString}`;
-                AsyncStorage.setItem(storageKey, selectedMarketingTip.id).catch(() => {});
-                
+                AsyncStorage.setItem(storageKey, selectedMarketingTip.id).catch(() => { });
+
                 return {
                   id: selectedMarketingTip.id,
                   name: selectedMarketingTip.name || 'Business Marketing Tip',
@@ -992,19 +994,19 @@ const TodaysPickScreen: React.FC = () => {
                 postersArray: Array.isArray(calendarApiResponse.data?.posters),
                 postersLength: calendarApiResponse.data?.posters?.length || 0,
               });
-              
+
               // Check if response is successful and has posters
               if (calendarApiResponse.success && calendarApiResponse.data && calendarApiResponse.data.posters && calendarApiResponse.data.posters.length > 0) {
                 const calendarPosters = calendarApiResponse.data.posters;
                 const recentDays = await getRecentDaysBatch(today, 'calendar');
                 const availablePosters = calendarPosters.filter(p => !recentDays.includes(p.id));
                 const postersToSelect = availablePosters.length > 0 ? availablePosters : calendarPosters;
-                
+
                 const selectedCalendar = selectDailyItem(postersToSelect, dailySeed, 'calendar');
                 if (selectedCalendar) {
                   const storageKey = `daily_calendar_${dateString}`;
-                  AsyncStorage.setItem(storageKey, selectedCalendar.id).catch(() => {});
-                  
+                  AsyncStorage.setItem(storageKey, selectedCalendar.id).catch(() => { });
+
                   return {
                     id: selectedCalendar.id,
                     name: selectedCalendar.name || selectedCalendar.title || 'Calendar Poster',
@@ -1032,7 +1034,7 @@ const TodaysPickScreen: React.FC = () => {
 
       // Wait for all processing to complete in parallel
       const processedResults = await Promise.all(processingPromises);
-      
+
       // Filter out null results and add to allPosters
       processedResults.forEach(result => {
         if (result) {
@@ -1056,7 +1058,7 @@ const TodaysPickScreen: React.FC = () => {
       console.log('📊 [TodaysPickScreen] 4. Festive Alerts:', calendarPosters.length, calendarPosters.map(p => ({ id: p.id, name: p.name, thumbnail: p.thumbnail })));
 
       const sectionsData: Array<{ title: string; data: Template[] }> = [];
-      
+
       // Add business section first
       if (businessPosters.length > 0) {
         sectionsData.push({
@@ -1064,7 +1066,7 @@ const TodaysPickScreen: React.FC = () => {
           data: businessPosters,
         });
       }
-      
+
       // Add Business Marketing Tips section second
       if (marketingTipsPosters.length > 0) {
         // Ensure only 1 poster per day for Business Marketing Tips
@@ -1074,7 +1076,7 @@ const TodaysPickScreen: React.FC = () => {
           data: singleMarketingTip,
         });
       }
-      
+
       // Add Festive Alerts section third
       if (calendarPosters.length > 0) {
         sectionsData.push({
@@ -1082,7 +1084,7 @@ const TodaysPickScreen: React.FC = () => {
           data: calendarPosters,
         });
       }
-      
+
       // Add motivational section fourth
       if (motivationalPosters.length > 0) {
         sectionsData.push({
@@ -1092,24 +1094,24 @@ const TodaysPickScreen: React.FC = () => {
       }
 
       setSections(sectionsData);
-      
+
       // Keep flat list for preloading and sync with allTemplates for layout compatibility
       // Order: Business first, then Business Marketing Tips (single), then Festive Alerts, then Motivational
       const singleMarketingTip = marketingTipsPosters.slice(0, 1);
       const orderedPosters = [...businessPosters, ...singleMarketingTip, ...calendarPosters, ...motivationalPosters];
-      
+
       // Cache today's selections for future use (persists across app restarts)
       if (orderedPosters.length > 0) {
         const cacheKey = `todays_pick_${dateString}`;
-        AsyncStorage.setItem(cacheKey, JSON.stringify(orderedPosters)).catch(() => {});
+        AsyncStorage.setItem(cacheKey, JSON.stringify(orderedPosters)).catch(() => { });
       }
-      
+
       setTodayPosters(orderedPosters);
-      
+
       // Sync with allTemplates for PosterPlayerScreen layout compatibility
       const templatesWithLanguages = orderedPosters.map((t: Template) => mergeTemplateLanguages(t));
       setAllTemplates(templatesWithLanguages);
-      
+
       // Set first poster as current poster if available
       if (templatesWithLanguages.length > 0) {
         setCurrentPoster(templatesWithLanguages[0]);
@@ -1133,18 +1135,18 @@ const TodaysPickScreen: React.FC = () => {
   const filteredPosters = useMemo(() => {
     // Ensure all templates have languages merged before filtering
     const templatesWithLanguages = todayPosters.map(t => mergeTemplateLanguages(t));
-    
+
     // If "All" is selected, return ALL templates without any language filtering
     if (selectedLanguage === 'all') {
       return templatesWithLanguages;
     }
-    
+
     // Filter by language - if no matches, return empty array
     const languageFiltered = templatesWithLanguages.filter(template => {
       const matches = templateContainsLanguage(template, selectedLanguage);
       return matches;
     });
-    
+
     return languageFiltered;
   }, [todayPosters, selectedLanguage]);
 
@@ -1167,14 +1169,14 @@ const TodaysPickScreen: React.FC = () => {
     if (filteredPosters.length > 0) {
       // Preload first batch immediately (reduced from 20 to 12 for faster initial render)
       preloadImages(filteredPosters, 0, 12);
-      
+
       // Preload next batch after a delay (reduced batch size)
       const timeoutId = setTimeout(() => {
         if (filteredPosters.length > 12) {
           preloadImages(filteredPosters, 12, 12);
         }
       }, 800); // Increased delay to reduce initial load
-      
+
       return () => clearTimeout(timeoutId);
     }
   }, [filteredPosters, preloadImages]);
@@ -1182,10 +1184,10 @@ const TodaysPickScreen: React.FC = () => {
   // Handle viewable items change for progressive image loading (throttled for performance)
   const onViewableItemsChanged = useCallback(({ viewableItems }: any) => {
     if (!viewableItems || viewableItems.length === 0) return;
-    
+
     // Only preload if we have a significant number of items
     if (filteredPosters.length < 50) return;
-    
+
     const lastVisibleIndex = Math.max(...viewableItems.map((item: any) => item.index || 0));
     // Preload next batch when user scrolls near the end (reduced from 10 to 5 items threshold)
     if (lastVisibleIndex >= filteredPosters.length - 5 && lastVisibleIndex < filteredPosters.length - 1) {
@@ -1220,7 +1222,7 @@ const TodaysPickScreen: React.FC = () => {
     // Use convertedInitialPoster which has thumbnail properly set for GreetingTemplates
     const initialPosterToUse = convertedInitialPoster;
     const initialPosterImage = initialPosterToUse.thumbnail || (initialPosterToUse as any).content?.background || '';
-    
+
     // Skip if we have a loading placeholder or no image
     if (initialPosterToUse.id === 'loading' || !initialPosterImage) {
       return;
@@ -1230,7 +1232,7 @@ const TodaysPickScreen: React.FC = () => {
     // This handles the case when user navigates back and selects a different image
     const initialPosterId = initialPosterToUse.id;
     const prevId = prevInitialPosterIdRef.current;
-    
+
     // If initialPoster ID changed, it means a different poster was selected
     // Reset auto-detection tracking so it can work for the new poster
     // Also allow auto-detection again when navigating to a new category/poster
@@ -1241,7 +1243,7 @@ const TodaysPickScreen: React.FC = () => {
       // Clear allTemplates immediately to prevent showing old posters in grid
       setAllTemplates([]);
     }
-    
+
     // If initialPoster ID changed, update immediately regardless of category type
     if (prevId !== null && prevId !== initialPosterId) {
       // Ensure thumbnail is set from content.background if needed
@@ -1249,7 +1251,7 @@ const TodaysPickScreen: React.FC = () => {
       if (!newPoster.thumbnail && (newPoster as any).content?.background) {
         newPoster = { ...newPoster, thumbnail: (newPoster as any).content.background };
       }
-      
+
       if (newPoster.thumbnail || (newPoster as any).content?.background) {
         console.log('🔄 [POSTER PLAYER] New poster selected - updating immediately:', initialPosterId, 'from:', prevId);
         // Update poster immediately
@@ -1261,13 +1263,13 @@ const TodaysPickScreen: React.FC = () => {
         return;
       }
     }
-    
+
     // Update ref to track current initialPoster ID (first time or when it changes)
     // On first load (prevId is null), reset auto-detection tracking
     if (prevId === null) {
       lastAutoDetectedPosterIdRef.current = null; // Allow auto-detection on initial load
     }
-    
+
     if (prevInitialPosterIdRef.current !== initialPosterId) {
       prevInitialPosterIdRef.current = initialPosterId;
     }
@@ -1275,15 +1277,15 @@ const TodaysPickScreen: React.FC = () => {
     // If currentPoster is still the loading placeholder or doesn't match, update it
     // BUT: Don't reset if user manually selected a poster (via swipe or click)
     const isUserSelected = userSelectedPosterRef.current === currentPoster.id;
-    if (!isUserSelected && (currentPoster.id === 'loading' || 
-        currentPoster.id !== initialPosterId ||
-        (!currentPoster.thumbnail && !(currentPoster as any).content?.background))) {
+    if (!isUserSelected && (currentPoster.id === 'loading' ||
+      currentPoster.id !== initialPosterId ||
+      (!currentPoster.thumbnail && !(currentPoster as any).content?.background))) {
       // Ensure thumbnail is set from content.background if needed
       let newPoster = mergeTemplateLanguages(initialPosterToUse);
       if (!newPoster.thumbnail && (newPoster as any).content?.background) {
         newPoster = { ...newPoster, thumbnail: (newPoster as any).content.background };
       }
-      
+
       if (newPoster.thumbnail || (newPoster as any).content?.background) {
         console.log('🔄 [POSTER PLAYER] Updating currentPoster with loaded data:', newPoster.id);
         setCurrentPoster(newPoster);
@@ -1311,7 +1313,7 @@ const TodaysPickScreen: React.FC = () => {
         const limit = posterLimit || 5; // Default to 5 if not specified, use 200 for "My Business"
         console.log('📡 [POSTER PLAYER] Fetching business category posters for:', businessCategory, 'with limit:', limit);
         const response = await businessCategoryPostersApi.getPostersByCategory(businessCategory!, limit);
-        
+
         if (response.success && response.data.posters) {
           // Convert BusinessCategoryPoster to Template format (already limited to 5 by API)
           const convertedTemplates: Template[] = response.data.posters.map((poster: any) => {
@@ -1345,14 +1347,14 @@ const TodaysPickScreen: React.FC = () => {
             // Set first poster as current poster and others as related
             const ensuredTemplates = convertedTemplates.map(t => mergeTemplateLanguages(t));
             setAllTemplates(ensuredTemplates);
-            
+
             // Try to find the initialPoster (the one that was clicked) in the loaded templates
             // Use the clicked poster if it exists, otherwise use the first one
             const ensuredInitialPoster = mergeTemplateLanguages(initialPoster);
             const matchingPoster = ensuredTemplates.find(t => t.id === ensuredInitialPoster.id && ensuredInitialPoster.thumbnail);
             const posterToSet = matchingPoster || ensuredTemplates[0];
             setCurrentPoster(posterToSet);
-            
+
             console.log('✅ [POSTER PLAYER] Loaded', ensuredTemplates.length, 'business category posters');
             console.log('📌 [POSTER PLAYER] Using poster:', matchingPoster ? 'clicked poster found' : 'first poster (clicked not found)');
             if (__DEV__ && posterToSet?.tags) {
@@ -1384,7 +1386,7 @@ const TodaysPickScreen: React.FC = () => {
     const fetchGreetingCategoryTemplates = async () => {
       // Use convertedInitialPoster which has thumbnail properly set for GreetingTemplates
       const posterToMatch = convertedInitialPoster;
-      
+
       // Note: Immediate update is handled by the route param change detection useEffect above
       // This ensures the correct image is shown immediately when a new poster is selected
       try {
@@ -1395,7 +1397,7 @@ const TodaysPickScreen: React.FC = () => {
           .replace(/[^a-z0-9\s]/g, ' ')
           .replace(/\s+/g, ' ')
           .trim();
-        
+
         // Use getTemplates with category filter and limit of 200 to get templates
         // Also use searchTemplates with both original and normalized category names
         // This ensures we get all templates that match the category (like HomeScreen does)
@@ -1405,10 +1407,10 @@ const TodaysPickScreen: React.FC = () => {
           greetingTemplatesService.searchTemplates(greetingCategory!, undefined),
           greetingTemplatesService.searchTemplates(normalizedCategory!, undefined)
         ]);
-        
+
         // Combine all search results
         const searchTemplates = [...searchTemplatesOriginal, ...searchTemplatesNormalized];
-        
+
         // Combine both results and remove duplicates
         const combinedTemplates = [...categoryTemplates, ...searchTemplates];
         const uniqueTemplatesMap = new Map();
@@ -1418,43 +1420,43 @@ const TodaysPickScreen: React.FC = () => {
           }
         });
         const allTemplates = Array.from(uniqueTemplatesMap.values());
-        
+
         // Filter templates to only include those that have the category name in their tags or category
         // Use both original and normalized category names for matching (to match HomeScreen behavior)
         const filteredTemplates = allTemplates.filter(template => {
           const templateAny = template as any;
           const templateTags = Array.isArray(templateAny.tags) ? templateAny.tags : [];
-          const normalizedTags = templateTags.map((tag: string) => 
+          const normalizedTags = templateTags.map((tag: string) =>
             typeof tag === 'string' ? tag.toLowerCase().replace(/[&]/g, 'and').replace(/[^a-z0-9\s]/g, ' ').trim() : ''
           );
-          
+
           // Check if any tag contains the original or normalized category name (case-insensitive)
           const hasMatchingTag = templateTags.some((tag: string) => {
             if (typeof tag !== 'string') return false;
             const normalizedTag = tag.toLowerCase().replace(/[&]/g, 'and').replace(/[^a-z0-9\s]/g, ' ').trim();
             return tag.toLowerCase().includes(greetingCategory!.toLowerCase()) ||
-                   tag.toLowerCase().includes(normalizedCategory) ||
-                   normalizedTag.includes(normalizedCategory) ||
-                   normalizedCategory.includes(normalizedTag);
+              tag.toLowerCase().includes(normalizedCategory) ||
+              normalizedTag.includes(normalizedCategory) ||
+              normalizedCategory.includes(normalizedTag);
           });
-          
+
           // Also check if category matches (original or normalized)
-          const normalizedTemplateCategory = template.category 
+          const normalizedTemplateCategory = template.category
             ? template.category.toLowerCase().replace(/[&]/g, 'and').replace(/[^a-z0-9\s]/g, ' ').trim()
             : '';
           const categoryMatch = template.category?.toLowerCase().includes(greetingCategory!.toLowerCase()) ||
-                                normalizedTemplateCategory.includes(normalizedCategory) ||
-                                normalizedCategory.includes(normalizedTemplateCategory);
-          
+            normalizedTemplateCategory.includes(normalizedCategory) ||
+            normalizedCategory.includes(normalizedTemplateCategory);
+
           return hasMatchingTag || categoryMatch;
         });
-        
+
         // Use filtered templates if available, otherwise use all templates
         // Limit to 200 templates (as requested by user for general categories)
-        const templatesToUse = filteredTemplates.length > 0 
+        const templatesToUse = filteredTemplates.length > 0
           ? filteredTemplates.slice(0, 200)
           : allTemplates.slice(0, 200);
-        
+
         if (templatesToUse.length > 0) {
           // Convert GreetingTemplate to Template format
           const convertedTemplates: Template[] = templatesToUse.map((template: any) => {
@@ -1486,7 +1488,7 @@ const TodaysPickScreen: React.FC = () => {
           // Ensure the initially selected poster is present
           // Use convertedInitialPoster which has thumbnail properly set
           const initialPosterWithLanguages = mergeTemplateLanguages(posterToMatch);
-          
+
           // Log for debugging
           if (__DEV__) {
             console.log('🔍 [POSTER PLAYER] Looking for clicked poster:', {
@@ -1496,7 +1498,7 @@ const TodaysPickScreen: React.FC = () => {
               totalTemplates: ensuredTemplates.length
             });
           }
-          
+
           const existingIndex = ensuredTemplates.findIndex(t => t.id === initialPosterWithLanguages.id);
           let nextTemplates = ensuredTemplates;
           if (existingIndex === -1 && initialPosterWithLanguages.thumbnail) {
@@ -1511,33 +1513,33 @@ const TodaysPickScreen: React.FC = () => {
           // For GreetingTemplates, also check content.background as it might be the actual image URL
           const initialPosterThumbnail = initialPosterWithLanguages.thumbnail || (initialPosterWithLanguages as any).content?.background || '';
           const initialPosterBackground = (initialPosterWithLanguages as any).content?.background || '';
-          
+
           const matchingPosterById = nextTemplates.find(t => {
             if (t.id !== initialPosterWithLanguages.id) return false;
             // Must have a valid thumbnail/background
             const tThumbnail = t.thumbnail || (t as any).content?.background || '';
             return tThumbnail && (initialPosterThumbnail || initialPosterBackground);
           });
-          
+
           const matchingPosterByThumbnail = !matchingPosterById && (initialPosterThumbnail || initialPosterBackground)
             ? nextTemplates.find(t => {
-                const tThumbnail = t.thumbnail || (t as any).content?.background || '';
-                // Compare both thumbnail and background URLs
-                return (tThumbnail && initialPosterThumbnail && tThumbnail === initialPosterThumbnail) ||
-                       (tThumbnail && initialPosterBackground && tThumbnail === initialPosterBackground) ||
-                       (initialPosterBackground && tThumbnail && tThumbnail === initialPosterBackground);
-              })
+              const tThumbnail = t.thumbnail || (t as any).content?.background || '';
+              // Compare both thumbnail and background URLs
+              return (tThumbnail && initialPosterThumbnail && tThumbnail === initialPosterThumbnail) ||
+                (tThumbnail && initialPosterBackground && tThumbnail === initialPosterBackground) ||
+                (initialPosterBackground && tThumbnail && tThumbnail === initialPosterBackground);
+            })
             : null;
           const matchingPoster = matchingPosterById || matchingPosterByThumbnail;
-          
+
           setAllTemplates(nextTemplates);
-          
+
           // Set current poster and trigger language detection
           // Use the clicked poster if found, otherwise use the first one
           // IMPORTANT: Always prefer the clicked poster (posterToMatch) if it has a valid image
           // This ensures the exact clicked image is shown, even if matching fails
           let posterToSet: Template | null = matchingPoster || null;
-          
+
           // If no match found OR if the matching poster is different from the clicked one,
           // use the clicked poster if it has a valid image
           if (!posterToSet || posterToSet.id !== posterToMatch.id) {
@@ -1551,29 +1553,29 @@ const TodaysPickScreen: React.FC = () => {
               posterToSet = nextTemplates[0];
             }
           }
-          
+
           // Ensure we have a valid poster
           if (!posterToSet) {
             console.warn('⚠️ [POSTER PLAYER] No valid poster found, skipping update');
             return;
           }
-          
+
           // Ensure the poster has thumbnail set (for GreetingTemplates, use content.background if thumbnail is missing)
           if (!posterToSet.thumbnail && (posterToSet as any).content?.background) {
             posterToSet = { ...posterToSet, thumbnail: (posterToSet as any).content.background };
           }
-          
+
           const finalPoster = mergeTemplateLanguages(posterToSet);
-          
+
           // Only update if the poster is actually different to avoid unnecessary re-renders
           setCurrentPoster(prevPoster => {
-            if (prevPoster.id === finalPoster.id && 
-                prevPoster.thumbnail === finalPoster.thumbnail) {
+            if (prevPoster.id === finalPoster.id &&
+              prevPoster.thumbnail === finalPoster.thumbnail) {
               return prevPoster; // No change needed
             }
             return finalPoster;
           });
-          
+
           if (matchingPoster) {
             console.log('✅ [POSTER PLAYER] Using clicked greeting poster:', matchingPoster.id);
           } else if (initialPosterWithLanguages.thumbnail && posterToSet.id === initialPosterWithLanguages.id) {
@@ -1581,14 +1583,14 @@ const TodaysPickScreen: React.FC = () => {
           } else {
             console.log('⚠️ [POSTER PLAYER] Clicked greeting poster not found, using first:', nextTemplates[0]?.id, 'clicked was:', initialPosterWithLanguages.id);
           }
-          
+
           // Auto-detect language from the first poster's tags
           // Only auto-detect if user hasn't manually selected a language
-          if (!userManuallySelectedLanguageRef.current && 
-              lastAutoDetectedPosterIdRef.current !== finalPoster.id && 
-              finalPoster.tags && finalPoster.tags.length > 0) {
+          if (!userManuallySelectedLanguageRef.current &&
+            lastAutoDetectedPosterIdRef.current !== finalPoster.id &&
+            finalPoster.tags && finalPoster.tags.length > 0) {
             const languagesFromTags = extractLanguagesFromTags(finalPoster.tags);
-            
+
             // Only auto-detect if we actually found language keywords
             if (languagesFromTags.length > 0) {
               const availableLanguageIds = ['hindi', 'english'];
@@ -1596,7 +1598,7 @@ const TodaysPickScreen: React.FC = () => {
                 const normalizedLangId = langId.toLowerCase();
                 return languagesFromTags.some(detectedLang => detectedLang.toLowerCase() === normalizedLangId);
               });
-              
+
               if (detectedLanguage) {
                 setSelectedLanguage(detectedLanguage);
                 lastAutoDetectedPosterIdRef.current = finalPoster.id; // Track that we auto-detected for this poster
@@ -1637,17 +1639,17 @@ const TodaysPickScreen: React.FC = () => {
       try {
         console.log('📡 [POSTER PLAYER] Fetching calendar posters for date:', calendarDate);
         const response = await calendarApi.getPostersByDate(calendarDate!);
-        
+
         // Print full JSON response
         console.log('═══════════════════════════════════════════════════════');
         console.log('📦 [CALENDAR API] FULL JSON RESPONSE');
         console.log('═══════════════════════════════════════════════════════');
         console.log(JSON.stringify(response, null, 2));
         console.log('═══════════════════════════════════════════════════════');
-        
+
         if (response.success && response.data.posters.length > 0) {
           console.log('📋 [CALENDAR POSTERS] Raw posters from API:', response.data.posters.length);
-          
+
           // Log raw poster data before conversion
           response.data.posters.forEach((poster: any, index: number) => {
             console.log(`📋 [CALENDAR POSTER ${index + 1}] Raw data:`, JSON.stringify({
@@ -1661,7 +1663,7 @@ const TodaysPickScreen: React.FC = () => {
               languages: (poster as any).languages,
             }, null, 2));
           });
-          
+
           // Convert CalendarPoster to Template format
           const convertedTemplates: Template[] = response.data.posters.map((poster: any) => {
             // Normalize tags to ensure they're in the correct format
@@ -1684,14 +1686,14 @@ const TodaysPickScreen: React.FC = () => {
 
             return template;
           });
-          
+
           console.log('📋 [CALENDAR POSTERS] Converted templates (before language merge):');
           convertedTemplates.forEach((template, index) => {
             console.log(`  Template ${index + 1}:`, JSON.stringify({
               id: template.id,
               name: template.name,
-                tags: template.tags || [],
-                tagsLength: (template.tags || []).length,
+              tags: template.tags || [],
+              tagsLength: (template.tags || []).length,
             }, null, 2));
           });
 
@@ -1699,7 +1701,7 @@ const TodaysPickScreen: React.FC = () => {
             // Set first poster as current poster and others as related
             // Ensure all templates have languages extracted from tags
             const ensuredTemplates = convertedTemplates.map(t => mergeTemplateLanguages(t));
-            
+
             console.log('📋 [CALENDAR POSTERS] After language merge:');
             ensuredTemplates.forEach((template, index) => {
               const languagesFromTags = extractLanguagesFromTags(template.tags);
@@ -1713,9 +1715,9 @@ const TodaysPickScreen: React.FC = () => {
                 willMatchHindi: templateContainsLanguage(template, 'hindi'),
               }, null, 2));
             });
-            
+
             setAllTemplates(ensuredTemplates);
-            
+
             // Use the initial poster if it exists in the list, otherwise use the first one
             // Ensure the initial poster also has languages merged
             const ensuredInitialPoster = mergeTemplateLanguages(initialPoster);
@@ -1726,17 +1728,17 @@ const TodaysPickScreen: React.FC = () => {
               : null;
             const matchingPoster = matchingPosterById || matchingPosterByThumbnail;
             const posterToSet = matchingPoster || ensuredTemplates[0];
-            
+
             // Ensure the selected poster has languages properly merged
             const finalPoster = mergeTemplateLanguages(posterToSet);
             setCurrentPoster(finalPoster);
-            
+
             if (matchingPoster) {
               console.log('📌 [POSTER PLAYER] Using clicked calendar poster:', matchingPoster.id);
             } else {
               console.log('📌 [POSTER PLAYER] Clicked calendar poster not found, using first:', ensuredTemplates[0]?.id);
             }
-            
+
             console.log('✅ [POSTER PLAYER] Loaded', ensuredTemplates.length, 'calendar posters for date:', calendarDate);
             console.log('═══════════════════════════════════════════════════════');
           }
@@ -1812,7 +1814,7 @@ const TodaysPickScreen: React.FC = () => {
         }
         return ensuredInitialPoster;
       }
-      
+
       // If currentPoster is still the loading placeholder or has no thumbnail
       if (prevPoster.id === 'loading' || !prevPoster.thumbnail) {
         // If we have a valid poster with thumbnail, use it
@@ -1832,21 +1834,21 @@ const TodaysPickScreen: React.FC = () => {
     if (userManuallySelectedLanguageRef.current) {
       return;
     }
-    
+
     const initialPosterWithLanguages = mergeTemplateLanguages(initialPoster);
-    
+
     // Detect the primary language from the initial poster
     const posterLanguages = Array.isArray(initialPosterWithLanguages.languages)
       ? initialPosterWithLanguages.languages.map((lang: string) => lang.toLowerCase())
       : [];
-    
+
     const posterTags = Array.isArray(initialPosterWithLanguages.tags) ? initialPosterWithLanguages.tags : [];
     const languagesFromTags = extractLanguagesFromTags(posterTags);
     const allPosterLanguages = Array.from(new Set([...posterLanguages, ...languagesFromTags.map(l => l.toLowerCase())]));
-    
+
     // Available language IDs that we support
     const availableLanguageIds = ['english', 'hindi'];
-    
+
     // Find the first matching language from available languages
     const detectedLanguage = availableLanguageIds.find(langId => {
       const normalizedLangId = langId.toLowerCase();
@@ -1856,14 +1858,14 @@ const TodaysPickScreen: React.FC = () => {
       }
       // Check if tags contain keywords for this language
       const keywords = LANGUAGE_KEYWORDS[normalizedLangId] || [normalizedLangId];
-      return keywords.some(keyword => 
+      return keywords.some(keyword =>
         allPosterLanguages.some(posterLang => posterLang.includes(keyword)) ||
-        posterTags.some((tag: unknown) => 
+        posterTags.some((tag: unknown) =>
           typeof tag === 'string' && tag.toLowerCase().includes(keyword)
         )
       );
     });
-    
+
     // If a language is detected, switch to it
     // Always auto-detect based on the current poster's language
     // Only skip if we've already detected for this poster to avoid duplicate detection
@@ -1881,7 +1883,7 @@ const TodaysPickScreen: React.FC = () => {
     if (userManuallySelectedLanguageRef.current) {
       return;
     }
-    
+
     // Skip if no currentPoster or if it's a loading placeholder
     if (!currentPoster || currentPoster.id === 'loading' || (!currentPoster.thumbnail && !(currentPoster as any).content?.background)) {
       return;
@@ -1893,34 +1895,34 @@ const TodaysPickScreen: React.FC = () => {
     }
 
     const posterWithLanguages = mergeTemplateLanguages(currentPoster);
-    
+
     // Detect the primary language from tags
     const posterTags = Array.isArray(posterWithLanguages.tags) ? posterWithLanguages.tags : [];
-    
+
     if (posterTags.length === 0) {
       return; // No tags to detect language from
     }
 
     // Extract languages from tags using the helper function
     const languagesFromTags = extractLanguagesFromTags(posterTags);
-    
+
     // Also check if poster has explicit languages array
     const posterLanguages = Array.isArray(posterWithLanguages.languages)
       ? posterWithLanguages.languages.map((lang: string) => lang.toLowerCase())
       : [];
-    
+
     // Combine both sources
     const allDetectedLanguages = Array.from(new Set([...languagesFromTags, ...posterLanguages]));
-    
+
     // Available language IDs that we support (priority order: hindi, english)
     const availableLanguageIds = ['hindi', 'english'];
-    
+
     // Find the first matching language from available languages (prioritizing hindi/marathi over english)
     const detectedLanguage = availableLanguageIds.find(langId => {
       const normalizedLangId = langId.toLowerCase();
       return allDetectedLanguages.some(detectedLang => detectedLang.toLowerCase() === normalizedLangId);
     });
-    
+
     // If a language is detected and it's different from current selection, switch to it
     // Always auto-detect based on the current poster's language
     // Only skip if we've already detected for this poster to avoid duplicate detection
@@ -2057,24 +2059,24 @@ const TodaysPickScreen: React.FC = () => {
   const handlePosterSelect = useCallback((poster: Template) => {
     // Merge template languages to ensure we have all language info
     const posterWithLanguages = mergeTemplateLanguages(poster);
-    
+
     // Mark this as a user-selected poster (via swipe or click)
     userSelectedPosterRef.current = posterWithLanguages.id;
-    
+
     // Only auto-detect language if user hasn't manually selected a language (including "All")
     if (!userManuallySelectedLanguageRef.current) {
       // Detect the primary language from the poster
       const posterLanguages = Array.isArray(posterWithLanguages.languages)
         ? posterWithLanguages.languages.map((lang: string) => lang.toLowerCase())
         : [];
-      
+
       const posterTags = Array.isArray(posterWithLanguages.tags) ? posterWithLanguages.tags : [];
       const languagesFromTags = extractLanguagesFromTags(posterTags);
       const allPosterLanguages = Array.from(new Set([...posterLanguages, ...languagesFromTags.map(l => l.toLowerCase())]));
-      
+
       // Available language IDs that we support
       const availableLanguageIds = ['english', 'hindi'];
-      
+
       // Find the first matching language from available languages
       const detectedLanguage = availableLanguageIds.find(langId => {
         const normalizedLangId = langId.toLowerCase();
@@ -2084,14 +2086,14 @@ const TodaysPickScreen: React.FC = () => {
         }
         // Check if tags contain keywords for this language
         const keywords = LANGUAGE_KEYWORDS[normalizedLangId] || [normalizedLangId];
-        return keywords.some(keyword => 
+        return keywords.some(keyword =>
           allPosterLanguages.some(posterLang => posterLang.includes(keyword)) ||
-          posterTags.some((tag: unknown) => 
+          posterTags.some((tag: unknown) =>
             typeof tag === 'string' && tag.toLowerCase().includes(keyword)
           )
         );
       });
-      
+
       // If a language is detected and it's different from current selection, switch to it
       // Always auto-detect based on the current poster's language
       // Only skip if we've already detected for this poster to avoid duplicate detection
@@ -2100,7 +2102,7 @@ const TodaysPickScreen: React.FC = () => {
         lastAutoDetectedPosterIdRef.current = posterWithLanguages?.id || null;
       }
     }
-    
+
     // Update the current poster
     setCurrentPoster(posterWithLanguages);
   }, [selectedLanguage]);
@@ -2183,7 +2185,7 @@ const TodaysPickScreen: React.FC = () => {
     // Mark that user manually selected a language (including "All")
     // This prevents auto-detection from overriding user's choice
     userManuallySelectedLanguageRef.current = true;
-    
+
     // Reset auto-detection tracking so it can work for the current poster if needed
     // But only if user selects a specific language (not "All")
     if (languageId !== 'all') {
@@ -2193,7 +2195,7 @@ const TodaysPickScreen: React.FC = () => {
       // This prevents auto-detection from switching away from "All"
       lastAutoDetectedPosterIdRef.current = null;
     }
-    
+
     setSelectedLanguage(languageId);
 
     /*
@@ -2226,10 +2228,10 @@ const TodaysPickScreen: React.FC = () => {
     const scale = screenWidth / 375;
     return Math.round(baseSize * scale);
   }, [screenWidth]);
-  
+
   // Detect if fold phone is unfolded (typically width >= 900px)
   const isFoldPhoneUnfolded = useMemo(() => screenWidth >= 900, [screenWidth]);
-  
+
   // Calculate number of columns: 4 for tablets or unfolded fold phones, 2 for small screens, 3 for regular phones
   const numColumns = useMemo(() => {
     if (isTabletDevice || isFoldPhoneUnfolded) {
@@ -2242,7 +2244,7 @@ const TodaysPickScreen: React.FC = () => {
     // Regular phones show 3 columns
     return 3;
   }, [isTabletDevice, isFoldPhoneUnfolded, screenWidth]);
-  
+
   // Card dimensions matching HomeScreen.tsx exactly
   // Use the exact same logic as HomeScreen.tsx getCardWidth()
   // For unfolded fold phones, use standard phone width (375px) to maintain same card size as HomeScreen
@@ -2251,16 +2253,16 @@ const TodaysPickScreen: React.FC = () => {
     if (!screenWidth || isNaN(screenWidth) || screenWidth <= 0) {
       return 100; // Fallback width
     }
-    
+
     let baseWidth: number;
-    
+
     if (isTabletDevice) {
       baseWidth = screenWidth * 0.15; // 6-7 cards visible on tablet
     } else {
       // For unfolded fold phones, use standard phone width (375px) to get HomeScreen card size
       // For regular phones, use actual screen width
       const referenceWidth = isFoldPhoneUnfolded ? 375 : screenWidth;
-      
+
       if (referenceWidth >= 600) {
         baseWidth = referenceWidth * 0.22; // 4 cards on medium phones
       } else if (referenceWidth >= 400) {
@@ -2269,58 +2271,58 @@ const TodaysPickScreen: React.FC = () => {
         baseWidth = referenceWidth * 0.32; // 3 cards on small phones with more spacing
       }
     }
-    
+
     // Ensure baseWidth is valid
     if (isNaN(baseWidth) || baseWidth <= 0) {
       baseWidth = 100; // Fallback
     }
-    
+
     // For all devices, calculate card width to fill available space exactly
     if (numColumns > 0 && !isNaN(numColumns)) {
       // Calculate available width: screen width minus padding and gaps
       const padding = moderateScale(8); // relatedSection paddingHorizontal
       const gap = moderateScale(3); // gap between cards
-      
+
       // Validate padding and gap
       const validPadding = (isNaN(padding) || padding < 0) ? 8 : padding;
       const validGap = (isNaN(gap) || gap < 0) ? 3 : gap;
-      
+
       const totalGaps = validGap * (numColumns - 1);
       const availableWidth = screenWidth - (validPadding * 2) - totalGaps;
-      
+
       // Safety check for availableWidth
       if (isNaN(availableWidth) || availableWidth <= 0) {
         return baseWidth;
       }
-      
+
       // Calculate optimal card width to fill the space exactly
       const optimalWidth = availableWidth / numColumns;
-      
+
       // Use optimal width to fill space exactly (this eliminates empty space on the right)
       // Only validate that it's a valid number, not that it's larger than baseWidth
       if (isNaN(optimalWidth) || !isFinite(optimalWidth) || optimalWidth <= 0) {
         return baseWidth; // Fallback if calculation fails
       }
-      
+
       return optimalWidth;
     }
-    
+
     return baseWidth;
   }, [screenWidth, isTabletDevice, isFoldPhoneUnfolded, numColumns, moderateScale]);
-  
+
   const cardHeight = useMemo(() => {
     // Make cards square by setting height equal to width
     const actualCardWidth = cardWidth;
-    
+
     // Safety check - ensure cardWidth is valid
     if (!actualCardWidth || isNaN(actualCardWidth) || !isFinite(actualCardWidth) || actualCardWidth <= 0) {
       return 100; // Fallback height
     }
-    
+
     // Return the same value as cardWidth to make it square
     return actualCardWidth;
   }, [cardWidth]);
-  
+
   // Responsive poster height - dynamically adapts to screen size and rotation
   const posterHeight = useMemo(() => {
     if (isTabletDevice) {
@@ -2339,7 +2341,7 @@ const TodaysPickScreen: React.FC = () => {
   const computedPreviewHeight = useMemo(() => {
     if (imageDimensions && imageDimensions.width > 0 && imageDimensions.height > 0) {
       const aspectHeight = screenWidth * (imageDimensions.height / imageDimensions.width);
-      
+
       // Calculate maximum allowed height to leave room for header, grid, and safe areas
       // Reserve space for: header (~80px), top spacing, grid section (~150px), and safe areas
       const headerHeight = moderateScale(80);
@@ -2347,18 +2349,18 @@ const TodaysPickScreen: React.FC = () => {
       const gridMinHeight = moderateScale(150); // Minimum space for grid
       const bottomSpacing = insets.bottom;
       const reservedSpace = headerHeight + topSpacing + gridMinHeight + bottomSpacing + moderateScale(30); // Extra buffer
-      
+
       // Maximum poster height - larger limits to show better preview
       const isFoldPhoneUnfolded = screenWidth >= 900; // Fold phones typically have width >= 900px when unfolded
-      
+
       // Use larger max heights for better preview
       const baseMaxPercentage = isFoldPhoneUnfolded ? 0.50 : 0.60; // 50% for fold phones, 60% for regular
       const maxPosterHeightByPercentage = screenHeight * baseMaxPercentage;
       const maxPosterHeightBySpace = screenHeight - reservedSpace;
-      
+
       // Use the smaller of the two constraints to ensure grid is always visible
       const maxPosterHeight = Math.min(maxPosterHeightByPercentage, maxPosterHeightBySpace);
-      
+
       // Return the smaller of aspect height or max allowed height
       return Math.min(aspectHeight, maxPosterHeight);
     }
@@ -2448,7 +2450,7 @@ const TodaysPickScreen: React.FC = () => {
     const metadata = templateMetadata.get(item.id);
     const imageUrl = metadata?.imageUrl || item.thumbnail || '';
     const isSelected = currentPosterId === item.id;
-    
+
     return (
       <RelatedPosterItem
         item={item}
@@ -2465,7 +2467,7 @@ const TodaysPickScreen: React.FC = () => {
 
   const renderLanguageButton = useCallback((language: typeof languages[0]) => {
     const iconSize = getIconSize(12);
-    
+
     return (
       <TouchableOpacity
         key={language.id}
@@ -2491,20 +2493,20 @@ const TodaysPickScreen: React.FC = () => {
     );
   }, [selectedLanguage, handleLanguageChange, getIconSize, screenWidth]);
 
-     return (
-     <View style={[styles.container, { backgroundColor: theme.colors.gradient[0] || '#e8e8e8' }]}>
-       <StatusBar 
-         barStyle="dark-content"
-         backgroundColor="transparent" 
-         translucent={true}
-       />
-       
-       <LinearGradient
-         colors={theme.colors.gradient}
-         style={styles.gradientBackground}
-         start={{ x: 0, y: 0 }}
-         end={{ x: 1, y: 1 }}
-       >
+  return (
+    <View style={[styles.container, { backgroundColor: theme.colors.gradient[0] || '#e8e8e8' }]}>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="transparent"
+        translucent={true}
+      />
+
+      <LinearGradient
+        colors={theme.colors.gradient}
+        style={styles.gradientBackground}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
         {/* Safe Area Top Spacing */}
         <View style={{ height: insets.top + moderateScale(12) }} />
 
@@ -2590,7 +2592,7 @@ const TodaysPickScreen: React.FC = () => {
             {/* Section Header */}
             <View style={styles.sectionHeaderContainer}>
               <LinearGradient
-                colors={isDarkMode 
+                colors={isDarkMode
                   ? [theme.colors.primary + '30', theme.colors.secondary + '20', 'transparent']
                   : [theme.colors.primary + '18', theme.colors.secondary + '10', 'transparent']
                 }
@@ -2636,109 +2638,109 @@ const TodaysPickScreen: React.FC = () => {
               </LinearGradient>
             </View>
 
-           {/* Compact Poster Section */}
-           <View
-             style={[styles.posterContainer, { height: computedPreviewHeight, width: '100%' }]}
-             {...swipeResponder.panHandlers}
-             collapsable={false}
-           >
-           <LazyFullImage
-             key={`poster-${currentPoster.id}-${currentPoster.thumbnail || (currentPoster as any).content?.background || ''}`}
-             thumbnailUri={currentPoster.thumbnail || (currentPoster as any).content?.background || ''}
-             fullImageUri={getHighQualityImageUrl(currentPoster)}
-             style={styles.posterImage}
-             resizeMode="contain"
-             loadOnMount={true}
-             preload={true}
-             quality="high"
-             maxWidth={2400}
-             showLoader={false}
-           />
-         </View>
+            {/* Compact Poster Section */}
+            <View
+              style={[styles.posterContainer, { height: computedPreviewHeight, width: '100%' }]}
+              {...swipeResponder.panHandlers}
+              collapsable={false}
+            >
+              <LazyFullImage
+                key={`poster-${currentPoster.id}-${currentPoster.thumbnail || (currentPoster as any).content?.background || ''}`}
+                thumbnailUri={currentPoster.thumbnail || (currentPoster as any).content?.background || ''}
+                fullImageUri={getHighQualityImageUrl(currentPoster)}
+                style={styles.posterImage}
+                resizeMode="contain"
+                loadOnMount={true}
+                preload={true}
+                quality="high"
+                maxWidth={2400}
+                showLoader={false}
+              />
+            </View>
 
-         {/* Service filter buttons for Event Planners */}
-         {isEventPlannerCategory && (
-           <View style={styles.serviceFilterContainer}>
-             {['generator', 'decorators', 'sound', 'mandap'].map(filterKey => {
-               const isActive = selectedServiceFilter === filterKey;
-               const labelMap: Record<string, string> = {
-                 generator: 'Generator',
-                 decorators: 'Decorators',
-                 sound: 'Sound',
-                 mandap: 'Mandap'
-               };
-               return (
-                 <TouchableOpacity
-                   key={filterKey}
-                   style={[
-                     styles.serviceFilterButton,
-                     isActive && styles.serviceFilterButtonActive
-                   ]}
-                   onPress={() => setSelectedServiceFilter(prev => prev === filterKey ? null : filterKey)}
-                   activeOpacity={0.9}
-                 >
-                   <LinearGradient
-                     colors={[theme.colors.secondary, theme.colors.primary]}
-                     start={{ x: 0, y: 0 }}
-                     end={{ x: 1, y: 0 }}
-                     style={[
-                       styles.serviceFilterButtonGradient,
-                       !isActive && styles.serviceFilterButtonGradientInactive
-                     ]}
-                   >
-                     <Text style={[
-                       styles.serviceFilterButtonText,
-                       isActive && styles.serviceFilterButtonTextActive
-                     ]}>
-                       {labelMap[filterKey]}
-                     </Text>
-                   </LinearGradient>
-                 </TouchableOpacity>
-               );
-             })}
-           </View>
-         )}
+            {/* Service filter buttons for Event Planners */}
+            {isEventPlannerCategory && (
+              <View style={styles.serviceFilterContainer}>
+                {['generator', 'decorators', 'sound', 'mandap'].map(filterKey => {
+                  const isActive = selectedServiceFilter === filterKey;
+                  const labelMap: Record<string, string> = {
+                    generator: 'Generator',
+                    decorators: 'Decorators',
+                    sound: 'Sound',
+                    mandap: 'Mandap'
+                  };
+                  return (
+                    <TouchableOpacity
+                      key={filterKey}
+                      style={[
+                        styles.serviceFilterButton,
+                        isActive && styles.serviceFilterButtonActive
+                      ]}
+                      onPress={() => setSelectedServiceFilter(prev => prev === filterKey ? null : filterKey)}
+                      activeOpacity={0.9}
+                    >
+                      <LinearGradient
+                        colors={[theme.colors.secondary, theme.colors.primary]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={[
+                          styles.serviceFilterButtonGradient,
+                          !isActive && styles.serviceFilterButtonGradientInactive
+                        ]}
+                      >
+                        <Text style={[
+                          styles.serviceFilterButtonText,
+                          isActive && styles.serviceFilterButtonTextActive
+                        ]}>
+                          {labelMap[filterKey]}
+                        </Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
 
-         {/* Compact Related Posters Section */}
-        <View style={styles.relatedSection}>
-           {filteredPosters.length > 0 ? (
-             <FlatList
-               data={filteredPosters}
-               renderItem={renderRelatedPoster}
-               keyExtractor={(item) => item.id}
-               numColumns={numColumns}
-               key={`grid-${numColumns}`}
-               columnWrapperStyle={styles.relatedGrid}
-               showsVerticalScrollIndicator={true}
-               contentContainerStyle={styles.relatedList}
-               style={styles.relatedFlatList}
-               // Enhanced performance optimizations for large lists
-               removeClippedSubviews={true}
-               maxToRenderPerBatch={isTabletDevice ? 8 : 6}
-               initialNumToRender={isTabletDevice ? 8 : 6}
-               windowSize={isTabletDevice ? 8 : 6}
-               getItemLayout={(data, index) => ({
-                 length: cardHeight,
-                 offset: cardHeight * index,
-                 index,
-               })}
-               updateCellsBatchingPeriod={50}
-               viewabilityConfig={{
-                itemVisiblePercentThreshold: 50,
-                minimumViewTime: 300,
-                waitForInteraction: true,
-              }}
-               // Optimized viewability callback for better performance
-               onViewableItemsChanged={onViewableItemsChanged}
-             />
-           ) : (
-             <View style={styles.noResultsContainer}>
-               <Text style={styles.noResultsText}>
-                 No posters available for this category
-               </Text>
-             </View>
-           )}
-        </View>
+            {/* Compact Related Posters Section */}
+            <View style={styles.relatedSection}>
+              {filteredPosters.length > 0 ? (
+                <FlatList
+                  data={filteredPosters}
+                  renderItem={renderRelatedPoster}
+                  keyExtractor={(item) => item.id}
+                  numColumns={numColumns}
+                  key={`grid-${numColumns}`}
+                  columnWrapperStyle={styles.relatedGrid}
+                  showsVerticalScrollIndicator={true}
+                  contentContainerStyle={styles.relatedList}
+                  style={styles.relatedFlatList}
+                  // Enhanced performance optimizations for large lists
+                  removeClippedSubviews={true}
+                  maxToRenderPerBatch={isTabletDevice ? 8 : 6}
+                  initialNumToRender={isTabletDevice ? 8 : 6}
+                  windowSize={isTabletDevice ? 8 : 6}
+                  getItemLayout={(data, index) => ({
+                    length: cardHeight,
+                    offset: cardHeight * index,
+                    index,
+                  })}
+                  updateCellsBatchingPeriod={50}
+                  viewabilityConfig={{
+                    itemVisiblePercentThreshold: 50,
+                    minimumViewTime: 300,
+                    waitForInteraction: true,
+                  }}
+                  // Optimized viewability callback for better performance
+                  onViewableItemsChanged={onViewableItemsChanged}
+                />
+              ) : (
+                <View style={styles.noResultsContainer}>
+                  <Text style={styles.noResultsText}>
+                    No posters available for this category
+                  </Text>
+                </View>
+              )}
+            </View>
           </>
         )}
 

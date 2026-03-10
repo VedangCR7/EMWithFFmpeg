@@ -8,6 +8,7 @@ export interface VideoLayer {
   size: { width: number; height: number };
   style?: any;
   fieldType?: string;
+  zIndex?: number;
 }
 
 export interface OverlayConfig {

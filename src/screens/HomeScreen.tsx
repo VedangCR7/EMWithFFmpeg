@@ -31,9 +31,9 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { MainStackParamList } from '../navigation/AppNavigator';
 import dashboardService, { Banner, Template } from '../services/dashboard';
-import homeApi, { 
-  FeaturedContent, 
-  VideoContent 
+import homeApi, {
+  FeaturedContent,
+  VideoContent
 } from '../services/homeApi';
 import greetingTemplatesService from '../services/greetingTemplates';
 import businessCategoryPostersApi from '../services/businessCategoryPostersApi';
@@ -42,6 +42,7 @@ import businessProfileService, { BusinessProfile } from '../services/businessPro
 import calendarApi, { CalendarPoster } from '../services/calendarApi';
 import { useTheme } from '../context/ThemeContext';
 import { useSubscription } from '../contexts/SubscriptionContext';
+import { useBusinessProfile } from '../context/BusinessProfileContext';
 import authService from '../services/auth';
 import { performanceMonitor } from '../utils/performanceMonitor';
 import { requestDeduplication } from '../utils/requestDeduplication';
@@ -52,24 +53,24 @@ import ComingSoonModal from '../components/ComingSoonModal';
 import HorizontalFestivalCalendar from '../components/HorizontalFestivalCalendar';
 import BusinessCategoriesSection from '../components/sections/BusinessCategoriesSection';
 import GeneralCategoriesSection from '../components/sections/GeneralCategoriesSection';
-import responsiveUtils, { 
-  responsiveSpacing, 
-  responsiveFontSize, 
-  responsiveSize, 
-  responsiveLayout, 
-  responsiveShadow, 
-  responsiveText, 
-  responsiveGrid, 
-  responsiveButton, 
-  responsiveInput, 
+import responsiveUtils, {
+  responsiveSpacing,
+  responsiveFontSize,
+  responsiveSize,
+  responsiveLayout,
+  responsiveShadow,
+  responsiveText,
+  responsiveGrid,
+  responsiveButton,
+  responsiveInput,
   responsiveCard
 } from '../utils/responsiveUtils';
 
 // Compact spacing multiplier to reduce all spacing
 const COMPACT_MULTIPLIER = 0.5;
 
-const devWarn = __DEV__ ? console.warn : () => {};
-const devError = __DEV__ ? console.error : () => {};
+const devWarn = __DEV__ ? console.warn : () => { };
+const devError = __DEV__ ? console.error : () => { };
 
 // Memoized Template Card Component to avoid recreating Animated.Value on every render
 interface TemplateCardProps {
@@ -135,20 +136,20 @@ const TemplateCard: React.FC<TemplateCardProps> = React.memo(({ item, cardWidth,
       onPress={handleCardPress}
       style={styles.templateCardWrapper}
     >
-      <Animated.View 
+      <Animated.View
         style={[
-          styles.templateCard, 
-          { 
+          styles.templateCard,
+          {
             backgroundColor: theme.colors.cardBackground,
             transform: [{ scale: scaleAnim }],
           }
         ]}
       >
         <View style={[styles.templateImageContainer, { height: cardWidth }]}>
-          <OptimizedImage 
-            uri={item.thumbnail} 
-            style={styles.templateImage} 
-            resizeMode="cover" 
+          <OptimizedImage
+            uri={item.thumbnail}
+            style={styles.templateImage}
+            resizeMode="cover"
             mode="thumbnail"
             cacheKey={`template_${item.id}`}
           />
@@ -159,17 +160,17 @@ const TemplateCard: React.FC<TemplateCardProps> = React.memo(({ item, cardWidth,
 }, (prevProps, nextProps) => {
   // Return true if props are equal (skip re-render), false if different (re-render)
   if (prevProps === nextProps) return true;
-  
+
   // Check item ID and thumbnail first (most likely to change)
   if (prevProps.item.id !== nextProps.item.id) return false;
   if (prevProps.item.thumbnail !== nextProps.item.thumbnail) return false;
-  
+
   // Check dimensions
   if (prevProps.cardWidth !== nextProps.cardWidth) return false;
-  
+
   // Check theme colors (not object reference)
   if (prevProps.theme?.colors?.cardBackground !== nextProps.theme?.colors?.cardBackground) return false;
-  
+
   // All props are equal, skip re-render
   return true;
 });
@@ -342,20 +343,20 @@ const VideoTemplateCard: React.FC<VideoTemplateCardProps> = React.memo(({ item, 
       onPress={handleCardPress}
       style={styles.templateCardWrapper}
     >
-      <Animated.View 
+      <Animated.View
         style={[
-          styles.templateCard, 
-          { 
+          styles.templateCard,
+          {
             backgroundColor: theme.colors.cardBackground,
             transform: [{ scale: scaleAnim }],
           }
         ]}
       >
         <View style={[styles.templateImageContainer, { height: cardWidth }]}>
-          <OptimizedImage 
-            uri={item.thumbnail} 
-            style={styles.templateImage} 
-            resizeMode="cover" 
+          <OptimizedImage
+            uri={item.thumbnail}
+            style={styles.templateImage}
+            resizeMode="cover"
             mode="thumbnail"
             cacheKey={`video_${item.id}`}
           />
@@ -369,18 +370,18 @@ const VideoTemplateCard: React.FC<VideoTemplateCardProps> = React.memo(({ item, 
 }, (prevProps, nextProps) => {
   // Return true if props are equal (skip re-render), false if different (re-render)
   if (prevProps === nextProps) return true;
-  
+
   // Check item ID and thumbnail first (most likely to change)
   if (prevProps.item.id !== nextProps.item.id) return false;
   if (prevProps.item.thumbnail !== nextProps.item.thumbnail) return false;
-  
+
   // Check dimensions and icon size
   if (prevProps.cardWidth !== nextProps.cardWidth) return false;
   if (prevProps.playIconSize !== nextProps.playIconSize) return false;
-  
+
   // Check theme colors (not object reference)
   if (prevProps.theme?.colors?.cardBackground !== nextProps.theme?.colors?.cardBackground) return false;
-  
+
   // All props are equal, skip re-render
   return true;
 });
@@ -408,16 +409,16 @@ const GreetingCategoryCard: React.FC<GreetingCategoryCardProps> = React.memo(({ 
       onPress={handlePress}
     >
       <View style={[
-        styles.businessCategoryCardContent, 
-        { 
+        styles.businessCategoryCardContent,
+        {
           backgroundColor: theme.colors.cardBackground,
           height: cardWidth, // Make cards square
         }
       ]}>
         <View style={styles.businessCategoryImageSection}>
           {categoryImage ? (
-            <OptimizedImage 
-              uri={categoryImage} 
+            <OptimizedImage
+              uri={categoryImage}
               style={styles.businessCategoryImage}
               resizeMode="cover"
               mode="thumbnail"
@@ -449,7 +450,7 @@ const GreetingCategoryCard: React.FC<GreetingCategoryCardProps> = React.memo(({ 
             ]}
             pointerEvents="none"
           >
-            <Text 
+            <Text
               style={[styles.businessCategoryName, { color: '#ffffff', textAlign: 'left' }]}
               numberOfLines={1}
               ellipsizeMode="tail"
@@ -464,21 +465,21 @@ const GreetingCategoryCard: React.FC<GreetingCategoryCardProps> = React.memo(({ 
 }, (prevProps, nextProps) => {
   // Return true if props are equal (skip re-render)
   if (prevProps === nextProps) return true;
-  
+
   // Check item ID and name first
   if (prevProps.item.id !== nextProps.item.id) return false;
   if (prevProps.item.name !== nextProps.item.name) return false;
   if (prevProps.item.icon !== nextProps.item.icon) return false;
-  
+
   // Check dimensions
   if (prevProps.cardWidth !== nextProps.cardWidth) return false;
-  
+
   // Check category image
   if (prevProps.categoryImage !== nextProps.categoryImage) return false;
-  
+
   // Check theme colors (not object reference)
   if (prevProps.theme?.colors?.cardBackground !== nextProps.theme?.colors?.cardBackground) return false;
-  
+
   // All props are equal, skip re-render
   return true;
 });
@@ -509,7 +510,7 @@ const GreetingCard: React.FC<GreetingCardProps> = React.memo(({ item, cardWidth,
       }
       return;
     }
-    
+
     // Navigate immediately - related templates already computed
     // Pass greetingCategory derived from searchQuery so PosterPlayerScreen can fetch the correct templates
     navigation.navigate('PosterPlayer', {
@@ -519,7 +520,7 @@ const GreetingCard: React.FC<GreetingCardProps> = React.memo(({ item, cardWidth,
       templateSource: 'greeting',
       greetingCategory: searchQuery || undefined, // Pass searchQuery as greetingCategory for proper template fetching
     });
-    
+
     // Call onCardPress after navigation to avoid blocking
     if (onCardPress) {
       requestAnimationFrame(() => {
@@ -532,9 +533,9 @@ const GreetingCard: React.FC<GreetingCardProps> = React.memo(({ item, cardWidth,
     return (
       <View style={[styles.templateCard, { height: cardWidth, backgroundColor: theme.colors.cardBackground }]}>
         <View style={[styles.templateImageContainer, { height: cardWidth }]}>
-          <ActivityIndicator 
-            size="large" 
-            color={theme.colors.primary} 
+          <ActivityIndicator
+            size="large"
+            color={theme.colors.primary}
             style={styles.loadingIndicator}
           />
           <Text style={[styles.loadingText, { color: theme.colors.primary }]}>Loading...</Text>
@@ -558,10 +559,10 @@ const GreetingCard: React.FC<GreetingCardProps> = React.memo(({ item, cardWidth,
         ]}
       >
         <View style={[styles.templateImageContainer, { height: cardWidth }]}>
-          <OptimizedImage 
-            uri={item.thumbnail} 
-            style={styles.templateImage} 
-            resizeMode="cover" 
+          <OptimizedImage
+            uri={item.thumbnail}
+            style={styles.templateImage}
+            resizeMode="cover"
             mode="thumbnail"
             cacheKey={`template_${item.id}`}
           />
@@ -572,24 +573,24 @@ const GreetingCard: React.FC<GreetingCardProps> = React.memo(({ item, cardWidth,
 }, (prevProps, nextProps) => {
   // Return true if props are equal (skip re-render)
   if (prevProps === nextProps) return true;
-  
+
   // Check item ID and thumbnail first
   if (!prevProps.item || !nextProps.item) return false;
   if (prevProps.item.id !== nextProps.item.id) return false;
   if (prevProps.item.thumbnail !== nextProps.item.thumbnail) return false;
-  
+
   // Check dimensions
   if (prevProps.cardWidth !== nextProps.cardWidth) return false;
-  
+
   // Check theme colors (not object reference)
   if (prevProps.theme?.colors?.cardBackground !== nextProps.theme?.colors?.cardBackground) return false;
-  
+
   // Check searchQuery
   if (prevProps.searchQuery !== nextProps.searchQuery) return false;
-  
+
   // Check categoryTemplates length (simplified check - templates array reference might change)
   if (prevProps.categoryTemplates.length !== nextProps.categoryTemplates.length) return false;
-  
+
   // All critical props are equal, skip re-render (ignore callback functions)
   return true;
 });
@@ -629,146 +630,82 @@ const HomeScreen: React.FC = React.memo(() => {
   const { refreshSubscription } = useSubscription();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<StackNavigationProp<MainStackParamList>>();
-  
+
   // Get current user info
   const userProfileSectionRef = useRef<React.ElementRef<typeof TouchableOpacity>>(null);
   const [userProfile, setUserProfile] = useState(() => authService.getCurrentUser());
   const [userBusinessProfiles, setUserBusinessProfiles] = useState<BusinessProfile[]>([]);
   const [businessProfilesLoadingState, setBusinessProfilesLoadingState] = useState(false);
-  const [selectedBusinessProfileId, setSelectedBusinessProfileId] = useState<string | null>(null);
+  const { selectedBusinessProfile, setSelectedBusinessProfile, initializeSelectedProfile, isLoading: isContextLoading } = useBusinessProfile();
+  const selectedBusinessProfileId = selectedBusinessProfile?.id || null;
   const [isBusinessProfileDropdownVisible, setIsBusinessProfileDropdownVisible] = useState(false);
   const [businessProfileDropdownPosition, setBusinessProfileDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
 
+  // Clear business profile selection when user changes
   useEffect(() => {
     const unsubscribe = authService.onAuthStateChanged(user => {
-      console.log('=��� [HOMESCREEN] Auth state changed, new user:', user?.id || 'null');
+      console.log('= [HOMESCREEN] Auth state changed, new user:', user?.id || 'null');
       setUserProfile(user);
-      
-      // Clear business profile selection when user changes
+
       if (!user) {
-        console.log('=��� [HOMESCREEN] User logged out, clearing business profile selection');
-        setSelectedBusinessProfileId(null);
+        console.log('= [HOMESCREEN] User logged out, clearing business profile selection');
         setUserBusinessProfiles([]);
-        // Clear stored business profile ID
-        AsyncStorage.removeItem('selectedBusinessProfileId').catch(() => {});
-        AsyncStorage.removeItem('selectedBusinessProfileCategory').catch(() => {});
       }
     });
     return unsubscribe;
   }, []);
 
-  useEffect(() => {
-    let isMounted = true;
-    const loadBusinessProfiles = async () => {
-      const currentUserId = userProfile?.id || authService.getCurrentUser()?.id;
-      if (!currentUserId) {
-        console.log('G��n+� [HOMESCREEN] No user ID, skipping business profiles load');
-        setUserBusinessProfiles([]);
-        setSelectedBusinessProfileId(null);
-        return;
-      }
-      
-      console.log('=��� [HOMESCREEN] Loading business profiles for user:', currentUserId);
-      setBusinessProfilesLoadingState(true);
-      try {
-        const profiles = await businessProfileService.getUserBusinessProfiles(currentUserId);
-        if (!isMounted) {
-          return;
-        }
-        
-        console.log('G�� [HOMESCREEN] Loaded business profiles:', profiles.length);
-        setUserBusinessProfiles(profiles);
-        
-        // Get stored profile ID, but verify it belongs to current user
-        const storedProfileId = await AsyncStorage.getItem('selectedBusinessProfileId');
-        const storedUserId = await AsyncStorage.getItem('selectedBusinessProfileUserId');
-        
-        let resolvedProfileId: string | null = null;
-        
-        // Only use stored profile ID if it belongs to the current user
-        if (storedProfileId && storedUserId === currentUserId && profiles.some(profile => profile.id === storedProfileId)) {
-          resolvedProfileId = storedProfileId;
-          console.log('G�� [HOMESCREEN] Using stored business profile:', resolvedProfileId);
-          // Use first profile if no valid stored profile
-          resolvedProfileId = profiles[0].id;
-          console.log('G�� [HOMESCREEN] Using first business profile:', resolvedProfileId);
-          // Store the user ID with the profile ID
-          await AsyncStorage.setItem('selectedBusinessProfileUserId', currentUserId).catch(() => {});
-        } else {
-          // Clear stored profile if user has no profiles
-          await AsyncStorage.removeItem('selectedBusinessProfileId').catch(() => {});
-          await AsyncStorage.removeItem('selectedBusinessProfileUserId').catch(() => {});
-        }
-        
-        if (resolvedProfileId) {
-          setSelectedBusinessProfileId(resolvedProfileId);
-        } else {
-          setSelectedBusinessProfileId(null);
-        }
-      } catch (error) {
-        if (__DEV__) {
-          devError('Error loading business profiles for dropdown:', error);
-        }
-        setUserBusinessProfiles([]);
-        setSelectedBusinessProfileId(null);
-      } finally {
-        if (isMounted) {
-          setBusinessProfilesLoadingState(false);
-        }
-      }
-    };
-
-    loadBusinessProfiles();
-    return () => {
-      isMounted = false;
-    };
-  }, [userProfile?.id]);
-
-  // Refresh business profiles when screen comes into focus (e.g., returning from BusinessProfilesScreen)
+  // Refresh business profiles when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      console.log('🔄 [HOMESCREEN] Screen focused - refreshing business profiles and subscription...');
-      const currentUserId = userProfile?.id || authService.getCurrentUser()?.id;
-      if (currentUserId) {
-        const loadProfiles = async () => {
-          try {
-            setBusinessProfilesLoadingState(true);
-            const profiles = await businessProfileService.getUserBusinessProfiles(currentUserId);
-            setUserBusinessProfiles(profiles);
-            
-            // Auto-select first profile if none selected
-            if (profiles.length > 0 && !selectedBusinessProfileId) {
-              setSelectedBusinessProfileId(profiles[0].id);
-            }
-          } catch (error) {
-            console.error('Error refreshing business profiles:', error);
-          } finally {
+      let isMounted = true;
+      console.log('🔄 [HOMESCREEN] Screen focused - refreshing business profiles...');
+
+      const loadProfiles = async () => {
+        const currentUserId = userProfile?.id || authService.getCurrentUser()?.id;
+        if (!currentUserId) return;
+
+        try {
+          setBusinessProfilesLoadingState(true);
+          const profiles = await businessProfileService.getUserBusinessProfiles(currentUserId);
+
+          if (!isMounted) return;
+
+          setUserBusinessProfiles(profiles);
+
+          // Let BusinessProfileContext handle auto-selection logic
+          await initializeSelectedProfile(profiles);
+        } catch (error) {
+          console.error('Error refreshing business profiles:', error);
+        } finally {
+          if (isMounted) {
             setBusinessProfilesLoadingState(false);
           }
-        };
-        loadProfiles();
-        
-        // Also refresh subscription status
-        console.log('🔄 SUBSCRIPTION_STATUS_FETCH - HomeScreen focused, refreshing subscription');
-        refreshSubscription(true);
-      }
-    }, [userProfile?.id, selectedBusinessProfileId, refreshSubscription])
+        }
+      };
+
+      loadProfiles();
+
+      // Also refresh subscription status
+      refreshSubscription(true);
+
+      return () => {
+        isMounted = false;
+      };
+    }, [userProfile?.id, initializeSelectedProfile, refreshSubscription])
   );
 
   const userName = useMemo(() => {
     return (
+      selectedBusinessProfile?.name ||
       userProfile?.displayName ||
       userProfile?.name ||
       userProfile?.companyName ||
       userProfile?.username ||
       'User'
     );
-  }, [userProfile]);
-  const selectedBusinessProfile = useMemo(
-    () => userBusinessProfiles.find(profile => profile.id === selectedBusinessProfileId) || null,
-    [userBusinessProfiles, selectedBusinessProfileId]
-  );
-  const userInitials = useMemo(() => 
+  }, [userProfile, selectedBusinessProfile]);
+  const userInitials = useMemo(() =>
     userName
       .split(' ')
       .map((n: string) => n[0])
@@ -779,6 +716,9 @@ const HomeScreen: React.FC = React.memo(() => {
   );
   const userAvatarUri = useMemo(() => {
     return (
+      selectedBusinessProfile?.logo ||
+      selectedBusinessProfile?.companyLogo ||
+      selectedBusinessProfile?.banner ||
       userProfile?.photo ||
       userProfile?.photoURL ||
       userProfile?.logo ||
@@ -786,39 +726,8 @@ const HomeScreen: React.FC = React.memo(() => {
       userProfile?.avatar ||
       null
     );
-  }, [userProfile]);
-  useEffect(() => {
-    const currentUserId = userProfile?.id || authService.getCurrentUser()?.id;
-    if (selectedBusinessProfileId && currentUserId) {
-      // Store profile ID with user ID to prevent cross-user contamination
-      AsyncStorage.setItem('selectedBusinessProfileId', selectedBusinessProfileId).catch(() => {});
-      AsyncStorage.setItem('selectedBusinessProfileUserId', currentUserId).catch(() => {});
-    }
-    if (selectedBusinessProfile?.category) {
-      AsyncStorage.setItem('selectedBusinessProfileCategory', selectedBusinessProfile.category).catch(() => {});
-    }
-    // Store profile name for MyBusiness screen display
-    if (selectedBusinessProfile?.name) {
-      AsyncStorage.setItem('selectedBusinessProfileName', selectedBusinessProfile.name).catch(() => {});
-    }
-    // Store subcategory for MyBusiness screen filtering
-    if (selectedBusinessProfile?.subcategory || selectedBusinessProfile?.subCategory) {
-      const subcategory = selectedBusinessProfile.subcategory || selectedBusinessProfile.subCategory;
-      if (subcategory) {
-        AsyncStorage.setItem('selectedBusinessProfileSubcategory', subcategory).catch(() => {});
-      }
-    }
-    
-    // DEBUG: Log what's being stored
-    console.log('=��� [HOMESCREEN DEBUG] Storing profile data:', {
-      selectedBusinessProfileId,
-      profileName: selectedBusinessProfile?.name,
-      profileCategory: selectedBusinessProfile?.category,
-      profileSubcategory: selectedBusinessProfile?.subcategory || selectedBusinessProfile?.subCategory,
-      currentUserId
-    });
-  }, [selectedBusinessProfileId, selectedBusinessProfile?.category, selectedBusinessProfile?.name, selectedBusinessProfile?.subcategory, selectedBusinessProfile?.subCategory, userProfile?.id]);
-  
+  }, [userProfile, selectedBusinessProfile]);
+
   // Dynamic dimensions for responsive layout
   const [dimensions, setDimensions] = useState(() => {
     const { width, height } = Dimensions.get('window');
@@ -835,7 +744,7 @@ const HomeScreen: React.FC = React.memo(() => {
   }, []);
 
   const [isBusinessCategoriesModalClosing, setIsBusinessCategoriesModalClosing] = useState(false);
-  
+
   const closeBusinessCategoriesModal = useCallback(() => {
     // Hide content immediately for instant feedback
     setIsBusinessCategoriesModalClosing(true);
@@ -849,17 +758,17 @@ const HomeScreen: React.FC = React.memo(() => {
 
   const screenWidth = dimensions.width;
   const screenHeight = dimensions.height;
-  
+
   // Dynamic device detection that updates on rotation
   const isTabletDevice = useMemo(() => screenWidth >= 768, [screenWidth]);
   const isLandscapeMode = useMemo(() => screenWidth > screenHeight, [screenWidth, screenHeight]);
-  
+
   // Responsive icon sizes
   const getIconSize = useCallback((baseSize: number) => {
     const scale = screenWidth / 375; // Base on iPhone 8 width
     return Math.round(baseSize * scale);
   }, [screenWidth]);
-  
+
   // Responsive card calculations - dynamically adapts to screen size and rotation
   const getCardWidth = useCallback(() => {
     if (isTabletDevice) {
@@ -874,26 +783,26 @@ const HomeScreen: React.FC = React.memo(() => {
   }, [screenWidth, isTabletDevice]);
 
   const cardWidth = getCardWidth();
-  
+
   // Helper function for moderateScale (matches the one defined at bottom of file)
   const getModerateScale = useCallback((size: number, factor = 0.5) => {
     const scale = (s: number) => (screenWidth / 375) * s;
     return size + (scale(size) - size) * factor;
   }, [screenWidth]);
 
-  
+
   // Helper function for getResponsiveValue (matches the one defined at bottom of file)
   const getResponsiveValue = useCallback((small: number, medium: number, large: number) => {
     if (screenWidth < 400) return small;
     if (screenWidth < 768) return medium;
     return large;
   }, [screenWidth]);
-  
+
   // Calculate item spacing for getItemLayout (matches templateCardWrapper marginRight)
   const itemSpacing = useMemo(() => {
     return getModerateScale(3);
   }, [getModerateScale]);
-  
+
   // Memoized getItemLayout for horizontal FlatLists with fixed card width
   const getItemLayout = useCallback((data: any, index: number) => {
     const itemLength = cardWidth + itemSpacing;
@@ -903,7 +812,7 @@ const HomeScreen: React.FC = React.memo(() => {
       index,
     };
   }, [cardWidth, itemSpacing]);
-  
+
   // Memoized getItemLayout for banner carousel (different width)
   const getBannerItemLayout = useCallback((data: any, index: number) => {
     const bannerWidth = getResponsiveValue(screenWidth * 0.70, screenWidth * 0.65, screenWidth * 0.55);
@@ -915,7 +824,7 @@ const HomeScreen: React.FC = React.memo(() => {
       index,
     };
   }, [screenWidth, getResponsiveValue, getModerateScale]);
-  
+
   // Responsive icon sizes for different UI elements
   const searchIconSize = getIconSize(12);
   const statusIconSize = getIconSize(8);
@@ -934,7 +843,7 @@ const HomeScreen: React.FC = React.memo(() => {
     const cardWidth = (containerWidth - totalSpacing) / modalColumns;
     return cardWidth;
   }, [isTabletDevice, screenWidth, modalColumns, getModerateScale]);
-  
+
   // Gap between cards (for spacing)
   const modalCardGap = useMemo(() => getModerateScale(3), [getModerateScale]);
 
@@ -946,7 +855,7 @@ const HomeScreen: React.FC = React.memo(() => {
   const [greetingCategories, setGreetingCategories] = useState<Array<{ id: string; name: string }>>([]);
   const [currentCategoryIndex, setCurrentCategoryIndex] = useState(0);
   const categoryFadeAnim = useRef(new Animated.Value(1)).current;
-  
+
   // Business categories state
   const [businessCategories, setBusinessCategories] = useState<BusinessCategory[]>([]);
   const [businessCategoriesLoading, setBusinessCategoriesLoading] = useState(false);
@@ -955,7 +864,7 @@ const HomeScreen: React.FC = React.memo(() => {
   const [rotatingBusinessCategories, setRotatingBusinessCategories] = useState<Array<{ id: string; name: string }>>([]);
   const [currentBusinessCategoryIndex, setCurrentBusinessCategoryIndex] = useState(0);
   const businessCategoryFadeAnim = useRef(new Animated.Value(1)).current;
-  
+
   // Track if animations have been initialized
   const animationsInitializedRef = useRef(false);
   // Highlight state for business categories section
@@ -969,7 +878,7 @@ const HomeScreen: React.FC = React.memo(() => {
   const [greetingCategoriesLoading, setGreetingCategoriesLoading] = useState(false);
   const [greetingCategoryImages, setGreetingCategoryImages] = useState<Record<string, string>>({});
   const memoizedGreetingCategoryImages = useMemo(() => greetingCategoryImages, [greetingCategoryImages]);
-  
+
   // Show all categories with placeholders (don't filter by image availability)
   // Limit to displayed count for lazy loading
   const filteredGreetingCategoriesList = useMemo(() => {
@@ -977,7 +886,7 @@ const HomeScreen: React.FC = React.memo(() => {
     // Show placeholders for categories without images - images will load progressively
     return greetingCategoriesList.slice(0, displayedCategoriesCount);
   }, [greetingCategoriesList, displayedCategoriesCount]);
-  
+
   const generalCategoryModalColumns = modalColumns;
   const {
     generalCategoryModalCardWidth,
@@ -992,7 +901,7 @@ const HomeScreen: React.FC = React.memo(() => {
     const totalSpacing = horizontalPadding * 2 + gap * (generalCategoryModalColumns - 1);
     const cardWidth = (containerWidth - totalSpacing) / generalCategoryModalColumns;
     const rowHeight = cardWidth + getModerateScale(12); // card height + spacing
-    
+
     return {
       generalCategoryModalCardWidth: cardWidth,
       generalCategoryModalContentWidth: containerWidth,
@@ -1020,7 +929,7 @@ const HomeScreen: React.FC = React.memo(() => {
       index,
     };
   }, [generalCategoryModalColumns, generalCategoryModalRowHeight]);
-  
+
   // Refs to prevent duplicate API calls
   const apiDataLoadedRef = useRef(false);
   const greetingCategoriesLoadedRef = useRef(false);
@@ -1071,7 +980,7 @@ const HomeScreen: React.FC = React.memo(() => {
   const [isVideosModalVisible, setIsVideosModalVisible] = useState(false);
   const [showVideoComingSoonModal, setShowVideoComingSoonModal] = useState(false);
   const [isCustomerSupportModalVisible, setIsCustomerSupportModalVisible] = useState(false);
-  
+
   // Greeting section modal states
   const [isBusinessEthicsModalVisible, setIsBusinessEthicsModalVisible] = useState(false);
   const [isSuccessMindsetModalVisible, setIsSuccessMindsetModalVisible] = useState(false);
@@ -1092,31 +1001,31 @@ const HomeScreen: React.FC = React.memo(() => {
       if (__DEV__) console.warn('[FEATURED CONTENT] filterDiwaliContent received non-array:', content);
       return [];
     }
-    
+
     const filtered = content.filter(item => {
       const title = (item.title || '').toLowerCase();
       const description = (item.description || '').toLowerCase();
       const imageUrl = (item.imageUrl || '').toLowerCase();
-      
+
       // Filter out items that contain "diwali" in title, description, or image URL
-      const isDiwali = title.includes('diwali') || 
-                       description.includes('diwali') || 
-                       imageUrl.includes('diwali');
-      
+      const isDiwali = title.includes('diwali') ||
+        description.includes('diwali') ||
+        imageUrl.includes('diwali');
+
       if (isDiwali && __DEV__) {
         console.log('[FEATURED CONTENT] Filtering out Diwali item:', item.id, item.title);
       }
-      
+
       return !isDiwali;
     });
-    
+
     if (__DEV__) {
       console.log(`[FEATURED CONTENT] Diwali filter: ${content.length} items -> ${filtered.length} items`);
       if (filtered.length === 0 && content.length > 0) {
         console.warn('[FEATURED CONTENT] All items were filtered out as Diwali content!');
       }
     }
-    
+
     return filtered;
   }, []);
   const [videoContent, setVideoContent] = useState<VideoContent[]>([]);
@@ -1146,10 +1055,10 @@ const HomeScreen: React.FC = React.memo(() => {
   const [businessQuotesTemplates, setBusinessQuotesTemplates] = useState<any[]>([]);
   const [businessQuotesTemplatesRaw, setBusinessQuotesTemplatesRaw] = useState<any[]>([]);
   const [businessQuotesLoading, setBusinessQuotesLoading] = useState(false);
-  
+
   // Track image preloading progress - must be defined before startProgressiveImagePreloading
   const imagePreloadRef = useRef({ critical: false, high: false, medium: false, low: false });
-  
+
   // Progressive image preloading system
   // Loads images in batches: Critical G�� High G�� Medium G�� Low priority
   // IMPORTANT: Defined before loadApiData so it can be called from within it
@@ -1163,30 +1072,30 @@ const HomeScreen: React.FC = React.memo(() => {
     const preloadCriticalImages = async () => {
       try {
         const criticalImages: string[] = [];
-        
+
         // Featured content images (first 3 for carousel)
         featuredContent.slice(0, 3).forEach(item => {
           if (item.imageUrl) criticalImages.push(item.imageUrl);
           if (item.thumbnailUrl) criticalImages.push(item.thumbnailUrl);
         });
-        
+
         // Preload critical images immediately
         if (criticalImages.length > 0) {
           await Promise.allSettled(
-            criticalImages.map(url => Image.prefetch(url).catch(() => {}))
+            criticalImages.map(url => Image.prefetch(url).catch(() => { }))
           );
           if (__DEV__) {
             console.log(`[IMAGE PRELOAD] G�� Critical: ${criticalImages.length} images preloaded`);
           }
         }
-        
+
         // Phase 2: HIGH PRIORITY - Greeting template thumbnails (visible sections)
         setTimeout(() => {
           if (imagePreloadRef.current.high) return;
           imagePreloadRef.current.high = true;
-          
+
           const highPriorityImages: string[] = [];
-          
+
           // Greeting template thumbnails (first 3 from each section)
           [
             ...businessEthicsTemplates.slice(0, 3),
@@ -1199,15 +1108,15 @@ const HomeScreen: React.FC = React.memo(() => {
           ].forEach(template => {
             if (template?.thumbnail) highPriorityImages.push(template.thumbnail);
           });
-          
+
           // Video content thumbnails (first 3) - commented out, not in use for now
           // videoContent.slice(0, 3).forEach(video => {
           //   if (video.thumbnail) highPriorityImages.push(video.thumbnail);
           // });
-          
+
           if (highPriorityImages.length > 0) {
             Promise.allSettled(
-              highPriorityImages.map(url => Image.prefetch(url).catch(() => {}))
+              highPriorityImages.map(url => Image.prefetch(url).catch(() => { }))
             ).then(() => {
               if (__DEV__) {
                 console.log(`[IMAGE PRELOAD] G�� High Priority: ${highPriorityImages.length} images preloaded`);
@@ -1215,21 +1124,21 @@ const HomeScreen: React.FC = React.memo(() => {
             });
           }
         }, 500); // Start after 500ms
-        
+
         // Phase 3: MEDIUM PRIORITY - Business category previews and more greeting templates
         setTimeout(() => {
           if (imagePreloadRef.current.medium) return;
           imagePreloadRef.current.medium = true;
-          
+
           const mediumPriorityImages: string[] = [];
-          
+
           // Business category preview images (first image from each category)
           Object.values(businessCategoryPreviews).forEach(templates => {
             if (templates?.[0]?.thumbnail) {
               mediumPriorityImages.push(templates[0].thumbnail);
             }
           });
-          
+
           // More greeting templates (next 3 from each section)
           [
             ...businessEthicsTemplates.slice(3, 6),
@@ -1242,15 +1151,15 @@ const HomeScreen: React.FC = React.memo(() => {
           ].forEach(template => {
             if (template?.thumbnail) mediumPriorityImages.push(template.thumbnail);
           });
-          
+
           // More video content - commented out, not in use for now
           // videoContent.slice(3, 6).forEach(video => {
           //   if (video.thumbnail) mediumPriorityImages.push(video.thumbnail);
           // });
-          
+
           if (mediumPriorityImages.length > 0) {
             Promise.allSettled(
-              mediumPriorityImages.map(url => Image.prefetch(url).catch(() => {}))
+              mediumPriorityImages.map(url => Image.prefetch(url).catch(() => { }))
             ).then(() => {
               if (__DEV__) {
                 console.log(`[IMAGE PRELOAD] G�� Medium Priority: ${mediumPriorityImages.length} images preloaded`);
@@ -1258,27 +1167,27 @@ const HomeScreen: React.FC = React.memo(() => {
             });
           }
         }, 1500); // Start after 1.5s
-        
+
         // Phase 4: LOW PRIORITY - Calendar posters and remaining images
         setTimeout(() => {
           if (imagePreloadRef.current.low) return;
           imagePreloadRef.current.low = true;
-          
+
           const lowPriorityImages: string[] = [];
-          
+
           // Calendar poster thumbnails
           calendarPosters.slice(0, 5).forEach(poster => {
             if (poster.thumbnail) lowPriorityImages.push(poster.thumbnail);
           });
-          
+
           // Remaining featured content
           featuredContent.slice(3).forEach(item => {
             if (item.imageUrl) lowPriorityImages.push(item.imageUrl);
           });
-          
+
           if (lowPriorityImages.length > 0) {
             Promise.allSettled(
-              lowPriorityImages.map(url => Image.prefetch(url).catch(() => {}))
+              lowPriorityImages.map(url => Image.prefetch(url).catch(() => { }))
             ).then(() => {
               if (__DEV__) {
                 console.log(`[IMAGE PRELOAD] G�� Low Priority: ${lowPriorityImages.length} images preloaded`);
@@ -1292,7 +1201,7 @@ const HomeScreen: React.FC = React.memo(() => {
         }
       }
     };
-    
+
     preloadCriticalImages();
   }, [featuredContent, businessEthicsTemplates, successMindsetTemplates, socialMediaGrowthTemplates, moneyAndFinanceTemplates, businessLegendQuoteTemplates, businessMarketingTipsTemplates, businessQuotesTemplates, /* videoContent, */ businessCategoryPreviews, calendarPosters]);
 
@@ -1301,7 +1210,7 @@ const HomeScreen: React.FC = React.memo(() => {
     // Don't block rendering - load cached data first, then fetch fresh
     setApiLoading(true);
     setApiError(null);
-    
+
     // Step 0: Try to load cached data immediately for instant display
     const loadCachedData = async () => {
       try {
@@ -1309,7 +1218,7 @@ const HomeScreen: React.FC = React.memo(() => {
         const featuredCacheKey = 'home_featured_' + JSON.stringify({ limit: 1 });
         // Video API commented out - not in use for now
         // const videoCacheKey = 'home_videos_' + JSON.stringify({ limit: 1 });
-        
+
         // Cache keys for greeting sections (format: greeting_search_${query}_all)
         const greetingCacheKeys = [
           'greeting_search_business ethics_all',
@@ -1320,13 +1229,13 @@ const HomeScreen: React.FC = React.memo(() => {
           'greeting_search_business marketing tips_all',
           'greeting_search_business quotes_all',
         ];
-        
+
         const [cachedFeatured, /* cachedVideos, */ ...cachedGreetings] = await Promise.all([
           cacheService.get(featuredCacheKey),
           // cacheService.get(videoCacheKey), // Video API commented out
           ...greetingCacheKeys.map(key => cacheService.get(key)),
         ]);
-        
+
         if (cachedFeatured && (cachedFeatured as any).data) {
           React.startTransition(() => {
             const filteredData = filterDiwaliContent((cachedFeatured as any).data || []);
@@ -1339,7 +1248,7 @@ const HomeScreen: React.FC = React.memo(() => {
               link: item.link,
             }));
             setBanners(convertedBanners);
-            
+
             // Trigger progressive preloading when cached featured content loads
             if (filteredData.length > 0) {
               setTimeout(() => {
@@ -1348,14 +1257,14 @@ const HomeScreen: React.FC = React.memo(() => {
             }
           });
         }
-        
+
         // Video API commented out - not in use for now
         // if (cachedVideos && (cachedVideos as any).data) {
         //   React.startTransition(() => {
         //     setVideoContent((cachedVideos as any).data || []);
         //   });
         // }
-        
+
         // Load cached greeting sections immediately
         // IMPORTANT: Update state directly (not in startTransition) to ensure sections appear immediately
         // This prevents sections from disappearing when general categories load
@@ -1383,7 +1292,7 @@ const HomeScreen: React.FC = React.memo(() => {
               ? { display: cachedGreetings[6].slice(0, 3), raw: cachedGreetings[6] }
               : { display: [], raw: [] },
           };
-          
+
           // Update state directly to prevent sections from disappearing
           setBusinessEthicsTemplates(greetingUpdates.businessEthics.display);
           setBusinessEthicsTemplatesRaw(greetingUpdates.businessEthics.raw);
@@ -1399,10 +1308,10 @@ const HomeScreen: React.FC = React.memo(() => {
           setBusinessMarketingTipsTemplatesRaw(greetingUpdates.businessMarketingTips.raw);
           setBusinessQuotesTemplates(greetingUpdates.businessQuotes.display);
           setBusinessQuotesTemplatesRaw(greetingUpdates.businessQuotes.raw);
-          
+
           // Mark greeting sections as loaded to prevent them from disappearing
           greetingSectionsLoadedRef.current = true;
-          
+
           // Trigger progressive preloading when cached greeting templates load
           setTimeout(() => {
             startProgressiveImagePreloading();
@@ -1412,20 +1321,20 @@ const HomeScreen: React.FC = React.memo(() => {
         // Ignore cache errors, continue with API calls
       }
     };
-    
+
     // Load cached data immediately (non-blocking)
     loadCachedData();
-    
+
     // Now fetch fresh data in background
     return performanceMonitor.measureAsync('loadApiData', async () => {
       try {
         if (__DEV__) {
         }
-        
+
         // Track success count for error handling
         let totalMainRequests = 2;
         const networkErrors: string[] = [];
-        
+
         // Step 1: Load first 1 item from each main section for INSTANT loading (minimal data)
         const immediateApiPromises = [
           requestDeduplication.deduplicate(
@@ -1442,7 +1351,7 @@ const HomeScreen: React.FC = React.memo(() => {
                 firstItem: Array.isArray(response.data) && response.data.length > 0 ? response.data[0] : null,
               });
             }
-            
+
             if (response.success && response.data && Array.isArray(response.data)) {
               React.startTransition(() => {
                 // Filter out Diwali content before setting
@@ -1463,7 +1372,7 @@ const HomeScreen: React.FC = React.memo(() => {
                   link: item.link,
                 }));
                 setBanners(convertedBanners);
-                
+
                 // Trigger progressive preloading when featured content loads
                 if (filteredData.length > 0) {
                   setTimeout(() => {
@@ -1509,7 +1418,7 @@ const HomeScreen: React.FC = React.memo(() => {
             });
             return { type: 'featured', response: null, success: false };
           }),
-          
+
           // Video API commented out - not in use for now
           // requestDeduplication.deduplicate(
           //   RequestDeduplication.generateKey('videoContent', { limit: 1 }),
@@ -1551,7 +1460,7 @@ const HomeScreen: React.FC = React.memo(() => {
           //   });
           //   return { type: 'videos', response: null, success: false };
           // }),
-          
+
           // Return a resolved promise to maintain promise array structure
           Promise.resolve({ type: 'videos', response: null, success: false }),
         ];
@@ -1560,7 +1469,7 @@ const HomeScreen: React.FC = React.memo(() => {
         // This allows UI to render immediately
         Promise.allSettled(immediateApiPromises).then(results => {
           // Count successful responses from results
-          const successCount = results.filter(result => 
+          const successCount = results.filter(result =>
             result.status === 'fulfilled' && result.value.success
           ).length;
 
@@ -1589,7 +1498,7 @@ const HomeScreen: React.FC = React.memo(() => {
             if (__DEV__) {
             }
           }
-          
+
           // Mark loading as complete
           React.startTransition(() => {
             setApiLoading(false);
@@ -1599,7 +1508,7 @@ const HomeScreen: React.FC = React.memo(() => {
             setApiLoading(false);
           });
         });
-        
+
         // Step 2: Load remaining items in background (non-blocking)
         setTimeout(async () => {
           try {
@@ -1623,7 +1532,7 @@ const HomeScreen: React.FC = React.memo(() => {
                 setBanners(convertedBanners);
               });
             }
-            
+
             // Load full video content (20 items) - commented out, not in use for now
             // const fullVideosResponse = await requestDeduplication.deduplicate(
             //   RequestDeduplication.generateKey('videoContent', { limit: 20 }),
@@ -1657,7 +1566,7 @@ const HomeScreen: React.FC = React.memo(() => {
               greetingTemplatesService.searchTemplates('business marketing tips').catch(() => []),
               greetingTemplatesService.searchTemplates('business quotes').catch(() => [])
             ]);
-            
+
             const [
               businessEthicsResponse,
               successMindsetResponse,
@@ -1667,7 +1576,7 @@ const HomeScreen: React.FC = React.memo(() => {
               businessMarketingTipsResponse,
               businessQuotesResponse
             ] = greetingPromises;
-            
+
             // Debug: Log response statuses
             if (__DEV__) {
               console.log('[GREETING SECTIONS] API Response Status:', {
@@ -1679,7 +1588,7 @@ const HomeScreen: React.FC = React.memo(() => {
                 businessMarketingTips: { status: businessMarketingTipsResponse.status, length: businessMarketingTipsResponse.status === 'fulfilled' ? businessMarketingTipsResponse.value.length : 0 },
                 businessQuotes: { status: businessQuotesResponse.status, length: businessQuotesResponse.status === 'fulfilled' ? businessQuotesResponse.value.length : 0 },
               });
-              
+
               // Log rejected reasons
               if (businessEthicsResponse.status === 'rejected') {
                 console.error('[GREETING SECTIONS] Business Ethics error:', businessEthicsResponse.reason);
@@ -1688,7 +1597,7 @@ const HomeScreen: React.FC = React.memo(() => {
                 console.error('[GREETING SECTIONS] Success Mindset error:', successMindsetResponse.reason);
               }
             }
-            
+
             // Handle greeting sections responses - Set first 3 items immediately
             const greetingUpdates = {
               businessEthics: businessEthicsResponse.status === 'fulfilled' && businessEthicsResponse.value.length > 0
@@ -1713,7 +1622,7 @@ const HomeScreen: React.FC = React.memo(() => {
                 ? { display: businessQuotesResponse.value.slice(0, 3), raw: businessQuotesResponse.value }
                 : { display: [], raw: [] },
             };
-            
+
             if (__DEV__) {
               console.log('[GREETING SECTIONS] Final Updates:', {
                 businessEthics: greetingUpdates.businessEthics.display.length,
@@ -1742,15 +1651,15 @@ const HomeScreen: React.FC = React.memo(() => {
             setBusinessMarketingTipsTemplatesRaw(greetingUpdates.businessMarketingTips.raw);
             setBusinessQuotesTemplates(greetingUpdates.businessQuotes.display);
             setBusinessQuotesTemplatesRaw(greetingUpdates.businessQuotes.raw);
-            
+
             // Mark greeting sections as loaded to prevent them from disappearing
             greetingSectionsLoadedRef.current = true;
-            
+
             // Trigger progressive preloading when greeting templates load
             setTimeout(() => {
               startProgressiveImagePreloading();
             }, 200);
-            
+
             if (__DEV__) {
               console.log('[GREETING SECTIONS] G�� State updated immediately - sections should be visible now');
             }
@@ -1760,18 +1669,18 @@ const HomeScreen: React.FC = React.memo(() => {
             }
           }
         })(); // Execute immediately, don't await
-    } catch (error) {
-      // Only catch unexpected errors (like state setting errors or promise.allSettled issues)
-      // Expected API errors are already handled above
-      if (__DEV__) {
-        devError('Unexpected error loading API data:', error);
+      } catch (error) {
+        // Only catch unexpected errors (like state setting errors or promise.allSettled issues)
+        // Expected API errors are already handled above
+        if (__DEV__) {
+          devError('Unexpected error loading API data:', error);
+        }
+        // Don't set apiError here unless it's a truly unexpected error
+        // Most errors should be handled by Promise.allSettled above
+        React.startTransition(() => {
+          setApiLoading(false);
+        });
       }
-      // Don't set apiError here unless it's a truly unexpected error
-      // Most errors should be handled by Promise.allSettled above
-      React.startTransition(() => {
-        setApiLoading(false);
-      });
-    }
     });
   }, [filterDiwaliContent]);
 
@@ -1802,7 +1711,7 @@ const HomeScreen: React.FC = React.memo(() => {
     try {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
+
       // Format date string helper
       const formatDateString = (date: Date): string => {
         const year = date.getFullYear();
@@ -1810,7 +1719,7 @@ const HomeScreen: React.FC = React.memo(() => {
         const day = date.getDate();
         return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       };
-      
+
       // Load today's poster immediately
       const todayString = formatDateString(today);
       try {
@@ -1825,7 +1734,7 @@ const HomeScreen: React.FC = React.memo(() => {
           devError('Error loading today\'s calendar posters:', error);
         }
       }
-      
+
       // Load rest of the dates (next 15 days) in the background
       // Use setTimeout to ensure it doesn't block the UI
       setTimeout(async () => {
@@ -1836,7 +1745,7 @@ const HomeScreen: React.FC = React.memo(() => {
             const date = new Date(today);
             date.setDate(today.getDate() + i);
             const dateString = formatDateString(date);
-            
+
             datePromises.push(
               calendarApi.getPostersByDate(dateString)
                 .then(response => {
@@ -1848,10 +1757,10 @@ const HomeScreen: React.FC = React.memo(() => {
                 .catch(() => [])
             );
           }
-          
+
           const results = await Promise.all(datePromises);
           const futurePosters = results.flat();
-          
+
           // Merge with today's posters (remove duplicates)
           setCalendarPosters(prevPosters => {
             const allPosters = [...prevPosters, ...futurePosters];
@@ -1866,7 +1775,7 @@ const HomeScreen: React.FC = React.memo(() => {
           }
         }
       }, 0); // Execute in next event loop tick
-      
+
     } catch (error) {
       if (__DEV__) {
         devError('Error loading calendar posters:', error);
@@ -1881,9 +1790,9 @@ const HomeScreen: React.FC = React.memo(() => {
       return;
     }
     apiDataLoadedRef.current = true;
-    
+
     let isMounted = true;
-    
+
     const loadInitialData = () => {
       // Don't await - make it truly non-blocking for instant UI
       // Load API data in background
@@ -1892,7 +1801,7 @@ const HomeScreen: React.FC = React.memo(() => {
           devError('Error loading API data:', error);
         }
       });
-      
+
       // Load calendar posters in background after critical content loads
       // Delay calendar loading for instant initial load
       setTimeout(() => {
@@ -1901,19 +1810,19 @@ const HomeScreen: React.FC = React.memo(() => {
         }
       }, 500);
     };
-    
+
     // Load initial data immediately for faster startup (reduced delay)
     // Use small timeout to ensure UI renders first, but don't wait for all interactions
     setTimeout(() => {
       loadInitialData();
     }, 100); // Reduced delay for faster initial load
-    
+
     // Start progressive image preloading after initial render
     // This runs in parallel with data loading for optimal performance
     setTimeout(() => {
       startProgressiveImagePreloading();
     }, 200); // Start preloading 200ms after initial render
-    
+
     return () => {
       isMounted = false;
     };
@@ -1936,19 +1845,19 @@ const HomeScreen: React.FC = React.memo(() => {
             try {
               const response = await businessCategoryPostersApi.getPostersByCategory(category.name, 200); // Request all posters to show complete collection
               const posters = response.data?.posters || [];
-              
+
               const templates = posters
                 .map((poster: any) => convertBusinessPosterToTemplate(poster, category.name))
                 .filter((template: Template) => !!template.thumbnail)
                 .slice(0, 6); // Show 6 images for business categories
-              
+
               if (templates.length > 0) {
                 // Prefetch first thumbnail immediately for instant display
                 const firstThumbnail = templates[0]?.thumbnail;
                 if (firstThumbnail) {
-                  Image.prefetch(firstThumbnail).catch(() => {});
+                  Image.prefetch(firstThumbnail).catch(() => { });
                 }
-                
+
                 return { categoryId: category.id, templates, success: true };
               }
             } catch (error) {
@@ -2016,7 +1925,7 @@ const HomeScreen: React.FC = React.memo(() => {
           const directImage = category.imageUrl;
           if (directImage) {
             // Prefetch and update state immediately
-            Image.prefetch(directImage).catch(() => {});
+            Image.prefetch(directImage).catch(() => { });
             React.startTransition(() => {
               setGreetingCategoryImages(prev => ({ ...prev, [category.id]: directImage }));
             });
@@ -2026,14 +1935,14 @@ const HomeScreen: React.FC = React.memo(() => {
           // Use searchTemplatesFast directly (optimized for small limits, has caching)
           // Limit to 1 for fastest response - we only need one thumbnail
           const templates = await greetingTemplatesService.searchTemplatesFast(category.name, undefined, 1);
-          
+
           // Use first template (fast search already filters by tags)
           const selectedTemplate = templates?.[0];
           const previewUrl = selectedTemplate?.thumbnail || selectedTemplate?.content?.background;
-          
+
           if (previewUrl) {
             // Prefetch image immediately
-            Image.prefetch(previewUrl).catch(() => {});
+            Image.prefetch(previewUrl).catch(() => { });
             // Update state immediately for this category (progressive display)
             React.startTransition(() => {
               setGreetingCategoryImages(prev => ({ ...prev, [category.id]: previewUrl }));
@@ -2090,9 +1999,9 @@ const HomeScreen: React.FC = React.memo(() => {
       return;
     }
     greetingCategoriesLoadedRef.current = true;
-    
+
     let isMounted = true;
-    
+
     const loadGreetingCategoriesList = async () => {
       setGreetingCategoriesLoading(true);
       try {
@@ -2109,7 +2018,7 @@ const HomeScreen: React.FC = React.memo(() => {
 
           // Store all categories for lazy loading
           setAllGreetingCategories(mappedCategories);
-          
+
           // Set both states from single API call
           // Use startTransition to prevent blocking other sections from rendering
           React.startTransition(() => {
@@ -2117,7 +2026,7 @@ const HomeScreen: React.FC = React.memo(() => {
             setGreetingCategoriesList(mappedCategories);
             const newGreetingCategories = mappedCategories.map(({ id, name, icon }) => ({ id, name, icon }));
             setGreetingCategories(newGreetingCategories); // Also set for rotating categories
-            
+
             // Trigger initial animation when categories are first loaded (faster)
             if (newGreetingCategories.length > 0) {
               // Use small timeout instead of InteractionManager for faster animation start
@@ -2126,14 +2035,14 @@ const HomeScreen: React.FC = React.memo(() => {
               }, 50); // Small delay to ensure UI is ready
             }
           });
-          
+
           // Load greeting category preview images INSTANTLY - all first 5 in parallel
           // Start immediately without any delay - images will appear progressively
           const initialCategories = mappedCategories.slice(0, 5);
           // Process all 5 categories in parallel immediately (no batching, no delay)
           // Each category updates state independently as soon as its image is found
           fetchGreetingCategoryPreviewImages(initialCategories, true); // true = isInitialLoad
-          
+
           if (__DEV__) {
           }
         }
@@ -2147,9 +2056,9 @@ const HomeScreen: React.FC = React.memo(() => {
         }
       }
     };
-    
+
     loadGreetingCategoriesList();
-    
+
     return () => {
       isMounted = false;
     };
@@ -2193,14 +2102,8 @@ const HomeScreen: React.FC = React.memo(() => {
 
   // Load business categories and filter out user's own category (only called once on mount with ref guard)
   useEffect(() => {
-    // Prevent duplicate calls even in React Strict Mode
-    if (businessCategoriesLoadedRef.current) {
-      return;
-    }
-    businessCategoriesLoadedRef.current = true;
-    
     let isMounted = true;
-    
+
     const loadBusinessCategories = async () => {
       setBusinessCategoriesLoading(true);
       try {
@@ -2214,49 +2117,49 @@ const HomeScreen: React.FC = React.memo(() => {
           // Get all categories from response (for rotation)
           // Handle both response structures: response.categories or response.data?.categories
           const allCategories = response.categories || (response as any).data?.categories || [];
-          
+
           if (!allCategories || allCategories.length === 0) {
             if (__DEV__) {
               devWarn('G��n+� [BUSINESS CATEGORIES] No categories in response:', response);
             }
             return;
           }
-          
+
           // Get current user's business category (subcategory is what user actually selected)
           const currentUser = authService.getCurrentUser();
           const userSubCategory = currentUser?.subCategory || currentUser?.subcategory || '';
           const selectedProfileSubCategory = selectedBusinessProfile?.subCategory || selectedBusinessProfile?.subcategory || '';
-          
+
           console.log('=��� [BUSINESS CATEGORY FILTER]', {
             userSubCategory: userSubCategory,
             selectedProfileSubCategory: selectedProfileSubCategory,
             currentUser: currentUser
           });
-          
+
           // Filter out user's own business category and selected business profile's category (for section display only)
           const filteredCategories = allCategories.filter((category: BusinessCategory) => {
             const categoryName = category.name?.trim() || '';
             const userSubCategoryName = userSubCategory?.trim() || '';
             const selectedProfileSubCategoryName = selectedProfileSubCategory?.trim() || '';
-            
+
             // Check if user's subcategory matches this business category name
             const matchesUserSubCategory = categoryName.toLowerCase() === userSubCategoryName.toLowerCase();
-            
+
             // Check if selected profile's subcategory matches this business category name
             const matchesSelectedProfileSubCategory = categoryName.toLowerCase() === selectedProfileSubCategoryName.toLowerCase();
-            
+
             // Check if user's subcategory matches any subcategory within this business category
             const containsUserSubCategory = category.subCategories?.some((subCat: any) => {
               const subCatName = typeof subCat === 'string' ? subCat : subCat?.name;
               return subCatName?.toLowerCase() === userSubCategoryName.toLowerCase();
             }) || false;
-            
+
             // Check if selected profile's subcategory matches any subcategory within this business category
             const containsSelectedProfileSubCategory = category.subCategories?.some((subCat: any) => {
               const subCatName = typeof subCat === 'string' ? subCat : subCat?.name;
               return subCatName?.toLowerCase() === selectedProfileSubCategoryName.toLowerCase();
             }) || false;
-            
+
             console.log('=��� [FILTERING CATEGORY]', {
               categoryName: categoryName,
               userSubCategoryName: userSubCategoryName,
@@ -2267,18 +2170,18 @@ const HomeScreen: React.FC = React.memo(() => {
               containsSelectedProfileSubCategory: containsSelectedProfileSubCategory,
               shouldExclude: matchesUserSubCategory || matchesSelectedProfileSubCategory || containsUserSubCategory || containsSelectedProfileSubCategory
             });
-            
+
             // Exclude categories that match user's subcategory or selected profile's subcategory
-            const shouldExclude = matchesUserSubCategory || 
-                                matchesSelectedProfileSubCategory || 
-                                containsUserSubCategory || 
-                                containsSelectedProfileSubCategory;
-            
+            const shouldExclude = matchesUserSubCategory ||
+              matchesSelectedProfileSubCategory ||
+              containsUserSubCategory ||
+              containsSelectedProfileSubCategory;
+
             return !shouldExclude;
           });
-          
+
           setBusinessCategories(filteredCategories);
-          
+
           // Set rotating business categories for button display (use ALL categories including user's own)
           // This ensures we have categories to rotate through in the button
           const rotatingCategories = allCategories
@@ -2287,17 +2190,17 @@ const HomeScreen: React.FC = React.memo(() => {
               id: category.id,
               name: category.name.trim(),
             }));
-          
+
           if (rotatingCategories.length > 0) {
             setRotatingBusinessCategories(rotatingCategories);
             // Reset index to 0 when categories are loaded
             setCurrentBusinessCategoryIndex(0);
-            
+
             // Trigger initial animation when categories are first loaded
             InteractionManager.runAfterInteractions(() => {
               animateBusinessCategoryChange();
             });
-            
+
             if (__DEV__) {
             }
           } else {
@@ -2305,11 +2208,11 @@ const HomeScreen: React.FC = React.memo(() => {
               devWarn('G��n+� [ROTATING BUSINESS CATEGORIES] No valid categories found');
             }
           }
-          
+
           // Load business category preview images immediately (no delay)
           // First batch loads instantly, remaining load progressively
           fetchBusinessCategoryPreviewImages(filteredCategories, 3); // Process 3 at a time
-          
+
           if (__DEV__) {
           }
         } else {
@@ -2327,13 +2230,13 @@ const HomeScreen: React.FC = React.memo(() => {
         }
       }
     };
-    
+
     loadBusinessCategories();
-    
+
     return () => {
       isMounted = false;
     };
-  }, []); // Empty dependency array - only run once on mount (fetchBusinessCategoryPreviewImages is stable)
+  }, [selectedBusinessProfile?.id, selectedBusinessProfile?.subcategory, selectedBusinessProfile?.subCategory]);
 
   // Fetch preview images for categories missing previews when modal opens
   useEffect(() => {
@@ -2357,7 +2260,7 @@ const HomeScreen: React.FC = React.memo(() => {
   // Initialize animations immediately on mount
   useEffect(() => {
     if (animationsInitializedRef.current) return;
-    
+
     // Use InteractionManager to start animations after initial render
     const interaction = InteractionManager.runAfterInteractions(() => {
       // Ensure fade animations start at visible state
@@ -2365,7 +2268,7 @@ const HomeScreen: React.FC = React.memo(() => {
       businessCategoryFadeAnim.setValue(1);
       animationsInitializedRef.current = true;
     });
-    
+
     return () => {
       interaction.cancel();
     };
@@ -2375,7 +2278,7 @@ const HomeScreen: React.FC = React.memo(() => {
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
     let interactionHandle: any = null;
-    
+
     // Start rotation immediately, even if categories are empty (will use fallback)
     const startRotation = () => {
       if (greetingCategories.length > 0) {
@@ -2391,10 +2294,10 @@ const HomeScreen: React.FC = React.memo(() => {
         }, 3000);
       }
     };
-    
+
     // Start immediately
     startRotation();
-    
+
     // Also ensure it starts after interactions complete
     interactionHandle = InteractionManager.runAfterInteractions(() => {
       if (interval) {
@@ -2402,7 +2305,7 @@ const HomeScreen: React.FC = React.memo(() => {
       }
       startRotation();
     });
-    
+
     return () => {
       if (interactionHandle) {
         interactionHandle.cancel();
@@ -2417,7 +2320,7 @@ const HomeScreen: React.FC = React.memo(() => {
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
     let interactionHandle: any = null;
-    
+
     // Start rotation immediately, even if categories are empty (will use fallback)
     const startRotation = () => {
       if (rotatingBusinessCategories.length > 0) {
@@ -2433,10 +2336,10 @@ const HomeScreen: React.FC = React.memo(() => {
         }, 3000);
       }
     };
-    
+
     // Start immediately
     startRotation();
-    
+
     // Also ensure it starts after interactions complete
     interactionHandle = InteractionManager.runAfterInteractions(() => {
       if (interval) {
@@ -2444,7 +2347,7 @@ const HomeScreen: React.FC = React.memo(() => {
       }
       startRotation();
     });
-    
+
     return () => {
       if (interactionHandle) {
         interactionHandle.cancel();
@@ -2482,15 +2385,15 @@ const HomeScreen: React.FC = React.memo(() => {
       businessMarketingTipsTemplatesRaw.length,
       businessQuotesTemplatesRaw.length,
     ].join(',');
-    
+
     // If lengths haven't changed, return cached result (optimization)
-    if (greetingTemplatesCacheRef.current.lengthsSignature === currentLengthsSignature && 
-        greetingTemplatesCacheRef.current.templates.length > 0) {
+    if (greetingTemplatesCacheRef.current.lengthsSignature === currentLengthsSignature &&
+      greetingTemplatesCacheRef.current.templates.length > 0) {
       return greetingTemplatesCacheRef.current.templates;
     }
-    
+
     const all: any[] = [];
-    
+
     // Collect from all greeting sections (use Raw arrays for complete data)
     if (businessEthicsTemplatesRaw.length > 0) all.push(...businessEthicsTemplatesRaw);
     if (successMindsetTemplatesRaw.length > 0) all.push(...successMindsetTemplatesRaw);
@@ -2499,7 +2402,7 @@ const HomeScreen: React.FC = React.memo(() => {
     if (businessLegendQuoteTemplatesRaw.length > 0) all.push(...businessLegendQuoteTemplatesRaw);
     if (businessMarketingTipsTemplatesRaw.length > 0) all.push(...businessMarketingTipsTemplatesRaw);
     if (businessQuotesTemplatesRaw.length > 0) all.push(...businessQuotesTemplatesRaw);
-    
+
     // Convert greeting templates to Template format for unified search
     const converted = all.map(greetingTemplate => ({
       id: greetingTemplate.id,
@@ -2513,13 +2416,13 @@ const HomeScreen: React.FC = React.memo(() => {
       isGreeting: true, // Flag to identify greeting templates
       originalTemplate: greetingTemplate, // Keep reference to original
     }));
-    
+
     // Cache the result
     greetingTemplatesCacheRef.current = {
       templates: converted,
       lengthsSignature: currentLengthsSignature,
     };
-    
+
     return converted;
   }, [
     businessEthicsTemplatesRaw,
@@ -2556,40 +2459,40 @@ const HomeScreen: React.FC = React.memo(() => {
       setCurrentRequestId(requestId);
       setIsSearching(true);
       setDisableBackgroundUpdates(true);
-      
+
       // Use local search immediately for better performance
       // Search in name, category, description, and tags
       const searchLower = searchQuery.toLowerCase();
-      
+
       // Check if search query matches any General Category name
-      const matchingCategories = filteredGreetingCategoriesList.filter(category => 
-        category.name.toLowerCase().includes(searchLower) || 
+      const matchingCategories = filteredGreetingCategoriesList.filter(category =>
+        category.name.toLowerCase().includes(searchLower) ||
         searchLower.includes(category.name.toLowerCase())
       );
       const matchingCategoryNames = matchingCategories.map(category => category.name.toLowerCase());
-      
+
       // Check if search query matches any Business Category name
-      const matchingBusinessCategories = businessCategories.filter(category => 
-        category.name.toLowerCase().includes(searchLower) || 
+      const matchingBusinessCategories = businessCategories.filter(category =>
+        category.name.toLowerCase().includes(searchLower) ||
         searchLower.includes(category.name.toLowerCase())
       );
       const matchingBusinessCategoryNames = matchingBusinessCategories.map(category => category.name.toLowerCase());
-      
+
       // Combine greeting templates, calendar posters, and business category previews for unified search
       const allBusinessCategoryTemplates = Object.values(businessCategoryPreviews).flat();
       const allTemplates = [...allGreetingTemplates, ...calendarPosters, ...allBusinessCategoryTemplates];
-      
+
       // First, show immediate local results
       const filtered = allTemplates.filter(template => {
         // Search in name
         if (template.name?.toLowerCase().includes(searchLower)) return true;
-        
+
         // Search in category
         if (template.category?.toLowerCase().includes(searchLower)) return true;
-        
+
         // Search in description
         if (template.description?.toLowerCase().includes(searchLower)) return true;
-        
+
         // Search in tags array (including calendar posters tags)
         if (template.tags && Array.isArray(template.tags)) {
           const tagMatch = template.tags.some((tag: string) => {
@@ -2601,37 +2504,37 @@ const HomeScreen: React.FC = React.memo(() => {
           });
           if (tagMatch) return true;
         }
-        
+
         // Search in festival name for calendar posters
         if ((template as any).festivalName && (template as any).festivalName.toLowerCase().includes(searchLower)) {
           return true;
         }
-        
+
         // Check if template category matches any General Category name
-        if (template.category && matchingCategoryNames.some(catName => 
+        if (template.category && matchingCategoryNames.some(catName =>
           template.category?.toLowerCase().includes(catName)
         )) {
           return true;
         }
-        
+
         // Check if template category matches any Business Category name
-        if (template.category && matchingBusinessCategoryNames.some(catName => 
+        if (template.category && matchingBusinessCategoryNames.some(catName =>
           template.category?.toLowerCase().includes(catName)
         )) {
           return true;
         }
-        
+
         return false;
       });
-      
+
       // Remove duplicates based on id
       const uniqueFiltered = Array.from(
         new Map(filtered.map(template => [template.id, template])).values()
       );
-      
+
       // Set initial results immediately
       setTemplates(uniqueFiltered);
-      
+
       // Then fetch General Category templates if search matches a category and update results
       if (matchingCategories.length > 0 || matchingBusinessCategories.length > 0) {
         (async () => {
@@ -2648,7 +2551,7 @@ const HomeScreen: React.FC = React.memo(() => {
                 return [];
               }
             });
-            
+
             // Fetch Business Category templates
             const businessCategoryResultsPromises = matchingBusinessCategories.map(async (category) => {
               try {
@@ -2661,15 +2564,15 @@ const HomeScreen: React.FC = React.memo(() => {
                 return [];
               }
             });
-            
+
             const [generalCategoryResultsArrays, businessCategoryResultsArrays] = await Promise.all([
               Promise.all(generalCategoryResultsPromises),
               Promise.all(businessCategoryResultsPromises)
             ]);
-            
+
             const generalCategoryResults = generalCategoryResultsArrays.flat();
             const businessCategoryResults = businessCategoryResultsArrays.flat();
-            
+
             // Convert general category results to Template format
             const convertedGeneralCategoryResults = generalCategoryResults.map(greetingTemplate => ({
               id: greetingTemplate.id,
@@ -2683,7 +2586,7 @@ const HomeScreen: React.FC = React.memo(() => {
               isGreeting: true,
               originalTemplate: greetingTemplate,
             }));
-            
+
             // Convert business category results to Template format
             const convertedBusinessCategoryResults = businessCategoryResults.map((poster: any) => ({
               id: poster.id,
@@ -2697,13 +2600,13 @@ const HomeScreen: React.FC = React.memo(() => {
               isBusiness: true,
               originalTemplate: poster,
             }));
-            
+
             // Combine with existing results and remove duplicates
             const allResults = [...uniqueFiltered, ...convertedGeneralCategoryResults, ...convertedBusinessCategoryResults];
             const finalUniqueResults = Array.from(
               new Map(allResults.map(template => [template.id, template])).values()
             );
-            
+
             if (currentRequestId === requestId) {
               setTemplates(finalUniqueResults);
             }
@@ -2714,21 +2617,21 @@ const HomeScreen: React.FC = React.memo(() => {
           }
         })();
       }
-      
+
       // Try API search in background
       setTimeout(async () => {
         if (currentRequestId !== requestId) return;
         try {
           // Search greeting templates via API
           const greetingResults = await greetingTemplatesService.searchTemplates(searchQuery);
-          
+
           // Check if search query matches any General Category name
           const searchLower = searchQuery.toLowerCase();
-          const matchingCategories = filteredGreetingCategoriesList.filter(category => 
-            category.name.toLowerCase().includes(searchLower) || 
+          const matchingCategories = filteredGreetingCategoriesList.filter(category =>
+            category.name.toLowerCase().includes(searchLower) ||
             searchLower.includes(category.name.toLowerCase())
           );
-          
+
           // Search for templates in matching General Categories
           const generalCategoryResultsPromises = matchingCategories.map(async (category) => {
             try {
@@ -2741,10 +2644,10 @@ const HomeScreen: React.FC = React.memo(() => {
               return [];
             }
           });
-          
+
           const generalCategoryResultsArrays = await Promise.all(generalCategoryResultsPromises);
           const generalCategoryResults = generalCategoryResultsArrays.flat();
-          
+
           // Convert greeting results to Template format
           const convertedGreetingResults = greetingResults.map(greetingTemplate => ({
             id: greetingTemplate.id,
@@ -2758,7 +2661,7 @@ const HomeScreen: React.FC = React.memo(() => {
             isGreeting: true,
             originalTemplate: greetingTemplate,
           }));
-          
+
           // Convert general category results to Template format
           const convertedGeneralCategoryResults = generalCategoryResults.map(greetingTemplate => ({
             id: greetingTemplate.id,
@@ -2772,13 +2675,13 @@ const HomeScreen: React.FC = React.memo(() => {
             isGreeting: true,
             originalTemplate: greetingTemplate,
           }));
-          
+
           // Combine results and remove duplicates based on id
           const allResults = [...convertedGreetingResults, ...convertedGeneralCategoryResults];
           const uniqueApiResults = Array.from(
             new Map(allResults.map(template => [template.id, template])).values()
           );
-          
+
           if (currentRequestId === requestId) {
             // Merge API results with existing local results, preserving local results
             setTemplates(prevTemplates => {
@@ -2791,8 +2694,8 @@ const HomeScreen: React.FC = React.memo(() => {
         } catch (error) {
           if (__DEV__) {
             if (__DEV__) {
-            devError('Search error:', error);
-          }
+              devError('Search error:', error);
+            }
           }
         }
       }, 100);
@@ -2804,19 +2707,19 @@ const HomeScreen: React.FC = React.memo(() => {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    
+
     try {
       // Clear all caches before refreshing
       homeApi.clearCache();
       greetingTemplatesService.clearCache(); // Clear greeting templates cache
       calendarApi.clearCache(); // Clear calendar posters cache to show newly posted images
-      
+
       // Force refresh calendar component by updating refresh key
       setCalendarRefreshKey(prev => prev + 1);
-      
+
       // Force refresh categories to ensure deleted categories are removed
       await greetingTemplatesService.refreshCategories();
-      
+
       // Refresh API data
       await loadApiData(true);
     } catch (error) {
@@ -2842,12 +2745,12 @@ const HomeScreen: React.FC = React.memo(() => {
 
   const handleDownloadTemplate = useCallback(async (templateId: string) => {
     // Update local state immediately for better UX
-    setTemplates(prev => prev.map(template => 
-      template.id === templateId 
+    setTemplates(prev => prev.map(template =>
+      template.id === templateId
         ? { ...template, isDownloaded: true, downloads: template.downloads + 1 }
         : template
     ));
-    
+
     // Try API call in background
     setTimeout(async () => {
       try {
@@ -2863,52 +2766,52 @@ const HomeScreen: React.FC = React.memo(() => {
   const handleSearch = useCallback(async () => {
     const requestId = currentRequestId + 1;
     setCurrentRequestId(requestId);
-    
+
     if (!searchQuery.trim()) {
       setIsSearching(false);
       setDisableBackgroundUpdates(false); // Re-enable background updates when clearing search
       setTemplates([]);
       return;
     }
-    
+
     setIsSearching(true);
     setDisableBackgroundUpdates(true); // Disable background updates when searching
     // Use local search immediately for better performance with API data
     const searchLower = searchQuery.toLowerCase();
-    
+
     // Check if search query matches any General Category name
     const matchingCategoryNames = filteredGreetingCategoriesList
-      .filter(category => 
-        category.name.toLowerCase().includes(searchLower) || 
+      .filter(category =>
+        category.name.toLowerCase().includes(searchLower) ||
         searchLower.includes(category.name.toLowerCase())
       )
       .map(category => category.name.toLowerCase());
-    
+
     // Check if search query matches any Business Category name
     const matchingBusinessCategoryNames = businessCategories
-      .filter(category => 
-        category.name.toLowerCase().includes(searchLower) || 
+      .filter(category =>
+        category.name.toLowerCase().includes(searchLower) ||
         searchLower.includes(category.name.toLowerCase())
       )
       .map(category => category.name.toLowerCase());
-    
+
     // Debug logging
     console.log('=��� [SEARCH DEBUG] Search query:', searchQuery);
     console.log('=��� [SEARCH DEBUG] Business categories available:', businessCategories.map(c => c.name));
     console.log('=��� [SEARCH DEBUG] Matching business categories:', matchingBusinessCategoryNames);
     console.log('=��� [SEARCH DEBUG] Matching greeting categories:', matchingCategoryNames);
-    
+
     // Local search removed - only API search for greeting templates
     setTemplates([]);
-    
+
     // Try API search in background
     setTimeout(async () => {
       // Check if this is still the current request
       if (currentRequestId !== requestId) return;
-      
+
       try {
         const results = await dashboardService.searchTemplates(searchQuery);
-        
+
         // Search for templates in matching General Categories
         const generalCategoryResultsPromises = matchingCategoryNames.map(async (categoryName) => {
           try {
@@ -2921,7 +2824,7 @@ const HomeScreen: React.FC = React.memo(() => {
             return [];
           }
         });
-        
+
         // Search for templates in matching Business Categories
         const businessCategoryResultsPromises = matchingBusinessCategoryNames.map(async (categoryName) => {
           try {
@@ -2934,18 +2837,18 @@ const HomeScreen: React.FC = React.memo(() => {
             return [];
           }
         });
-        
+
         const [generalCategoryResultsArrays, businessCategoryResultsArrays] = await Promise.all([
           Promise.all(generalCategoryResultsPromises),
           Promise.all(businessCategoryResultsPromises)
         ]);
-        
+
         const generalCategoryResults = generalCategoryResultsArrays.flat();
         const businessCategoryResults = businessCategoryResultsArrays.flat();
-        
+
         console.log('=��� [SEARCH DEBUG] General category results count:', generalCategoryResults.length);
         console.log('=��� [SEARCH DEBUG] Business category results count:', businessCategoryResults.length);
-        
+
         // Convert general category results to Template format
         const convertedGeneralCategoryResults = generalCategoryResults.map(greetingTemplate => ({
           id: greetingTemplate.id,
@@ -2959,7 +2862,7 @@ const HomeScreen: React.FC = React.memo(() => {
           isGreeting: true,
           originalTemplate: greetingTemplate,
         }));
-        
+
         // Convert business category results to Template format
         const convertedBusinessCategoryResults = businessCategoryResults.map((poster: any) => ({
           id: poster.id,
@@ -2973,17 +2876,17 @@ const HomeScreen: React.FC = React.memo(() => {
           isBusiness: true,
           originalTemplate: poster,
         }));
-        
+
         // Combine results and remove duplicates
         const allResults = [...convertedGeneralCategoryResults, ...convertedBusinessCategoryResults];
         const uniqueResults = Array.from(
           new Map(allResults.map(template => [template.id, template])).values()
         );
-        
+
         console.log('=��� [SEARCH DEBUG] Total results before dedup:', allResults.length);
         console.log('=��� [SEARCH DEBUG] Unique results after dedup:', uniqueResults.length);
         console.log('=��� [SEARCH DEBUG] Business templates in results:', convertedBusinessCategoryResults.length);
-        
+
         // Only update if this is still the current request and we're still searching
         if (currentRequestId === requestId && isSearching) {
           // Merge API results with existing local results, preserving local results
@@ -3001,52 +2904,52 @@ const HomeScreen: React.FC = React.memo(() => {
   }, [searchQuery, activeTab, currentRequestId, isSearching, filteredGreetingCategoriesList, businessCategories]);
 
   // Memoized lookup maps for O(1) access instead of O(n) find operations
-const videoContentMap = useMemo(() => {
-  const map = new Map();
-  videoContent.forEach(video => map.set(video.id, video));
-  return map;
-}, [videoContent]);
+  const videoContentMap = useMemo(() => {
+    const map = new Map();
+    videoContent.forEach(video => map.set(video.id, video));
+    return map;
+  }, [videoContent]);
 
 
-// Memoize business category previews to prevent unnecessary re-renders
-const memoizedBusinessCategoryPreviews = useMemo(() => {
-  return businessCategoryPreviews;
-}, [businessCategoryPreviews]);
+  // Memoize business category previews to prevent unnecessary re-renders
+  const memoizedBusinessCategoryPreviews = useMemo(() => {
+    return businessCategoryPreviews;
+  }, [businessCategoryPreviews]);
 
-const handleTemplatePress = useCallback((template: Template | VideoContent | any) => {
-  // Navigate immediately using optimized O(1) lookups
-  // Check for video match using O(1) lookup
-  const matchedVideo = videoContentMap.get(template.id);
+  const handleTemplatePress = useCallback((template: Template | VideoContent | any) => {
+    // Navigate immediately using optimized O(1) lookups
+    // Check for video match using O(1) lookup
+    const matchedVideo = videoContentMap.get(template.id);
 
-  if (matchedVideo) {
-    // Pre-filter related videos for faster access
-    const related = videoContent.filter(video => video.id !== matchedVideo.id);
-    navigation.navigate('VideoPlayer', {
-      selectedVideo: matchedVideo,
-      relatedVideos: related,
-    });
-    return;
-  }
+    if (matchedVideo) {
+      // Pre-filter related videos for faster access
+      const related = videoContent.filter(video => video.id !== matchedVideo.id);
+      navigation.navigate('VideoPlayer', {
+        selectedVideo: matchedVideo,
+        relatedVideos: related,
+      });
+      return;
+    }
 
-  // Check if it's a greeting template
-  if (template.isGreeting && template.originalTemplate) {
-    // Navigate immediately with pre-computed related templates
-    const relatedTemplates = allGreetingTemplates.filter(t => t.id !== template.id);
+    // Check if it's a greeting template
+    if (template.isGreeting && template.originalTemplate) {
+      // Navigate immediately with pre-computed related templates
+      const relatedTemplates = allGreetingTemplates.filter(t => t.id !== template.id);
+      navigation.navigate('PosterPlayer', {
+        selectedPoster: template.originalTemplate,
+        relatedPosters: relatedTemplates.map(t => t.originalTemplate || t),
+        searchQuery: searchQuery,
+        templateSource: 'greeting',
+      });
+      return;
+    }
+
+    // Navigate to PosterPlayer with template
     navigation.navigate('PosterPlayer', {
-      selectedPoster: template.originalTemplate,
-      relatedPosters: relatedTemplates.map(t => t.originalTemplate || t),
-      searchQuery: searchQuery,
-      templateSource: 'greeting',
+      selectedPoster: template as Template,
+      relatedPosters: [],
     });
-    return;
-  }
-
-  // Navigate to PosterPlayer with template
-  navigation.navigate('PosterPlayer', {
-    selectedPoster: template as Template,
-    relatedPosters: [],
-  });
-}, [videoContentMap, videoContent, allGreetingTemplates, navigation, searchQuery]);
+  }, [videoContentMap, videoContent, allGreetingTemplates, navigation, searchQuery]);
 
   const closeModal = useCallback(() => {
     setIsModalVisible(false);
@@ -3087,18 +2990,19 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
     }
   }, [userBusinessProfiles.length, isBusinessProfileDropdownVisible, closeBusinessProfileDropdown]);
 
-  const handleBusinessProfileSelect = useCallback((profileId: string) => {
-    setSelectedBusinessProfileId(profileId);
+  const handleBusinessProfileSelect = useCallback(async (profileId: string) => {
+    const profile = userBusinessProfiles.find(p => p.id === profileId) || null;
+    await setSelectedBusinessProfile(profile);
     closeBusinessProfileDropdown();
     businessCategoryPostersApi.clearCache();
-  }, [closeBusinessProfileDropdown]);
+  }, [closeBusinessProfileDropdown, userBusinessProfiles, setSelectedBusinessProfile]);
 
   const handleWhatsAppPress = useCallback(async () => {
     try {
       const phoneNumber = '918551941415'; // Phone number without + sign for WhatsApp (8551941415 with country code 91)
       const message = 'Hello, I need support';
       const url = `whatsapp://send?phone=${phoneNumber}&text=${encodeURIComponent(message)}`;
-      
+
       const canOpen = await Linking.canOpenURL(url);
       if (canOpen) {
         await Linking.openURL(url);
@@ -3258,15 +3162,15 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
 
   const handleBusinessButtonPress = useCallback(() => {
     setSelectedCategory('business');
-    
+
     // Clear any existing highlight timeout
     if (highlightTimeoutRef.current) {
       clearTimeout(highlightTimeoutRef.current);
     }
-    
+
     // Highlight the business categories section
     setIsBusinessCategoriesHighlighted(true);
-    
+
     // Clear highlight after 3 seconds
     highlightTimeoutRef.current = setTimeout(() => {
       setIsBusinessCategoriesHighlighted(false);
@@ -3288,7 +3192,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
     const featuredItem = featuredContent.find(fc => fc.id === item.id);
     // Prioritize thumbnailUrl for faster loading, fallback to imageUrl
     const bannerImageUrl = featuredItem?.thumbnailUrl || item.imageUrl;
-    
+
     // Convert featured content to Template format for navigation
     const convertFeaturedContentToTemplate = (featured: FeaturedContent): Template => ({
       id: featured.id,
@@ -3303,7 +3207,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
     const handleBannerPress = () => {
       // Find the clicked featured content item
       const clickedFeaturedContent = featuredContent.find(fc => fc.id === item.id);
-      
+
       if (!clickedFeaturedContent) {
         // Fallback if featured content not found
         const bannerTemplate: Template = {
@@ -3323,7 +3227,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
 
       // Convert clicked item to template
       const selectedTemplate = convertFeaturedContentToTemplate(clickedFeaturedContent);
-      
+
       // Get other featured content items (excluding the clicked one) and convert to templates
       const relatedTemplates = featuredContent
         .filter(fc => fc.id !== item.id)
@@ -3341,32 +3245,32 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
         style={styles.bannerContainerWrapper}
         onPress={handleBannerPress}
       >
-                 <View style={styles.bannerContainer}>
-          <OptimizedImage 
-            uri={bannerImageUrl} 
+        <View style={styles.bannerContainer}>
+          <OptimizedImage
+            uri={bannerImageUrl}
             style={styles.bannerImage}
             resizeMode="cover"
             mode="thumbnail"
           />
-           <LinearGradient
-             colors={['transparent', 'rgba(0,0,0,0.7)']}
-             style={styles.bannerOverlay}
-           />
-           <View style={styles.bannerContent}>
-             {/* Banner title removed as per user request */}
-             <TouchableOpacity 
-               style={[styles.bannerButton, { backgroundColor: theme.colors.cardBackground }]}
-               onPress={handleBannerPress}
-             >
-               <Text style={[styles.bannerButtonText, { color: theme.colors.primary }]}>VIEW</Text>
-             </TouchableOpacity>
-           </View>
-         </View>
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.7)']}
+            style={styles.bannerOverlay}
+          />
+          <View style={styles.bannerContent}>
+            {/* Banner title removed as per user request */}
+            <TouchableOpacity
+              style={[styles.bannerButton, { backgroundColor: theme.colors.cardBackground }]}
+              onPress={handleBannerPress}
+            >
+              <Text style={[styles.bannerButtonText, { color: theme.colors.primary }]}>VIEW</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </TouchableOpacity>
     );
   }, [theme, navigation, featuredContent]);
 
-                                       
+
 
   const renderTemplate = useCallback(({ item }: { item: Template }) => {
     return (
@@ -3412,7 +3316,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
   // These are stable functions that won't change on every render
   // Using useCallback instead of useMemo for better performance
 
-  const businessEthicsCategoryTemplates = useMemo(() => 
+  const businessEthicsCategoryTemplates = useMemo(() =>
     businessEthicsTemplatesRaw.length > 0 ? businessEthicsTemplatesRaw : businessEthicsTemplates,
     [businessEthicsTemplatesRaw, businessEthicsTemplates]
   );
@@ -3427,7 +3331,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
     />
   ), [navigation, theme, cardWidth, businessEthicsCategoryTemplates]);
 
-  const successMindsetCategoryTemplates = useMemo(() => 
+  const successMindsetCategoryTemplates = useMemo(() =>
     successMindsetTemplatesRaw.length > 0 ? successMindsetTemplatesRaw : successMindsetTemplates,
     [successMindsetTemplatesRaw, successMindsetTemplates]
   );
@@ -3442,7 +3346,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
     />
   ), [navigation, theme, cardWidth, successMindsetCategoryTemplates]);
 
-  const socialMediaGrowthCategoryTemplates = useMemo(() => 
+  const socialMediaGrowthCategoryTemplates = useMemo(() =>
     socialMediaGrowthTemplatesRaw.length > 0 ? socialMediaGrowthTemplatesRaw : socialMediaGrowthTemplates,
     [socialMediaGrowthTemplatesRaw, socialMediaGrowthTemplates]
   );
@@ -3457,7 +3361,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
     />
   ), [navigation, theme, cardWidth, socialMediaGrowthCategoryTemplates]);
 
-  const moneyAndFinanceCategoryTemplates = useMemo(() => 
+  const moneyAndFinanceCategoryTemplates = useMemo(() =>
     moneyAndFinanceTemplatesRaw.length > 0 ? moneyAndFinanceTemplatesRaw : moneyAndFinanceTemplates,
     [moneyAndFinanceTemplatesRaw, moneyAndFinanceTemplates]
   );
@@ -3472,7 +3376,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
     />
   ), [navigation, theme, cardWidth, moneyAndFinanceCategoryTemplates]);
 
-  const businessLegendQuoteCategoryTemplates = useMemo(() => 
+  const businessLegendQuoteCategoryTemplates = useMemo(() =>
     businessLegendQuoteTemplatesRaw.length > 0 ? businessLegendQuoteTemplatesRaw : businessLegendQuoteTemplates,
     [businessLegendQuoteTemplatesRaw, businessLegendQuoteTemplates]
   );
@@ -3487,7 +3391,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
     />
   ), [navigation, theme, cardWidth, businessLegendQuoteCategoryTemplates]);
 
-  const businessMarketingTipsCategoryTemplates = useMemo(() => 
+  const businessMarketingTipsCategoryTemplates = useMemo(() =>
     businessMarketingTipsTemplatesRaw.length > 0 ? businessMarketingTipsTemplatesRaw : businessMarketingTipsTemplates,
     [businessMarketingTipsTemplatesRaw, businessMarketingTipsTemplates]
   );
@@ -3502,7 +3406,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
     />
   ), [navigation, theme, cardWidth, businessMarketingTipsCategoryTemplates]);
 
-  const businessQuotesCategoryTemplates = useMemo(() => 
+  const businessQuotesCategoryTemplates = useMemo(() =>
     businessQuotesTemplatesRaw.length > 0 ? businessQuotesTemplatesRaw : businessQuotesTemplates,
     [businessQuotesTemplatesRaw, businessQuotesTemplates]
   );
@@ -3540,7 +3444,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
   // Pagination handlers for greeting sections - load 3 more items when user scrolls
   const loadMoreBusinessEthics = useCallback(async () => {
     if (businessEthicsLoading || businessEthicsTemplates.length >= businessEthicsTemplatesRaw.length) return;
-    
+
     setBusinessEthicsLoading(true);
     try {
       // If we have raw templates, use them; otherwise fetch more
@@ -3572,7 +3476,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
 
   const loadMoreSuccessMindset = useCallback(async () => {
     if (successMindsetLoading || successMindsetTemplates.length >= successMindsetTemplatesRaw.length) return;
-    
+
     setSuccessMindsetLoading(true);
     try {
       if (successMindsetTemplatesRaw.length > successMindsetTemplates.length) {
@@ -3602,7 +3506,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
 
   const loadMoreSocialMediaGrowth = useCallback(async () => {
     if (socialMediaGrowthLoading || socialMediaGrowthTemplates.length >= socialMediaGrowthTemplatesRaw.length) return;
-    
+
     setSocialMediaGrowthLoading(true);
     try {
       if (socialMediaGrowthTemplatesRaw.length > socialMediaGrowthTemplates.length) {
@@ -3632,7 +3536,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
 
   const loadMoreMoneyAndFinance = useCallback(async () => {
     if (moneyAndFinanceLoading || moneyAndFinanceTemplates.length >= moneyAndFinanceTemplatesRaw.length) return;
-    
+
     setMoneyAndFinanceLoading(true);
     try {
       if (moneyAndFinanceTemplatesRaw.length > moneyAndFinanceTemplates.length) {
@@ -3662,7 +3566,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
 
   const loadMoreBusinessLegendQuote = useCallback(async () => {
     if (businessLegendQuoteLoading || businessLegendQuoteTemplates.length >= businessLegendQuoteTemplatesRaw.length) return;
-    
+
     setBusinessLegendQuoteLoading(true);
     try {
       if (businessLegendQuoteTemplatesRaw.length > businessLegendQuoteTemplates.length) {
@@ -3692,7 +3596,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
 
   const loadMoreBusinessMarketingTips = useCallback(async () => {
     if (businessMarketingTipsLoading || businessMarketingTipsTemplates.length >= businessMarketingTipsTemplatesRaw.length) return;
-    
+
     setBusinessMarketingTipsLoading(true);
     try {
       if (businessMarketingTipsTemplatesRaw.length > businessMarketingTipsTemplates.length) {
@@ -3722,7 +3626,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
 
   const loadMoreBusinessQuotes = useCallback(async () => {
     if (businessQuotesLoading || businessQuotesTemplates.length >= businessQuotesTemplatesRaw.length) return;
-    
+
     setBusinessQuotesLoading(true);
     try {
       if (businessQuotesTemplatesRaw.length > businessQuotesTemplates.length) {
@@ -3765,13 +3669,13 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
     onPress: () => void;
   }
 
-  const ModalTemplateItem: React.FC<ModalTemplateItemProps> = React.memo(({ 
-    template, 
-    modalCardWidth, 
-    modalCardGap, 
-    modalColumns, 
-    index, 
-    onPress 
+  const ModalTemplateItem: React.FC<ModalTemplateItemProps> = React.memo(({
+    template,
+    modalCardWidth,
+    modalCardGap,
+    modalColumns,
+    index,
+    onPress
   }) => {
     const isLastInRow = (index + 1) % modalColumns === 0;
     return (
@@ -3785,10 +3689,10 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
         onPress={onPress}
       >
         <View style={styles.upcomingEventModalImageContainer}>
-          <OptimizedImage 
-            uri={template.thumbnail} 
-            style={styles.upcomingEventModalImage} 
-            resizeMode="cover" 
+          <OptimizedImage
+            uri={template.thumbnail}
+            style={styles.upcomingEventModalImage}
+            resizeMode="cover"
           />
           <LinearGradient
             colors={['transparent', 'rgba(0,0,0,0.8)']}
@@ -3818,13 +3722,13 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
     onPress: () => void;
   }
 
-  const ModalVideoItem: React.FC<ModalVideoItemProps> = React.memo(({ 
-    video, 
-    modalCardWidth, 
-    modalCardGap, 
-    modalColumns, 
-    index, 
-    onPress 
+  const ModalVideoItem: React.FC<ModalVideoItemProps> = React.memo(({
+    video,
+    modalCardWidth,
+    modalCardGap,
+    modalColumns,
+    index,
+    onPress
   }) => {
     const isLastInRow = (index + 1) % modalColumns === 0;
     return (
@@ -3838,10 +3742,10 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
         onPress={onPress}
       >
         <View style={styles.upcomingEventModalImageContainer}>
-          <OptimizedImage 
-            uri={video.thumbnail} 
-            style={styles.upcomingEventModalImage} 
-            resizeMode="cover" 
+          <OptimizedImage
+            uri={video.thumbnail}
+            style={styles.upcomingEventModalImage}
+            resizeMode="cover"
           />
           <LinearGradient
             colors={['transparent', 'rgba(0,0,0,0.8)']}
@@ -3871,13 +3775,13 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
     onPress: () => void;
   }
 
-  const ModalFeaturedItem: React.FC<ModalFeaturedItemProps> = React.memo(({ 
-    featured, 
-    modalCardWidth, 
-    modalCardGap, 
-    modalColumns, 
-    index, 
-    onPress 
+  const ModalFeaturedItem: React.FC<ModalFeaturedItemProps> = React.memo(({
+    featured,
+    modalCardWidth,
+    modalCardGap,
+    modalColumns,
+    index,
+    onPress
   }) => {
     const isLastInRow = (index + 1) % modalColumns === 0;
     return (
@@ -3891,9 +3795,9 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
         onPress={onPress}
       >
         <View style={styles.upcomingEventModalImageContainer}>
-          <OptimizedImage 
-            uri={featured.thumbnailUrl || featured.imageUrl} 
-            style={styles.upcomingEventModalImage} 
+          <OptimizedImage
+            uri={featured.thumbnailUrl || featured.imageUrl}
+            style={styles.upcomingEventModalImage}
             resizeMode="cover"
             mode="thumbnail"
           />
@@ -3927,15 +3831,15 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
     onPress: () => void;
   }
 
-  const ModalBusinessCategoryItem: React.FC<ModalBusinessCategoryItemProps> = React.memo(({ 
-    category, 
+  const ModalBusinessCategoryItem: React.FC<ModalBusinessCategoryItemProps> = React.memo(({
+    category,
     previewTemplates,
-    modalCardWidth, 
-    modalCardGap, 
-    modalColumns, 
+    modalCardWidth,
+    modalCardGap,
+    modalColumns,
     index,
     isLastInRow: isLastInRowProp,
-    onPress 
+    onPress
   }) => {
     const displayImage = useMemo(() => {
       const thumbnails = previewTemplates
@@ -3943,7 +3847,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
         .filter((uri): uri is string => typeof uri === 'string' && uri.length > 0);
       return thumbnails[0] || category.imageUrl || (category as any).image || null;
     }, [previewTemplates, category]);
-    
+
     const isLastInRow = isLastInRowProp !== undefined ? isLastInRowProp : (index + 1) % modalColumns === 0;
     return (
       <TouchableOpacity
@@ -3957,10 +3861,10 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
       >
         <View style={styles.upcomingEventModalImageContainer}>
           {displayImage ? (
-            <OptimizedImage 
-              uri={displayImage} 
-              style={styles.upcomingEventModalImage} 
-              resizeMode="cover" 
+            <OptimizedImage
+              uri={displayImage}
+              style={styles.upcomingEventModalImage}
+              resizeMode="cover"
             />
           ) : (
             <View style={[styles.upcomingEventModalImage, { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.05)' }]}>
@@ -3972,7 +3876,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
             style={styles.upcomingEventModalOverlay}
           />
           <View style={styles.businessCategoryModalNameContainer}>
-            <Text 
+            <Text
               style={styles.businessCategoryModalName}
               numberOfLines={1}
               ellipsizeMode="tail"
@@ -3998,7 +3902,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
   // Group business categories by parentCategoryName for sectioned display
   const groupedBusinessCategories = useMemo(() => {
     const groups: Record<string, BusinessCategory[]> = {};
-    
+
     businessCategories.forEach(category => {
       const parentName = category.parentCategoryName || 'General';
       if (!groups[parentName]) {
@@ -4006,7 +3910,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
       }
       groups[parentName].push(category);
     });
-    
+
     // Convert to SectionList format with rows for proper grid layout
     const sections = Object.keys(groups)
       .sort() // Sort section names alphabetically
@@ -4023,14 +3927,14 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
           data: rows, // Each row is an array of categories
         };
       });
-    
+
     return sections;
   }, [businessCategories, modalColumns]);
 
   // Get icon for section type (parentCategoryName) - Business category specific icons
   const getSectionIcon = useCallback((title: string) => {
     const titleLower = title.toLowerCase();
-    
+
     // Business category specific icons
     if (titleLower.includes('restaurant') || titleLower.includes('food') || titleLower.includes('dining')) return 'restaurant';
     if (titleLower.includes('wedding') || titleLower.includes('event') || titleLower.includes('celebration')) return 'celebration';
@@ -4052,7 +3956,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
     if (titleLower.includes('sports') || titleLower.includes('gym') || titleLower.includes('athletic')) return 'sports';
     if (titleLower.includes('pharmacy') || titleLower.includes('drug') || titleLower.includes('medicine')) return 'local-pharmacy';
     if (titleLower.includes('pet') || titleLower.includes('animal') || titleLower.includes('veterinary')) return 'pets';
-    
+
     // Default business icons
     return 'business-center';
   }, []);
@@ -4060,7 +3964,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
   // Render section header for grouped business categories
   const renderBusinessCategorySectionHeader = useCallback((info: { section: { title: string; data: BusinessCategory[][] } }) => {
     const iconName = getSectionIcon(info.section.title);
-    
+
     return (
       <View
         style={[
@@ -4075,7 +3979,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
       >
         <View style={styles.businessCategorySectionHeaderWrapper}>
           <LinearGradient
-            colors={isDarkMode 
+            colors={isDarkMode
               ? [theme.colors.primary + '30', theme.colors.secondary + '20', 'transparent']
               : [theme.colors.primary + '18', theme.colors.secondary + '10', 'transparent']
             }
@@ -4130,7 +4034,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
       categoryName: category.name,
       settingTemplateSource: true
     });
-    
+
     const cachedTemplates = businessCategoryPreviews[category.id];
 
     // Navigate immediately if we have cached templates
@@ -4149,7 +4053,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
     // Navigate immediately with loading state, then load data in background
     // Use loading placeholder since we'll fetch actual data in background
     const firstPoster = null;
-    
+
     navigation.navigate('PosterPlayer', {
       selectedPoster: firstPoster || {
         id: 'loading',
@@ -4194,8 +4098,8 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
     // item is now a row (array of categories)
     // Each row should only contain up to modalColumns items
     return (
-      <View style={[styles.upcomingEventModalRow, { 
-        flexDirection: 'row', 
+      <View style={[styles.upcomingEventModalRow, {
+        flexDirection: 'row',
         flexWrap: 'nowrap',
         width: '100%',
       }]}>
@@ -4465,10 +4369,10 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
     // Only start auto-scroll if user is not manually scrolling
     const startAutoScroll = () => {
       if (isUserScrollingRef.current) return;
-      
+
       autoScrollIntervalRef.current = setInterval(() => {
         if (isUserScrollingRef.current) return;
-        
+
         setFeaturedCarouselIndex(prevIndex => {
           const nextIndex = (prevIndex + 1) % featuredContent.length;
           featuredCarouselIndexRef.current = nextIndex;
@@ -4557,11 +4461,11 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
         .map((item: any) => ({ index: item.index, isViewable: item.isViewable }))
         .filter((item: any) => item.index !== undefined && item.index !== null)
         .sort((a: any, b: any) => b.index - a.index); // Sort descending (highest first)
-      
+
       if (sortedItems.length > 0) {
         // Always use the highest index (most forward item)
         const visibleIndex = sortedItems[0].index;
-        
+
         // Update immediately if index changed - no backward jump prevention needed
         // since we're always picking the most forward item
         if (visibleIndex !== featuredCarouselIndexRef.current) {
@@ -4585,22 +4489,22 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
     const adjustedOffset = scrollOffset - SIDE_PADDING;
     const calculatedIndex = adjustedOffset / (CARD_WIDTH + CARD_SPACING);
     const currentIndex = Math.round(calculatedIndex);
-    
+
     // Update to final position - this should match what onScroll already set
     if (currentIndex >= 0 && currentIndex < featuredContent.length) {
       featuredCarouselIndexRef.current = currentIndex;
       setFeaturedCarouselIndex(currentIndex);
     }
-    
+
     // Mark that user scrolling has ended
     isUserScrollingRef.current = false;
-    
+
     // Restart auto-scroll after a delay
     setTimeout(() => {
       if (!isUserScrollingRef.current && featuredContent.length > 0 && !autoScrollIntervalRef.current) {
         autoScrollIntervalRef.current = setInterval(() => {
           if (isUserScrollingRef.current) return;
-          
+
           setFeaturedCarouselIndex(prevIndex => {
             const nextIndex = (prevIndex + 1) % featuredContent.length;
             featuredCarouselIndexRef.current = nextIndex;
@@ -4653,9 +4557,9 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
       <View
         style={[styles.featuredCarouselCard, { width: '100%', height: featuredCarouselItemHeight }]}
       >
-        <OptimizedImage 
-          uri={item.imageUrl} 
-          style={[styles.featuredCarouselImage, { width: '100%', height: '100%' }]} 
+        <OptimizedImage
+          uri={item.imageUrl}
+          style={[styles.featuredCarouselImage, { width: '100%', height: '100%' }]}
           resizeMode="cover"
           mode="full"
         />
@@ -4668,7 +4572,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
     // Use categoryImage as thumbnail if available, otherwise use empty string
     // PosterPlayerScreen will fetch templates and display the first one, but we want to show the category image initially
     const thumbnail = categoryImage || '';
-    
+
     navigation.navigate('PosterPlayer', {
       selectedPoster: {
         id: 'loading',
@@ -4782,61 +4686,61 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                 </TouchableOpacity>
               </View>
               <ScrollView style={styles.businessProfileDropdownList}>
-                    {userBusinessProfiles.map(profile => {
-                      const isActive = profile.id === selectedBusinessProfileId;
-                      const profileLogo = profile.logo || profile.companyLogo || profile.banner;
-                      const initials = profile.name ? profile.name.split(' ').map(part => part[0]).join('').slice(0, 2).toUpperCase() : 'MB';
-                      return (
-                        <TouchableOpacity
-                          key={profile.id}
-                          style={[
-                            styles.businessProfileDropdownItem,
-                            isActive && styles.businessProfileDropdownItemActive,
-                          ]}
-                          onPress={() => handleBusinessProfileSelect(profile.id)}
-                        >
-                          <View style={styles.businessProfileDropdownItemContent}>
-                            <View style={styles.businessProfileDropdownAvatar}>
-                              {profileLogo ? (
-                                <OptimizedImage
-                                  uri={profileLogo}
-                                  style={styles.businessProfileDropdownAvatarImage}
-                                  resizeMode="cover"
-                                  cacheKey={`business_profile_${profile.id}`}
-                                />
-                              ) : (
-                                <Text style={styles.businessProfileDropdownAvatarText}>{initials}</Text>
-                              )}
-                            </View>
-                            <View style={styles.businessProfileDropdownTextContainer}>
-                              <View style={styles.businessProfileDropdownItemHeader}>
-                                <Text
-                                  style={[
-                                    styles.businessProfileDropdownItemName,
-                                    { color: theme.colors.text },
-                                  ]}
-                                  numberOfLines={1}
-                                >
-                                  {profile.name}
-                                </Text>
-                                {isActive && (
-                                  <Icon name="check" size={moderateScale(16)} color={theme.colors.primary} />
-                                )}
-                              </View>
-                              <Text
-                                style={[
-                                  styles.businessProfileDropdownItemCategory,
-                                  { color: theme.colors.textSecondary },
-                                ]}
-                                numberOfLines={1}
-                              >
-                                {profile.subcategory || profile.subCategory || profile.category || 'General'}
-                              </Text>
-                            </View>
+                {userBusinessProfiles.map(profile => {
+                  const isActive = profile.id === selectedBusinessProfileId;
+                  const profileLogo = profile.logo || profile.companyLogo || profile.banner;
+                  const initials = profile.name ? profile.name.split(' ').map(part => part[0]).join('').slice(0, 2).toUpperCase() : 'MB';
+                  return (
+                    <TouchableOpacity
+                      key={profile.id}
+                      style={[
+                        styles.businessProfileDropdownItem,
+                        isActive && styles.businessProfileDropdownItemActive,
+                      ]}
+                      onPress={() => handleBusinessProfileSelect(profile.id)}
+                    >
+                      <View style={styles.businessProfileDropdownItemContent}>
+                        <View style={styles.businessProfileDropdownAvatar}>
+                          {profileLogo ? (
+                            <OptimizedImage
+                              uri={profileLogo}
+                              style={styles.businessProfileDropdownAvatarImage}
+                              resizeMode="cover"
+                              cacheKey={`business_profile_${profile.id}`}
+                            />
+                          ) : (
+                            <Text style={styles.businessProfileDropdownAvatarText}>{initials}</Text>
+                          )}
+                        </View>
+                        <View style={styles.businessProfileDropdownTextContainer}>
+                          <View style={styles.businessProfileDropdownItemHeader}>
+                            <Text
+                              style={[
+                                styles.businessProfileDropdownItemName,
+                                { color: theme.colors.text },
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {profile.name}
+                            </Text>
+                            {isActive && (
+                              <Icon name="check" size={moderateScale(16)} color={theme.colors.primary} />
+                            )}
                           </View>
-                        </TouchableOpacity>
-                      );
-                    })}
+                          <Text
+                            style={[
+                              styles.businessProfileDropdownItemCategory,
+                              { color: theme.colors.textSecondary },
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {profile.subcategory || profile.subCategory || profile.category || 'General'}
+                          </Text>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
               </ScrollView>
               <TouchableOpacity
                 style={styles.businessProfileDropdownManageButton}
@@ -4855,16 +4759,16 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
   };
 
   return (
-    <SafeAreaView 
+    <SafeAreaView
       style={[styles.container, { backgroundColor: theme.colors.gradient[0] || '#e8e8e8' }]}
       edges={['top', 'left', 'right']}
     >
-      <StatusBar 
+      <StatusBar
         barStyle={isDarkMode ? "light-content" : "dark-content"}
-        backgroundColor="transparent" 
+        backgroundColor="transparent"
         translucent={true}
       />
-      
+
       <LinearGradient
         colors={theme.colors.gradient}
         style={styles.gradientBackground}
@@ -4875,10 +4779,10 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
         <View style={styles.header}>
           <View style={styles.headerTop}>
             {/* User Profile Info */}
-            <View 
+            <View
               style={styles.userProfileSection}
             >
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.userAvatarContainer}
                 onPress={toggleBusinessProfileDropdown}
                 ref={userProfileSectionRef}
@@ -4922,17 +4826,17 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                   <Text style={styles.apiLoadingText}>Loading...</Text>
                 </View>
               )}
-              
+
               {/* Search Button */}
               <TouchableOpacity
                 style={[styles.headerActionButton, { backgroundColor: theme.colors.cardBackground }]}
                 onPress={toggleSearchBar}
                 activeOpacity={0.7}
               >
-                <Icon 
-                  name={isSearchBarVisible ? "close" : "search"} 
-                  size={moderateScale(20)} 
-                  color={theme.colors.text} 
+                <Icon
+                  name={isSearchBarVisible ? "close" : "search"}
+                  size={moderateScale(20)}
+                  color={theme.colors.text}
                 />
               </TouchableOpacity>
 
@@ -4981,7 +4885,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
           </View>
         )}
 
-        <ScrollView 
+        <ScrollView
           ref={scrollViewRef}
           style={styles.content}
           contentContainerStyle={[styles.scrollContent, { paddingBottom: 80 + insets.bottom }]}
@@ -4997,87 +4901,87 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
           {/* Category Buttons */}
           {!isSearching && searchQuery.trim() === '' && (
             <View style={styles.categoryButtonsContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.categoryButton,
-                    styles.categoryButtonBusiness,
-                    selectedCategory === 'business' && styles.categoryButtonActive,
-                  ]}
-                  onPress={handleBusinessButtonPress}
-                  activeOpacity={0.85}
+              <TouchableOpacity
+                style={[
+                  styles.categoryButton,
+                  styles.categoryButtonBusiness,
+                  selectedCategory === 'business' && styles.categoryButtonActive,
+                ]}
+                onPress={handleBusinessButtonPress}
+                activeOpacity={0.85}
+              >
+                <LinearGradient
+                  colors={selectedCategory === 'business'
+                    ? ['#667eea', '#764ba2']
+                    : ['rgba(102, 126, 234, 0.1)', 'rgba(118, 75, 162, 0.05)']
+                  }
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.categoryButtonGradient}
                 >
-                  <LinearGradient
-                    colors={selectedCategory === 'business' 
-                      ? ['#667eea', '#764ba2']
-                      : ['rgba(102, 126, 234, 0.1)', 'rgba(118, 75, 162, 0.05)']
-                    }
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.categoryButtonGradient}
-                  >
-                    <View style={styles.categoryButtonContent}>
-                      <Icon 
-                        name="business" 
-                        size={moderateScale(14)} 
-                        color={selectedCategory === 'business' ? '#ffffff' : '#667eea'} 
-                        style={styles.categoryButtonIcon}
-                      />
-                      <Animated.Text style={[
+                  <View style={styles.categoryButtonContent}>
+                    <Icon
+                      name="business"
+                      size={moderateScale(14)}
+                      color={selectedCategory === 'business' ? '#ffffff' : '#667eea'}
+                      style={styles.categoryButtonIcon}
+                    />
+                    <Animated.Text style={[
+                      styles.categoryButtonText,
+                      styles.categoryButtonTextBusiness,
+                      {
+                        color: selectedCategory === 'business' ? '#ffffff' : '#667eea',
+                        opacity: businessCategoryFadeAnim,
+                      }
+                    ]}>
+                      {businessCategoryButtonLabel}
+                    </Animated.Text>
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.categoryButton,
+                  styles.categoryButtonRotating,
+                  selectedCategory === 'general' && styles.categoryButtonActive,
+                ]}
+                onPress={() => navigation.navigate('GreetingTemplates')}
+                activeOpacity={0.85}
+              >
+                <LinearGradient
+                  colors={['#f093fb', '#f5576c']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.categoryButtonGradient}
+                >
+                  <View style={styles.categoryButtonContent}>
+                    <Icon
+                      name="auto-awesome"
+                      size={moderateScale(14)}
+                      color="#ffffff"
+                      style={styles.categoryButtonIcon}
+                    />
+                    <Animated.Text
+                      style={[
                         styles.categoryButtonText,
-                        styles.categoryButtonTextBusiness,
-                        { 
-                          color: selectedCategory === 'business' ? '#ffffff' : '#667eea',
-                          opacity: businessCategoryFadeAnim,
+                        styles.categoryButtonRotatingText,
+                        {
+                          color: '#ffffff',
+                          opacity: categoryFadeAnim,
+                          flexShrink: 1,
+                          minWidth: 0,
                         }
-                      ]}>
-                        {businessCategoryButtonLabel}
-                      </Animated.Text>
+                      ]}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      {greetingCategoryButtonLabel}
+                    </Animated.Text>
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
             </View>
-                  </LinearGradient>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[
-                    styles.categoryButton,
-                    styles.categoryButtonRotating,
-                    selectedCategory === 'general' && styles.categoryButtonActive,
-                  ]}
-                  onPress={() => navigation.navigate('GreetingTemplates')}
-                  activeOpacity={0.85}
-                >
-                  <LinearGradient
-                    colors={['#f093fb', '#f5576c']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.categoryButtonGradient}
-                  >
-                    <View style={styles.categoryButtonContent}>
-                      <Icon 
-                        name="auto-awesome" 
-                        size={moderateScale(14)} 
-                        color="#ffffff" 
-                        style={styles.categoryButtonIcon}
-                      />
-                      <Animated.Text 
-                        style={[
-                          styles.categoryButtonText,
-                          styles.categoryButtonRotatingText,
-                          { 
-                            color: '#ffffff',
-                            opacity: categoryFadeAnim,
-                            flexShrink: 1,
-                            minWidth: 0,
-                          }
-                        ]}
-                        numberOfLines={1}
-                        ellipsizeMode="tail"
-                      >
-                        {greetingCategoryButtonLabel}
-                      </Animated.Text>
-                    </View>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
           )}
 
           {!isSearching && searchQuery.trim() === '' && featuredContent.length > 0 && (
@@ -5161,7 +5065,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                 if (displayedCategoriesCount < allGreetingCategories.length) {
                   const nextCount = Math.min(displayedCategoriesCount + 5, allGreetingCategories.length);
                   setDisplayedCategoriesCount(nextCount);
-                  
+
                   // Load preview images for newly displayed categories (batched for non-initial)
                   const newCategories = allGreetingCategories.slice(displayedCategoriesCount, nextCount);
                   if (newCategories.length > 0) {
@@ -5228,11 +5132,11 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
           {/* Search Results - Shown only when searching */}
           {isSearching && searchQuery.trim() !== '' && (() => {
             const searchLower = searchQuery.toLowerCase();
-            const matchingCategories = filteredGreetingCategoriesList.filter(category => 
-              category.name.toLowerCase().includes(searchLower) || 
+            const matchingCategories = filteredGreetingCategoriesList.filter(category =>
+              category.name.toLowerCase().includes(searchLower) ||
               searchLower.includes(category.name.toLowerCase())
             );
-            
+
             return (
               <>
                 {/* Show matching General Categories */}
@@ -5254,7 +5158,7 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
                     />
                   </View>
                 )}
-                
+
                 {/* Show matching Templates */}
                 <View style={styles.templatesSection}>
                   <View style={styles.sectionHeader}>
@@ -5295,9 +5199,9 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
           {!isSearching && searchQuery.trim() === '' && videoContent.length > 0 && (
             <View style={styles.videoSection}>
               <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
-                Video Content
-              </Text>
+                <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
+                  Video Content
+                </Text>
                 {renderBrowseAllButton(handleViewAllVideos)}
               </View>
               <FlatList
@@ -5325,12 +5229,12 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
           {/* Business Ethics Section - Hidden when searching */}
           {!isSearching && searchQuery.trim() === '' && businessEthicsTemplates.length > 0 && (
             <View style={styles.templatesSection}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
-                Business Ethics
-              </Text>
-              {renderBrowseAllButton(handleViewAllBusinessEthics)}
-            </View>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
+                  Business Ethics
+                </Text>
+                {renderBrowseAllButton(handleViewAllBusinessEthics)}
+              </View>
               <FlatList
                 data={businessEthicsTemplates}
                 renderItem={renderBusinessEthicsCard}
@@ -5355,12 +5259,12 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
           {/* Success Mindset Section - Hidden when searching */}
           {!isSearching && searchQuery.trim() === '' && (successMindsetTemplates.length > 0 || greetingSectionsLoadedRef.current) && successMindsetTemplates.length > 0 && (
             <View style={styles.templatesSection}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
-                Success Mindset
-              </Text>
-              {renderBrowseAllButton(handleViewAllSuccessMindset)}
-            </View>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
+                  Success Mindset
+                </Text>
+                {renderBrowseAllButton(handleViewAllSuccessMindset)}
+              </View>
               <FlatList
                 data={successMindsetTemplates}
                 renderItem={renderSuccessMindsetCard}
@@ -5385,12 +5289,12 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
           {/* Social Media Growth Section - Hidden when searching */}
           {!isSearching && searchQuery.trim() === '' && socialMediaGrowthTemplates.length > 0 && (
             <View style={styles.templatesSection}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
-                Social Media Growth
-              </Text>
-              {renderBrowseAllButton(handleViewAllSocialMediaGrowth)}
-            </View>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
+                  Social Media Growth
+                </Text>
+                {renderBrowseAllButton(handleViewAllSocialMediaGrowth)}
+              </View>
               <FlatList
                 data={socialMediaGrowthTemplates}
                 renderItem={renderSocialMediaGrowthCard}
@@ -5415,12 +5319,12 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
           {/* Money and Finance Section - Hidden when searching */}
           {!isSearching && searchQuery.trim() === '' && moneyAndFinanceTemplates.length > 0 && (
             <View style={styles.templatesSection}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
-                Money and Finance
-              </Text>
-              {renderBrowseAllButton(handleViewAllMoneyAndFinance)}
-            </View>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
+                  Money and Finance
+                </Text>
+                {renderBrowseAllButton(handleViewAllMoneyAndFinance)}
+              </View>
               <FlatList
                 data={moneyAndFinanceTemplates}
                 renderItem={renderMoneyAndFinanceCard}
@@ -5445,12 +5349,12 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
           {/* Business Legend Quote Section - Hidden when searching */}
           {!isSearching && searchQuery.trim() === '' && businessLegendQuoteTemplates.length > 0 && (
             <View style={styles.templatesSection}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
-                Business Legend Quote
-              </Text>
-              {renderBrowseAllButton(handleViewAllBusinessLegendQuote)}
-            </View>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
+                  Business Legend Quote
+                </Text>
+                {renderBrowseAllButton(handleViewAllBusinessLegendQuote)}
+              </View>
               <FlatList
                 data={businessLegendQuoteTemplates}
                 renderItem={renderBusinessLegendQuoteCard}
@@ -5475,12 +5379,12 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
           {/* Business Marketing Tips Section - Hidden when searching */}
           {!isSearching && searchQuery.trim() === '' && businessMarketingTipsTemplates.length > 0 && (
             <View style={styles.templatesSection}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
-                Business Marketing Tips
-              </Text>
-              {renderBrowseAllButton(handleViewAllBusinessMarketingTips)}
-            </View>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
+                  Business Marketing Tips
+                </Text>
+                {renderBrowseAllButton(handleViewAllBusinessMarketingTips)}
+              </View>
               <FlatList
                 data={businessMarketingTipsTemplates}
                 renderItem={renderBusinessMarketingTipsCard}
@@ -5505,12 +5409,12 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
           {/* Business Quotes Section - Hidden when searching */}
           {!isSearching && searchQuery.trim() === '' && businessQuotesTemplates.length > 0 && (
             <View style={styles.templatesSection}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
-                Business Quotes
-              </Text>
-              {renderBrowseAllButton(handleViewAllBusinessQuotes)}
-            </View>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
+                  Business Quotes
+                </Text>
+                {renderBrowseAllButton(handleViewAllBusinessQuotes)}
+              </View>
               <FlatList
                 data={businessQuotesTemplates}
                 renderItem={renderBusinessQuotesCard}
@@ -5532,695 +5436,695 @@ const handleTemplatePress = useCallback((template: Template | VideoContent | any
             </View>
           )}
 
-                 </ScrollView>
-       </LinearGradient>
+        </ScrollView>
+      </LinearGradient>
 
-       {/* Template Preview Modal */}
-       <Modal
-         visible={isModalVisible}
-         transparent={true}
-         animationType="fade"
-         onRequestClose={closeModal}
-       >
-         <View style={styles.modalOverlay}>
-           <TouchableOpacity 
-             style={styles.modalBackground} 
-             activeOpacity={1} 
-             onPress={closeModal}
-           >
-             <View style={styles.modalContent}>
-               <TouchableOpacity 
-                 style={styles.closeButton}
-                 onPress={closeModal}
-               >
-                 <Text style={styles.closeButtonText}>G��</Text>
-               </TouchableOpacity>
-               {selectedTemplate && (
-                 <>
-                   <View style={styles.modalImageContainer}>
-                     <OptimizedImage 
-                       uri={selectedTemplate.thumbnail} 
-                       style={styles.modalImage}
-                       resizeMode="cover"
-                     />
-                     <LinearGradient
-                       colors={['transparent', 'rgba(0,0,0,0.3)']}
-                       style={styles.modalImageOverlay}
-                     />
-                   </View>
-                   <View style={styles.modalInfoContainer}>
-                     <View style={styles.modalHeader}>
-                       <Text style={styles.modalTitle}>{selectedTemplate.name}</Text>
-                       <Text style={styles.modalCategory}>{selectedTemplate.category}</Text>
-                     </View>
+      {/* Template Preview Modal */}
+      <Modal
+        visible={isModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={closeModal}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={styles.modalBackground}
+            activeOpacity={1}
+            onPress={closeModal}
+          >
+            <View style={styles.modalContent}>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={closeModal}
+              >
+                <Text style={styles.closeButtonText}>G��</Text>
+              </TouchableOpacity>
+              {selectedTemplate && (
+                <>
+                  <View style={styles.modalImageContainer}>
+                    <OptimizedImage
+                      uri={selectedTemplate.thumbnail}
+                      style={styles.modalImage}
+                      resizeMode="cover"
+                    />
+                    <LinearGradient
+                      colors={['transparent', 'rgba(0,0,0,0.3)']}
+                      style={styles.modalImageOverlay}
+                    />
+                  </View>
+                  <View style={styles.modalInfoContainer}>
+                    <View style={styles.modalHeader}>
+                      <Text style={styles.modalTitle}>{selectedTemplate.name}</Text>
+                      <Text style={styles.modalCategory}>{selectedTemplate.category}</Text>
+                    </View>
                     <View style={styles.modalStats}>
                       <View style={styles.modalStat}>
                         <Text style={styles.modalStatLabel}>Downloads</Text>
                         <Text style={styles.modalStatValue}>{selectedTemplate.downloads}</Text>
                       </View>
                     </View>
-                   </View>
-                 </>
-               )}
-             </View>
-           </TouchableOpacity>
-         </View>
-               </Modal>
-
-        {/* Business Categories Modal */}
-        <Modal
-          visible={isBusinessCategoriesModalVisible}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={closeBusinessCategoriesModal}
-        >
-          <View style={styles.modalOverlay} pointerEvents="box-none">
-            <TouchableOpacity
-              style={StyleSheet.absoluteFill}
-              activeOpacity={1}
-              onPress={closeBusinessCategoriesModal}
-            />
-            <View style={[styles.upcomingEventsModalContent, { backgroundColor: theme.colors.surface }]}>
-              <LinearGradient
-                colors={theme.colors.gradient}
-                style={styles.upcomingEventsModalGradient}
-              >
-                <View style={styles.upcomingEventsModalHeader}>
-                  <View style={styles.upcomingEventsModalTitleContainer}>
-                    <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>Business Categories</Text>
                   </View>
-                  <TouchableOpacity 
-                    style={styles.upcomingEventsCloseButton}
-                    onPress={closeBusinessCategoriesModal}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>G��</Text>
-                  </TouchableOpacity>
-                </View>
-              </LinearGradient>
-              {!isBusinessCategoriesModalClosing && (
-                <View style={[styles.upcomingEventsModalBody, { backgroundColor: theme.colors.background }]}>
-                  <SectionList
-                    key={`business-categories-modal-${businessCategories.length}`}
-                    sections={groupedBusinessCategories}
-                    keyExtractor={(item, index) => `row-${index}-${item.map(c => c.id).join('-')}`}
-                    renderItem={renderBusinessCategoryModalItem}
-                    renderSectionHeader={renderBusinessCategorySectionHeader}
-                    contentContainerStyle={styles.upcomingEventsModalScroll}
-                    showsVerticalScrollIndicator={false}
-                    removeClippedSubviews={true}
-                    maxToRenderPerBatch={10}
-                    windowSize={5}
-                    initialNumToRender={10}
-                    updateCellsBatchingPeriod={50}
-                    stickySectionHeadersEnabled={false}
-                  />
-                </View>
+                </>
               )}
             </View>
-          </View>
-        </Modal>
+          </TouchableOpacity>
+        </View>
+      </Modal>
 
-        {/* General Categories Modal */}
-        <Modal
-          visible={isGeneralCategoriesModalVisible}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={closeGeneralCategoriesModal}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.upcomingEventsModalContent}>
-              <LinearGradient
-                colors={['#f5f5f5', '#ffffff']}
-                style={styles.upcomingEventsModalGradient}
-              >
-                <View style={styles.upcomingEventsModalHeader}>
-                  <View style={styles.upcomingEventsModalTitleContainer}>
-                    <Text style={styles.upcomingEventsModalTitle}>General Categories</Text>
-                  </View>
-                  <TouchableOpacity 
-                    style={styles.upcomingEventsCloseButton}
-                    onPress={closeGeneralCategoriesModal}
-                  >
-                    <Text style={styles.upcomingEventsCloseButtonText}>G��</Text>
-                  </TouchableOpacity>
-                </View>
-              </LinearGradient>
-              <View style={styles.upcomingEventsModalBody}>
-                <FlatList
-                  key={`general-categories-modal-${generalCategoryModalColumns}-${filteredGreetingCategoriesList.length}`}
-                  data={filteredGreetingCategoriesList}
-                  keyExtractor={keyExtractorIdString}
-                  numColumns={generalCategoryModalColumns}
-                  columnWrapperStyle={styles.generalCategoryModalRow}
-                  contentContainerStyle={[
-                    styles.generalCategoryModalList,
-                    {
-                      width: generalCategoryModalContentWidth,
-                      paddingHorizontal: generalCategoryModalHorizontalPadding,
-                      alignSelf: 'center',
-                    },
-                  ]}
-                  showsVerticalScrollIndicator={false}
-                  initialNumToRender={generalCategoryModalInitialRenderCount}
-                  maxToRenderPerBatch={generalCategoryModalColumns * 2}
-                  windowSize={5}
-                  updateCellsBatchingPeriod={80}
-                  removeClippedSubviews={true}
-                  getItemLayout={getGeneralCategoryModalItemLayout}
-                  maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-                  renderItem={({ item, index }) => (
-                    <View
-                      style={[
-                        styles.generalCategoryModalCardWrapper,
-                        {
-                          width: generalCategoryModalCardWidth,
-                          marginRight: (index + 1) % generalCategoryModalColumns === 0 ? 0 : generalCategoryModalGap,
-                        },
-                      ]}
-                    >
-                      <GreetingCategoryCard
-                        item={item}
-                        cardWidth={generalCategoryModalCardWidth}
-                        theme={theme}
-                        categoryImage={memoizedGreetingCategoryImages[item.id] || item.imageUrl || null}
-                        onPress={(category) => {
-                          closeGeneralCategoriesModal();
-                          const categoryImage = memoizedGreetingCategoryImages[item.id] || item.imageUrl || null;
-                          handleGreetingCategoryPress(category, categoryImage);
-                        }}
-                      />
-                    </View>
-                  )}
-                />
-              </View>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Video Content Modal */}
-        <Modal
-          visible={isVideosModalVisible}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={closeVideosModal}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.upcomingEventsModalContent}>
-              <LinearGradient
-                colors={['#f5f5f5', '#ffffff']}
-                style={styles.upcomingEventsModalGradient}
-              >
-                <View style={styles.upcomingEventsModalHeader}>
-                  <View style={styles.upcomingEventsModalTitleContainer}>
-                    <Text style={styles.upcomingEventsModalTitle}>Video Content</Text>
-                  </View>
-                  <TouchableOpacity 
-                    style={styles.upcomingEventsCloseButton}
-                    onPress={closeVideosModal}
-                  >
-                    <Text style={styles.upcomingEventsCloseButtonText}>G��</Text>
-                  </TouchableOpacity>
-                </View>
-              </LinearGradient>
-              <View style={styles.upcomingEventsModalBody}>
-                <FlatList
-                  key={`videos-modal-${videoContent.length}`}
-                  data={videoContent}
-                  keyExtractor={keyExtractorId}
-                  numColumns={modalColumns}
-                  columnWrapperStyle={styles.upcomingEventModalRow}
-                  contentContainerStyle={styles.upcomingEventsModalScroll}
-                  showsVerticalScrollIndicator={false}
-                  removeClippedSubviews={true}
-                  maxToRenderPerBatch={10}
-                  windowSize={5}
-                  initialNumToRender={10}
-                  updateCellsBatchingPeriod={50}
-                  getItemLayout={getModalItemLayout}
-                  renderItem={renderVideoModalItem}
-                />
-              </View>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Customer Support Modal */}
-        <Modal
-          visible={isCustomerSupportModalVisible}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={closeCustomerSupportModal}
-        >
-          <View style={styles.customerSupportModalOverlay}>
-            <TouchableOpacity
-              style={styles.customerSupportModalBackdrop}
-              activeOpacity={1}
-              onPress={closeCustomerSupportModal}
+      {/* Business Categories Modal */}
+      <Modal
+        visible={isBusinessCategoriesModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={closeBusinessCategoriesModal}
+      >
+        <View style={styles.modalOverlay} pointerEvents="box-none">
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={closeBusinessCategoriesModal}
+          />
+          <View style={[styles.upcomingEventsModalContent, { backgroundColor: theme.colors.surface }]}>
+            <LinearGradient
+              colors={theme.colors.gradient}
+              style={styles.upcomingEventsModalGradient}
             >
-              <View style={styles.customerSupportModalContent}>
-                {/* Customer Support Image - Positioned at top */}
-                <View style={styles.customerSupportImageContainer}>
-                  <Image
-                    source={require('../assets/icons/customerSupport.png')}
-                    style={styles.customerSupportImage}
-                    resizeMode="cover"
-                  />
+              <View style={styles.upcomingEventsModalHeader}>
+                <View style={styles.upcomingEventsModalTitleContainer}>
+                  <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>Business Categories</Text>
                 </View>
-
-                {/* Close Button - Overlaps the image */}
                 <TouchableOpacity
-                  style={styles.customerSupportCloseButton}
-                  onPress={closeCustomerSupportModal}
+                  style={styles.upcomingEventsCloseButton}
+                  onPress={closeBusinessCategoriesModal}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.customerSupportCloseButtonText}>G��</Text>
+                  <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>G��</Text>
+                </TouchableOpacity>
+              </View>
+            </LinearGradient>
+            {!isBusinessCategoriesModalClosing && (
+              <View style={[styles.upcomingEventsModalBody, { backgroundColor: theme.colors.background }]}>
+                <SectionList
+                  key={`business-categories-modal-${businessCategories.length}`}
+                  sections={groupedBusinessCategories}
+                  keyExtractor={(item, index) => `row-${index}-${item.map(c => c.id).join('-')}`}
+                  renderItem={renderBusinessCategoryModalItem}
+                  renderSectionHeader={renderBusinessCategorySectionHeader}
+                  contentContainerStyle={styles.upcomingEventsModalScroll}
+                  showsVerticalScrollIndicator={false}
+                  removeClippedSubviews={true}
+                  maxToRenderPerBatch={10}
+                  windowSize={5}
+                  initialNumToRender={10}
+                  updateCellsBatchingPeriod={50}
+                  stickySectionHeadersEnabled={false}
+                />
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* General Categories Modal */}
+      <Modal
+        visible={isGeneralCategoriesModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={closeGeneralCategoriesModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.upcomingEventsModalContent}>
+            <LinearGradient
+              colors={['#f5f5f5', '#ffffff']}
+              style={styles.upcomingEventsModalGradient}
+            >
+              <View style={styles.upcomingEventsModalHeader}>
+                <View style={styles.upcomingEventsModalTitleContainer}>
+                  <Text style={styles.upcomingEventsModalTitle}>General Categories</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.upcomingEventsCloseButton}
+                  onPress={closeGeneralCategoriesModal}
+                >
+                  <Text style={styles.upcomingEventsCloseButtonText}>G��</Text>
+                </TouchableOpacity>
+              </View>
+            </LinearGradient>
+            <View style={styles.upcomingEventsModalBody}>
+              <FlatList
+                key={`general-categories-modal-${generalCategoryModalColumns}-${filteredGreetingCategoriesList.length}`}
+                data={filteredGreetingCategoriesList}
+                keyExtractor={keyExtractorIdString}
+                numColumns={generalCategoryModalColumns}
+                columnWrapperStyle={styles.generalCategoryModalRow}
+                contentContainerStyle={[
+                  styles.generalCategoryModalList,
+                  {
+                    width: generalCategoryModalContentWidth,
+                    paddingHorizontal: generalCategoryModalHorizontalPadding,
+                    alignSelf: 'center',
+                  },
+                ]}
+                showsVerticalScrollIndicator={false}
+                initialNumToRender={generalCategoryModalInitialRenderCount}
+                maxToRenderPerBatch={generalCategoryModalColumns * 2}
+                windowSize={5}
+                updateCellsBatchingPeriod={80}
+                removeClippedSubviews={true}
+                getItemLayout={getGeneralCategoryModalItemLayout}
+                maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+                renderItem={({ item, index }) => (
+                  <View
+                    style={[
+                      styles.generalCategoryModalCardWrapper,
+                      {
+                        width: generalCategoryModalCardWidth,
+                        marginRight: (index + 1) % generalCategoryModalColumns === 0 ? 0 : generalCategoryModalGap,
+                      },
+                    ]}
+                  >
+                    <GreetingCategoryCard
+                      item={item}
+                      cardWidth={generalCategoryModalCardWidth}
+                      theme={theme}
+                      categoryImage={memoizedGreetingCategoryImages[item.id] || item.imageUrl || null}
+                      onPress={(category) => {
+                        closeGeneralCategoriesModal();
+                        const categoryImage = memoizedGreetingCategoryImages[item.id] || item.imageUrl || null;
+                        handleGreetingCategoryPress(category, categoryImage);
+                      }}
+                    />
+                  </View>
+                )}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Video Content Modal */}
+      <Modal
+        visible={isVideosModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={closeVideosModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.upcomingEventsModalContent}>
+            <LinearGradient
+              colors={['#f5f5f5', '#ffffff']}
+              style={styles.upcomingEventsModalGradient}
+            >
+              <View style={styles.upcomingEventsModalHeader}>
+                <View style={styles.upcomingEventsModalTitleContainer}>
+                  <Text style={styles.upcomingEventsModalTitle}>Video Content</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.upcomingEventsCloseButton}
+                  onPress={closeVideosModal}
+                >
+                  <Text style={styles.upcomingEventsCloseButtonText}>G��</Text>
+                </TouchableOpacity>
+              </View>
+            </LinearGradient>
+            <View style={styles.upcomingEventsModalBody}>
+              <FlatList
+                key={`videos-modal-${videoContent.length}`}
+                data={videoContent}
+                keyExtractor={keyExtractorId}
+                numColumns={modalColumns}
+                columnWrapperStyle={styles.upcomingEventModalRow}
+                contentContainerStyle={styles.upcomingEventsModalScroll}
+                showsVerticalScrollIndicator={false}
+                removeClippedSubviews={true}
+                maxToRenderPerBatch={10}
+                windowSize={5}
+                initialNumToRender={10}
+                updateCellsBatchingPeriod={50}
+                getItemLayout={getModalItemLayout}
+                renderItem={renderVideoModalItem}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Customer Support Modal */}
+      <Modal
+        visible={isCustomerSupportModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={closeCustomerSupportModal}
+      >
+        <View style={styles.customerSupportModalOverlay}>
+          <TouchableOpacity
+            style={styles.customerSupportModalBackdrop}
+            activeOpacity={1}
+            onPress={closeCustomerSupportModal}
+          >
+            <View style={styles.customerSupportModalContent}>
+              {/* Customer Support Image - Positioned at top */}
+              <View style={styles.customerSupportImageContainer}>
+                <Image
+                  source={require('../assets/icons/customerSupport.png')}
+                  style={styles.customerSupportImage}
+                  resizeMode="cover"
+                />
+              </View>
+
+              {/* Close Button - Overlaps the image */}
+              <TouchableOpacity
+                style={styles.customerSupportCloseButton}
+                onPress={closeCustomerSupportModal}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.customerSupportCloseButtonText}>G��</Text>
+              </TouchableOpacity>
+
+              {/* Contact Options */}
+              <View style={styles.customerSupportOptionsContainer}>
+                {/* WhatsApp Option */}
+                <TouchableOpacity
+                  style={styles.customerSupportOptionButton}
+                  onPress={handleWhatsAppPress}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.customerSupportOptionIconContainer}>
+                    <MaterialCommunityIcons name="whatsapp" size={moderateScale(24)} color="#009688" />
+                  </View>
+                  <Text style={styles.customerSupportOptionText}>WhatsApp Us</Text>
+                  <Icon name="chevron-right" size={moderateScale(24)} color="#009688" />
                 </TouchableOpacity>
 
-                {/* Contact Options */}
-                <View style={styles.customerSupportOptionsContainer}>
-                  {/* WhatsApp Option */}
-                  <TouchableOpacity
-                    style={styles.customerSupportOptionButton}
-                    onPress={handleWhatsAppPress}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.customerSupportOptionIconContainer}>
-                      <MaterialCommunityIcons name="whatsapp" size={moderateScale(24)} color="#009688" />
-                    </View>
-                    <Text style={styles.customerSupportOptionText}>WhatsApp Us</Text>
-                    <Icon name="chevron-right" size={moderateScale(24)} color="#009688" />
-                  </TouchableOpacity>
-
-                  {/* Phone Option */}
-                  <TouchableOpacity
-                    style={styles.customerSupportOptionButton}
-                    onPress={handlePhonePress}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.customerSupportOptionIconContainer}>
-                      <Icon name="phone" size={moderateScale(24)} color="#009688" />
-                    </View>
-                    <Text style={styles.customerSupportOptionText}>Call Our Team</Text>
-                    <Icon name="chevron-right" size={moderateScale(24)} color="#009688" />
-                  </TouchableOpacity>
-
-                  {/* Email Option */}
-                  <TouchableOpacity
-                    style={styles.customerSupportOptionButton}
-                    onPress={handleEmailPress}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.customerSupportOptionIconContainer}>
-                      <Icon name="email" size={moderateScale(24)} color="#009688" />
-                    </View>
-                    <Text style={styles.customerSupportOptionText}>Email Us</Text>
-                    <Icon name="chevron-right" size={moderateScale(24)} color="#009688" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </TouchableOpacity>
-          </View>
-        </Modal>
-
-        <ComingSoonModal
-          visible={showVideoComingSoonModal}
-          onClose={() => setShowVideoComingSoonModal(false)}
-          title="Video Editor Coming Soon"
-          subtitle="We are polishing the video creation experience. Stay tuned for the next update!"
-        />
-
-
-        {/* Business Ethics Modal */}
-        <Modal
-          visible={isBusinessEthicsModalVisible}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={closeBusinessEthicsModal}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.upcomingEventsModalContent}>
-              <LinearGradient
-                colors={['#f5f5f5', '#ffffff']}
-                style={styles.upcomingEventsModalGradient}
-              >
-                <View style={styles.upcomingEventsModalHeader}>
-                  <View style={styles.upcomingEventsModalTitleContainer}>
-                    <Text style={styles.upcomingEventsModalTitle}>Business Ethics</Text>
+                {/* Phone Option */}
+                <TouchableOpacity
+                  style={styles.customerSupportOptionButton}
+                  onPress={handlePhonePress}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.customerSupportOptionIconContainer}>
+                    <Icon name="phone" size={moderateScale(24)} color="#009688" />
                   </View>
-                  <TouchableOpacity 
-                    style={styles.upcomingEventsCloseButton}
-                    onPress={closeBusinessEthicsModal}
-                  >
-                    <Text style={styles.upcomingEventsCloseButtonText}>G��</Text>
-                  </TouchableOpacity>
-                </View>
-              </LinearGradient>
-              <View style={styles.upcomingEventsModalBody}>
-                <FlatList
-                  key={`businessethics-modal-${businessEthicsTemplatesRaw.length > 0 ? businessEthicsTemplatesRaw.length : businessEthicsTemplates.length}`}
-                  data={businessEthicsTemplatesRaw.length > 0 ? businessEthicsTemplatesRaw : businessEthicsTemplates}
-                  keyExtractor={keyExtractorId}
-                  numColumns={modalColumns}
-                  columnWrapperStyle={styles.upcomingEventModalRow}
-                  contentContainerStyle={styles.upcomingEventsModalScroll}
-                  showsVerticalScrollIndicator={false}
-                  removeClippedSubviews={true}
-                  maxToRenderPerBatch={10}
-                  windowSize={5}
-                  initialNumToRender={10}
-                  updateCellsBatchingPeriod={50}
-                  getItemLayout={getModalItemLayout}
-                  renderItem={renderBusinessEthicsModalItem}
-                />
+                  <Text style={styles.customerSupportOptionText}>Call Our Team</Text>
+                  <Icon name="chevron-right" size={moderateScale(24)} color="#009688" />
+                </TouchableOpacity>
+
+                {/* Email Option */}
+                <TouchableOpacity
+                  style={styles.customerSupportOptionButton}
+                  onPress={handleEmailPress}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.customerSupportOptionIconContainer}>
+                    <Icon name="email" size={moderateScale(24)} color="#009688" />
+                  </View>
+                  <Text style={styles.customerSupportOptionText}>Email Us</Text>
+                  <Icon name="chevron-right" size={moderateScale(24)} color="#009688" />
+                </TouchableOpacity>
               </View>
             </View>
-          </View>
-        </Modal>
+          </TouchableOpacity>
+        </View>
+      </Modal>
 
-        {/* Success Mindset Modal */}
-        <Modal
-          visible={isSuccessMindsetModalVisible}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={closeSuccessMindsetModal}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.upcomingEventsModalContent}>
-              <LinearGradient
-                colors={['#f5f5f5', '#ffffff']}
-                style={styles.upcomingEventsModalGradient}
-              >
-                <View style={styles.upcomingEventsModalHeader}>
-                  <View style={styles.upcomingEventsModalTitleContainer}>
-                    <Text style={styles.upcomingEventsModalTitle}>Success Mindset</Text>
-                  </View>
-                  <TouchableOpacity 
-                    style={styles.upcomingEventsCloseButton}
-                    onPress={closeSuccessMindsetModal}
-                  >
-                    <Text style={styles.upcomingEventsCloseButtonText}>G��</Text>
-                  </TouchableOpacity>
+      <ComingSoonModal
+        visible={showVideoComingSoonModal}
+        onClose={() => setShowVideoComingSoonModal(false)}
+        title="Video Editor Coming Soon"
+        subtitle="We are polishing the video creation experience. Stay tuned for the next update!"
+      />
+
+
+      {/* Business Ethics Modal */}
+      <Modal
+        visible={isBusinessEthicsModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={closeBusinessEthicsModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.upcomingEventsModalContent}>
+            <LinearGradient
+              colors={['#f5f5f5', '#ffffff']}
+              style={styles.upcomingEventsModalGradient}
+            >
+              <View style={styles.upcomingEventsModalHeader}>
+                <View style={styles.upcomingEventsModalTitleContainer}>
+                  <Text style={styles.upcomingEventsModalTitle}>Business Ethics</Text>
                 </View>
-              </LinearGradient>
-              <View style={styles.upcomingEventsModalBody}>
-                <FlatList
-                  key={`successmindset-modal-${successMindsetTemplatesRaw.length > 0 ? successMindsetTemplatesRaw.length : successMindsetTemplates.length}`}
-                  data={successMindsetTemplatesRaw.length > 0 ? successMindsetTemplatesRaw : successMindsetTemplates}
-                  keyExtractor={keyExtractorId}
-                  numColumns={modalColumns}
-                  columnWrapperStyle={styles.upcomingEventModalRow}
-                  contentContainerStyle={styles.upcomingEventsModalScroll}
-                  showsVerticalScrollIndicator={false}
-                  removeClippedSubviews={true}
-                  maxToRenderPerBatch={10}
-                  windowSize={5}
-                  initialNumToRender={10}
-                  updateCellsBatchingPeriod={50}
-                  getItemLayout={getModalItemLayout}
-                  renderItem={renderSuccessMindsetModalItem}
-                />
+                <TouchableOpacity
+                  style={styles.upcomingEventsCloseButton}
+                  onPress={closeBusinessEthicsModal}
+                >
+                  <Text style={styles.upcomingEventsCloseButtonText}>G��</Text>
+                </TouchableOpacity>
               </View>
+            </LinearGradient>
+            <View style={styles.upcomingEventsModalBody}>
+              <FlatList
+                key={`businessethics-modal-${businessEthicsTemplatesRaw.length > 0 ? businessEthicsTemplatesRaw.length : businessEthicsTemplates.length}`}
+                data={businessEthicsTemplatesRaw.length > 0 ? businessEthicsTemplatesRaw : businessEthicsTemplates}
+                keyExtractor={keyExtractorId}
+                numColumns={modalColumns}
+                columnWrapperStyle={styles.upcomingEventModalRow}
+                contentContainerStyle={styles.upcomingEventsModalScroll}
+                showsVerticalScrollIndicator={false}
+                removeClippedSubviews={true}
+                maxToRenderPerBatch={10}
+                windowSize={5}
+                initialNumToRender={10}
+                updateCellsBatchingPeriod={50}
+                getItemLayout={getModalItemLayout}
+                renderItem={renderBusinessEthicsModalItem}
+              />
             </View>
           </View>
-        </Modal>
+        </View>
+      </Modal>
 
-        {/* Social Media Growth Modal */}
-        <Modal
-          visible={isSocialMediaGrowthModalVisible}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={closeSocialMediaGrowthModal}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.upcomingEventsModalContent}>
-              <LinearGradient
-                colors={['#f5f5f5', '#ffffff']}
-                style={styles.upcomingEventsModalGradient}
-              >
-                <View style={styles.upcomingEventsModalHeader}>
-                  <View style={styles.upcomingEventsModalTitleContainer}>
-                    <Text style={styles.upcomingEventsModalTitle}>Social Media Growth</Text>
-                  </View>
-                  <TouchableOpacity 
-                    style={styles.upcomingEventsCloseButton}
-                    onPress={closeSocialMediaGrowthModal}
-                  >
-                    <Text style={styles.upcomingEventsCloseButtonText}>G��</Text>
-                  </TouchableOpacity>
+      {/* Success Mindset Modal */}
+      <Modal
+        visible={isSuccessMindsetModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={closeSuccessMindsetModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.upcomingEventsModalContent}>
+            <LinearGradient
+              colors={['#f5f5f5', '#ffffff']}
+              style={styles.upcomingEventsModalGradient}
+            >
+              <View style={styles.upcomingEventsModalHeader}>
+                <View style={styles.upcomingEventsModalTitleContainer}>
+                  <Text style={styles.upcomingEventsModalTitle}>Success Mindset</Text>
                 </View>
-              </LinearGradient>
-              <View style={styles.upcomingEventsModalBody}>
-                <FlatList
-                  key={`socialmediagrowth-modal-${socialMediaGrowthTemplatesRaw.length > 0 ? socialMediaGrowthTemplatesRaw.length : socialMediaGrowthTemplates.length}`}
-                  data={socialMediaGrowthTemplatesRaw.length > 0 ? socialMediaGrowthTemplatesRaw : socialMediaGrowthTemplates}
-                  keyExtractor={keyExtractorId}
-                  numColumns={modalColumns}
-                  columnWrapperStyle={styles.upcomingEventModalRow}
-                  contentContainerStyle={styles.upcomingEventsModalScroll}
-                  showsVerticalScrollIndicator={false}
-                  removeClippedSubviews={true}
-                  maxToRenderPerBatch={10}
-                  windowSize={5}
-                  initialNumToRender={10}
-                  updateCellsBatchingPeriod={50}
-                  getItemLayout={getModalItemLayout}
-                  renderItem={renderSocialMediaGrowthModalItem}
-                />
+                <TouchableOpacity
+                  style={styles.upcomingEventsCloseButton}
+                  onPress={closeSuccessMindsetModal}
+                >
+                  <Text style={styles.upcomingEventsCloseButtonText}>G��</Text>
+                </TouchableOpacity>
               </View>
+            </LinearGradient>
+            <View style={styles.upcomingEventsModalBody}>
+              <FlatList
+                key={`successmindset-modal-${successMindsetTemplatesRaw.length > 0 ? successMindsetTemplatesRaw.length : successMindsetTemplates.length}`}
+                data={successMindsetTemplatesRaw.length > 0 ? successMindsetTemplatesRaw : successMindsetTemplates}
+                keyExtractor={keyExtractorId}
+                numColumns={modalColumns}
+                columnWrapperStyle={styles.upcomingEventModalRow}
+                contentContainerStyle={styles.upcomingEventsModalScroll}
+                showsVerticalScrollIndicator={false}
+                removeClippedSubviews={true}
+                maxToRenderPerBatch={10}
+                windowSize={5}
+                initialNumToRender={10}
+                updateCellsBatchingPeriod={50}
+                getItemLayout={getModalItemLayout}
+                renderItem={renderSuccessMindsetModalItem}
+              />
             </View>
           </View>
-        </Modal>
+        </View>
+      </Modal>
 
-        {/* Money and Finance Modal */}
-        <Modal
-          visible={isMoneyAndFinanceModalVisible}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={closeMoneyAndFinanceModal}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.upcomingEventsModalContent}>
-              <LinearGradient
-                colors={['#f5f5f5', '#ffffff']}
-                style={styles.upcomingEventsModalGradient}
-              >
-                <View style={styles.upcomingEventsModalHeader}>
-                  <View style={styles.upcomingEventsModalTitleContainer}>
-                    <Text style={styles.upcomingEventsModalTitle}>Money and Finance</Text>
-                  </View>
-                  <TouchableOpacity 
-                    style={styles.upcomingEventsCloseButton}
-                    onPress={closeMoneyAndFinanceModal}
-                  >
-                    <Text style={styles.upcomingEventsCloseButtonText}>G��</Text>
-                  </TouchableOpacity>
+      {/* Social Media Growth Modal */}
+      <Modal
+        visible={isSocialMediaGrowthModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={closeSocialMediaGrowthModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.upcomingEventsModalContent}>
+            <LinearGradient
+              colors={['#f5f5f5', '#ffffff']}
+              style={styles.upcomingEventsModalGradient}
+            >
+              <View style={styles.upcomingEventsModalHeader}>
+                <View style={styles.upcomingEventsModalTitleContainer}>
+                  <Text style={styles.upcomingEventsModalTitle}>Social Media Growth</Text>
                 </View>
-              </LinearGradient>
-              <View style={styles.upcomingEventsModalBody}>
-                <FlatList
-                  key={`moneyandfinance-modal-${moneyAndFinanceTemplatesRaw.length > 0 ? moneyAndFinanceTemplatesRaw.length : moneyAndFinanceTemplates.length}`}
-                  data={moneyAndFinanceTemplatesRaw.length > 0 ? moneyAndFinanceTemplatesRaw : moneyAndFinanceTemplates}
-                  keyExtractor={keyExtractorId}
-                  numColumns={modalColumns}
-                  columnWrapperStyle={styles.upcomingEventModalRow}
-                  contentContainerStyle={styles.upcomingEventsModalScroll}
-                  showsVerticalScrollIndicator={false}
-                  removeClippedSubviews={true}
-                  maxToRenderPerBatch={10}
-                  windowSize={5}
-                  initialNumToRender={10}
-                  updateCellsBatchingPeriod={50}
-                  getItemLayout={getModalItemLayout}
-                  renderItem={renderMoneyAndFinanceModalItem}
-                />
+                <TouchableOpacity
+                  style={styles.upcomingEventsCloseButton}
+                  onPress={closeSocialMediaGrowthModal}
+                >
+                  <Text style={styles.upcomingEventsCloseButtonText}>G��</Text>
+                </TouchableOpacity>
               </View>
+            </LinearGradient>
+            <View style={styles.upcomingEventsModalBody}>
+              <FlatList
+                key={`socialmediagrowth-modal-${socialMediaGrowthTemplatesRaw.length > 0 ? socialMediaGrowthTemplatesRaw.length : socialMediaGrowthTemplates.length}`}
+                data={socialMediaGrowthTemplatesRaw.length > 0 ? socialMediaGrowthTemplatesRaw : socialMediaGrowthTemplates}
+                keyExtractor={keyExtractorId}
+                numColumns={modalColumns}
+                columnWrapperStyle={styles.upcomingEventModalRow}
+                contentContainerStyle={styles.upcomingEventsModalScroll}
+                showsVerticalScrollIndicator={false}
+                removeClippedSubviews={true}
+                maxToRenderPerBatch={10}
+                windowSize={5}
+                initialNumToRender={10}
+                updateCellsBatchingPeriod={50}
+                getItemLayout={getModalItemLayout}
+                renderItem={renderSocialMediaGrowthModalItem}
+              />
             </View>
           </View>
-        </Modal>
+        </View>
+      </Modal>
 
-        {/* Business Legend Quote Modal */}
-        <Modal
-          visible={isBusinessLegendQuoteModalVisible}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={closeBusinessLegendQuoteModal}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.upcomingEventsModalContent}>
-              <LinearGradient
-                colors={['#f5f5f5', '#ffffff']}
-                style={styles.upcomingEventsModalGradient}
-              >
-                <View style={styles.upcomingEventsModalHeader}>
-                  <View style={styles.upcomingEventsModalTitleContainer}>
-                    <Text style={styles.upcomingEventsModalTitle}>Business Legend Quote</Text>
-                  </View>
-                  <TouchableOpacity 
-                    style={styles.upcomingEventsCloseButton}
-                    onPress={closeBusinessLegendQuoteModal}
-                  >
-                    <Text style={styles.upcomingEventsCloseButtonText}>G��</Text>
-                  </TouchableOpacity>
+      {/* Money and Finance Modal */}
+      <Modal
+        visible={isMoneyAndFinanceModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={closeMoneyAndFinanceModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.upcomingEventsModalContent}>
+            <LinearGradient
+              colors={['#f5f5f5', '#ffffff']}
+              style={styles.upcomingEventsModalGradient}
+            >
+              <View style={styles.upcomingEventsModalHeader}>
+                <View style={styles.upcomingEventsModalTitleContainer}>
+                  <Text style={styles.upcomingEventsModalTitle}>Money and Finance</Text>
                 </View>
-              </LinearGradient>
-              <View style={styles.upcomingEventsModalBody}>
-                <FlatList
-                  key={`businesslegendquote-modal-${businessLegendQuoteTemplatesRaw.length > 0 ? businessLegendQuoteTemplatesRaw.length : businessLegendQuoteTemplates.length}`}
-                  data={businessLegendQuoteTemplatesRaw.length > 0 ? businessLegendQuoteTemplatesRaw : businessLegendQuoteTemplates}
-                  keyExtractor={keyExtractorId}
-                  numColumns={modalColumns}
-                  columnWrapperStyle={styles.upcomingEventModalRow}
-                  contentContainerStyle={styles.upcomingEventsModalScroll}
-                  showsVerticalScrollIndicator={false}
-                  removeClippedSubviews={true}
-                  maxToRenderPerBatch={10}
-                  windowSize={5}
-                  initialNumToRender={10}
-                  updateCellsBatchingPeriod={50}
-                  getItemLayout={getModalItemLayout}
-                  renderItem={renderBusinessLegendQuoteModalItem}
-                />
+                <TouchableOpacity
+                  style={styles.upcomingEventsCloseButton}
+                  onPress={closeMoneyAndFinanceModal}
+                >
+                  <Text style={styles.upcomingEventsCloseButtonText}>G��</Text>
+                </TouchableOpacity>
               </View>
+            </LinearGradient>
+            <View style={styles.upcomingEventsModalBody}>
+              <FlatList
+                key={`moneyandfinance-modal-${moneyAndFinanceTemplatesRaw.length > 0 ? moneyAndFinanceTemplatesRaw.length : moneyAndFinanceTemplates.length}`}
+                data={moneyAndFinanceTemplatesRaw.length > 0 ? moneyAndFinanceTemplatesRaw : moneyAndFinanceTemplates}
+                keyExtractor={keyExtractorId}
+                numColumns={modalColumns}
+                columnWrapperStyle={styles.upcomingEventModalRow}
+                contentContainerStyle={styles.upcomingEventsModalScroll}
+                showsVerticalScrollIndicator={false}
+                removeClippedSubviews={true}
+                maxToRenderPerBatch={10}
+                windowSize={5}
+                initialNumToRender={10}
+                updateCellsBatchingPeriod={50}
+                getItemLayout={getModalItemLayout}
+                renderItem={renderMoneyAndFinanceModalItem}
+              />
             </View>
           </View>
-        </Modal>
+        </View>
+      </Modal>
 
-        {/* Business Marketing Tips Modal */}
-        <Modal
-          visible={isBusinessMarketingTipsModalVisible}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={closeBusinessMarketingTipsModal}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.upcomingEventsModalContent}>
-              <LinearGradient
-                colors={['#f5f5f5', '#ffffff']}
-                style={styles.upcomingEventsModalGradient}
-              >
-                <View style={styles.upcomingEventsModalHeader}>
-                  <View style={styles.upcomingEventsModalTitleContainer}>
-                    <Text style={styles.upcomingEventsModalTitle}>Business Marketing Tips</Text>
-                  </View>
-                  <TouchableOpacity 
-                    style={styles.upcomingEventsCloseButton}
-                    onPress={closeBusinessMarketingTipsModal}
-                  >
-                    <Text style={styles.upcomingEventsCloseButtonText}>G��</Text>
-                  </TouchableOpacity>
+      {/* Business Legend Quote Modal */}
+      <Modal
+        visible={isBusinessLegendQuoteModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={closeBusinessLegendQuoteModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.upcomingEventsModalContent}>
+            <LinearGradient
+              colors={['#f5f5f5', '#ffffff']}
+              style={styles.upcomingEventsModalGradient}
+            >
+              <View style={styles.upcomingEventsModalHeader}>
+                <View style={styles.upcomingEventsModalTitleContainer}>
+                  <Text style={styles.upcomingEventsModalTitle}>Business Legend Quote</Text>
                 </View>
-              </LinearGradient>
-              <View style={styles.upcomingEventsModalBody}>
-                <FlatList
-                  key={`businessmarketingtips-modal-${businessMarketingTipsTemplatesRaw.length > 0 ? businessMarketingTipsTemplatesRaw.length : businessMarketingTipsTemplates.length}`}
-                  data={businessMarketingTipsTemplatesRaw.length > 0 ? businessMarketingTipsTemplatesRaw : businessMarketingTipsTemplates}
-                  keyExtractor={keyExtractorId}
-                  numColumns={modalColumns}
-                  columnWrapperStyle={styles.upcomingEventModalRow}
-                  contentContainerStyle={styles.upcomingEventsModalScroll}
-                  showsVerticalScrollIndicator={false}
-                  removeClippedSubviews={true}
-                  maxToRenderPerBatch={10}
-                  windowSize={5}
-                  initialNumToRender={10}
-                  updateCellsBatchingPeriod={50}
-                  getItemLayout={getModalItemLayout}
-                  renderItem={renderBusinessMarketingTipsModalItem}
-                />
+                <TouchableOpacity
+                  style={styles.upcomingEventsCloseButton}
+                  onPress={closeBusinessLegendQuoteModal}
+                >
+                  <Text style={styles.upcomingEventsCloseButtonText}>G��</Text>
+                </TouchableOpacity>
               </View>
+            </LinearGradient>
+            <View style={styles.upcomingEventsModalBody}>
+              <FlatList
+                key={`businesslegendquote-modal-${businessLegendQuoteTemplatesRaw.length > 0 ? businessLegendQuoteTemplatesRaw.length : businessLegendQuoteTemplates.length}`}
+                data={businessLegendQuoteTemplatesRaw.length > 0 ? businessLegendQuoteTemplatesRaw : businessLegendQuoteTemplates}
+                keyExtractor={keyExtractorId}
+                numColumns={modalColumns}
+                columnWrapperStyle={styles.upcomingEventModalRow}
+                contentContainerStyle={styles.upcomingEventsModalScroll}
+                showsVerticalScrollIndicator={false}
+                removeClippedSubviews={true}
+                maxToRenderPerBatch={10}
+                windowSize={5}
+                initialNumToRender={10}
+                updateCellsBatchingPeriod={50}
+                getItemLayout={getModalItemLayout}
+                renderItem={renderBusinessLegendQuoteModalItem}
+              />
             </View>
           </View>
-        </Modal>
+        </View>
+      </Modal>
 
-        {/* Business Quotes Modal */}
-        <Modal
-          visible={isBusinessQuotesModalVisible}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={closeBusinessQuotesModal}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.upcomingEventsModalContent}>
-              <LinearGradient
-                colors={['#f5f5f5', '#ffffff']}
-                style={styles.upcomingEventsModalGradient}
-              >
-                <View style={styles.upcomingEventsModalHeader}>
-                  <View style={styles.upcomingEventsModalTitleContainer}>
-                    <Text style={styles.upcomingEventsModalTitle}>Business Quotes</Text>
-                  </View>
-                  <TouchableOpacity 
-                    style={styles.upcomingEventsCloseButton}
-                    onPress={closeBusinessQuotesModal}
-                  >
-                    <Text style={styles.upcomingEventsCloseButtonText}>G��</Text>
-                  </TouchableOpacity>
+      {/* Business Marketing Tips Modal */}
+      <Modal
+        visible={isBusinessMarketingTipsModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={closeBusinessMarketingTipsModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.upcomingEventsModalContent}>
+            <LinearGradient
+              colors={['#f5f5f5', '#ffffff']}
+              style={styles.upcomingEventsModalGradient}
+            >
+              <View style={styles.upcomingEventsModalHeader}>
+                <View style={styles.upcomingEventsModalTitleContainer}>
+                  <Text style={styles.upcomingEventsModalTitle}>Business Marketing Tips</Text>
                 </View>
-              </LinearGradient>
-              <View style={styles.upcomingEventsModalBody}>
-                <FlatList
-                  key={`businessquotes-modal-${businessQuotesTemplatesRaw.length > 0 ? businessQuotesTemplatesRaw.length : businessQuotesTemplates.length}`}
-                  data={businessQuotesTemplatesRaw.length > 0 ? businessQuotesTemplatesRaw : businessQuotesTemplates}
-                  keyExtractor={keyExtractorId}
-                  numColumns={modalColumns}
-                  columnWrapperStyle={styles.upcomingEventModalRow}
-                  contentContainerStyle={styles.upcomingEventsModalScroll}
-                  showsVerticalScrollIndicator={false}
-                  removeClippedSubviews={true}
-                  maxToRenderPerBatch={10}
-                  windowSize={5}
-                  initialNumToRender={10}
-                  updateCellsBatchingPeriod={50}
-                  getItemLayout={getModalItemLayout}
-                  renderItem={renderBusinessQuotesModalItem}
-                />
+                <TouchableOpacity
+                  style={styles.upcomingEventsCloseButton}
+                  onPress={closeBusinessMarketingTipsModal}
+                >
+                  <Text style={styles.upcomingEventsCloseButtonText}>G��</Text>
+                </TouchableOpacity>
               </View>
+            </LinearGradient>
+            <View style={styles.upcomingEventsModalBody}>
+              <FlatList
+                key={`businessmarketingtips-modal-${businessMarketingTipsTemplatesRaw.length > 0 ? businessMarketingTipsTemplatesRaw.length : businessMarketingTipsTemplates.length}`}
+                data={businessMarketingTipsTemplatesRaw.length > 0 ? businessMarketingTipsTemplatesRaw : businessMarketingTipsTemplates}
+                keyExtractor={keyExtractorId}
+                numColumns={modalColumns}
+                columnWrapperStyle={styles.upcomingEventModalRow}
+                contentContainerStyle={styles.upcomingEventsModalScroll}
+                showsVerticalScrollIndicator={false}
+                removeClippedSubviews={true}
+                maxToRenderPerBatch={10}
+                windowSize={5}
+                initialNumToRender={10}
+                updateCellsBatchingPeriod={50}
+                getItemLayout={getModalItemLayout}
+                renderItem={renderBusinessMarketingTipsModalItem}
+              />
             </View>
           </View>
-        </Modal>
+        </View>
+      </Modal>
 
-
-        {/* Featured Content Modal */}
-        <Modal visible={isFeaturedContentModalVisible} transparent={true} animationType="slide" onRequestClose={closeFeaturedContentModal}>
-          <View style={styles.modalOverlay}>
-            <View style={styles.upcomingEventsModalContent}>
-              <LinearGradient colors={['#f5f5f5', '#ffffff']} style={styles.upcomingEventsModalGradient}>
-                <View style={styles.upcomingEventsModalHeader}>
-                  <View style={styles.upcomingEventsModalTitleContainer}>
-                    <Text style={styles.upcomingEventsModalTitle}>Featured Content</Text>
-                  </View>
-                  <TouchableOpacity style={styles.upcomingEventsCloseButton} onPress={closeFeaturedContentModal}>
-                    <Text style={styles.upcomingEventsCloseButtonText}>G��</Text>
-                  </TouchableOpacity>
+      {/* Business Quotes Modal */}
+      <Modal
+        visible={isBusinessQuotesModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={closeBusinessQuotesModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.upcomingEventsModalContent}>
+            <LinearGradient
+              colors={['#f5f5f5', '#ffffff']}
+              style={styles.upcomingEventsModalGradient}
+            >
+              <View style={styles.upcomingEventsModalHeader}>
+                <View style={styles.upcomingEventsModalTitleContainer}>
+                  <Text style={styles.upcomingEventsModalTitle}>Business Quotes</Text>
                 </View>
-              </LinearGradient>
-              <View style={styles.upcomingEventsModalBody}>
-                <FlatList
-                  key={`featured-content-modal-${featuredContent.length}`}
-                  data={featuredContent}
-                  keyExtractor={keyExtractorId}
-                  numColumns={modalColumns}
-                  columnWrapperStyle={styles.upcomingEventModalRow}
-                  contentContainerStyle={styles.upcomingEventsModalScroll}
-                  showsVerticalScrollIndicator={false}
-                  removeClippedSubviews={true}
-                  maxToRenderPerBatch={10}
-                  windowSize={5}
-                  initialNumToRender={10}
-                  updateCellsBatchingPeriod={50}
-                  getItemLayout={getModalItemLayout}
-                  renderItem={renderFeaturedContentModalItem}
-                />
+                <TouchableOpacity
+                  style={styles.upcomingEventsCloseButton}
+                  onPress={closeBusinessQuotesModal}
+                >
+                  <Text style={styles.upcomingEventsCloseButtonText}>G��</Text>
+                </TouchableOpacity>
               </View>
+            </LinearGradient>
+            <View style={styles.upcomingEventsModalBody}>
+              <FlatList
+                key={`businessquotes-modal-${businessQuotesTemplatesRaw.length > 0 ? businessQuotesTemplatesRaw.length : businessQuotesTemplates.length}`}
+                data={businessQuotesTemplatesRaw.length > 0 ? businessQuotesTemplatesRaw : businessQuotesTemplates}
+                keyExtractor={keyExtractorId}
+                numColumns={modalColumns}
+                columnWrapperStyle={styles.upcomingEventModalRow}
+                contentContainerStyle={styles.upcomingEventsModalScroll}
+                showsVerticalScrollIndicator={false}
+                removeClippedSubviews={true}
+                maxToRenderPerBatch={10}
+                windowSize={5}
+                initialNumToRender={10}
+                updateCellsBatchingPeriod={50}
+                getItemLayout={getModalItemLayout}
+                renderItem={renderBusinessQuotesModalItem}
+              />
             </View>
           </View>
-        </Modal>
+        </View>
+      </Modal>
 
 
-        </SafeAreaView>
-    );
-  });
+      {/* Featured Content Modal */}
+      <Modal visible={isFeaturedContentModalVisible} transparent={true} animationType="slide" onRequestClose={closeFeaturedContentModal}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.upcomingEventsModalContent}>
+            <LinearGradient colors={['#f5f5f5', '#ffffff']} style={styles.upcomingEventsModalGradient}>
+              <View style={styles.upcomingEventsModalHeader}>
+                <View style={styles.upcomingEventsModalTitleContainer}>
+                  <Text style={styles.upcomingEventsModalTitle}>Featured Content</Text>
+                </View>
+                <TouchableOpacity style={styles.upcomingEventsCloseButton} onPress={closeFeaturedContentModal}>
+                  <Text style={styles.upcomingEventsCloseButtonText}>G��</Text>
+                </TouchableOpacity>
+              </View>
+            </LinearGradient>
+            <View style={styles.upcomingEventsModalBody}>
+              <FlatList
+                key={`featured-content-modal-${featuredContent.length}`}
+                data={featuredContent}
+                keyExtractor={keyExtractorId}
+                numColumns={modalColumns}
+                columnWrapperStyle={styles.upcomingEventModalRow}
+                contentContainerStyle={styles.upcomingEventsModalScroll}
+                showsVerticalScrollIndicator={false}
+                removeClippedSubviews={true}
+                maxToRenderPerBatch={10}
+                windowSize={5}
+                initialNumToRender={10}
+                updateCellsBatchingPeriod={50}
+                getItemLayout={getModalItemLayout}
+                renderItem={renderFeaturedContentModalItem}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+
+    </SafeAreaView>
+  );
+});
 
 HomeScreen.displayName = 'HomeScreen';
 
@@ -6604,77 +6508,77 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(8),
     fontWeight: '600',
   },
-     upcomingEventsSection: {
-     marginBottom: verticalScale(10),
-     paddingHorizontal: moderateScale(8),
-   },
-   sectionHeader: {
-     flexDirection: 'row',
-     justifyContent: 'space-between',
-     alignItems: 'center',
-     paddingHorizontal: moderateScale(10),
-     marginBottom: verticalScale(4),
-   },
+  upcomingEventsSection: {
+    marginBottom: verticalScale(10),
+    paddingHorizontal: moderateScale(8),
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: moderateScale(10),
+    marginBottom: verticalScale(4),
+  },
   viewAllButton: {
-   paddingHorizontal: moderateScale(2),
-   paddingVertical: moderateScale(2),
-   borderRadius: moderateScale(8),
-   overflow: 'hidden',
- },
- viewAllButtonGradient: {
-   paddingHorizontal: moderateScale(6),
-   paddingVertical: moderateScale(3),
-   borderRadius: moderateScale(6),
-   justifyContent: 'center',
-   alignItems: 'center',
-   flexDirection: 'row',
-   gap: moderateScale(2),
- },
+    paddingHorizontal: moderateScale(2),
+    paddingVertical: moderateScale(2),
+    borderRadius: moderateScale(8),
+    overflow: 'hidden',
+  },
+  viewAllButtonGradient: {
+    paddingHorizontal: moderateScale(6),
+    paddingVertical: moderateScale(3),
+    borderRadius: moderateScale(6),
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: moderateScale(2),
+  },
   viewAllButtonText: {
-   fontSize: SCREEN_WIDTH < 360 ? moderateScale(10) : moderateScale(9),
-   fontWeight: '600',
-   color: '#ffffff',
- },
-       upcomingEventsList: {
-      paddingHorizontal: moderateScale(3),
-    },
+    fontSize: SCREEN_WIDTH < 360 ? moderateScale(10) : moderateScale(9),
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  upcomingEventsList: {
+    paddingHorizontal: moderateScale(3),
+  },
   upcomingEventCard: {
-        width: getResponsiveValue(SCREEN_WIDTH * 0.32, SCREEN_WIDTH * 0.28, SCREEN_WIDTH * 0.18),
-        marginRight: moderateScale(3),
-        backgroundColor: 'rgba(255,255,255,0.1)',
-        borderRadius: moderateScale(8),
-        overflow: 'hidden',
-        ...responsiveShadow.small,
-      },
-   upcomingEventImageContainer: {
-     height: verticalScale(60),
-     position: 'relative',
-   },
-   upcomingEventImage: {
-     width: '100%',
-     height: '100%',
-   },
-   upcomingEventOverlay: {
-     position: 'absolute',
-     bottom: 0,
-     left: 0,
-     right: 0,
-     height: 40,
-   },
-   upcomingEventBadge: {
-     position: 'absolute',
-     top: moderateScale(4),
-     left: moderateScale(4),
-     backgroundColor: 'rgba(0,0,0,0.7)',
-     paddingHorizontal: moderateScale(4),
-     paddingVertical: moderateScale(2),
-     borderRadius: moderateScale(6),
-   },
-   upcomingEventBadgeText: {
-     fontSize: moderateScale(7),
-     color: '#ffffff',
-     fontWeight: '600',
-   },
+    width: getResponsiveValue(SCREEN_WIDTH * 0.32, SCREEN_WIDTH * 0.28, SCREEN_WIDTH * 0.18),
+    marginRight: moderateScale(3),
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: moderateScale(8),
+    overflow: 'hidden',
+    ...responsiveShadow.small,
+  },
+  upcomingEventImageContainer: {
+    height: verticalScale(60),
+    position: 'relative',
+  },
+  upcomingEventImage: {
+    width: '100%',
+    height: '100%',
+  },
+  upcomingEventOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 40,
+  },
+  upcomingEventBadge: {
+    position: 'absolute',
+    top: moderateScale(4),
+    left: moderateScale(4),
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: moderateScale(4),
+    paddingVertical: moderateScale(2),
+    borderRadius: moderateScale(6),
+  },
+  upcomingEventBadgeText: {
+    fontSize: moderateScale(7),
+    color: '#ffffff',
+    fontWeight: '600',
+  },
   templatesSection: {
     paddingBottom: verticalScale(15),
     paddingHorizontal: moderateScale(8),
@@ -6797,11 +6701,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...responsiveShadow.small,
   },
-    templateImageContainer: {
-      height: verticalScale(60),
-      position: 'relative',
-      overflow: 'hidden',
-    },
+  templateImageContainer: {
+    height: verticalScale(60),
+    position: 'relative',
+    overflow: 'hidden',
+  },
   templateImage: {
     width: '100%',
     height: '100%',
@@ -6895,546 +6799,546 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
   },
-     templateStat: {
-     fontSize: responsiveFontSize.xs,
-   },
-   modalOverlay: {
-     flex: 1,
-     backgroundColor: 'rgba(0, 0, 0, 0.8)',
-     justifyContent: 'center',
-     alignItems: 'center',
-   },
-   modalBackground: {
-     flex: 1,
-     justifyContent: 'center',
-     alignItems: 'center',
-   },
-   modalContent: {
-     width: SCREEN_WIDTH * 0.92, // Slightly wider
-     height: SCREEN_HEIGHT * 0.75, // Reduced from 0.8
-     backgroundColor: '#ffffff',
-     borderRadius: moderateScale(16), // Reduced from 20
-     overflow: 'hidden',
-     position: 'relative',
-   },
-   closeButton: {
-     position: 'absolute',
-     top: moderateScale(10), // Reduced from 15
-     right: moderateScale(10),
-     width: moderateScale(26), // Reduced from 30
-     height: moderateScale(26),
-     borderRadius: moderateScale(13),
-     backgroundColor: 'rgba(0, 0, 0, 0.4)', // Lighter
-     justifyContent: 'center',
-     alignItems: 'center',
-     zIndex: 10,
-   },
-   closeButtonText: {
-     color: '#ffffff',
-     fontSize: moderateScale(14), // Reduced from 16
-     fontWeight: 'bold',
-   },
-   modalImageContainer: {
-     height: SCREEN_HEIGHT * 0.35, // Reduced from 0.4
-     position: 'relative',
-   },
-   modalImage: {
-     width: '100%',
-     height: '100%',
-   },
-   modalImageOverlay: {
-     position: 'absolute',
-     bottom: 0,
-     left: 0,
-     right: 0,
-     height: moderateScale(40), // Reduced from 60
-   },
-   modalInfoContainer: {
-     flex: 1,
-     padding: moderateScale(12), // Reduced from 18
-   },
-   modalHeader: {
-     marginBottom: verticalScale(8), // Reduced from 12
-   },
-   modalTitle: {
-     fontSize: moderateScale(15), // Reduced from 18
-     fontWeight: 'bold',
-     color: '#333333',
-     marginBottom: moderateScale(3), // Reduced from 4
-   },
-   modalCategory: {
-     fontSize: moderateScale(11), // Reduced from 14
-     color: '#666666',
-     fontWeight: '500',
-   },
-   modalStats: {
-     flexDirection: 'row',
-     justifyContent: 'space-around',
-     marginBottom: verticalScale(12), // Reduced from 20
-     paddingVertical: verticalScale(6), // Reduced from 10
-     backgroundColor: '#f8f9fa',
-     borderRadius: moderateScale(10), // Reduced from 15
-   },
-   modalStat: {
-     alignItems: 'center',
-   },
-   modalStatLabel: {
-     fontSize: moderateScale(9), // Reduced from 12
-     color: '#666666',
-     fontWeight: '500',
-     marginBottom: moderateScale(2), // Reduced from 4
-   },
-   modalStatValue: {
-     fontSize: moderateScale(13), // Reduced from 16
-     fontWeight: 'bold',
-     color: '#333333',
-   },
-   // Upcoming Festivals Modal Styles - Compact & Responsive
+  templateStat: {
+    fontSize: responsiveFontSize.xs,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalBackground: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: SCREEN_WIDTH * 0.92, // Slightly wider
+    height: SCREEN_HEIGHT * 0.75, // Reduced from 0.8
+    backgroundColor: '#ffffff',
+    borderRadius: moderateScale(16), // Reduced from 20
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: moderateScale(10), // Reduced from 15
+    right: moderateScale(10),
+    width: moderateScale(26), // Reduced from 30
+    height: moderateScale(26),
+    borderRadius: moderateScale(13),
+    backgroundColor: 'rgba(0, 0, 0, 0.4)', // Lighter
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  closeButtonText: {
+    color: '#ffffff',
+    fontSize: moderateScale(14), // Reduced from 16
+    fontWeight: 'bold',
+  },
+  modalImageContainer: {
+    height: SCREEN_HEIGHT * 0.35, // Reduced from 0.4
+    position: 'relative',
+  },
+  modalImage: {
+    width: '100%',
+    height: '100%',
+  },
+  modalImageOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: moderateScale(40), // Reduced from 60
+  },
+  modalInfoContainer: {
+    flex: 1,
+    padding: moderateScale(12), // Reduced from 18
+  },
+  modalHeader: {
+    marginBottom: verticalScale(8), // Reduced from 12
+  },
+  modalTitle: {
+    fontSize: moderateScale(15), // Reduced from 18
+    fontWeight: 'bold',
+    color: '#333333',
+    marginBottom: moderateScale(3), // Reduced from 4
+  },
+  modalCategory: {
+    fontSize: moderateScale(11), // Reduced from 14
+    color: '#666666',
+    fontWeight: '500',
+  },
+  modalStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: verticalScale(12), // Reduced from 20
+    paddingVertical: verticalScale(6), // Reduced from 10
+    backgroundColor: '#f8f9fa',
+    borderRadius: moderateScale(10), // Reduced from 15
+  },
+  modalStat: {
+    alignItems: 'center',
+  },
+  modalStatLabel: {
+    fontSize: moderateScale(9), // Reduced from 12
+    color: '#666666',
+    fontWeight: '500',
+    marginBottom: moderateScale(2), // Reduced from 4
+  },
+  modalStatValue: {
+    fontSize: moderateScale(13), // Reduced from 16
+    fontWeight: 'bold',
+    color: '#333333',
+  },
+  // Upcoming Festivals Modal Styles - Compact & Responsive
   upcomingEventsModalContent: {
     width: SCREEN_WIDTH >= 768 ? SCREEN_WIDTH * 0.90 : SCREEN_WIDTH * 0.96,
     maxWidth: SCREEN_WIDTH >= 768 ? 900 : SCREEN_WIDTH * 0.96,
-      height: SCREEN_HEIGHT * 0.85, // Reduced from 0.9
-      backgroundColor: '#ffffff', // This will be overridden by theme in the component
-     borderRadius: moderateScale(8),
-      overflow: 'hidden',
-      position: 'relative',
-      shadowColor: '#000',
-      shadowOffset: {
-        width: 0,
-        height: moderateScale(8), // Reduced from 20
-      },
-      shadowOpacity: 0.2, // Reduced from 0.3
-      shadowRadius: moderateScale(12), // Reduced from 25
-      elevation: 10, // Reduced from 15
-    },
-    upcomingEventsModalGradient: {
-      paddingTop: verticalScale(8), // Further reduced from 15
-      paddingBottom: verticalScale(4), // Further reduced from 6
-    },
-    upcomingEventsModalHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center', // Changed from flex-start to center
-      paddingHorizontal: moderateScale(12),
-    },
-    upcomingEventsModalTitleContainer: {
-      flex: 1,
-      marginRight: moderateScale(6), // Reduced from 8
-    },
-    upcomingEventsModalTitle: {
-      fontSize: SCREEN_WIDTH >= 768 ? moderateScale(15) : moderateScale(13), // Further reduced from 18/16
-      fontWeight: 'bold',
-      color: '#333333', // This will be overridden by theme in the component
-      marginBottom: 0, // No margin needed without subtitle
-      textShadowColor: 'rgba(255,255,255,0.5)',
-      textShadowOffset: { width: 0, height: 0.5 },
-      textShadowRadius: 2,
-    },
-    upcomingEventsModalSubtitle: {
-      fontSize: 0, // Hidden
-      color: 'rgba(255,255,255,0)',
-      fontWeight: '500',
-      display: 'none',
-    },
-    upcomingEventsCloseButton: {
-      width: SCREEN_WIDTH >= 768 ? moderateScale(28) : moderateScale(26), // Further reduced from 36/32
-      height: SCREEN_WIDTH >= 768 ? moderateScale(28) : moderateScale(26),
-      borderRadius: SCREEN_WIDTH >= 768 ? moderateScale(14) : moderateScale(13),
-      backgroundColor: 'rgba(0,0,0,0.08)',
-      justifyContent: 'center',
-      alignItems: 'center',
-      borderWidth: 0.3,
-      borderColor: 'rgba(0,0,0,0.1)',
-    },
-    upcomingEventsCloseButtonText: {
-      fontSize: SCREEN_WIDTH >= 768 ? moderateScale(15) : moderateScale(14), // Further reduced from 18/16
-      color: '#333333',
-      fontWeight: 'bold',
-    },
-    upcomingEventsModalBody: {
-      flex: 1,
-      backgroundColor: '#f8f9fa', // This will be overridden by theme in the component
-    },
-    upcomingEventsModalScroll: {
-      paddingHorizontal: 0, // Remove padding from container, add to rows instead
-      paddingTop: moderateScale(12),
-      paddingBottom: moderateScale(12),
-    },
-    upcomingEventModalRow: {
-      flexDirection: 'row',
-      justifyContent: 'flex-start', // Changed from space-between to align items from left
-      marginBottom: moderateScale(6),
-      paddingLeft: moderateScale(8), // Left padding
-      paddingRight: moderateScale(8), // Right padding - equal to left
-      width: '100%',
-    },
-    upcomingEventModalCard: {
-      // Width is set dynamically via inline styles based on modalColumns
-      // Note: marginRight is applied conditionally in renderItem to avoid extra space on last card
-      backgroundColor: '#ffffff', // This will be overridden by theme in the component
-      borderRadius: moderateScale(8),
-      ...responsiveShadow.small,
-      overflow: 'hidden',
-      borderWidth: 0.5,
-      borderColor: 'rgba(0,0,0,0.03)',
-    },
-      upcomingEventModalImageContainer: {
-        width: '100%',
-        aspectRatio: SCREEN_WIDTH >= 768 ? 1 : 0.9, // More square for compact layout
-        position: 'relative',
-        overflow: 'hidden',
-        borderTopLeftRadius: moderateScale(8),
-        borderTopRightRadius: moderateScale(8),
-      },
-    upcomingEventModalImage: {
-      width: '100%',
-      height: '100%',
-    },
-    upcomingEventModalOverlay: {
-      position: 'absolute',
-      bottom: 0,
-      left: 0,
-      right: 0,
-      height: SCREEN_WIDTH >= 768 ? moderateScale(50) : moderateScale(40), // Reduced from 80/60
-    },
-    upcomingEventModalBadge: {
-      position: 'absolute',
-      top: moderateScale(6), // Reduced from 12
-      left: moderateScale(6),
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: moderateScale(6), // Reduced from 10
-      paddingVertical: moderateScale(3), // Reduced from 6
-      borderRadius: moderateScale(10), // Reduced from 16
-      gap: moderateScale(2), // Reduced from 4
-      shadowColor: '#000',
-      shadowOffset: {
-        width: 0,
-        height: moderateScale(1), // Reduced from 2
-      },
-      shadowOpacity: 0.15, // Reduced from 0.2
-      shadowRadius: moderateScale(3), // Reduced from 4
-      elevation: 2, // Reduced from 3
-    },
-    upcomingEventModalBadgeText: {
-      fontSize: moderateScale(7), // Reduced from 10
-      color: '#ffffff',
-      fontWeight: '700',
-      letterSpacing: 0.3, // Reduced from 0.5
-    },
-    premiumEventBadge: {
-      backgroundColor: 'rgba(0,0,0,0.8)',
-    },
-    premiumEventBadgeText: {
-      color: '#FFD700',
-    },
-    upcomingEventModalContent: {
-      padding: moderateScale(6), // Reduced from responsiveSpacing.sm
-    },
-    upcomingEventModalTitle: {
-      fontSize: SCREEN_WIDTH >= 768 ? moderateScale(13) : moderateScale(12), // Reduced from 16/14
-      fontWeight: 'bold',
-      color: '#333333',
-      marginBottom: moderateScale(2), // Reduced from responsiveSpacing.xs
-    },
-    upcomingEventModalDetails: {
-      gap: moderateScale(2), // Reduced from responsiveSpacing.xs
-    },
-    upcomingEventModalDetail: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    upcomingEventModalDetailLabel: {
-      fontSize: SCREEN_WIDTH >= 768 ? moderateScale(11) : moderateScale(10), // Reduced from 14/13
-      color: '#666666',
-      fontWeight: '500',
-    },
-    // Customer Support Modal Styles
-    customerSupportModalOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    customerSupportModalBackdrop: {
-      flex: 1,
-      width: '100%',
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    customerSupportModalContent: {
-      width: SCREEN_WIDTH >= 768 ? SCREEN_WIDTH * 0.6 : SCREEN_WIDTH * 0.85,
-      maxWidth: 450,
-      minHeight: moderateScale(400), // Increased height to fit all buttons
-      backgroundColor: '#ffffff',
-      borderRadius: moderateScale(12),
-      padding: moderateScale(24),
-      paddingTop: 0, // No top padding since image is at top
-      paddingHorizontal: 0, // No horizontal padding to allow image to stretch
-      position: 'relative',
-      overflow: 'hidden', // Ensure image respects border radius
-      ...responsiveShadow.large,
-    },
-    customerSupportImageContainer: {
-      width: '100%',
-      height: moderateScale(200),
-      position: 'relative',
-      marginTop: 0,
-      marginBottom: moderateScale(8),
-      marginLeft: 0,
-      marginRight: 0,
-    },
-    customerSupportImage: {
-      width: '100%',
-      height: '100%',
-    },
-    customerSupportCloseButton: {
-      position: 'absolute',
-      top: moderateScale(12),
-      right: moderateScale(12),
-      width: moderateScale(32),
-      height: moderateScale(32),
-      borderRadius: moderateScale(16),
-      backgroundColor: 'rgba(255, 255, 255, 0.9)',
-      justifyContent: 'center',
-      alignItems: 'center',
-      zIndex: 20, // Higher z-index to overlap image
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.2,
-      shadowRadius: 4,
-      elevation: 5,
-    },
-    customerSupportCloseButtonText: {
-      fontSize: moderateScale(18),
-      color: '#333333',
-      fontWeight: 'bold',
-    },
-    customerSupportOptionsContainer: {
-      gap: moderateScale(16),
-      marginTop: moderateScale(20),
-      width: '100%',
-      paddingHorizontal: moderateScale(24), // Add horizontal padding for buttons
-    },
-    customerSupportOptionButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: '#ffffff',
-      borderRadius: moderateScale(12),
-      padding: moderateScale(16),
-      borderWidth: 1,
-      borderColor: '#E0E0E0',
-      ...responsiveShadow.small,
-    },
-    customerSupportOptionIconContainer: {
-      width: moderateScale(40),
-      height: moderateScale(40),
-      borderRadius: moderateScale(20),
-      backgroundColor: '#E0F2F1',
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginRight: moderateScale(12),
-    },
-    customerSupportOptionText: {
-      flex: 1,
-      fontSize: moderateScale(14),
-      fontWeight: '500',
-      color: '#333333',
-    },
-    businessProfilePill: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      alignSelf: 'flex-start',
-      marginTop: moderateScale(4),
-      paddingHorizontal: moderateScale(10),
-      paddingVertical: moderateScale(4),
-      borderRadius: moderateScale(20),
-      backgroundColor: 'rgba(102, 126, 234, 0.12)',
-      gap: moderateScale(4),
-    },
-    businessProfilePillText: {
-      fontSize: moderateScale(10),
-      fontWeight: '600',
-      color: '#667eea',
-      maxWidth: moderateScale(140),
-    },
-    businessProfileDropdownOverlay: {
-      ...StyleSheet.absoluteFillObject,
-      zIndex: 50,
-    },
-    businessProfileDropdownBackdrop: {
-      ...StyleSheet.absoluteFillObject,
-      backgroundColor: 'transparent',
-    },
-    businessProfileDropdownContent: {
-      position: 'absolute',
-      borderRadius: moderateScale(12),
-      borderWidth: 1,
-      borderColor: 'rgba(0,0,0,0.12)',
-      ...responsiveShadow.small,
-      paddingVertical: moderateScale(14),
-      paddingHorizontal: moderateScale(12),
-      backgroundColor: '#ffffff',
-      maxHeight: moderateScale(260),
-    },
-    businessProfileDropdownTitle: {
-      fontSize: moderateScale(14),
-      fontWeight: '700',
-      marginBottom: moderateScale(10),
-    },
-    businessProfileDropdownHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: moderateScale(8),
-    },
-    businessProfileDropdownList: {
-      maxHeight: moderateScale(210),
-      marginBottom: moderateScale(12),
-    },
-    businessProfileDropdownItem: {
-      borderWidth: 1,
-      borderColor: '#E0E0E0',
-      borderRadius: moderateScale(12),
-      paddingHorizontal: moderateScale(12),
-      paddingVertical: moderateScale(10),
-      marginBottom: moderateScale(8),
-      backgroundColor: '#ffffff',
-    },
-    businessProfileDropdownItemActive: {
-      borderColor: '#667eea',
-      backgroundColor: 'rgba(102, 126, 234, 0.08)',
-    },
-    businessProfileDropdownItemHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: moderateScale(4),
-    },
-    businessProfileDropdownItemContent: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: moderateScale(10),
-    },
-    businessProfileDropdownAvatar: {
-      width: moderateScale(36),
-      height: moderateScale(36),
-      borderRadius: moderateScale(18),
-      backgroundColor: 'rgba(102, 126, 234, 0.12)',
-      justifyContent: 'center',
-      alignItems: 'center',
-      overflow: 'hidden',
-    },
-    businessProfileDropdownAvatarImage: {
-      width: '100%',
-      height: '100%',
-    },
-    businessProfileDropdownAvatarText: {
-      fontSize: moderateScale(12),
-      fontWeight: '700',
-      color: '#667eea',
-    },
-    businessProfileDropdownTextContainer: {
-      flex: 1,
-    },
-    businessProfileDropdownItemName: {
-      fontSize: moderateScale(12),
-      fontWeight: '600',
-      flex: 1,
-      marginRight: moderateScale(6),
-    },
-    businessProfileDropdownItemCategory: {
-      fontSize: moderateScale(10),
-      fontWeight: '500',
-    },
-    businessProfileDropdownManageButton: {
-      paddingVertical: moderateScale(10),
-      borderRadius: moderateScale(24),
-      backgroundColor: '#667eea',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    businessProfileDropdownManageButtonText: {
-      color: '#ffffff',
-      fontSize: moderateScale(12),
-      fontWeight: '600',
-    },
-    businessProfileDropdownLoading: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: moderateScale(20),
-      gap: moderateScale(6),
-    },
-    businessProfileDropdownLoadingText: {
-      fontSize: moderateScale(10),
-      fontWeight: '500',
-    },
-    businessProfileDropdownEmpty: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: moderateScale(20),
-      gap: moderateScale(10),
-    },
-    businessProfileDropdownEmptyText: {
-      fontSize: moderateScale(11),
-      textAlign: 'center',
-      fontWeight: '500',
-    },
-    generalCategoryModalRow: {
-      justifyContent: 'flex-start',
-      marginBottom: moderateScale(6),
-      paddingHorizontal: 0,
-    },
-    generalCategoryModalList: {
-      paddingHorizontal: moderateScale(8),
-      paddingTop: moderateScale(8),
-      paddingBottom: moderateScale(12),
-    },
-    generalCategoryModalCardWrapper: {
-      marginRight: 0,
-      marginBottom: moderateScale(6),
-    },
-    businessCategorySectionHeaderContainer: {
-      width: '100%',
-    },
-    businessCategorySectionHeaderWrapper: {
-      borderRadius: moderateScale(20),
-      overflow: 'hidden',
-    },
-    businessCategorySectionHeaderGradient: {
-      borderRadius: moderateScale(14),
-      overflow: 'hidden',
-      paddingHorizontal: moderateScale(14),
-      paddingVertical: moderateScale(10),
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: 'rgba(0, 0, 0, 0.04)',
-    },
-    businessCategorySectionHeaderContent: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    businessCategorySectionIconContainer: {
-      width: moderateScale(36),
-      height: moderateScale(36),
-      borderRadius: moderateScale(18),
-      justifyContent: 'center',
-      alignItems: 'center',
-      ...responsiveShadow.small,
-    },
-    businessCategorySectionTitleContainer: {
-      flex: 1,
-    },
-    businessCategorySectionHeaderText: {
-      letterSpacing: 0.4,
-    },
-    businessCategorySectionUnderline: {
-      height: 2,
-      width: moderateScale(32),
-      borderRadius: moderateScale(1),
-    },
+    height: SCREEN_HEIGHT * 0.85, // Reduced from 0.9
+    backgroundColor: '#ffffff', // This will be overridden by theme in the component
+    borderRadius: moderateScale(8),
+    overflow: 'hidden',
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: moderateScale(8), // Reduced from 20
+    },
+    shadowOpacity: 0.2, // Reduced from 0.3
+    shadowRadius: moderateScale(12), // Reduced from 25
+    elevation: 10, // Reduced from 15
+  },
+  upcomingEventsModalGradient: {
+    paddingTop: verticalScale(8), // Further reduced from 15
+    paddingBottom: verticalScale(4), // Further reduced from 6
+  },
+  upcomingEventsModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center', // Changed from flex-start to center
+    paddingHorizontal: moderateScale(12),
+  },
+  upcomingEventsModalTitleContainer: {
+    flex: 1,
+    marginRight: moderateScale(6), // Reduced from 8
+  },
+  upcomingEventsModalTitle: {
+    fontSize: SCREEN_WIDTH >= 768 ? moderateScale(15) : moderateScale(13), // Further reduced from 18/16
+    fontWeight: 'bold',
+    color: '#333333', // This will be overridden by theme in the component
+    marginBottom: 0, // No margin needed without subtitle
+    textShadowColor: 'rgba(255,255,255,0.5)',
+    textShadowOffset: { width: 0, height: 0.5 },
+    textShadowRadius: 2,
+  },
+  upcomingEventsModalSubtitle: {
+    fontSize: 0, // Hidden
+    color: 'rgba(255,255,255,0)',
+    fontWeight: '500',
+    display: 'none',
+  },
+  upcomingEventsCloseButton: {
+    width: SCREEN_WIDTH >= 768 ? moderateScale(28) : moderateScale(26), // Further reduced from 36/32
+    height: SCREEN_WIDTH >= 768 ? moderateScale(28) : moderateScale(26),
+    borderRadius: SCREEN_WIDTH >= 768 ? moderateScale(14) : moderateScale(13),
+    backgroundColor: 'rgba(0,0,0,0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 0.3,
+    borderColor: 'rgba(0,0,0,0.1)',
+  },
+  upcomingEventsCloseButtonText: {
+    fontSize: SCREEN_WIDTH >= 768 ? moderateScale(15) : moderateScale(14), // Further reduced from 18/16
+    color: '#333333',
+    fontWeight: 'bold',
+  },
+  upcomingEventsModalBody: {
+    flex: 1,
+    backgroundColor: '#f8f9fa', // This will be overridden by theme in the component
+  },
+  upcomingEventsModalScroll: {
+    paddingHorizontal: 0, // Remove padding from container, add to rows instead
+    paddingTop: moderateScale(12),
+    paddingBottom: moderateScale(12),
+  },
+  upcomingEventModalRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start', // Changed from space-between to align items from left
+    marginBottom: moderateScale(6),
+    paddingLeft: moderateScale(8), // Left padding
+    paddingRight: moderateScale(8), // Right padding - equal to left
+    width: '100%',
+  },
+  upcomingEventModalCard: {
+    // Width is set dynamically via inline styles based on modalColumns
+    // Note: marginRight is applied conditionally in renderItem to avoid extra space on last card
+    backgroundColor: '#ffffff', // This will be overridden by theme in the component
+    borderRadius: moderateScale(8),
+    ...responsiveShadow.small,
+    overflow: 'hidden',
+    borderWidth: 0.5,
+    borderColor: 'rgba(0,0,0,0.03)',
+  },
+  upcomingEventModalImageContainer: {
+    width: '100%',
+    aspectRatio: SCREEN_WIDTH >= 768 ? 1 : 0.9, // More square for compact layout
+    position: 'relative',
+    overflow: 'hidden',
+    borderTopLeftRadius: moderateScale(8),
+    borderTopRightRadius: moderateScale(8),
+  },
+  upcomingEventModalImage: {
+    width: '100%',
+    height: '100%',
+  },
+  upcomingEventModalOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: SCREEN_WIDTH >= 768 ? moderateScale(50) : moderateScale(40), // Reduced from 80/60
+  },
+  upcomingEventModalBadge: {
+    position: 'absolute',
+    top: moderateScale(6), // Reduced from 12
+    left: moderateScale(6),
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: moderateScale(6), // Reduced from 10
+    paddingVertical: moderateScale(3), // Reduced from 6
+    borderRadius: moderateScale(10), // Reduced from 16
+    gap: moderateScale(2), // Reduced from 4
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: moderateScale(1), // Reduced from 2
+    },
+    shadowOpacity: 0.15, // Reduced from 0.2
+    shadowRadius: moderateScale(3), // Reduced from 4
+    elevation: 2, // Reduced from 3
+  },
+  upcomingEventModalBadgeText: {
+    fontSize: moderateScale(7), // Reduced from 10
+    color: '#ffffff',
+    fontWeight: '700',
+    letterSpacing: 0.3, // Reduced from 0.5
+  },
+  premiumEventBadge: {
+    backgroundColor: 'rgba(0,0,0,0.8)',
+  },
+  premiumEventBadgeText: {
+    color: '#FFD700',
+  },
+  upcomingEventModalContent: {
+    padding: moderateScale(6), // Reduced from responsiveSpacing.sm
+  },
+  upcomingEventModalTitle: {
+    fontSize: SCREEN_WIDTH >= 768 ? moderateScale(13) : moderateScale(12), // Reduced from 16/14
+    fontWeight: 'bold',
+    color: '#333333',
+    marginBottom: moderateScale(2), // Reduced from responsiveSpacing.xs
+  },
+  upcomingEventModalDetails: {
+    gap: moderateScale(2), // Reduced from responsiveSpacing.xs
+  },
+  upcomingEventModalDetail: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  upcomingEventModalDetailLabel: {
+    fontSize: SCREEN_WIDTH >= 768 ? moderateScale(11) : moderateScale(10), // Reduced from 14/13
+    color: '#666666',
+    fontWeight: '500',
+  },
+  // Customer Support Modal Styles
+  customerSupportModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  customerSupportModalBackdrop: {
+    flex: 1,
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  customerSupportModalContent: {
+    width: SCREEN_WIDTH >= 768 ? SCREEN_WIDTH * 0.6 : SCREEN_WIDTH * 0.85,
+    maxWidth: 450,
+    minHeight: moderateScale(400), // Increased height to fit all buttons
+    backgroundColor: '#ffffff',
+    borderRadius: moderateScale(12),
+    padding: moderateScale(24),
+    paddingTop: 0, // No top padding since image is at top
+    paddingHorizontal: 0, // No horizontal padding to allow image to stretch
+    position: 'relative',
+    overflow: 'hidden', // Ensure image respects border radius
+    ...responsiveShadow.large,
+  },
+  customerSupportImageContainer: {
+    width: '100%',
+    height: moderateScale(200),
+    position: 'relative',
+    marginTop: 0,
+    marginBottom: moderateScale(8),
+    marginLeft: 0,
+    marginRight: 0,
+  },
+  customerSupportImage: {
+    width: '100%',
+    height: '100%',
+  },
+  customerSupportCloseButton: {
+    position: 'absolute',
+    top: moderateScale(12),
+    right: moderateScale(12),
+    width: moderateScale(32),
+    height: moderateScale(32),
+    borderRadius: moderateScale(16),
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 20, // Higher z-index to overlap image
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  customerSupportCloseButtonText: {
+    fontSize: moderateScale(18),
+    color: '#333333',
+    fontWeight: 'bold',
+  },
+  customerSupportOptionsContainer: {
+    gap: moderateScale(16),
+    marginTop: moderateScale(20),
+    width: '100%',
+    paddingHorizontal: moderateScale(24), // Add horizontal padding for buttons
+  },
+  customerSupportOptionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: moderateScale(12),
+    padding: moderateScale(16),
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    ...responsiveShadow.small,
+  },
+  customerSupportOptionIconContainer: {
+    width: moderateScale(40),
+    height: moderateScale(40),
+    borderRadius: moderateScale(20),
+    backgroundColor: '#E0F2F1',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: moderateScale(12),
+  },
+  customerSupportOptionText: {
+    flex: 1,
+    fontSize: moderateScale(14),
+    fontWeight: '500',
+    color: '#333333',
+  },
+  businessProfilePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    marginTop: moderateScale(4),
+    paddingHorizontal: moderateScale(10),
+    paddingVertical: moderateScale(4),
+    borderRadius: moderateScale(20),
+    backgroundColor: 'rgba(102, 126, 234, 0.12)',
+    gap: moderateScale(4),
+  },
+  businessProfilePillText: {
+    fontSize: moderateScale(10),
+    fontWeight: '600',
+    color: '#667eea',
+    maxWidth: moderateScale(140),
+  },
+  businessProfileDropdownOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 50,
+  },
+  businessProfileDropdownBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'transparent',
+  },
+  businessProfileDropdownContent: {
+    position: 'absolute',
+    borderRadius: moderateScale(12),
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.12)',
+    ...responsiveShadow.small,
+    paddingVertical: moderateScale(14),
+    paddingHorizontal: moderateScale(12),
+    backgroundColor: '#ffffff',
+    maxHeight: moderateScale(260),
+  },
+  businessProfileDropdownTitle: {
+    fontSize: moderateScale(14),
+    fontWeight: '700',
+    marginBottom: moderateScale(10),
+  },
+  businessProfileDropdownHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: moderateScale(8),
+  },
+  businessProfileDropdownList: {
+    maxHeight: moderateScale(210),
+    marginBottom: moderateScale(12),
+  },
+  businessProfileDropdownItem: {
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: moderateScale(12),
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(10),
+    marginBottom: moderateScale(8),
+    backgroundColor: '#ffffff',
+  },
+  businessProfileDropdownItemActive: {
+    borderColor: '#667eea',
+    backgroundColor: 'rgba(102, 126, 234, 0.08)',
+  },
+  businessProfileDropdownItemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: moderateScale(4),
+  },
+  businessProfileDropdownItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(10),
+  },
+  businessProfileDropdownAvatar: {
+    width: moderateScale(36),
+    height: moderateScale(36),
+    borderRadius: moderateScale(18),
+    backgroundColor: 'rgba(102, 126, 234, 0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  businessProfileDropdownAvatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  businessProfileDropdownAvatarText: {
+    fontSize: moderateScale(12),
+    fontWeight: '700',
+    color: '#667eea',
+  },
+  businessProfileDropdownTextContainer: {
+    flex: 1,
+  },
+  businessProfileDropdownItemName: {
+    fontSize: moderateScale(12),
+    fontWeight: '600',
+    flex: 1,
+    marginRight: moderateScale(6),
+  },
+  businessProfileDropdownItemCategory: {
+    fontSize: moderateScale(10),
+    fontWeight: '500',
+  },
+  businessProfileDropdownManageButton: {
+    paddingVertical: moderateScale(10),
+    borderRadius: moderateScale(24),
+    backgroundColor: '#667eea',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  businessProfileDropdownManageButtonText: {
+    color: '#ffffff',
+    fontSize: moderateScale(12),
+    fontWeight: '600',
+  },
+  businessProfileDropdownLoading: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: moderateScale(20),
+    gap: moderateScale(6),
+  },
+  businessProfileDropdownLoadingText: {
+    fontSize: moderateScale(10),
+    fontWeight: '500',
+  },
+  businessProfileDropdownEmpty: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: moderateScale(20),
+    gap: moderateScale(10),
+  },
+  businessProfileDropdownEmptyText: {
+    fontSize: moderateScale(11),
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  generalCategoryModalRow: {
+    justifyContent: 'flex-start',
+    marginBottom: moderateScale(6),
+    paddingHorizontal: 0,
+  },
+  generalCategoryModalList: {
+    paddingHorizontal: moderateScale(8),
+    paddingTop: moderateScale(8),
+    paddingBottom: moderateScale(12),
+  },
+  generalCategoryModalCardWrapper: {
+    marginRight: 0,
+    marginBottom: moderateScale(6),
+  },
+  businessCategorySectionHeaderContainer: {
+    width: '100%',
+  },
+  businessCategorySectionHeaderWrapper: {
+    borderRadius: moderateScale(20),
+    overflow: 'hidden',
+  },
+  businessCategorySectionHeaderGradient: {
+    borderRadius: moderateScale(14),
+    overflow: 'hidden',
+    paddingHorizontal: moderateScale(14),
+    paddingVertical: moderateScale(10),
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(0, 0, 0, 0.04)',
+  },
+  businessCategorySectionHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  businessCategorySectionIconContainer: {
+    width: moderateScale(36),
+    height: moderateScale(36),
+    borderRadius: moderateScale(18),
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...responsiveShadow.small,
+  },
+  businessCategorySectionTitleContainer: {
+    flex: 1,
+  },
+  businessCategorySectionHeaderText: {
+    letterSpacing: 0.4,
+  },
+  businessCategorySectionUnderline: {
+    height: 2,
+    width: moderateScale(32),
+    borderRadius: moderateScale(1),
+  },
 
-  });
+});
 
-export default HomeScreen; 
+export default HomeScreen;
 
 

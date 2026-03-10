@@ -8,6 +8,7 @@ import { getTabBarStyle, getTabBarItemStyle, getTabBarLabelStyle } from '../util
 import authService from '../services/auth';
 import { useTheme } from '../context/ThemeContext';
 import { useSubscription } from '../contexts/SubscriptionContext';
+import { useBusinessProfile } from '../context/BusinessProfileContext';
 import { navigationRef, navigate as navigateService } from './NavigationService';
 import logger from '../utils/logger';
 import {
@@ -180,96 +181,96 @@ const Tab = createBottomTabNavigator<TabParamList>();
 // Bottom tab navigator for authenticated users
 const TabNavigator = () => {
   const insets = useSafeAreaInsets();
-  
+
   return (
     <MainStack.Navigator>
-      <MainStack.Screen 
-        name="MainTabs" 
+      <MainStack.Screen
+        name="MainTabs"
         component={MainTabNavigator}
         options={{ headerShown: false }}
       />
-      <MainStack.Screen 
-        name="PosterEditor" 
+      <MainStack.Screen
+        name="PosterEditor"
         component={PosterEditorScreen}
         options={{ headerShown: false }}
       />
-      <MainStack.Screen 
-        name="PosterPlayer" 
+      <MainStack.Screen
+        name="PosterPlayer"
         component={PosterPlayerScreen}
         options={{ headerShown: false }}
       />
-      <MainStack.Screen 
-        name="PosterPreview" 
+      <MainStack.Screen
+        name="PosterPreview"
         component={PosterPreviewScreen}
         options={{ headerShown: false }}
       />
-      <MainStack.Screen 
-        name="VideoEditor" 
+      <MainStack.Screen
+        name="VideoEditor"
         component={VideoEditorScreen}
         options={{ headerShown: false }}
       />
-      <MainStack.Screen 
-        name="VideoPlayer" 
+      <MainStack.Screen
+        name="VideoPlayer"
         component={VideoPlayerScreen}
         options={{ headerShown: false }}
       />
-      <MainStack.Screen 
-        name="VideoPreview" 
+      <MainStack.Screen
+        name="VideoPreview"
         component={VideoPreviewScreen}
         options={{ headerShown: false }}
       />
-      <MainStack.Screen 
-        name="BusinessProfiles" 
+      <MainStack.Screen
+        name="BusinessProfiles"
         component={BusinessProfilesScreen}
         options={{ headerShown: false }}
       />
-      <MainStack.Screen 
-        name="Events" 
+      <MainStack.Screen
+        name="Events"
         component={EventsScreen}
         options={{ headerShown: false }}
       />
-      <MainStack.Screen 
-        name="Subscription" 
+      <MainStack.Screen
+        name="Subscription"
         component={SubscriptionScreen}
         options={{ headerShown: false }}
       />
-      <MainStack.Screen 
-        name="TransactionHistory" 
+      <MainStack.Screen
+        name="TransactionHistory"
         component={TransactionHistoryScreen}
         options={{ headerShown: false }}
       />
-      <MainStack.Screen 
-        name="GreetingTemplates" 
+      <MainStack.Screen
+        name="GreetingTemplates"
         component={GreetingTemplatesScreen}
         options={{ headerShown: false }}
       />
-      <MainStack.Screen 
-        name="GreetingEditor" 
+      <MainStack.Screen
+        name="GreetingEditor"
         component={GreetingEditorScreen}
         options={{ headerShown: false }}
       />
-      <MainStack.Screen 
-        name="MyPosters" 
+      <MainStack.Screen
+        name="MyPosters"
         component={MyPostersScreen}
         options={{ headerShown: false }}
       />
-      <MainStack.Screen 
-        name="AboutUs" 
+      <MainStack.Screen
+        name="AboutUs"
         component={AboutUsScreen}
         options={{ headerShown: false }}
       />
-      <MainStack.Screen 
-        name="PrivacyPolicy" 
+      <MainStack.Screen
+        name="PrivacyPolicy"
         component={PrivacyPolicyScreen}
         options={{ headerShown: false }}
       />
-      <MainStack.Screen 
-        name="HelpSupport" 
+      <MainStack.Screen
+        name="HelpSupport"
         component={HelpSupportScreen}
         options={{ headerShown: false }}
       />
-      <MainStack.Screen 
-        name="TodaysPick" 
+      <MainStack.Screen
+        name="TodaysPick"
         component={TodaysPickScreen}
         options={{ headerShown: false }}
       />
@@ -281,11 +282,12 @@ const TabNavigator = () => {
 const CustomTabBar = (props: any) => {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
+  const { selectedBusinessProfile } = useBusinessProfile();
   const [isLoadingPosters, setIsLoadingPosters] = React.useState(false);
-  
+
   const isPosterPlayerFocused = props.state.routes[props.state.index]?.name === 'PosterPlayer';
   const isHomeFocused = props.state.routes[props.state.index]?.name === 'Home';
-  
+
   // Dynamic dimensions for screen rotation/resize support
   const [dimensions, setDimensions] = React.useState(() => {
     const { width } = Dimensions.get('window');
@@ -304,17 +306,17 @@ const CustomTabBar = (props: any) => {
   const currentScale = (size: number) => (dimensions.width / 375) * size;
   const currentModerateScale = (size: number, factor = 0.5) => size + (currentScale(size) - size) * factor;
   const isCurrentlySmall = dimensions.width < 375;
-  
+
   // Ultra-compact responsive sizes - maximally reduced
   const logoSize = currentModerateScale(isCurrentlySmall ? 36 : 42);
   const logoContainerSize = logoSize + currentModerateScale(6);
   const logoTopOffset = -(logoContainerSize / 2);
   const tabBarHeight = currentModerateScale(isCurrentlySmall ? 40 : 44); // Increased for small devices
   const tabBarPaddingTop = currentModerateScale(0);
-  const tabBarPaddingBottom = Math.max(currentModerateScale(6), insets.bottom + currentModerateScale(2));  const iconSize = currentModerateScale(isCurrentlySmall ? 24 : 20); // Increased from 22 to 24 for small devices
+  const tabBarPaddingBottom = Math.max(currentModerateScale(6), insets.bottom + currentModerateScale(2)); const iconSize = currentModerateScale(isCurrentlySmall ? 24 : 20); // Increased from 22 to 24 for small devices
   const fontSize = currentModerateScale(isCurrentlySmall ? 10 : 8); // Increased from 9 to 10 for small devices
   const borderWidth = currentModerateScale(0.8); // Further reduced from 1
-  
+
 
   // Default behavior: load posters for user's category
   const loadPostersForUserCategory = React.useCallback(async () => {
@@ -322,7 +324,7 @@ const CustomTabBar = (props: any) => {
 
     try {
       // Get user's business category and fetch posters with higher limit to work around backend limitation
-      const response = await businessCategoryPostersApi.getUserCategoryPosters();
+      const response = await businessCategoryPostersApi.getUserCategoryPosters(false, selectedBusinessProfile?.id);
 
       if (response?.success && response.data?.posters && response.data.posters.length > 0) {
         // Map BusinessCategoryPoster to Template format for PosterPlayerScreen
@@ -624,7 +626,7 @@ const CustomTabBar = (props: any) => {
     const timeoutId = setTimeout(() => {
       startAnimations();
     }, 50);
-    
+
     // Also restart after interactions complete to ensure they continue during loading
     const interaction = InteractionManager.runAfterInteractions(() => {
       startAnimations();
@@ -670,7 +672,7 @@ const CustomTabBar = (props: any) => {
     inputRange: [0, 1],
     outputRange: [theme.colors.primary, theme.colors.secondary],
   });
-  
+
   // Shadow animation values
   const animatedShadowRadius = shadowAnim.interpolate({
     inputRange: [0, 1],
@@ -680,13 +682,13 @@ const CustomTabBar = (props: any) => {
     inputRange: [0, 1],
     outputRange: [0.3, 0.6],
   });
-  
+
   // Floating animation - vertical movement
   const floatTranslateY = floatAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [0, -8],
   });
-  
+
   // Press animation handler
   const handlePressIn = () => {
     Animated.spring(pressAnim, {
@@ -696,7 +698,7 @@ const CustomTabBar = (props: any) => {
       friction: 10,
     }).start();
   };
-  
+
   const handlePressOut = () => {
     Animated.spring(pressAnim, {
       toValue: 1,
@@ -759,326 +761,326 @@ const CustomTabBar = (props: any) => {
 
   return (
     <View style={{ position: 'relative', width: '100%' }}>
-    <View style={{
-      backgroundColor: theme.colors.surface,
-      borderTopWidth: currentModerateScale(0.3), // Further reduced from 0.5
-      borderTopColor: theme.colors.border,
-      paddingTop: tabBarPaddingTop,
-      paddingBottom: tabBarPaddingBottom,
-      shadowColor: theme.colors.shadow,
-      shadowOffset: { width: 0, height: currentModerateScale(-0.5) }, // Further reduced from -1
-      shadowOpacity: 0.05, // Further reduced from 0.08
-      shadowRadius: currentModerateScale(2), // Further reduced from 3
-      elevation: 4, // Further reduced from 6
-      position: 'relative',
-    }}>
-      {/* Background overlay to hide any squares behind the circle */}
       <View style={{
-        position: 'absolute',
-        top: logoTopOffset,
-        left: '50%',
-        marginLeft: -(logoContainerSize / 2),
-        zIndex: 999,
         backgroundColor: theme.colors.surface,
-        width: logoContainerSize,
-        height: logoContainerSize,
-        borderRadius: logoContainerSize / 2,
-      }} />
-      
-      {/* Logo positioned to overlap with screen content - Clickable to navigate to Poster Player */}
-      <TouchableOpacity
-        onPress={handlePosterPlayerShortcut}
-        activeOpacity={0.7}
-        style={{
+        borderTopWidth: currentModerateScale(0.3), // Further reduced from 0.5
+        borderTopColor: theme.colors.border,
+        paddingTop: tabBarPaddingTop,
+        paddingBottom: tabBarPaddingBottom,
+        shadowColor: theme.colors.shadow,
+        shadowOffset: { width: 0, height: currentModerateScale(-0.5) }, // Further reduced from -1
+        shadowOpacity: 0.05, // Further reduced from 0.08
+        shadowRadius: currentModerateScale(2), // Further reduced from 3
+        elevation: 4, // Further reduced from 6
+        position: 'relative',
+      }}>
+        {/* Background overlay to hide any squares behind the circle */}
+        <View style={{
           position: 'absolute',
           top: logoTopOffset,
           left: '50%',
           marginLeft: -(logoContainerSize / 2),
-          zIndex: 1000,
+          zIndex: 999,
           backgroundColor: theme.colors.surface,
           width: logoContainerSize,
           height: logoContainerSize,
           borderRadius: logoContainerSize / 2,
-          justifyContent: 'center',
-          alignItems: 'center',
-          shadowColor: theme.colors.shadow,
-          shadowOffset: { width: 0, height: currentModerateScale(0.5) }, // Further reduced from 1
-          shadowOpacity: 0.08, // Further reduced from 0.12
-          shadowRadius: currentModerateScale(4), // Further reduced from 6
-          elevation: 4, // Further reduced from 6
-          borderWidth: borderWidth,
-          borderColor: theme.colors.border,
-          overflow: 'hidden',
-        }}
-      >
-        <Image
-          source={require('../assets/MainLogo/MB.png')}
+        }} />
+
+        {/* Logo positioned to overlap with screen content - Clickable to navigate to Poster Player */}
+        <TouchableOpacity
+          onPress={handlePosterPlayerShortcut}
+          activeOpacity={0.7}
           style={{
-            width: logoSize,
-            height: logoSize,
-            resizeMode: 'contain',
-          }}
-        />
-      </TouchableOpacity>
-      
-      {/* Tab Bar */}
-      <View style={{
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        alignItems: 'center',
-        height: tabBarHeight,
-        marginTop: currentModerateScale(10), // Add space for the circular overlapping logo
-      }}>
-        {props.state.routes.map((route: any, index: number) => {
-          const { options } = props.descriptors[route.key];
-          const label = options.tabBarLabel !== undefined
-            ? options.tabBarLabel
-            : options.title !== undefined
-            ? options.title
-            : route.name;
-
-          const isFocused = props.state.index === index;
-
-          const onPress = () => {
-            if (route.name === 'PosterPlayer') {
-              handlePosterPlayerShortcut();
-              return;
-            }
-
-            const event = props.navigation.emit({
-              type: 'tabPress',
-              target: route.key,
-              canPreventDefault: true,
-            });
-
-            if (!isFocused && !event.defaultPrevented) {
-              props.navigation.navigate(route.name);
-            }
-          };
-
-          const onLongPress = () => {
-            props.navigation.emit({
-              type: 'tabLongPress',
-              target: route.key,
-            });
-          };
-
-          return (
-            <TouchableOpacity
-              key={route.key}
-              accessibilityRole="button"
-              accessibilityState={isFocused ? { selected: true } : {}}
-              accessibilityLabel={options.tabBarAccessibilityLabel}
-              testID={options.tabBarTestID}
-              onPress={onPress}
-              onLongPress={onLongPress}
-              style={{
-                flex: 1,
-                alignItems: 'center',
-                justifyContent: 'center',
-                paddingVertical: currentModerateScale(4),
-              }}
-            >
-              {options.tabBarIcon ? (
-                options.tabBarIcon({
-                  focused: isFocused,
-                  color: isFocused ? theme.colors.primary : theme.colors.textSecondary,
-                  size: iconSize,
-                })
-              ) : (
-                // Add invisible spacer for tabs without icon to maintain text alignment
-                <View style={{ height: iconSize }} />
-              )}
-              <Text style={{
-                fontSize: fontSize,
-                fontWeight: '600',
-                marginTop: currentModerateScale(0.3), // Further reduced from 0.5
-                color: isFocused ? theme.colors.primary : theme.colors.textSecondary,
-              }}>
-                {label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-    </View>
-
-    {/* Loading overlay while fetching user category posters */}
-    <Modal transparent animationType="fade" visible={isLoadingPosters}>
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: 'rgba(0,0,0,0.35)',
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}
-      >
-        <View
-          style={{
+            position: 'absolute',
+            top: logoTopOffset,
+            left: '50%',
+            marginLeft: -(logoContainerSize / 2),
+            zIndex: 1000,
             backgroundColor: theme.colors.surface,
-            padding: 20,
-            borderRadius: 14,
-            width: 220,
+            width: logoContainerSize,
+            height: logoContainerSize,
+            borderRadius: logoContainerSize / 2,
+            justifyContent: 'center',
             alignItems: 'center',
-            gap: 10,
-          }}
-        >
-          <ActivityIndicator size="small" color={theme.colors.primary} />
-          <Text
-            style={{
-              fontSize: 14,
-              fontWeight: '600',
-              color: theme.colors.text,
-              textAlign: 'center',
-            }}
-          >
-            Loading posters...
-          </Text>
-        </View>
-      </View>
-    </Modal>
-
-    {/* Floating Action Button - Today's Pick - Only show on Home screen */}
-    {isHomeFocused && (
-      <Animated.View
-        style={{
-          position: 'absolute',
-          bottom: fabBottomOffset,
-          right: currentModerateScale(16),
-          transform: [
-            { scale: pulseScale },
-            { translateY: floatTranslateY },
-            { scale: entranceScale },
-          ],
-          zIndex: 1001,
-        }}
-      >
-      {/* Ripple Effect 1 */}
-      <Animated.View
-        style={{
-          position: 'absolute',
-          width: fabSize,
-          height: fabSize,
-          borderRadius: fabSize / 2,
-          borderWidth: 2,
-          borderColor: theme.colors.primary,
-          transform: [{ scale: ripple1Scale }],
-          opacity: ripple1Opacity,
-        }}
-      />
-      
-      {/* Ripple Effect 2 */}
-      <Animated.View
-        style={{
-          position: 'absolute',
-          width: fabSize,
-          height: fabSize,
-          borderRadius: fabSize / 2,
-          borderWidth: 2,
-          borderColor: theme.colors.secondary,
-          transform: [{ scale: ripple2Scale }],
-          opacity: ripple2Opacity,
-        }}
-      />
-
-      <Animated.View
-        style={{
-          width: fabSize,
-          height: fabSize,
-          borderRadius: fabSize / 2,
-          borderWidth: animatedBorderWidth,
-          borderColor: animatedBorderColor,
-          justifyContent: 'center',
-          alignItems: 'center',
-          shadowColor: theme.colors.primary,
-          shadowOffset: { width: 0, height: currentModerateScale(4) },
-          shadowOpacity: animatedShadowOpacity,
-          shadowRadius: animatedShadowRadius,
-          elevation: 12,
-        }}
-      >
-        <Animated.View
-          style={{
-            transform: [{ scale: pressAnim }],
-            width: fabSize,
-            height: fabSize,
-            borderRadius: fabSize / 2,
+            shadowColor: theme.colors.shadow,
+            shadowOffset: { width: 0, height: currentModerateScale(0.5) }, // Further reduced from 1
+            shadowOpacity: 0.08, // Further reduced from 0.12
+            shadowRadius: currentModerateScale(4), // Further reduced from 6
+            elevation: 4, // Further reduced from 6
+            borderWidth: borderWidth,
+            borderColor: theme.colors.border,
             overflow: 'hidden',
           }}
         >
-          <TouchableOpacity
-            onPress={handleTodaysPickPress}
-            onPressIn={handlePressIn}
-            onPressOut={handlePressOut}
-            activeOpacity={1}
+          <Image
+            source={require('../assets/MainLogo/MB.png')}
             style={{
-              width: '100%',
-              height: '100%',
-              borderRadius: fabSize / 2,
-              justifyContent: 'center',
+              width: logoSize,
+              height: logoSize,
+              resizeMode: 'contain',
+            }}
+          />
+        </TouchableOpacity>
+
+        {/* Tab Bar */}
+        <View style={{
+          flexDirection: 'row',
+          justifyContent: 'space-around',
+          alignItems: 'center',
+          height: tabBarHeight,
+          marginTop: currentModerateScale(10), // Add space for the circular overlapping logo
+        }}>
+          {props.state.routes.map((route: any, index: number) => {
+            const { options } = props.descriptors[route.key];
+            const label = options.tabBarLabel !== undefined
+              ? options.tabBarLabel
+              : options.title !== undefined
+                ? options.title
+                : route.name;
+
+            const isFocused = props.state.index === index;
+
+            const onPress = () => {
+              if (route.name === 'PosterPlayer') {
+                handlePosterPlayerShortcut();
+                return;
+              }
+
+              const event = props.navigation.emit({
+                type: 'tabPress',
+                target: route.key,
+                canPreventDefault: true,
+              });
+
+              if (!isFocused && !event.defaultPrevented) {
+                props.navigation.navigate(route.name);
+              }
+            };
+
+            const onLongPress = () => {
+              props.navigation.emit({
+                type: 'tabLongPress',
+                target: route.key,
+              });
+            };
+
+            return (
+              <TouchableOpacity
+                key={route.key}
+                accessibilityRole="button"
+                accessibilityState={isFocused ? { selected: true } : {}}
+                accessibilityLabel={options.tabBarAccessibilityLabel}
+                testID={options.tabBarTestID}
+                onPress={onPress}
+                onLongPress={onLongPress}
+                style={{
+                  flex: 1,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingVertical: currentModerateScale(4),
+                }}
+              >
+                {options.tabBarIcon ? (
+                  options.tabBarIcon({
+                    focused: isFocused,
+                    color: isFocused ? theme.colors.primary : theme.colors.textSecondary,
+                    size: iconSize,
+                  })
+                ) : (
+                  // Add invisible spacer for tabs without icon to maintain text alignment
+                  <View style={{ height: iconSize }} />
+                )}
+                <Text style={{
+                  fontSize: fontSize,
+                  fontWeight: '600',
+                  marginTop: currentModerateScale(0.3), // Further reduced from 0.5
+                  color: isFocused ? theme.colors.primary : theme.colors.textSecondary,
+                }}>
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+
+      {/* Loading overlay while fetching user category posters */}
+      <Modal transparent animationType="fade" visible={isLoadingPosters}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.35)',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: theme.colors.surface,
+              padding: 20,
+              borderRadius: 14,
+              width: 220,
               alignItems: 'center',
-              padding: currentModerateScale(4),
-              overflow: 'hidden',
+              gap: 10,
             }}
           >
-            {/* Yellow-Orange Gradient Background */}
-            <LinearGradient
-              colors={['#FFD700', '#FF8C00', '#FF6347']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
+            <ActivityIndicator size="small" color={theme.colors.primary} />
+            <Text
               style={{
-                position: 'absolute',
-                width: '100%',
-                height: '100%',
-                borderRadius: fabSize / 2,
-                zIndex: 1,
-              }}
-            />
-            
-            {/* Sparkle/Shimmer overlay - reduced opacity */}
-            <Animated.View
-              style={{
-                position: 'absolute',
-                width: '100%',
-                height: '100%',
-                backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                opacity: sparkleOpacity,
-                borderRadius: fabSize / 2,
-                zIndex: 2,
-              }}
-            />
-            
-            {/* Today's Pick Text */}
-            <Animated.View
-              style={{
-                zIndex: 3,
-                width: '100%',
-                height: '100%',
-                justifyContent: 'center',
-                alignItems: 'center',
+                fontSize: 14,
+                fontWeight: '600',
+                color: theme.colors.text,
+                textAlign: 'center',
               }}
             >
-              <Text
+              Loading posters...
+            </Text>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Floating Action Button - Today's Pick - Only show on Home screen */}
+      {isHomeFocused && (
+        <Animated.View
+          style={{
+            position: 'absolute',
+            bottom: fabBottomOffset,
+            right: currentModerateScale(16),
+            transform: [
+              { scale: pulseScale },
+              { translateY: floatTranslateY },
+              { scale: entranceScale },
+            ],
+            zIndex: 1001,
+          }}
+        >
+          {/* Ripple Effect 1 */}
+          <Animated.View
+            style={{
+              position: 'absolute',
+              width: fabSize,
+              height: fabSize,
+              borderRadius: fabSize / 2,
+              borderWidth: 2,
+              borderColor: theme.colors.primary,
+              transform: [{ scale: ripple1Scale }],
+              opacity: ripple1Opacity,
+            }}
+          />
+
+          {/* Ripple Effect 2 */}
+          <Animated.View
+            style={{
+              position: 'absolute',
+              width: fabSize,
+              height: fabSize,
+              borderRadius: fabSize / 2,
+              borderWidth: 2,
+              borderColor: theme.colors.secondary,
+              transform: [{ scale: ripple2Scale }],
+              opacity: ripple2Opacity,
+            }}
+          />
+
+          <Animated.View
+            style={{
+              width: fabSize,
+              height: fabSize,
+              borderRadius: fabSize / 2,
+              borderWidth: animatedBorderWidth,
+              borderColor: animatedBorderColor,
+              justifyContent: 'center',
+              alignItems: 'center',
+              shadowColor: theme.colors.primary,
+              shadowOffset: { width: 0, height: currentModerateScale(4) },
+              shadowOpacity: animatedShadowOpacity,
+              shadowRadius: animatedShadowRadius,
+              elevation: 12,
+            }}
+          >
+            <Animated.View
+              style={{
+                transform: [{ scale: pressAnim }],
+                width: fabSize,
+                height: fabSize,
+                borderRadius: fabSize / 2,
+                overflow: 'hidden',
+              }}
+            >
+              <TouchableOpacity
+                onPress={handleTodaysPickPress}
+                onPressIn={handlePressIn}
+                onPressOut={handlePressOut}
+                activeOpacity={1}
                 style={{
-                  color: '#FFFFFF',
-                  fontSize: currentModerateScale(9),
-                  fontWeight: '700',
-                  textAlign: 'center',
-                  textShadowColor: 'rgba(0, 0, 0, 0.3)',
-                  textShadowOffset: { width: 0, height: 1 },
-                  textShadowRadius: 2,
-                  letterSpacing: 0.3,
+                  width: '100%',
+                  height: '100%',
+                  borderRadius: fabSize / 2,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  padding: currentModerateScale(4),
+                  overflow: 'hidden',
                 }}
-                numberOfLines={2}
               >
-                Today's{'\n'}Pick
-              </Text>
+                {/* Yellow-Orange Gradient Background */}
+                <LinearGradient
+                  colors={['#FFD700', '#FF8C00', '#FF6347']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={{
+                    position: 'absolute',
+                    width: '100%',
+                    height: '100%',
+                    borderRadius: fabSize / 2,
+                    zIndex: 1,
+                  }}
+                />
+
+                {/* Sparkle/Shimmer overlay - reduced opacity */}
+                <Animated.View
+                  style={{
+                    position: 'absolute',
+                    width: '100%',
+                    height: '100%',
+                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                    opacity: sparkleOpacity,
+                    borderRadius: fabSize / 2,
+                    zIndex: 2,
+                  }}
+                />
+
+                {/* Today's Pick Text */}
+                <Animated.View
+                  style={{
+                    zIndex: 3,
+                    width: '100%',
+                    height: '100%',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: '#FFFFFF',
+                      fontSize: currentModerateScale(9),
+                      fontWeight: '700',
+                      textAlign: 'center',
+                      textShadowColor: 'rgba(0, 0, 0, 0.3)',
+                      textShadowOffset: { width: 0, height: 1 },
+                      textShadowRadius: 2,
+                      letterSpacing: 0.3,
+                    }}
+                    numberOfLines={2}
+                  >
+                    Today's{'\n'}Pick
+                  </Text>
+                </Animated.View>
+              </TouchableOpacity>
             </Animated.View>
-          </TouchableOpacity>
+          </Animated.View>
         </Animated.View>
-      </Animated.View>
-    </Animated.View>
-    )}
+      )}
     </View>
   );
 };
@@ -1087,7 +1089,7 @@ const CustomTabBar = (props: any) => {
 const MainTabNavigator = () => {
   const insets = useSafeAreaInsets();
   const { theme, isDarkMode } = useTheme();
-  
+
   return (
     <Tab.Navigator
       safeAreaInsets={{ bottom: 0 }}
@@ -1096,8 +1098,8 @@ const MainTabNavigator = () => {
         headerShown: false,
       }}
     >
-      <Tab.Screen 
-        name="Home" 
+      <Tab.Screen
+        name="Home"
         component={HomeScreen}
         options={{
           title: 'Home',
@@ -1106,8 +1108,8 @@ const MainTabNavigator = () => {
           ),
         }}
       />
-      <Tab.Screen 
-        name="Templates" 
+      <Tab.Screen
+        name="Templates"
         component={TemplateGalleryScreen}
         options={{
           title: 'Templates',
@@ -1116,8 +1118,8 @@ const MainTabNavigator = () => {
           ),
         }}
       />
-      <Tab.Screen 
-        name="PosterPlayer" 
+      <Tab.Screen
+        name="PosterPlayer"
         component={PosterPlayerScreen}
         initialParams={{ originScreen: "MainTabs" }}
         options={{
@@ -1125,8 +1127,8 @@ const MainTabNavigator = () => {
           tabBarStyle: { display: 'none' },
         }}
       />
-      <Tab.Screen 
-        name="Greetings" 
+      <Tab.Screen
+        name="Greetings"
         component={GreetingTemplatesScreen}
         options={{
           title: 'Greetings',
@@ -1135,8 +1137,8 @@ const MainTabNavigator = () => {
           ),
         }}
       />
-      <Tab.Screen 
-        name="Profile" 
+      <Tab.Screen
+        name="Profile"
         component={ProfileScreen}
         options={{
           title: 'Profile',
@@ -1161,7 +1163,7 @@ const AppNavigator = () => {
     let authUser: any = null;
     const startTime = Date.now();
     const MIN_SPLASH_TIME = 2000; // Reduced to 2 seconds for faster app startup
-    
+
     // Extended timeout to allow intro video to play fully before checking auth state
     const timeout = setTimeout(() => {
       if (!authStateReceived) {
@@ -1176,12 +1178,12 @@ const AppNavigator = () => {
       authStateReceived = true;
       authUser = user;
       clearTimeout(timeout); // Clear timeout once we get auth state
-      
+
       logger.log('🔔 AppNavigator: Auth state changed:', user ? '✅ User logged in' : '❌ User logged out');
       if (user) {
         logger.log('👤 User ID:', user.id || user.uid);
         logger.log('📧 User Email:', user.email);
-        
+
         // Preload subscription and transaction data for logged-in users
         logger.log('📡 Preloading subscription and transaction data...');
         refreshSubscription().then(() => {
@@ -1189,20 +1191,20 @@ const AppNavigator = () => {
         }).catch((error) => {
           logger.error('❌ Error preloading subscription data:', error);
         });
-        
+
         refreshTransactions().then(() => {
           logger.log('✅ Transaction data preloaded');
         }).catch((error) => {
           logger.error('❌ Error preloading transaction data:', error);
         });
       }
-      
+
       // Calculate remaining time for minimum splash display
       const elapsedTime = Date.now() - startTime;
       const remainingTime = Math.max(0, MIN_SPLASH_TIME - elapsedTime);
-      
+
       logger.log(`⏱️ Elapsed: ${elapsedTime}ms, Waiting: ${remainingTime}ms before navigation`);
-      
+
       // Wait for minimum splash time before navigating
       setTimeout(() => {
         setIsAuthenticated(!!authUser);
@@ -1216,11 +1218,11 @@ const AppNavigator = () => {
       logger.error('❌ AppNavigator: Error initializing auth service:', error);
       authStateReceived = true;
       clearTimeout(timeout);
-      
+
       // Still respect minimum time even on error
       const elapsedTime = Date.now() - startTime;
       const remainingTime = Math.max(0, MIN_SPLASH_TIME - elapsedTime);
-      
+
       setTimeout(() => {
         setIsLoading(false);
         setIsAuthenticated(false);
@@ -1241,8 +1243,8 @@ const AppNavigator = () => {
     return (
       <NavigationContainer ref={navigationRef}>
         <Stack.Navigator>
-          <Stack.Screen 
-            name="Splash" 
+          <Stack.Screen
+            name="Splash"
             component={SplashScreen}
             options={{ headerShown: false }}
           />
@@ -1253,53 +1255,53 @@ const AppNavigator = () => {
 
   // Show main navigation
   logger.log('AppNavigator: Showing main navigation, isAuthenticated:', isAuthenticated);
-  
+
   return (
     <NavigationContainer ref={navigationRef}>
       <Stack.Navigator>
         {isAuthenticated ? (
-          <Stack.Screen 
-            name="MainApp" 
+          <Stack.Screen
+            name="MainApp"
             component={TabNavigator}
             options={{ headerShown: false }}
           />
         ) : (
           <>
-            <Stack.Screen 
-              name="Login" 
+            <Stack.Screen
+              name="Login"
               component={LoginScreen}
               options={{ headerShown: false }}
             />
-            <Stack.Screen 
-              name="Registration" 
+            <Stack.Screen
+              name="Registration"
               component={RegistrationScreen}
               options={{ headerShown: false }}
             />
-            <Stack.Screen 
-              name="ForgotPassword" 
+            <Stack.Screen
+              name="ForgotPassword"
               component={ForgotPasswordScreen}
               options={{ headerShown: false }}
             />
-            <Stack.Screen 
-              name="VerifyResetCode" 
+            <Stack.Screen
+              name="VerifyResetCode"
               component={VerifyResetCodeScreen}
               options={{ headerShown: false }}
             />
-            <Stack.Screen 
-              name="ResetPassword" 
+            <Stack.Screen
+              name="ResetPassword"
               component={ResetPasswordScreen}
               options={{ headerShown: false }}
             />
-            <Stack.Screen 
-              name="EmailVerification" 
+            <Stack.Screen
+              name="EmailVerification"
               component={EmailVerificationScreen}
               options={{ headerShown: false }}
             />
           </>
         )}
         {/* Privacy Policy - accessible from both authenticated and unauthenticated states */}
-        <Stack.Screen 
-          name="PrivacyPolicy" 
+        <Stack.Screen
+          name="PrivacyPolicy"
           component={PrivacyPolicyScreen}
           options={{ headerShown: false }}
         />

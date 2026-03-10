@@ -59,15 +59,15 @@ class BusinessCategoryPostersApiService {
     try {
       const cacheKey = `category_${category}`;
       const now = Date.now();
-      
+
       const requestLimit = limit || 200;
-      
+
       // Check cache first (use base cache key without limit for flexibility)
       const baseCacheKey = `category_${category}`;
       if (this.postersCache.has(baseCacheKey) && !isRefresh) {
         const cached = this.postersCache.get(baseCacheKey)!;
         const cacheAge = now - cached.timestamp;
-        
+
         if (cacheAge < this.CACHE_DURATION) {
           // Apply limit if requested (for cache hits)
           const limitedPosters = requestLimit ? cached.data.slice(0, requestLimit) : cached.data;
@@ -83,18 +83,18 @@ class BusinessCategoryPostersApiService {
           };
         }
       }
-      
+
       // Build URL with categoryId support and backward compatibility
       let apiUrl = `/api/mobile/posters/category/${encodeURIComponent(category)}?limit=${requestLimit}`;
       if (categoryId) {
         apiUrl += `&categoryId=${encodeURIComponent(categoryId)}`;
       }
-      
+
       const response = await api.get(apiUrl);
-      
+
       if (response.data.success) {
         const posters = response.data.data.posters;
-        
+
         // Convert backend response to frontend format and fix URLs (optimized - no per-item logging)
         const baseUrl = 'https://eventmarketersbackend.onrender.com';
         const postersWithAbsoluteUrls = posters.map((poster: any) => {
@@ -102,14 +102,14 @@ class BusinessCategoryPostersApiService {
           const thumbnailUrl = poster.thumbnailUrl || poster.thumbnail;
           const imageUrl = poster.imageUrl;
           const downloadUrl = poster.downloadUrl;
-          
+
           return {
             id: poster.id,
             title: poster.title,
             description: poster.description,
             category: poster.category,
-            thumbnail: thumbnailUrl && !thumbnailUrl.startsWith('http') 
-              ? `${baseUrl}${thumbnailUrl}` 
+            thumbnail: thumbnailUrl && !thumbnailUrl.startsWith('http')
+              ? `${baseUrl}${thumbnailUrl}`
               : thumbnailUrl,
             imageUrl: imageUrl && !imageUrl.startsWith('http')
               ? `${baseUrl}${imageUrl}`
@@ -124,17 +124,17 @@ class BusinessCategoryPostersApiService {
             updatedAt: poster.updatedAt || poster.createdAt,
           } as BusinessCategoryPoster;
         });
-        
+
         // Apply limit if requested (in case API returns more than requested)
         const limitedPosters = requestLimit ? postersWithAbsoluteUrls.slice(0, requestLimit) : postersWithAbsoluteUrls;
-        
+
         // Cache the full results (without limit) so different limits can share cache
         this.postersCache.set(baseCacheKey, {
           data: postersWithAbsoluteUrls,
           timestamp: now
         });
-        
-        
+
+
         return {
           ...response.data,
           data: {
@@ -149,7 +149,7 @@ class BusinessCategoryPostersApiService {
         const errorMessage = response.data.message || response.data.error || 'No posters available for this category';
         if (__DEV__) {
         }
-        
+
         // Return empty response instead of throwing error
         return {
           success: false,
@@ -164,7 +164,7 @@ class BusinessCategoryPostersApiService {
     } catch (error: any) {
       if (error.response) {
       }
-      
+
       // Return empty data when API fails
       return {
         success: false,
@@ -181,24 +181,19 @@ class BusinessCategoryPostersApiService {
   /**
    * Get user's business category and fetch relevant posters (optimized logging)
    */
-  async getUserCategoryPosters(isRefresh: boolean = false): Promise<BusinessCategoryPostersResponse> {
+  async getUserCategoryPosters(isRefresh: boolean = false, preferredProfileId: string | null = null): Promise<BusinessCategoryPostersResponse> {
     try {
       const currentUser = authService.getCurrentUser();
       const userId = currentUser?.id;
-      
+
       if (!userId) {
         logger.warn('⚠️ [USER CATEGORY POSTERS] No user ID, using General category');
         return this.getPostersByCategory('General');
       }
 
       // FIRST: Try to get category from selected business profile (priority)
-      logger.log('� [USER CATEGORY POSTERS] Checking selected business profile first...');
-      
-      const preferredProfileId = await AsyncStorage.getItem('selectedBusinessProfileId');
-      const preferredCategory = await AsyncStorage.getItem('selectedBusinessProfileCategory');
-      
-      // DEBUG: Show what's being read from storage
-      logger.log(`🔍 [USER CATEGORY POSTERS] Stored data - ProfileID: ${preferredProfileId}, Category: ${preferredCategory}`);
+      logger.log(' [USER CATEGORY POSTERS] Checking selected business profile first...');
+      logger.log(`🔍 [USER CATEGORY POSTERS] Provided ProfileID: ${preferredProfileId}`);
 
       // Get user's business profiles to determine category
       const businessProfileService = (await import('./businessProfile')).default;
@@ -217,11 +212,10 @@ class BusinessCategoryPostersApiService {
       });
 
       logger.log(`🎯 [USER CATEGORY POSTERS] Preferred profile ID: ${preferredProfileId}`);
-      logger.log(`🎯 [USER CATEGORY POSTERS] Preferred category: ${preferredCategory}`);
 
       if (userProfiles.length > 0) {
         let profileToUse = userProfiles[0];
-        
+
         // If preferredProfileId is set, try to find that profile
         if (preferredProfileId) {
           const matchedProfile = userProfiles.find(profile => profile.id === preferredProfileId);
@@ -242,10 +236,10 @@ class BusinessCategoryPostersApiService {
           profileToUse = sortedProfiles[0];
           logger.log(`📋 [USER CATEGORY POSTERS] No preferred profile, using most recent: ${profileToUse.name}`);
         }
-        
+
         const primaryCategory = profileToUse.category;
         const subCategory = profileToUse.subCategory || profileToUse.subcategory;
-        
+
         // DEBUG: Show the profile details
         logger.log(`📋 [USER CATEGORY POSTERS] Selected profile details:`, {
           id: profileToUse.id,
@@ -253,25 +247,25 @@ class BusinessCategoryPostersApiService {
           category: primaryCategory,
           subCategory: subCategory
         });
-        
+
         // Use subcategory if available, otherwise use main category
         const targetCategory = subCategory || primaryCategory;
         const categoryType = subCategory ? 'subcategory (from business profile)' : 'main category (from business profile)';
-        
+
         logger.log(`✅ [USER CATEGORY POSTERS] Using ${categoryType}: ${targetCategory}`);
         if (subCategory) {
           logger.log(`📋 [USER CATEGORY POSTERS] Subcategory: ${subCategory}, Main category: ${primaryCategory}`);
         }
-        
+
         // DEBUG: Show what we're actually using for API call
         logger.log(`🎯 [USER CATEGORY POSTERS] API CALL - Fetching posters for category: "${targetCategory}"`);
-        
+
         return this.getPostersByCategory(targetCategory, 200, isRefresh, profileToUse.id);
       }
 
       // FALLBACK: Try to get original category from user's registration data
       logger.log('🔄 [USER CATEGORY POSTERS] No business profiles found, checking registration data...');
-      
+
       const user = authService.getCurrentUser();
       const originalCategory = user?._originalCategory || user?.category;
       const originalSubCategory = user?.subCategory || user?.subcategory;
@@ -279,7 +273,7 @@ class BusinessCategoryPostersApiService {
       if (originalCategory || originalSubCategory) {
         const targetCategory = originalSubCategory || originalCategory;
         const categoryType = originalSubCategory ? 'subcategory (from registration)' : 'main category (from registration)';
-        
+
         logger.log(`✅ [USER CATEGORY POSTERS] Using ${categoryType}: ${targetCategory}`);
         if (originalSubCategory) {
           logger.log(`📋 [USER CATEGORY POSTERS] Subcategory: ${originalSubCategory}, Main category: ${originalCategory}`);
@@ -323,7 +317,7 @@ class BusinessCategoryPostersApiService {
 
       const currentUser = authService.getCurrentUser();
       const userId = currentUser?.id;
-      
+
       if (!userId) {
         this.isDownloading = false;
         throw new Error('User not authenticated');
@@ -340,8 +334,8 @@ class BusinessCategoryPostersApiService {
       if (downloadResponse.data.success) {
         logger.log('✅ Poster download tracked successfully:', posterId);
         this.isDownloading = false;
-        return { 
-          success: true, 
+        return {
+          success: true,
           message: 'Poster download tracked successfully',
           downloadUrl: `https://example.com/posters/${posterId}.jpg`
         };
