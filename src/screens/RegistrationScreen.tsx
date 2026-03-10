@@ -415,6 +415,31 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
       return;
     }
 
+    // Real-time company name validation - alphanumeric only
+    if (field === 'name') {
+      setFormData(prev => ({
+        ...prev,
+        [field]: value,
+      }));
+
+      // Check for invalid characters and show error
+      if (!/^[a-zA-Z0-9\s]*$/.test(value)) {
+        setValidationErrors(prev => ({
+          ...prev,
+          name: 'Special characters are not allowed in company name',
+        }));
+      } else {
+        // Clear error if input is valid
+        if (validationErrors.name) {
+          setValidationErrors(prev => ({
+            ...prev,
+            name: '',
+          }));
+        }
+      }
+      return;
+    }
+
     // Real-time phone validation with digit count
     if (field === 'phone') {
       // Only allow digits
@@ -492,9 +517,11 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
   const validateForm = () => {
     const errors: { [key: string]: string } = {};
 
-    // Company Name validation
+    // Company Name validation - Alphanumeric only
     if (!formData.name.trim()) {
       errors.name = 'Company name is required to create your account';
+    } else if (!/^[a-zA-Z0-9\s]+$/.test(formData.name.trim())) {
+      errors.name = 'Company name can only contain letters, numbers, and spaces';
     } else if (formData.name.trim().length < 2) {
       errors.name = 'Company name must be at least 2 characters long';
     } else if (formData.name.trim().length > 100) {
