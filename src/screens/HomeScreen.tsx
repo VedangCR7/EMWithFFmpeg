@@ -651,6 +651,51 @@ const HomeScreen: React.FC = React.memo(() => {
     return unsubscribe;
   }, []);
 
+  // Listen for business profile update events from ProfileScreen
+  useEffect(() => {
+    let isMounted = true;
+    
+    const handleBusinessProfileUpdate = (event: any) => {
+      if (!isMounted) return;
+      
+      console.log('🔄 [HOMESCREEN] Business profile update event received:', event);
+      
+      // Refresh business profiles if this is for current user
+      const currentUserId = userProfile?.id || authService.getCurrentUser()?.id;
+      if (event.userId === currentUserId) {
+        console.log('🔄 [HOMESCREEN] Refreshing business profiles due to logo update...');
+        refreshBusinessProfiles();
+      }
+    };
+
+    // Listen for navigation dispatch events (fallback)
+    const handleNavigationDispatch = (event: any) => {
+      if (!isMounted) return;
+      
+      if (event.type === 'SET_BUSINESS_PROFILES_REFRESH') {
+        console.log('🔄 [HOMESCREEN] Navigation refresh event received, refreshing business profiles...');
+        refreshBusinessProfiles();
+      }
+    };
+
+    try {
+      // Use React Native's DeviceEventEmitter for cross-screen communication
+      const eventEmitter = require('react-native').NativeModules?.EventEmitter || 
+        new (require('react-native').DeviceEventEmitter)();
+      
+      const businessProfileSubscription = eventEmitter.addListener('businessProfileUpdated', handleBusinessProfileUpdate);
+      const navigationSubscription = eventEmitter.addListener('SET_BUSINESS_PROFILES_REFRESH', handleNavigationDispatch);
+      
+      return () => {
+        isMounted = false;
+        businessProfileSubscription?.remove?.();
+        navigationSubscription?.remove?.();
+      };
+    } catch (error) {
+      console.warn('⚠️ [HOMESCREEN] Could not setup business profile update listener:', error);
+    }
+  }, [userProfile]);
+
   // Refresh business profiles when screen comes into focus
   useFocusEffect(
     useCallback(() => {
@@ -691,6 +736,25 @@ const HomeScreen: React.FC = React.memo(() => {
     }, [userProfile?.id, initializeSelectedProfile, refreshSubscription])
   );
 
+  const refreshBusinessProfiles = useCallback(async () => {
+    const currentUserId = userProfile?.id || authService.getCurrentUser()?.id;
+    if (!currentUserId) return;
+
+    try {
+      setBusinessProfilesLoadingState(true);
+      const profiles = await businessProfileService.getUserBusinessProfiles(currentUserId);
+
+      setUserBusinessProfiles(profiles);
+
+      // Let BusinessProfileContext handle auto-selection logic
+      await initializeSelectedProfile(profiles);
+    } catch (error) {
+      console.error('Error refreshing business profiles:', error);
+    } finally {
+      setBusinessProfilesLoadingState(false);
+    }
+  }, [userProfile?.id, initializeSelectedProfile]);
+
   const userName = useMemo(() => {
     return (
       selectedBusinessProfile?.name ||
@@ -711,9 +775,13 @@ const HomeScreen: React.FC = React.memo(() => {
     [userName]
   );
   const userAvatarUri = useMemo(() => {
-    return (
+    const uri = (
       selectedBusinessProfile?.logo ||
       selectedBusinessProfile?.companyLogo ||
+      selectedBusinessProfile?.profileLogo ||
+      selectedBusinessProfile?.businessLogo ||
+      selectedBusinessProfile?.image ||
+      selectedBusinessProfile?.photo ||
       selectedBusinessProfile?.banner ||
       userProfile?.photo ||
       userProfile?.photoURL ||
@@ -722,6 +790,12 @@ const HomeScreen: React.FC = React.memo(() => {
       userProfile?.avatar ||
       null
     );
+    console.log('🖼️ [HOMESCREEN] userAvatarUri updated:', {
+      selectedBusinessProfileId: selectedBusinessProfile?.id,
+      selectedBusinessProfileName: selectedBusinessProfile?.name,
+      uri: uri
+    });
+    return uri;
   }, [userProfile, selectedBusinessProfile]);
 
   // Dynamic dimensions for responsive layout
@@ -2988,6 +3062,11 @@ const HomeScreen: React.FC = React.memo(() => {
 
   const handleBusinessProfileSelect = useCallback(async (profileId: string) => {
     const profile = userBusinessProfiles.find(p => p.id === profileId) || null;
+    console.log('🔄 [HOMESCREEN] handleBusinessProfileSelect called:', {
+      profileId,
+      profileName: profile?.name,
+      profileLogo: profile?.logo || profile?.companyLogo || profile?.profileLogo || profile?.businessLogo || profile?.image || profile?.photo || profile?.banner
+    });
     await setSelectedBusinessProfile(profile);
     closeBusinessProfileDropdown();
     businessCategoryPostersApi.clearCache();
@@ -4684,7 +4763,7 @@ const HomeScreen: React.FC = React.memo(() => {
               <ScrollView style={styles.businessProfileDropdownList}>
                 {userBusinessProfiles.map(profile => {
                   const isActive = profile.id === selectedBusinessProfileId;
-                  const profileLogo = profile.logo || profile.companyLogo || profile.banner;
+                  const profileLogo = profile.logo || profile.companyLogo || profile.profileLogo || profile.businessLogo || profile.image || profile.photo || profile.banner;
                   const initials = profile.name ? profile.name.split(' ').map(part => part[0]).join('').slice(0, 2).toUpperCase() : 'MB';
                   return (
                     <TouchableOpacity
@@ -4790,8 +4869,8 @@ const HomeScreen: React.FC = React.memo(() => {
                       uri={userAvatarUri}
                       style={styles.userAvatarImage}
                       resizeMode="cover"
-                      cacheKey={`user_avatar_${userProfile?.id || 'default'}`}
-                      key={`avatar_${userProfile?.id || 'default'}`}
+                      cacheKey={`user_avatar_${userProfile?.id || 'default'}_${selectedBusinessProfile?.id || 'personal'}`}
+                      key={`avatar_${userProfile?.id || 'default'}_${selectedBusinessProfile?.id || 'personal'}`}
                     />
                   ) : (
                     <Text style={styles.userAvatarText}>{userInitials}</Text>
