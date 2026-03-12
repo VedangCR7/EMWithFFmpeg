@@ -1038,7 +1038,7 @@ const HomeScreen: React.FC = React.memo(() => {
     ]).start();
   }, [businessCategoryFadeAnim]);
   const [banners, setBanners] = useState<Banner[]>([]);
-  const [templates, setTemplates] = useState<Template[]>([]);
+  const [templates, setTemplates] = useState<Array<{type: 'category' | 'template', data: any}>>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [calendarRefreshKey, setCalendarRefreshKey] = useState(0);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
@@ -2602,8 +2602,67 @@ const HomeScreen: React.FC = React.memo(() => {
         new Map(filtered.map(template => [template.id, template])).values()
       );
 
+      // Create structured results for immediate display
+      const structuredResults: Array<{type: 'category' | 'template', data: any}> = [];
+      
+      // Add matching categories first
+      matchingCategories.forEach(category => {
+        const categoryTemplates = uniqueFiltered.filter(template => 
+          template.category?.toLowerCase().includes(category.name.toLowerCase()) ||
+          template.tags?.some((tag: string) => tag.toLowerCase().includes(category.name.toLowerCase()))
+        );
+        
+        if (categoryTemplates.length > 0) {
+          structuredResults.push({
+            type: 'category',
+            data: {
+              name: category.name,
+              type: 'general',
+              templates: categoryTemplates
+            }
+          });
+        }
+      });
+
+      matchingBusinessCategories.forEach(category => {
+        const categoryTemplates = uniqueFiltered.filter(template => 
+          template.category?.toLowerCase().includes(category.name.toLowerCase()) ||
+          template.tags?.some((tag: string) => tag.toLowerCase().includes(category.name.toLowerCase()))
+        );
+        
+        if (categoryTemplates.length > 0) {
+          structuredResults.push({
+            type: 'category',
+            data: {
+              name: category.name,
+              type: 'business',
+              templates: categoryTemplates
+            }
+          });
+        }
+      });
+
+      // Add uncategorized templates
+      const categorizedTemplateIds = new Set();
+      structuredResults.forEach(item => {
+        if (item.type === 'category') {
+          item.data.templates.forEach((template: any) => {
+            categorizedTemplateIds.add(template.id);
+          });
+        }
+      });
+
+      uniqueFiltered.forEach(template => {
+        if (!categorizedTemplateIds.has(template.id)) {
+          structuredResults.push({
+            type: 'template',
+            data: template
+          });
+        }
+      });
+
       // Set initial results immediately
-      setTemplates(uniqueFiltered);
+      setTemplates(structuredResults);
 
       // Then fetch General Category templates if search matches a category and update results
       if (matchingCategories.length > 0 || matchingBusinessCategories.length > 0) {
@@ -2677,8 +2736,58 @@ const HomeScreen: React.FC = React.memo(() => {
               new Map(allResults.map(template => [template.id, template])).values()
             );
 
+            // Create structured search results with category headers
+            const structuredResults: Array<{type: 'category' | 'template', data: any}> = [];
+            
+            // Add matching general categories with their templates
+            matchingCategories.forEach(category => {
+              structuredResults.push({
+                type: 'category',
+                data: {
+                  name: category.name,
+                  type: 'general',
+                  templates: convertedGeneralCategoryResults.filter(template => 
+                    template.category?.toLowerCase().includes(category.name.toLowerCase()) ||
+                    template.tags?.some((tag: string) => tag.toLowerCase().includes(category.name.toLowerCase()))
+                  )
+                }
+              });
+            });
+
+            // Add matching business categories with their templates
+            matchingBusinessCategories.forEach(category => {
+              structuredResults.push({
+                type: 'category',
+                data: {
+                  name: category.name,
+                  type: 'business',
+                  templates: convertedBusinessCategoryResults.filter(template => 
+                    template.category?.toLowerCase().includes(category.name.toLowerCase()) ||
+                    template.tags?.some((tag: string) => tag.toLowerCase().includes(category.name.toLowerCase()))
+                  )
+                }
+              });
+            });
+
+            // Add individual templates that don't belong to matched categories
+            const uncategorizedTemplates = finalUniqueResults.filter(template => {
+              const templateCategory = template.category?.toLowerCase();
+              const isInMatchingCategory = [...matchingCategories, ...matchingBusinessCategories].some(cat =>
+                templateCategory?.includes(cat.name.toLowerCase()) ||
+                template.tags?.some((tag: string) => tag.toLowerCase().includes(cat.name.toLowerCase()))
+              );
+              return !isInMatchingCategory;
+            });
+
+            uncategorizedTemplates.forEach(template => {
+              structuredResults.push({
+                type: 'template',
+                data: template
+              });
+            });
+
             if (currentRequestId === requestId) {
-              setTemplates(finalUniqueResults);
+              setTemplates(structuredResults);
             }
           } catch (error) {
             if (__DEV__) {
@@ -3347,15 +3456,52 @@ const HomeScreen: React.FC = React.memo(() => {
 
 
 
-  const renderTemplate = useCallback(({ item }: { item: Template }) => {
-    return (
-      <TemplateCard
-        item={item}
-        cardWidth={cardWidth}
-        theme={theme}
-        onPress={handleTemplatePress}
-      />
-    );
+  const renderTemplate = useCallback(({ item }: { item: {type: 'category' | 'template', data: any} }) => {
+    if (item.type === 'category') {
+      // Render category header with templates
+      return (
+        <View style={styles.searchCategoryContainer}>
+          <Text style={[styles.searchCategoryTitle, { color: theme.colors.text }]}>
+            {item.data.name}
+          </Text>
+          <Text style={[styles.searchCategorySubtitle, { color: theme.colors.textSecondary }]}>
+            {item.data.type === 'business' ? 'Business Category' : 'General Category'}
+          </Text>
+          <FlatList
+            data={item.data.templates}
+            renderItem={({ item: template }) => (
+              <TemplateCard
+                item={template}
+                cardWidth={cardWidth}
+                theme={theme}
+                onPress={handleTemplatePress}
+              />
+            )}
+            keyExtractor={(template) => template.id}
+            horizontal={true}
+            showsHorizontalScrollIndicator={false}
+            nestedScrollEnabled={true}
+            removeClippedSubviews={true}
+            maxToRenderPerBatch={3}
+            windowSize={2}
+            initialNumToRender={3}
+            updateCellsBatchingPeriod={150}
+            getItemLayout={getItemLayout}
+            contentContainerStyle={styles.horizontalList}
+          />
+        </View>
+      );
+    } else {
+      // Render individual template
+      return (
+        <TemplateCard
+          item={item.data}
+          cardWidth={cardWidth}
+          theme={theme}
+          onPress={handleTemplatePress}
+        />
+      );
+    }
   }, [handleTemplatePress, theme, cardWidth]);
 
 
@@ -5246,7 +5392,11 @@ const HomeScreen: React.FC = React.memo(() => {
                       key={`search-results-${templates.length}`}
                       data={templates}
                       renderItem={renderTemplate}
-                      keyExtractor={keyExtractor}
+                      keyExtractor={(item, index) => 
+                        item.type === 'category' 
+                          ? `category-${item.data.name}-${index}` 
+                          : `template-${item.data.id}`
+                      }
                       horizontal={true}
                       showsHorizontalScrollIndicator={false}
                       nestedScrollEnabled={true}
@@ -5255,7 +5405,11 @@ const HomeScreen: React.FC = React.memo(() => {
                       windowSize={2}
                       initialNumToRender={3}
                       updateCellsBatchingPeriod={150}
-                      getItemLayout={getItemLayout}
+                      getItemLayout={(data, index) => ({
+                        length: item.type === 'category' ? 200 : cardWidth + 16,
+                        offset: item.type === 'category' ? index * 200 : index * (cardWidth + 16),
+                        index,
+                      })}
                       contentContainerStyle={styles.horizontalList}
                     />
                   ) : matchingCategories.length === 0 ? (
@@ -7410,6 +7564,24 @@ const styles = StyleSheet.create({
     height: 2,
     width: moderateScale(32),
     borderRadius: moderateScale(1),
+  },
+  // Search Category Styles
+  searchCategoryContainer: {
+    width: moderateScale(300),
+    paddingVertical: moderateScale(12),
+    paddingHorizontal: moderateScale(8),
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: moderateScale(8),
+    marginRight: moderateScale(12),
+  },
+  searchCategoryTitle: {
+    fontSize: moderateScale(14),
+    fontWeight: '600',
+    marginBottom: moderateScale(4),
+  },
+  searchCategorySubtitle: {
+    fontSize: moderateScale(11),
+    marginBottom: moderateScale(8),
   },
 
 });
