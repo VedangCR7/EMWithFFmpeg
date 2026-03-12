@@ -114,6 +114,33 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
   const { selectedBusinessProfile } = useBusinessProfile();
   const insets = useSafeAreaInsets();
 
+  // Skeleton shimmer animation
+  const shimmerAnim = useRef(new Animated.Value(0)).current;
+  
+  // Start shimmer animation when loading
+  useEffect(() => {
+    const shimmerAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(shimmerAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shimmerAnim, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    
+    shimmerAnimation.start();
+    
+    return () => {
+      shimmerAnimation.stop();
+    };
+  }, []);
+
   // Helper function to convert hex to rgba
   const hexToRgba = (hexColor: string, alpha: number): string => {
     if (!hexColor || typeof hexColor !== 'string') {
@@ -721,12 +748,54 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
           {
             width: cardWidth,
             height: cardHeight,
-            backgroundColor: '#f0f0f0',
+            backgroundColor: theme.colors.inputBackground || '#f0f0f0',
           },
         ]}
-      />
+      >
+        {/* Shimmer Effect */}
+        <Animated.View
+          style={[
+            styles.skeletonShimmer,
+            {
+              backgroundColor: theme.colors.primary + '20' || 'rgba(102, 126, 234, 0.2)',
+              opacity: shimmerAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.3, 0.7],
+              }),
+              transform: [
+                {
+                  translateX: shimmerAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-cardWidth, cardWidth],
+                  }),
+                },
+              ],
+            }
+          ]}
+        />
+        {/* Skeleton Content Structure */}
+        <View style={styles.skeletonContent}>
+          {/* Main image area */}
+          <View style={[
+            styles.skeletonImage,
+            { backgroundColor: theme.colors.border + '40' || 'rgba(0,0,0,0.1)' }
+          ]} />
+          {/* Text placeholder */}
+          <View style={styles.skeletonTextContainer}>
+            <View style={[
+              styles.skeletonTextLine,
+              { backgroundColor: theme.colors.border + '60' || 'rgba(0,0,0,0.15)' }
+            ]} />
+            <View style={[
+              styles.skeletonTextLine,
+              styles.skeletonTextLineSmall,
+              { backgroundColor: theme.colors.border + '40' || 'rgba(0,0,0,0.1)' }
+            ]} />
+          </View>
+        </View>
+      </View>
     );
-  }, [cardWidth, cardHeight]);
+  }, [cardWidth, cardHeight, theme.colors, shimmerAnim]);
 
   const getIconSize = useCallback((baseSize: number) => {
     const scale = screenWidth / 375;
@@ -1248,6 +1317,36 @@ const styles = StyleSheet.create({
   },
   serviceFilterButtonTextInactive: {
     color: 'rgba(255,255,255,0.7)',
+  },
+  // Skeleton Loading Styles
+  skeletonShimmer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: moderateScale(8),
+    overflow: 'hidden',
+  },
+  skeletonContent: {
+    flex: 1,
+    padding: moderateScale(8),
+  },
+  skeletonImage: {
+    flex: 1,
+    borderRadius: moderateScale(6),
+    marginBottom: moderateScale(8),
+  },
+  skeletonTextContainer: {
+    gap: moderateScale(4),
+  },
+  skeletonTextLine: {
+    height: moderateScale(8),
+    borderRadius: moderateScale(4),
+    width: '80%',
+  },
+  skeletonTextLineSmall: {
+    width: '60%',
   },
 });
 
