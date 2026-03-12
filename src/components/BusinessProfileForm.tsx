@@ -20,6 +20,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { BusinessProfile, CreateBusinessProfileData } from '../services/businessProfile';
+import businessProfileService from '../services/businessProfile';
 import { useTheme } from '../context/ThemeContext';
 import ImagePickerModal from './ImagePickerModal';
 import businessCategoriesService from '../services/businessCategoriesService';
@@ -94,7 +95,7 @@ const FloatingInput = React.memo(({
 interface BusinessProfileFormProps {
   visible: boolean;
   onClose: () => void;
-  onSubmit: (data: CreateBusinessProfileData) => void;
+  onSubmit: (data: CreateBusinessProfileData, pendingLogoUri?: string) => void;
   profile?: BusinessProfile | null;
   loading?: boolean;
 }
@@ -135,6 +136,7 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
   const [subcategories, setSubcategories] = useState<any[]>([]);
   const [loadingCategories, setLoadingCategories] = useState<boolean>(true);
   const [loadingSubcategories, setLoadingSubcategories] = useState<boolean>(false);
+  const [uploadingImage, setUploadingImage] = useState<boolean>(false);
   const [allCategoriesData, setAllCategoriesData] = useState<any[]>([]);
   const inputRefs = useRef<Record<string, RNTextInput | null>>({});
 
@@ -325,10 +327,33 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
     setShowImagePickerModal(true);
   };
 
-  const handleImageSelected = (imageUri: string) => {
+  const handleImageSelected = async (imageUri: string) => {
     setLogoImage(imageUri);
-    setFormData(prev => ({ ...prev, companyLogo: imageUri }));
     setShowImagePickerModal(false);
+    
+    // For new profile creation, we'll upload during form submission
+    // For existing profile editing, upload immediately
+    if (profile?.id) {
+      try {
+        setUploadingImage(true);
+        console.log('📤 Uploading logo for existing profile:', profile.id);
+        const uploadResult = await businessProfileService.uploadImage(profile.id, 'logo', imageUri);
+        console.log('✅ Logo uploaded successfully:', uploadResult.url);
+        setFormData(prev => ({ ...prev, companyLogo: uploadResult.url }));
+      } catch (error) {
+        console.error('❌ Failed to upload logo:', error);
+        Alert.alert('Upload Failed', 'Failed to upload logo. Please try again.');
+        // Reset logo on upload failure
+        setLogoImage(null);
+        setFormData(prev => ({ ...prev, companyLogo: '' }));
+      } finally {
+        setUploadingImage(false);
+      }
+    } else {
+      // For new profiles, store the local URI temporarily
+      // It will be uploaded during profile creation
+      setFormData(prev => ({ ...prev, companyLogo: imageUri }));
+    }
   };
 
   const handleCloseImagePicker = () => {
@@ -428,7 +453,7 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
     };
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     console.log('🔍 [BUSINESS FORM] Register button clicked');
     console.log('🔍 [BUSINESS FORM] Form data being submitted:', formData);
     
@@ -441,8 +466,29 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
       return;
     }
 
-    console.log('✅ [BUSINESS FORM] Form validation passed, submitting to parent');
-    onSubmit(formData);
+    // For new profiles, upload image if it's a local file path
+    if (!profile && formData.companyLogo && businessProfileService.isLocalFilePath(formData.companyLogo)) {
+      try {
+        setUploadingImage(true);
+        console.log('📤 [BUSINESS FORM] Uploading logo for new profile creation...');
+        
+        // For new profiles, we need to create the profile first, then upload the image
+        // So we'll submit the form without the logo, then upload it after getting the profile ID
+        const formDataWithoutLogo = { ...formData, companyLogo: '' };
+        
+        console.log('✅ [BUSINESS FORM] Form validation passed, submitting to parent (without logo)');
+        onSubmit(formDataWithoutLogo, formData.companyLogo); // Pass original logo URI separately
+        
+      } catch (error) {
+        console.error('❌ [BUSINESS FORM] Failed to prepare logo upload:', error);
+        Alert.alert('Upload Failed', 'Failed to prepare logo upload. Please try again.');
+      } finally {
+        setUploadingImage(false);
+      }
+    } else {
+      console.log('✅ [BUSINESS FORM] Form validation passed, submitting to parent');
+      onSubmit(formData);
+    }
   };
 
   
@@ -479,11 +525,11 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
               style={[
                 styles.saveButton, 
                 { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(102,126,234,0.15)' },
-                loading && styles.saveButtonDisabled
+                (loading || uploadingImage) && styles.saveButtonDisabled
               ]}
-              disabled={loading}
+              disabled={loading || uploadingImage}
             >
-              {loading ? (
+              {(loading || uploadingImage) ? (
                 <ActivityIndicator size="small" color={isDarkMode ? '#ffffff' : '#667eea'} />
               ) : (
                 <Text style={[styles.saveButtonText, { color: isDarkMode ? '#ffffff' : '#667eea' }]}>{profile ? 'SAVE' : 'REGISTER'}</Text>
@@ -530,6 +576,12 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
                     <View style={styles.logoPreviewContainer}>
                       <View style={styles.logoPreviewWrapper}>
                         <Image source={{ uri: logoImage }} style={styles.logoPreview} />
+                        {uploadingImage && (
+                          <View style={styles.logoUploadOverlay}>
+                            <ActivityIndicator size="small" color="#ffffff" />
+                            <Text style={styles.uploadingText}>Uploading...</Text>
+                          </View>
+                        )}
                         <View style={styles.logoOverlay}>
                           <Icon name="photo" size={24} color="#ffffff" />
                         </View>
@@ -538,6 +590,7 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
                         <TouchableOpacity 
                           style={styles.logoActionButton}
                           onPress={handleImagePickerPress}
+                          disabled={uploadingImage}
                         >
                           <Icon name="edit" size={16} color="#ffffff" style={styles.buttonIcon} />
                           <Text style={styles.logoActionButtonText}>Change</Text>
@@ -548,6 +601,7 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
                             setLogoImage(null);
                             setFormData(prev => ({ ...prev, companyLogo: '' }));
                           }}
+                          disabled={uploadingImage}
                         >
                           <Icon name="delete" size={16} color="#ffffff" style={styles.buttonIcon} />
                           <Text style={styles.logoActionButtonText}>Remove</Text>
@@ -1276,6 +1330,23 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  logoUploadOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  uploadingText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '500',
   },
   logoActionButtons: {
     flexDirection: 'row',

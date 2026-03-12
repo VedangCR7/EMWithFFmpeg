@@ -610,6 +610,26 @@ const BusinessProfilesScreen: React.FC = () => {
       const newProfile = await businessProfileService.createBusinessProfile(profileData);
       console.log('✅ [BUSINESS PAY] Business profile created:', newProfile?.id);
 
+      // Upload logo if there's a pending one
+      try {
+        const pendingLogoUri = await AsyncStorage.getItem('pending_business_logo_uri');
+        if (pendingLogoUri && newProfile?.id) {
+          console.log('📤 [BUSINESS PAY] Uploading pending logo for new profile:', newProfile.id);
+          const uploadResult = await businessProfileService.uploadImage(newProfile.id, 'logo', pendingLogoUri);
+          console.log('✅ [BUSINESS PAY] Logo uploaded successfully:', uploadResult.url);
+          
+          // Update the profile with the uploaded logo URL
+          await businessProfileService.updateBusinessProfile(newProfile.id, {
+            companyLogo: uploadResult.url
+          });
+          console.log('✅ [BUSINESS PAY] Profile updated with logo URL');
+        }
+        await AsyncStorage.removeItem('pending_business_logo_uri');
+      } catch (logoError) {
+        console.error('❌ [BUSINESS PAY] Failed to upload logo:', logoError);
+        // Don't fail the entire process if logo upload fails
+      }
+
       await AsyncStorage.removeItem('pending_business_profile_data');
       setPendingProfileData(null);
       setShowPaymentModal(false);
@@ -815,10 +835,13 @@ const BusinessProfilesScreen: React.FC = () => {
     }
   }, [processBusinessProfilePaymentSuccess]);
 
-  const handleFormSubmit = useCallback(async (formData: any) => {
+  const handleFormSubmit = useCallback(async (formData: any, pendingLogoUri?: string) => {
     // All new profiles require payment approval before creation
     if (!editingProfile) {
       setPendingProfileData(formData);
+      if (pendingLogoUri) {
+        await AsyncStorage.setItem('pending_business_logo_uri', pendingLogoUri);
+      }
       await AsyncStorage.setItem('pending_business_profile_data', JSON.stringify(formData));
       setShowPaymentModal(true);
       setShowForm(false);

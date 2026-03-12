@@ -546,7 +546,7 @@ class BusinessProfileService {
   }
 
   // Helper: Check if a URL is a local file path
-  private isLocalFilePath(url: string): boolean {
+  isLocalFilePath(url: string): boolean {
     if (!url) return false;
     return (
       url.startsWith('file://') ||
