@@ -77,8 +77,25 @@ interface TemplateCardProps {
   item: Template;
   cardWidth: number;
   theme: any;
-  onPress: (item: Template) => void;
+  onPress: (template: Template) => void;
 }
+
+// Search result item interfaces
+interface SearchResultCategory {
+  type: 'category';
+  data: {
+    name: string;
+    type: 'business' | 'general';
+    templates: Template[];
+  };
+}
+
+interface SearchResultTemplate {
+  type: 'template';
+  data: Template;
+}
+
+type SearchResultItem = SearchResultCategory | SearchResultTemplate;
 
 const TemplateCard: React.FC<TemplateCardProps> = React.memo(({ item, cardWidth, theme, onPress }) => {
   const scaleAnim = React.useRef(new Animated.Value(1)).current;
@@ -1038,7 +1055,7 @@ const HomeScreen: React.FC = React.memo(() => {
     ]).start();
   }, [businessCategoryFadeAnim]);
   const [banners, setBanners] = useState<Banner[]>([]);
-  const [templates, setTemplates] = useState<Array<{type: 'category' | 'template', data: any}>>([]);
+  const [templates, setTemplates] = useState<SearchResultItem[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [calendarRefreshKey, setCalendarRefreshKey] = useState(0);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
@@ -2603,7 +2620,7 @@ const HomeScreen: React.FC = React.memo(() => {
       );
 
       // Create structured results for immediate display
-      const structuredResults: Array<{type: 'category' | 'template', data: any}> = [];
+      const structuredResults: SearchResultItem[] = [];
       
       // Add matching categories first
       matchingCategories.forEach(category => {
@@ -2737,7 +2754,7 @@ const HomeScreen: React.FC = React.memo(() => {
             );
 
             // Create structured search results with category headers
-            const structuredResults: Array<{type: 'category' | 'template', data: any}> = [];
+            const structuredResults: SearchResultItem[] = [];
             
             // Add matching general categories with their templates
             matchingCategories.forEach(category => {
@@ -2864,9 +2881,15 @@ const HomeScreen: React.FC = React.memo(() => {
           if (currentRequestId === requestId) {
             // Merge API results with existing local results, preserving local results
             setTemplates(prevTemplates => {
-              const combinedResults = [...prevTemplates, ...uniqueApiResults];
+              // Convert uniqueApiResults to structured format
+              const structuredApiResults = uniqueApiResults.map(template => ({
+                type: 'template' as const,
+                data: template
+              }));
+              
+              const combinedResults = [...prevTemplates, ...structuredApiResults];
               return Array.from(
-                new Map(combinedResults.map(template => [template.id, template])).values()
+                new Map(combinedResults.map(item => [item.type === 'template' ? item.data.id : item.data.name, item])).values()
               );
             });
           }
@@ -2924,10 +2947,17 @@ const HomeScreen: React.FC = React.memo(() => {
 
   const handleDownloadTemplate = useCallback(async (templateId: string) => {
     // Update local state immediately for better UX
-    setTemplates(prev => prev.map(template =>
-      template.id === templateId
-        ? { ...template, isDownloaded: true, downloads: template.downloads + 1 }
-        : template
+    setTemplates(prev => prev.map(item =>
+      item.type === 'template' && item.data.id === templateId
+        ? { 
+            ...item, 
+            data: { 
+              ...item.data, 
+              isDownloaded: true, 
+              downloads: item.data.downloads + 1 
+            } 
+          }
+        : item
     ));
 
     // Try API call in background
@@ -3062,6 +3092,12 @@ const HomeScreen: React.FC = React.memo(() => {
           new Map(allResults.map(template => [template.id, template])).values()
         );
 
+        // Convert Template objects to SearchResultTemplate objects
+        const searchResultItems: SearchResultTemplate[] = uniqueResults.map(template => ({
+          type: 'template',
+          data: template
+        }));
+
         console.log('=��� [SEARCH DEBUG] Total results before dedup:', allResults.length);
         console.log('=��� [SEARCH DEBUG] Unique results after dedup:', uniqueResults.length);
         console.log('=��� [SEARCH DEBUG] Business templates in results:', convertedBusinessCategoryResults.length);
@@ -3070,10 +3106,16 @@ const HomeScreen: React.FC = React.memo(() => {
         if (currentRequestId === requestId && isSearching) {
           // Merge API results with existing local results, preserving local results
           setTemplates(prevTemplates => {
-            const combinedResults = [...prevTemplates, ...uniqueResults];
-            return Array.from(
-              new Map(combinedResults.map(template => [template.id, template])).values()
-            );
+            const combinedResults = [...prevTemplates, ...searchResultItems];
+            
+            // Deduplicate by creating a Map with proper typing
+            const dedupMap = new Map<string, SearchResultItem>();
+            combinedResults.forEach(item => {
+              const key = item.type === 'template' ? item.data.id : item.data.name;
+              dedupMap.set(key, item);
+            });
+            
+            return Array.from(dedupMap.values());
           });
         }
       } catch (error) {
@@ -3456,7 +3498,7 @@ const HomeScreen: React.FC = React.memo(() => {
 
 
 
-  const renderTemplate = useCallback(({ item }: { item: {type: 'category' | 'template', data: any} }) => {
+  const renderTemplate = useCallback(({ item }: { item: SearchResultItem }) => {
     if (item.type === 'category') {
       // Render category header with templates
       return (
@@ -5405,11 +5447,15 @@ const HomeScreen: React.FC = React.memo(() => {
                       windowSize={2}
                       initialNumToRender={3}
                       updateCellsBatchingPeriod={150}
-                      getItemLayout={(data, index) => ({
-                        length: item.type === 'category' ? 200 : cardWidth + 16,
-                        offset: item.type === 'category' ? index * 200 : index * (cardWidth + 16),
-                        index,
-                      })}
+                      getItemLayout={(data, index) => {
+                        if (!data) return { length: 0, offset: 0, index };
+                        const item = data[index];
+                        return {
+                          length: item.type === 'category' ? 200 : cardWidth + 16,
+                          offset: item.type === 'category' ? index * 200 : index * (cardWidth + 16),
+                          index,
+                        };
+                      }}
                       contentContainerStyle={styles.horizontalList}
                     />
                   ) : matchingCategories.length === 0 ? (
