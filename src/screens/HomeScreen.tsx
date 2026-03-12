@@ -3534,14 +3534,16 @@ const HomeScreen: React.FC = React.memo(() => {
         </View>
       );
     } else {
-      // Render individual template
+      // Render individual template in vertical layout
       return (
-        <TemplateCard
-          item={item.data}
-          cardWidth={cardWidth}
-          theme={theme}
-          onPress={handleTemplatePress}
-        />
+        <View style={styles.verticalTemplateContainer}>
+          <TemplateCard
+            item={item.data}
+            cardWidth={cardWidth}
+            theme={theme}
+            onPress={handleTemplatePress}
+          />
+        </View>
       );
     }
   }, [handleTemplatePress, theme, cardWidth]);
@@ -5439,24 +5441,15 @@ const HomeScreen: React.FC = React.memo(() => {
                           ? `category-${item.data.name}-${index}` 
                           : `template-${item.data.id}`
                       }
-                      horizontal={true}
-                      showsHorizontalScrollIndicator={false}
+                      horizontal={false}
+                      showsVerticalScrollIndicator={false}
                       nestedScrollEnabled={true}
                       removeClippedSubviews={true}
-                      maxToRenderPerBatch={3}
-                      windowSize={2}
+                      maxToRenderPerBatch={5}
+                      windowSize={5}
                       initialNumToRender={3}
                       updateCellsBatchingPeriod={150}
-                      getItemLayout={(data, index) => {
-                        if (!data) return { length: 0, offset: 0, index };
-                        const item = data[index];
-                        return {
-                          length: item.type === 'category' ? 200 : cardWidth + 16,
-                          offset: item.type === 'category' ? index * 200 : index * (cardWidth + 16),
-                          index,
-                        };
-                      }}
-                      contentContainerStyle={styles.horizontalList}
+                      contentContainerStyle={styles.verticalSearchList}
                     />
                   ) : matchingCategories.length === 0 ? (
                     <View style={{ padding: 20, alignItems: 'center' }}>
@@ -6965,6 +6958,14 @@ const styles = StyleSheet.create({
   },
   horizontalList: {
     paddingHorizontal: moderateScale(3),
+  },
+  verticalSearchList: {
+    paddingVertical: moderateScale(5),
+    paddingHorizontal: moderateScale(3),
+  },
+  verticalTemplateContainer: {
+    marginBottom: moderateScale(8),
+    alignItems: 'center',
   },
   templateCardWrapper: {
     width: getResponsiveValue(SCREEN_WIDTH * 0.32, SCREEN_WIDTH * 0.28, SCREEN_WIDTH * 0.18),
