@@ -333,7 +333,6 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
       await Share.open({
         url: shareableUri,
         title: 'Share Poster',
-        message: 'Sharing my latest EventMarketers poster.',
         subject: 'Poster',
       });
       console.log('Poster shared via react-native-share');

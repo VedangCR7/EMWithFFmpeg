@@ -17,7 +17,12 @@ export interface BusinessProfile {
   website?: string;
   logo?: string;
   companyLogo?: string;
+  profileLogo?: string; // Additional possible logo field from backend
+  businessLogo?: string; // Additional possible logo field from backend
+  image?: string; // Additional possible logo field from backend
+  photo?: string; // Additional possible logo field from backend
   banner?: string;
+  coverImage?: string; // Additional possible banner field from backend
   services: string[];
   createdAt: string;
   updatedAt: string;
@@ -73,25 +78,43 @@ class BusinessProfileService {
           
           if (profiles && profiles.length > 0) {
             // Convert backend profiles to frontend format
-            const businessProfiles: BusinessProfile[] = profiles.map((profile: any) => ({
-              id: profile.id,
-              name: profile.name || profile.businessName,
-              description: profile.description || '',
-              category: profile.category,
-              subCategory: profile.subCategory || profile.subcategory,
-              subcategory: profile.subCategory || profile.subcategory,
-              address: profile.address || '',
-              phone: profile.phone || '',
-              alternatePhone: profile.alternatePhone || '',
-              email: profile.email || '',
-              website: profile.website || '',
-              logo: profile.logo || '',
-              companyLogo: profile.logo || '',
-              banner: '',
-              services: [],
-              createdAt: profile.createdAt,
-              updatedAt: profile.updatedAt,
-            }));
+            const businessProfiles: BusinessProfile[] = profiles.map((profile: any) => {
+              // Debug logging to identify logo field names
+              console.log('🔍 [BUSINESS PROFILE] Profile data:', {
+                id: profile.id,
+                name: profile.name || profile.businessName,
+                logoFields: {
+                  logo: profile.logo,
+                  companyLogo: profile.companyLogo,
+                  profileLogo: profile.profileLogo,
+                  businessLogo: profile.businessLogo,
+                  image: profile.image,
+                  photo: profile.photo,
+                  banner: profile.banner,
+                  coverImage: profile.coverImage
+                }
+              });
+
+              return {
+                id: profile.id,
+                name: profile.name || profile.businessName,
+                description: profile.description || '',
+                category: profile.category,
+                subCategory: profile.subCategory || profile.subcategory,
+                subcategory: profile.subCategory || profile.subcategory,
+                address: profile.address || '',
+                phone: profile.phone || '',
+                alternatePhone: profile.alternatePhone || '',
+                email: profile.email || '',
+                website: profile.website || '',
+                logo: profile.logo || profile.companyLogo || profile.profileLogo || profile.businessLogo || profile.image || profile.photo || '',
+                companyLogo: profile.logo || profile.companyLogo || profile.profileLogo || profile.businessLogo || profile.image || profile.photo || '',
+                banner: profile.banner || profile.coverImage || '',
+                services: [],
+                createdAt: profile.createdAt,
+                updatedAt: profile.updatedAt,
+              };
+            });
             
             console.log(`✅ [BUSINESS PROFILES] Fetched ${businessProfiles.length} profiles`);
             return businessProfiles;

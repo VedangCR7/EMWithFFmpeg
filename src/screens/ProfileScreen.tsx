@@ -1279,7 +1279,8 @@ const ProfileScreen: React.FC = () => {
         console.log('🔄 Clearing business profile cache after profile update');
         try {
           const businessProfileService = require('../services/businessProfile').default;
-          businessProfileService.clearCache();
+          const currentUser = authService.getCurrentUser();
+          businessProfileService.clearCache(currentUser?.id);
         } catch (error) {
           console.error('Failed to clear business profile cache:', error);
         }
@@ -1291,6 +1292,45 @@ const ProfileScreen: React.FC = () => {
           businessCategoryPostersApi.clearCache();
         } catch (error) {
           console.error('Failed to clear business category posters cache:', error);
+        }
+        
+        // Trigger business profiles refresh in HomeScreen by emitting a custom event
+        console.log('🔄 Triggering business profiles refresh across app...');
+        try {
+          // Use a custom event to notify other screens to refresh business profiles
+          const eventEmitter = require('react-native').NativeModules?.EventEmitter || 
+            new (require('react-native').DeviceEventEmitter)();
+          
+          eventEmitter.emit('businessProfileUpdated', {
+            userId: currentUser?.id,
+            logoUrl: updatedLogo,
+            timestamp: Date.now()
+          });
+        } catch (eventError) {
+          console.warn('⚠️ Could not emit business profile update event:', eventError);
+        }
+        
+        // Fallback: try to update HomeScreen state directly if it's mounted
+        try {
+          // Find HomeScreen instance and refresh its business profiles
+          const navigation = require('@react-navigation/native').useNavigation();
+          const rootState = navigation.getState();
+          const homeScreenRoute = rootState?.routes?.find((route: any) => 
+            route.name === 'Home' || route.name === 'MyBusiness'
+          );
+          
+          if (homeScreenRoute) {
+            console.log('🔄 HomeScreen or MyBusiness screen is active, triggering refresh...');
+            // Small delay to ensure current operation completes
+            setTimeout(() => {
+              navigation.dispatch({
+                type: 'SET_BUSINESS_PROFILES_REFRESH',
+                payload: { timestamp: Date.now() }
+              });
+            }, 500);
+          }
+        } catch (navError) {
+          console.warn('⚠️ Could not trigger navigation refresh:', navError);
         }
         
         setShowEditProfileModal(false);

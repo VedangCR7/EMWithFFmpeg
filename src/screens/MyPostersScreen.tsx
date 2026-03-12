@@ -336,7 +336,6 @@ const MyPostersScreen: React.FC = () => {
       await Share.share({
         url: poster.imageUri,
         title: poster.title,
-        message: `Check out my poster: ${poster.title}`,
       });
     } catch (error) {
       console.error('Error sharing poster:', error);
