@@ -76,6 +76,7 @@ export type MainStackParamList = {
     selectedBusinessProfile?: any;
     selectedBusinessProfileId?: string;
   };
+  MyBusinessPosterPlayer: undefined;
   AboutUs: undefined;
   PrivacyPolicy: undefined;
   PosterPreview: {
@@ -138,7 +139,7 @@ export type MainStackParamList = {
 export type TabParamList = {
   Home: undefined;
   Templates: undefined;
-  PosterPlayer: { originScreen?: string };
+  MyBusiness: undefined;
   Greetings: undefined;
   Profile: undefined;
 };
@@ -161,6 +162,7 @@ import PosterPreviewScreen from '../screens/PosterPreviewScreen';
 import VideoEditorScreen from '../screens/VideoEditorScreen';
 import VideoPlayerScreen from '../screens/VideoPlayerScreen';
 import PosterPlayerScreen from '../screens/PosterPlayerScreen';
+import MyBusinessPosterPlayerScreen from '../screens/MyBusinessPosterPlayerScreen';
 import VideoPreviewScreen from '../screens/VideoPreviewScreen';
 import SubscriptionScreen from '../screens/SubscriptionScreen';
 import TransactionHistoryScreen from '../screens/TransactionHistoryScreen';
@@ -197,6 +199,11 @@ const TabNavigator = () => {
       <MainStack.Screen
         name="PosterPlayer"
         component={PosterPlayerScreen}
+        options={{ headerShown: false }}
+      />
+      <MainStack.Screen
+        name="MyBusinessPosterPlayer"
+        component={MyBusinessPosterPlayerScreen}
         options={{ headerShown: false }}
       />
       <MainStack.Screen
@@ -283,9 +290,11 @@ const CustomTabBar = (props: any) => {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const { selectedBusinessProfile } = useBusinessProfile();
-  const [isLoadingPosters, setIsLoadingPosters] = React.useState(false);
+  
+  // Loading state for poster fetching
+  const [isLoadingPosters, setIsLoadingPosters] = useState<boolean>(false);
 
-  const isPosterPlayerFocused = props.state.routes[props.state.index]?.name === 'PosterPlayer';
+  const isMyBusinessFocused = props.state.routes[props.state.index]?.name === 'MyBusiness';
   const isHomeFocused = props.state.routes[props.state.index]?.name === 'Home';
 
   // Dynamic dimensions for screen rotation/resize support
@@ -318,70 +327,10 @@ const CustomTabBar = (props: any) => {
   const borderWidth = currentModerateScale(0.8); // Further reduced from 1
 
 
-  // Default behavior: load posters for user's category
-  const loadPostersForUserCategory = React.useCallback(async () => {
-    setIsLoadingPosters(true);
-
-    try {
-      // Get user's business category and fetch posters with higher limit to work around backend limitation
-      const response = await businessCategoryPostersApi.getUserCategoryPosters(false, selectedBusinessProfile?.id);
-
-      if (response?.success && response.data?.posters && response.data.posters.length > 0) {
-        // Map BusinessCategoryPoster to Template format for PosterPlayerScreen
-        const mapPosterToTemplate = (poster: any) => ({
-          id: poster.id,
-          name: poster.title || 'Poster',
-          thumbnail: poster.imageUrl || poster.thumbnail || '',
-          category: poster.category || response.data.category || 'General',
-          downloads: poster.downloads || 0,
-          isDownloaded: false,
-          languages: [],
-          tags: poster.tags || [],
-        });
-
-        const selectedPoster = mapPosterToTemplate(response.data.posters[0]);
-        const relatedPosters = response.data.posters.slice(1).map(mapPosterToTemplate);
-
-        // Navigate to PosterPlayerScreen with posters
-        const navigationParams = {
-          selectedPoster,
-          relatedPosters,
-          searchQuery: '',
-          businessCategory: response.data.category, // Pass the business category to PosterPlayerScreen
-          posterLimit: 200, // Add high limit to ensure more posters are loaded
-        };
-
-        if (navigationRef.isReady()) {
-          navigateService('PosterPlayer', navigationParams);
-        } else {
-          const parentNavigator = props.navigation.getParent();
-          if (parentNavigator) {
-            parentNavigator.navigate('PosterPlayer', navigationParams);
-          } else {
-            props.navigation.navigate('PosterPlayer', navigationParams);
-          }
-        }
-      } else {
-        logger.warn('⚠️ [NAVBAR] No posters available for user category');
-        Alert.alert(
-          'No posters available',
-          'We could not find posters for your business category right now. Please try again later.',
-        );
-      }
-    } catch (error) {
-      logger.error('❌ [NAVBAR] Error loading user category posters:', error);
-      Alert.alert(
-        'Unable to load posters',
-        'Something went wrong while loading your posters. Please try again later.',
-      );
-    } finally {
-      setIsLoadingPosters(false);
-    }
+  const handlePosterPlayerShortcut = React.useCallback(() => {
+    // Simply navigate to MyBusiness tab
+    props.navigation.navigate('MyBusiness');
   }, [props.navigation]);
-
-  const handlePosterPlayerShortcut = React.useCallback(async () => {
-    await loadPostersForUserCategory();
-  }, [loadPostersForUserCategory]);
 
   const handleTodaysPickPress = React.useCallback(() => {
     const parentNavigator = props.navigation.getParent();
@@ -751,7 +700,7 @@ const CustomTabBar = (props: any) => {
     outputRange: [0, 1],
   });
 
-  if (isPosterPlayerFocused) {
+  if (isMyBusinessFocused) {
     return null;
   }
 
@@ -842,7 +791,7 @@ const CustomTabBar = (props: any) => {
             const isFocused = props.state.index === index;
 
             const onPress = () => {
-              if (route.name === 'PosterPlayer') {
+              if (route.name === 'MyBusiness') {
                 handlePosterPlayerShortcut();
                 return;
               }
@@ -1119,12 +1068,13 @@ const MainTabNavigator = () => {
         }}
       />
       <Tab.Screen
-        name="PosterPlayer"
-        component={PosterPlayerScreen}
-        initialParams={{ originScreen: "MainTabs" }}
+        name="MyBusiness"
+        component={MyBusinessPosterPlayerScreen}
         options={{
           title: 'My Business',
-          tabBarStyle: { display: 'none' },
+          tabBarIcon: ({ color, size }) => (
+            <Icon name="business" size={size} color={color} />
+          ),
         }}
       />
       <Tab.Screen

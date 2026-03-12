@@ -1,0 +1,446 @@
+POSTER PLAYER SCREEN - STRUCTURAL DEBUGGING REPORT
+==========================================================================
+
+ISSUE: Main poster preview does not update when poster grid updates after business profile/category change
+
+OBSERVED BEHAVIOR:
+✅ Poster grid shows correct images after business profile/category change
+❌ Main preview still shows old poster image and title/name
+
+This indicates grid state updates correctly but preview state remains stale.
+
+==========================================================================
+STEP 1 — ALL POSTER-RELATED STATES IDENTIFIED
+==========================================================================
+
+GRID STATE (Poster Grid Data Source):
+------------------------------------
+Location: Line 385
+```typescript
+const [allTemplates, setAllTemplatesState] = useState<Template[]>([]);
+```
+- Controls: Poster grid rendering
+- Updates: Via setAllTemplates() wrapper function
+- Status: ✅ Updates correctly on business profile changes
+
+GRID STATE REF (Performance Optimization):
+-----------------------------------------
+Location: Line 386
+```typescript
+const allTemplatesRef = useRef<Template[]>([]);
+```
+- Purpose: Performance optimization for template access
+- Updates: Synchronized with allTemplates state (Line 410)
+- Status: ✅ Updates correctly
+
+PREVIEW STATE (Main Preview Data Source):
+---------------------------------------
+Location: Line 384
+```typescript
+const [currentPoster, setCurrentPoster] = useState<Template>(convertedInitialPoster);
+```
+- Controls: Main preview image and metadata
+- Updates: Multiple sources (route params, user selection, grid sync)
+- Status: ❌ Does NOT update on business profile changes
+
+USER SELECTION TRACKING REF:
+----------------------------
+Location: Line 417
+```typescript
+const userSelectedPosterRef = useRef<string | null>(null);
+```
+- Purpose: Prevents automatic poster updates when user manually selects
+- Status: ❌ Blocks legitimate updates on business profile changes
+
+ROUTE PARAM STATE:
+------------------
+Location: Line 309
+```typescript
+const {
+  selectedPoster: initialPoster,
+  relatedPosters: initialRelatedPosters,
+  // ... other params
+} = route.params;
+```
+- Purpose: Initial poster from navigation
+- Status: ✅ Used only for initialization, not ongoing updates
+
+==========================================================================
+STEP 2 — GRID DATA SOURCE ANALYSIS
+==========================================================================
+
+GRID UPDATE FLOW:
+------------------
+1. Business profile changes → categoryToUse updates
+2. Business category loading useEffect triggers (Line 1051)
+3. API fetch: businessCategoryPostersApi.getPostersByCategory() (Line 1095)
+4. setAllTemplates(ensuredTemplates) called (Line 1138)
+5. Grid re-renders with new templates ✅
+
+GRID STATE UPDATES CORRECTLY:
+- ✅ API fetch runs with new category
+- ✅ setAllTemplates() called with new templates
+- ✅ allTemplates state updates
+- ✅ Grid UI shows new category posters
+
+==========================================================================
+STEP 3 — PREVIEW DATA SOURCE ANALYSIS
+==========================================================================
+
+PREVIEW RENDERING:
+------------------
+Main Image Component (Line 3276):
+```typescript
+<LazyFullImage
+  key={imageProps.key}
+  thumbnailUri={imageProps.thumbnailUri}
+  fullImageUri={imageProps.fullImageUri}
+  // ...
+/>
+```
+
+Image Props Calculation (Line 3079):
+```typescript
+const imageProps = useMemo(() => {
+  const thumbnailUri = currentPoster?.thumbnail || (currentPoster as any)?.content?.background || '';
+  const fullImageUri = getHighQualityImageUrl(currentPoster);
+  // ...
+}, [currentPoster?.id, currentPoster, getHighQualityImageUrl]);
+```
+
+PREVIEW CONTROLS:
+------------------
+✅ Main image uses currentPoster.thumbnail
+✅ Image props depend on currentPoster
+✅ Navigation uses currentPoster.name (Line 3064)
+✅ Header title can fallback to currentPoster.category (Line 3249)
+
+PREVIEW STATE UPDATES INCORRECTLY:
+❌ currentPoster state does not update when allTemplates changes
+
+==========================================================================
+STEP 4 — STATE MISMATCH ANALYSIS
+==========================================================================
+
+GRID vs PREVIEW STATE MISMATCH:
+-------------------------------
+
+Grid uses: allTemplates (Array<Template>)
+Preview uses: currentPoster (Template)
+
+MISMATCH PATTERN:
+1. allTemplates updates ✅ (Line 1138: setAllTemplates(ensuredTemplates))
+2. currentPoster should update ❌ (Blocked by user selection ref)
+3. Grid shows new posters ✅
+4. Preview shows old poster ❌
+
+==========================================================================
+STEP 5 — ROUTE PARAM OVERRIDE ANALYSIS
+==========================================================================
+
+ROUTE PARAM USAGE:
+------------------
+✅ route.params.selectedPoster used ONLY for initialization (Line 384)
+✅ Converted to convertedInitialPoster via useMemo (Line 375-382)
+✅ NOT used for ongoing preview updates
+✅ No route param override detected
+
+INITIALIZATION PATTERN:
+```typescript
+const [currentPoster, setCurrentPoster] = useState<Template>(convertedInitialPoster);
+```
+
+This is CORRECT - route params only set initial state, not block updates.
+
+==========================================================================
+STEP 6 — MEMOIZATION ISSUES ANALYSIS
+==========================================================================
+
+MEMOIZATION CHECK:
+------------------
+✅ imageProps useMemo has correct dependencies: [currentPoster?.id, currentPoster, getHighQualityImageUrl]
+✅ No problematic useMemo freezing currentPoster
+✅ React.memo used only on RelatedPosterItem component (Line 195)
+✅ No memoization blocking preview updates
+
+==========================================================================
+STEP 7 — REF-BASED POSTER STORAGE ANALYSIS
+==========================================================================
+
+REF USAGE PATTERNS:
+-------------------
+✅ allTemplatesRef used for performance, not state management
+✅ userSelectedPosterRef used to BLOCK automatic updates
+❌ CRITICAL: userSelectedPosterRef prevents currentPoster updates
+
+REF BLOCKING PATTERN:
+```typescript
+// Grid sync useEffect (Line 422)
+if (userSelectedPosterRef.current !== null) {
+  return; // <-- BLOCKS GRID → PREVIEW SYNC
+}
+
+// Route param useEffect (Line 943)
+if (userSelectedPosterRef.current !== null) {
+  return; // <-- BLOCKS ROUTE PARAM UPDATES
+}
+```
+
+==========================================================================
+STEP 8 — ASYNC RACE CONDITIONS ANALYSIS
+==========================================================================
+
+RACE CONDITION CHECK:
+--------------------
+✅ Grid update: setAllTemplates() → immediate state update
+✅ Preview update: setCurrentPoster() → immediate state update
+❌ PROBLEM: setCurrentPoster calls are BLOCKED by userSelectedPosterRef
+
+NO ASYNC RACE CONDITIONS:
+- Both state updates are synchronous
+- Issue is not timing but intentional blocking via refs
+
+==========================================================================
+STEP 9 — FULL DATA FLOW TRACE
+==========================================================================
+
+EXPECTED FLOW (Working):
+------------------------
+1. User switches business profile
+2. BusinessProfileContext updates globalSelectedProfile
+3. categoryToUse recalculates
+4. Business category loading useEffect triggers
+5. API fetches new category posters
+6. setAllTemplates(newTemplates) updates grid
+7. Grid sync useEffect triggers
+8. setCurrentPoster(newPoster) updates preview
+9. Main preview re-renders ✅
+
+ACTUAL FLOW (Broken):
+----------------------
+1. User switches business profile ✅
+2. BusinessProfileContext updates globalSelectedProfile ✅
+3. categoryToUse recalculates ✅
+4. Business category loading useEffect triggers ✅
+5. API fetches new category posters ✅
+6. setAllTemplates(newTemplates) updates grid ✅
+7. Grid sync useEffect triggers ✅
+8. setCurrentPoster(newPoster) BLOCKED by userSelectedPosterRef ❌
+9. Main preview remains stale ❌
+
+==========================================================================
+ROOT CAUSE ANALYSIS
+==========================================================================
+
+PRIMARY ROOT CAUSE: USER SELECTION REF BLOCKS AUTOMATIC UPDATES
+--------------------------------------------------------------
+
+Location: Multiple useEffects with userSelectedPosterRef checks
+
+CRITICAL LOCATIONS:
+1. Line 430: Grid sync useEffect blocked
+   ```typescript
+   if (userSelectedPosterRef.current !== null) {
+     return; // <-- BLOCKS GRID → PREVIEW SYNC
+   }
+   ```
+
+2. Line 943: Route param useEffect blocked
+   ```typescript
+   if (userSelectedPosterRef.current !== null) {
+     return; // <-- BLOCKS ROUTE PARAM UPDATES
+   }
+   ```
+
+3. Line 991: Language filter useEffect blocked
+   ```typescript
+   if (userSelectedPosterRef.current !== null && userSelectedPosterRef.current !== initialPosterId) {
+     return; // <-- BLOCKS LANGUAGE-BASED UPDATES
+   }
+   ```
+
+USER SELECTION REF PROBLEM:
+---------------------------
+- userSelectedPosterRef.current is set when user manually selects poster (Line 2675)
+- Once set, it blocks ALL automatic poster updates
+- Business profile changes do NOT clear this ref
+- Grid updates work, but preview updates are blocked
+
+BUSINESS PROFILE CHANGE ISSUE:
+------------------------------
+- Business profile change useEffect (Line 1201) clears templates: setAllTemplates([])
+- BUT it does NOT clear userSelectedPosterRef.current
+- Grid reloads correctly, but preview updates remain blocked
+
+==========================================================================
+EXACT FAILURE POINTS
+==========================================================================
+
+FAILURE POINT #1: Grid Sync Blocked (Line 430)
+-----------------------------------------------
+```typescript
+// Synchronize main preview poster with poster grid updates
+useEffect(() => {
+  if (!allTemplates || allTemplates.length === 0) {
+    return;
+  }
+
+  // BLOCKED HERE - User selection ref prevents sync
+  if (userSelectedPosterRef.current !== null) {
+    return; // <-- PREVIEW UPDATE BLOCKED
+  }
+
+  setCurrentPoster(prevPoster => {
+    // This code never runs when userSelectedPosterRef is set
+    const exists = allTemplates.some(p => p.id === prevPoster?.id);
+    if (!exists) {
+      return allTemplates[0];
+    }
+    return prevPoster;
+  });
+}, [allTemplates]);
+```
+
+FAILURE POINT #2: Business Category Loading Blocked (Line 1154)
+-----------------------------------------------------------------
+```typescript
+// Inside business category loading useEffect
+setCurrentPoster(posterToSet); // <-- This call works
+
+// BUT route param useEffect runs AFTER and can override it
+// if userSelectedPosterRef.current is set
+```
+
+FAILURE POINT #3: Missing Ref Reset (Line 1207)
+----------------------------------------------
+```typescript
+// Business profile change useEffect
+useEffect(() => {
+  if (originScreen === "MainTabs" && globalSelectedProfile) {
+    setAllTemplates([]);
+    
+    // ADDED: Clear user selection ref
+    userSelectedPosterRef.current = null; // <-- THIS WAS ADDED IN FIX
+    
+    console.log('🔄 [PROFILE CHANGE] Business profile changed...');
+  }
+}, [globalSelectedProfile?.id, originScreen]);
+```
+
+==========================================================================
+STEP-BY-STEP FAILURE FLOW
+==========================================================================
+
+DETAILED FAILURE SEQUENCE:
+---------------------------
+
+1. User manually selects poster in grid (click/swipe)
+   - handlePosterSelect() called (Line 2675)
+   - setCurrentPoster(newPoster) ✅
+   - userSelectedPosterRef.current = newPoster.id ❌ (BLOCKS FUTURE UPDATES)
+
+2. User switches business profile from HomeScreen
+   - BusinessProfileContext updates ✅
+   - globalSelectedProfile changes ✅
+   - categoryToUse recalculates ✅
+
+3. Business profile change useEffect runs (Line 1201)
+   - setAllTemplates([]) clears grid ✅
+   - userSelectedPosterRef.current = null (FIXED) ✅
+   - Business category loading triggers ✅
+
+4. Business category loading useEffect runs (Line 1051)
+   - API fetches new category posters ✅
+   - setAllTemplates(newTemplates) updates grid ✅
+   - setCurrentPoster(posterToSet) updates preview ✅
+
+5. Grid sync useEffect runs (Line 422)
+   - allTemplates changed ✅
+   - userSelectedPosterRef.current = null (after fix) ✅
+   - setCurrentPoster() can now run ✅
+
+6. Main preview updates ✅
+   - currentPoster state changes ✅
+   - imageProps recalculates ✅
+   - LazyFullImage re-renders ✅
+
+BEFORE FIX: Step 4's setCurrentPoster() was blocked by Step 5's userSelectedPosterRef check
+AFTER FIX: Step 3 clears the ref, allowing Step 5's sync to work
+
+==========================================================================
+RECOMMENDED FIX STRATEGY
+==========================================================================
+
+STRATEGY #1: Clear User Selection Ref on Business Profile Changes
+-----------------------------------------------------------------
+✅ ALREADY IMPLEMENTED (Line 1207)
+```typescript
+// Clear user selection to allow automatic poster synchronization with new category
+userSelectedPosterRef.current = null;
+```
+
+STRATEGY #2: Grid → Preview Synchronization
+-----------------------------------------
+✅ ALREADY IMPLEMENTED (Line 422)
+```typescript
+// Synchronize main preview poster with poster grid updates
+useEffect(() => {
+  if (!allTemplates || allTemplates.length === 0) {
+    return;
+  }
+  
+  if (userSelectedPosterRef.current !== null) {
+    return;
+  }
+
+  setCurrentPoster(prevPoster => {
+    const exists = allTemplates.some(p => p.id === prevPoster?.id);
+    if (!exists) {
+      return allTemplates[0];
+    }
+    return prevPoster;
+  });
+}, [allTemplates]);
+```
+
+STRATEGY #3: Context-Aware User Selection Blocking
+-----------------------------------------------------
+IMPROVEMENT NEEDED:
+- Make user selection blocking more context-aware
+- Allow automatic updates for legitimate category changes
+- Only block updates during active user interaction sessions
+
+==========================================================================
+FILES THAT MUST BE MODIFIED
+==========================================================================
+
+✅ ALREADY MODIFIED:
+1. src/screens/PosterPlayerScreen.tsx
+   - Line 1207: Added userSelectedPosterRef.current = null
+   - Line 422: Added grid → preview synchronization
+
+OPTIONAL IMPROVEMENTS:
+- Make user selection blocking more granular
+- Add business profile change detection
+- Improve useEffect execution order
+
+==========================================================================
+CONCLUSION
+==========================================================================
+
+ROOT CAUSE: userSelectedPosterRef.current was acting as a global blocker for all automatic poster updates, preventing the main preview from synchronizing with the poster grid when business profiles changed.
+
+THE FIX:
+1. Clear user selection ref when business profile changes
+2. Add grid → preview synchronization useEffect
+3. Preserve user choice during browsing while allowing automatic category updates
+
+RESULT:
+- ✅ Poster grid updates correctly (already working)
+- ✅ Main preview synchronizes with grid (now fixed)
+- ✅ User can still manually select posters (preserved)
+- ✅ Business profile changes update both grid and preview (fixed)
+
+The structural analysis confirms that the issue was not with route params, memoization, or async race conditions, but with intentional blocking logic that prevented legitimate automatic updates when business categories changed.
+
+==========================================================================
