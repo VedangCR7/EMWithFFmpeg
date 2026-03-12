@@ -494,20 +494,29 @@ class BusinessProfileService {
       console.log('📋 [UPLOAD] File info:', { filename, fileExtension, mimeType });
       
       const formData = new FormData();
-      formData.append('file', {
+      formData.append('logo', {
         uri: imageUri,
         type: mimeType,
         name: filename,
       } as any);
 
       console.log('📡 [UPLOAD] Uploading to:', `/api/mobile/business-profile/${profileId}/upload`);
+      console.log('📋 [UPLOAD] FormData details:', {
+        fieldName: 'logo',
+        fileName: filename,
+        mimeType,
+        profileId,
+      });
       
       try {
         const response = await api.post(`/api/mobile/business-profile/${profileId}/upload`, formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
+          timeout: 30000, // 30 second timeout
         });
+        
+        console.log('📡 [UPLOAD] Upload response:', response.data);
         
         if (response.data.success) {
           const uploadedUrl = response.data.data?.url || response.data.url;
@@ -519,13 +528,22 @@ class BusinessProfileService {
           cacheService.clear(`business_profile_${profileId}`);
           return { url: uploadedUrl };
         } else {
-          throw new Error('API returned unsuccessful response');
+          const apiError = response.data.error || response.data.message || 'Unknown API error';
+          console.error('❌ [UPLOAD] API returned unsuccessful response:', apiError);
+          throw new Error(`API error: ${apiError}`);
         }
       } catch (uploadError: any) {
         const status = uploadError.response?.status;
-        const errorMessage = uploadError.response?.data?.message || uploadError.message;
+        const errorMessage = uploadError.response?.data?.message || uploadError.response?.data?.error || uploadError.message;
+        const errorData = uploadError.response?.data;
         
-        console.error('❌ [UPLOAD] Upload failed:', status, errorMessage);
+        console.error('❌ [UPLOAD] Upload failed:', {
+          status,
+          errorMessage,
+          errorData,
+          profileId,
+          originalError: uploadError
+        });
         
         // If endpoint doesn't exist (404), provide helpful error
         if (status === 404) {
@@ -536,8 +554,17 @@ class BusinessProfileService {
           );
         }
         
-        // Re-throw other errors
-        throw new Error(`Upload failed: ${errorMessage}`);
+        // If server error (500), provide more specific guidance
+        if (status === 500) {
+          throw new Error(
+            'Backend server error during upload. This is likely a backend configuration issue. ' +
+            'Please contact the backend team to check the upload endpoint implementation. ' +
+            'Error: ' + (errorMessage || 'Internal server error')
+          );
+        }
+        
+        // Re-throw other errors with more context
+        throw new Error(`Upload failed: ${errorMessage || 'Unknown error'}`);
       }
     } catch (error: any) {
       console.error('❌ [UPLOAD] Error uploading business profile image:', error);
