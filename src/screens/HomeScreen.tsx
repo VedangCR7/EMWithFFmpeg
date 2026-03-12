@@ -3506,9 +3506,6 @@ const HomeScreen: React.FC = React.memo(() => {
           <Text style={[styles.searchCategoryTitle, { color: theme.colors.text }]}>
             {item.data.name}
           </Text>
-          <Text style={[styles.searchCategorySubtitle, { color: theme.colors.textSecondary }]}>
-            {item.data.type === 'business' ? 'Business Category' : 'General Category'}
-          </Text>
           <FlatList
             data={item.data.templates}
             renderItem={({ item: template }) => (
