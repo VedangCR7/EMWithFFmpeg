@@ -4869,8 +4869,8 @@ const HomeScreen: React.FC = React.memo(() => {
                       uri={userAvatarUri}
                       style={styles.userAvatarImage}
                       resizeMode="cover"
-                      cacheKey={`user_avatar_${userProfile?.id || 'default'}_${selectedBusinessProfile?.id || 'personal'}`}
-                      key={`avatar_${userProfile?.id || 'default'}_${selectedBusinessProfile?.id || 'personal'}`}
+                      cacheKey={`user_avatar_${selectedBusinessProfile?.id || 'personal'}_${userAvatarUri?.slice(-20) || 'default'}`}
+                      key={`avatar_${selectedBusinessProfile?.id || 'personal'}_${userAvatarUri?.slice(-20) || 'default'}`}
                     />
                   ) : (
                     <Text style={styles.userAvatarText}>{userInitials}</Text>
