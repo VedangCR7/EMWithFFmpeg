@@ -2580,10 +2580,14 @@ const HomeScreen: React.FC = React.memo(() => {
         // Search in description
         if (template.description?.toLowerCase().includes(searchLower)) return true;
 
-        // Search in tags array (including calendar posters tags)
+        // Search in tags array (including calendar posters tags) - EXCLUDE language tags
         if (template.tags && Array.isArray(template.tags)) {
           const tagMatch = template.tags.some((tag: string) => {
             const tagLower = tag?.toLowerCase();
+            // Skip language tags to prevent language buttons from appearing in search
+            if (tagLower === 'english' || tagLower === 'hindi' || tagLower === 'all') {
+              return false;
+            }
             if (tagLower?.includes(searchLower)) return true;
             // Check if tag matches any matching category name
             if (matchingCategoryNames.some(catName => tagLower?.includes(catName))) return true;
@@ -2624,10 +2628,25 @@ const HomeScreen: React.FC = React.memo(() => {
       
       // Add matching categories first
       matchingCategories.forEach(category => {
-        const categoryTemplates = uniqueFiltered.filter(template => 
-          template.category?.toLowerCase().includes(category.name.toLowerCase()) ||
-          template.tags?.some((tag: string) => tag.toLowerCase().includes(category.name.toLowerCase()))
-        );
+        const categoryTemplates = uniqueFiltered.filter(template => {
+          const templateCategory = template.category?.toLowerCase();
+          const categoryName = category.name.toLowerCase();
+          
+          // More inclusive matching logic
+          return templateCategory === categoryName ||
+                 templateCategory?.includes(categoryName) ||
+                 categoryName.includes(templateCategory) ||
+                 template.tags?.some((tag: string) => {
+                   const tagLower = tag.toLowerCase();
+                   // Skip language tags to prevent language buttons from appearing in categories
+                   if (tagLower === 'english' || tagLower === 'hindi' || tagLower === 'all') {
+                     return false;
+                   }
+                   return tagLower === categoryName || 
+                          tagLower.includes(categoryName) || 
+                          categoryName.includes(tagLower);
+                 });
+        });
         
         if (categoryTemplates.length > 0) {
           structuredResults.push({
@@ -2642,10 +2661,25 @@ const HomeScreen: React.FC = React.memo(() => {
       });
 
       matchingBusinessCategories.forEach(category => {
-        const categoryTemplates = uniqueFiltered.filter(template => 
-          template.category?.toLowerCase().includes(category.name.toLowerCase()) ||
-          template.tags?.some((tag: string) => tag.toLowerCase().includes(category.name.toLowerCase()))
-        );
+        const categoryTemplates = uniqueFiltered.filter(template => {
+          const templateCategory = template.category?.toLowerCase();
+          const categoryName = category.name.toLowerCase();
+          
+          // More inclusive matching logic
+          return templateCategory === categoryName ||
+                 templateCategory?.includes(categoryName) ||
+                 categoryName.includes(templateCategory) ||
+                 template.tags?.some((tag: string) => {
+                   const tagLower = tag.toLowerCase();
+                   // Skip language tags to prevent language buttons from appearing in categories
+                   if (tagLower === 'english' || tagLower === 'hindi' || tagLower === 'all') {
+                     return false;
+                   }
+                   return tagLower === categoryName || 
+                          tagLower.includes(categoryName) || 
+                          categoryName.includes(tagLower);
+                 });
+        });
         
         if (categoryTemplates.length > 0) {
           structuredResults.push({
@@ -2758,30 +2792,64 @@ const HomeScreen: React.FC = React.memo(() => {
             
             // Add matching general categories with their templates
             matchingCategories.forEach(category => {
+              const categoryTemplates = convertedGeneralCategoryResults.filter(template => {
+                const templateCategory = template.category?.toLowerCase();
+                const categoryName = category.name.toLowerCase();
+                
+                // More inclusive matching logic
+                return templateCategory === categoryName ||
+                       templateCategory?.includes(categoryName) ||
+                       categoryName.includes(templateCategory) ||
+                       template.tags?.some((tag: string) => {
+                         const tagLower = tag.toLowerCase();
+                         // Skip language tags to prevent language buttons from appearing in categories
+                         if (tagLower === 'english' || tagLower === 'hindi' || tagLower === 'all') {
+                           return false;
+                         }
+                         return tagLower === categoryName || 
+                                tagLower.includes(categoryName) || 
+                                categoryName.includes(tagLower);
+                       });
+              });
+              
               structuredResults.push({
                 type: 'category',
                 data: {
                   name: category.name,
                   type: 'general',
-                  templates: convertedGeneralCategoryResults.filter(template => 
-                    template.category?.toLowerCase().includes(category.name.toLowerCase()) ||
-                    template.tags?.some((tag: string) => tag.toLowerCase().includes(category.name.toLowerCase()))
-                  )
+                  templates: categoryTemplates
                 }
               });
             });
 
             // Add matching business categories with their templates
             matchingBusinessCategories.forEach(category => {
+              const categoryTemplates = convertedBusinessCategoryResults.filter(template => {
+                const templateCategory = template.category?.toLowerCase();
+                const categoryName = category.name.toLowerCase();
+                
+                // More inclusive matching logic
+                return templateCategory === categoryName ||
+                       templateCategory?.includes(categoryName) ||
+                       categoryName.includes(templateCategory) ||
+                       template.tags?.some((tag: string) => {
+                         const tagLower = tag.toLowerCase();
+                         // Skip language tags to prevent language buttons from appearing in categories
+                         if (tagLower === 'english' || tagLower === 'hindi' || tagLower === 'all') {
+                           return false;
+                         }
+                         return tagLower === categoryName || 
+                                tagLower.includes(categoryName) || 
+                                categoryName.includes(tagLower);
+                       });
+              });
+              
               structuredResults.push({
                 type: 'category',
                 data: {
                   name: category.name,
                   type: 'business',
-                  templates: convertedBusinessCategoryResults.filter(template => 
-                    template.category?.toLowerCase().includes(category.name.toLowerCase()) ||
-                    template.tags?.some((tag: string) => tag.toLowerCase().includes(category.name.toLowerCase()))
-                  )
+                  templates: categoryTemplates
                 }
               });
             });
@@ -2789,10 +2857,18 @@ const HomeScreen: React.FC = React.memo(() => {
             // Add individual templates that don't belong to matched categories
             const uncategorizedTemplates = finalUniqueResults.filter(template => {
               const templateCategory = template.category?.toLowerCase();
-              const isInMatchingCategory = [...matchingCategories, ...matchingBusinessCategories].some(cat =>
-                templateCategory?.includes(cat.name.toLowerCase()) ||
-                template.tags?.some((tag: string) => tag.toLowerCase().includes(cat.name.toLowerCase()))
-              );
+              const isInMatchingCategory = [...matchingCategories, ...matchingBusinessCategories].some(cat => {
+                const categoryName = cat.name.toLowerCase();
+                return templateCategory === categoryName ||
+                       templateCategory?.includes(categoryName) ||
+                       categoryName.includes(templateCategory) ||
+                       template.tags?.some((tag: string) => {
+                         const tagLower = tag.toLowerCase();
+                         return tagLower === categoryName || 
+                                tagLower.includes(categoryName) || 
+                                categoryName.includes(tagLower);
+                       });
+              });
               return !isInMatchingCategory;
             });
 
@@ -6781,7 +6857,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: moderateScale(10),
+    paddingHorizontal: moderateScale(2),
     marginBottom: verticalScale(4),
   },
   viewAllButton: {
@@ -6845,6 +6921,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   templatesSection: {
+    width: '100%',
     paddingBottom: verticalScale(15),
     paddingHorizontal: moderateScale(8),
   },
@@ -6958,11 +7035,11 @@ const styles = StyleSheet.create({
   },
   verticalSearchList: {
     paddingVertical: moderateScale(5),
-    paddingHorizontal: moderateScale(3),
+    paddingHorizontal: moderateScale(1),
   },
   verticalTemplateContainer: {
     marginBottom: moderateScale(8),
-    alignItems: 'center',
+    alignItems: 'stretch',
   },
   templateCardWrapper: {
     width: getResponsiveValue(SCREEN_WIDTH * 0.32, SCREEN_WIDTH * 0.28, SCREEN_WIDTH * 0.18),
@@ -7611,7 +7688,7 @@ const styles = StyleSheet.create({
   },
   // Search Category Styles
   searchCategoryContainer: {
-    width: moderateScale(300),
+    width: '100%',
     paddingVertical: moderateScale(12),
     paddingHorizontal: moderateScale(8),
     backgroundColor: 'rgba(255,255,255,0.1)',
