@@ -30,7 +30,7 @@ import userPreferencesService from '../services/userPreferences';
 import userProfileService from '../services/userProfile';
 import { useTheme } from '../context/ThemeContext';
 import { useSubscription } from '../contexts/SubscriptionContext';
-import { MainStackParamList } from '../navigation/AppNavigator';
+import type { MainStackParamList } from '../navigation/types';
 
 type ProfileScreenNavigationProp = StackNavigationProp<MainStackParamList>;
 import downloadedPostersService from '../services/downloadedPosters';
@@ -260,6 +260,7 @@ const ProfileScreen: React.FC = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [showSignOutModal, setShowSignOutModal] = useState(false);
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [showComingSoonModal, setShowComingSoonModal] = useState(false);
   const [comingSoonTitle, setComingSoonTitle] = useState('');
   const [comingSoonSubtitle, setComingSoonSubtitle] = useState('');
@@ -839,6 +840,55 @@ const ProfileScreen: React.FC = () => {
                 [{ text: 'OK' }]
               );
             }
+  };
+
+  const handleDeleteAccount = () => {
+    setShowDeleteAccountModal(true);
+  };
+
+  const confirmDeleteAccount = async () => {
+    try {
+      setShowDeleteAccountModal(false);
+      
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id;
+      
+      if (!userId) {
+        Alert.alert('Error', 'User not found. Please sign in again.');
+        return;
+      }
+      
+      // Show loading indicator
+      Alert.alert(
+        'Deleting Account',
+        'Please wait while we delete your account...',
+        [{ text: 'OK', onPress: () => {} }],
+        { cancelable: false }
+      );
+      
+      // Delete user account
+      await authApi.deleteUser(userId);
+      
+      // Clear all local data
+      clearSubscriptionData();
+      await authService.signOut();
+      
+      Alert.alert(
+        'Account Deleted',
+        'Your account has been successfully deleted.',
+        [{ text: 'OK' }]
+      );
+      
+      // Navigation will be handled by auth state change listener
+      
+    } catch (error: any) {
+      console.error('Delete account error:', error);
+      Alert.alert(
+        'Delete Account Error',
+        error.response?.data?.message || 'Failed to delete account. Please try again.',
+        [{ text: 'OK' }]
+      );
+    }
   };
 
 
@@ -2164,6 +2214,27 @@ const ProfileScreen: React.FC = () => {
             }]}>Sign Out</Text>
           </TouchableOpacity>
 
+          {/* Delete Account Button */}
+          <TouchableOpacity 
+            style={[styles.signOutButton, { 
+              backgroundColor: '#cc0000',
+              borderColor: '#cc0000',
+              marginHorizontal: dynamicModerateScale(8),
+              marginTop: dynamicModerateScale(8),
+              paddingVertical: dynamicModerateScale(10),
+              borderRadius: dynamicModerateScale(12),
+            }]} 
+            onPress={handleDeleteAccount}
+          >
+            <Icon name="delete-forever" size={getIconSize(14)} color="#ffffff" style={[styles.signOutIcon, {
+              marginRight: dynamicModerateScale(5),
+            }]} />
+            <Text style={[styles.signOutText, { 
+              color: '#ffffff',
+              fontSize: getFontSize(10),
+            }]}>Delete Account</Text>
+          </TouchableOpacity>
+
           {/* App Version */}
             <Text style={[styles.versionText, { 
             color: theme.colors.textSecondary,
@@ -2808,6 +2879,120 @@ const ProfileScreen: React.FC = () => {
                   <Text style={[styles.signOutConfirmButtonText, {
                     fontSize: getFontSize(10),
                   }]}>Sign Out</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Delete Account Confirmation Modal */}
+      <Modal
+        visible={showDeleteAccountModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowDeleteAccountModal(false)}
+        statusBarTranslucent={true}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowDeleteAccountModal(false)}
+        >
+          <TouchableOpacity 
+            activeOpacity={1}
+            onPress={() => {}} // Prevent closing when tapping inside modal
+          >
+            <View style={[styles.signOutModalContainer, {
+              backgroundColor: theme.colors.surface,
+              borderRadius: dynamicModerateScale(16),
+              padding: dynamicModerateScale(16),
+            }]}>
+              <View style={[styles.signOutModalHeader, {
+                marginBottom: dynamicModerateScale(10),
+              }]}>
+                <View style={[styles.signOutIconContainer, { 
+                  backgroundColor: '#ffebee',
+                  width: dynamicModerateScale(42),
+                  height: dynamicModerateScale(42),
+                  borderRadius: dynamicModerateScale(21),
+                  marginBottom: dynamicModerateScale(6),
+                }]}>
+                  <Icon name="delete-forever" size={getIconSize(22)} color="#cc0000" />
+                </View>
+                <Text 
+                  style={[styles.signOutModalTitle, { 
+                    color: theme.colors.text,
+                    fontSize: getFontSize(14),
+                  }]}
+                >
+                  Delete Account
+                </Text>
+                <TouchableOpacity 
+                  style={[styles.closeModalButton, { 
+                    backgroundColor: theme.colors.inputBackground,
+                    width: dynamicModerateScale(24),
+                    height: dynamicModerateScale(24),
+                    borderRadius: dynamicModerateScale(12),
+                    top: dynamicModerateScale(-5),
+                    right: dynamicModerateScale(-5),
+                  }]}
+                  onPress={() => setShowDeleteAccountModal(false)}
+                  activeOpacity={0.7}
+                >
+                  <Icon name="close" size={getIconSize(16)} color={theme.colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+              
+              <View style={[styles.signOutModalContent, {
+                marginBottom: dynamicModerateScale(12),
+              }]}>
+                <Text style={[styles.signOutModalMessage, { 
+                  color: theme.colors.text,
+                  fontSize: getFontSize(10),
+                  lineHeight: dynamicModerateScale(16),
+                }]}>
+                  ⚠️ This action cannot be undone!
+                </Text>
+                <Text style={[styles.signOutModalSubMessage, { 
+                  color: theme.colors.textSecondary,
+                  fontSize: getFontSize(9),
+                  textAlign: 'center',
+                  lineHeight: dynamicModerateScale(14),
+                  marginTop: dynamicModerateScale(8),
+                }]}>
+                  Deleting your account will permanently remove all your data, including posters, business profiles, and subscription information.
+                </Text>
+              </View>
+              
+              <View style={[styles.signOutModalButtons, {
+                gap: dynamicModerateScale(8),
+              }]}>
+                <TouchableOpacity 
+                  style={[styles.signOutCancelButton, { 
+                    backgroundColor: theme.colors.inputBackground,
+                    paddingVertical: dynamicModerateScale(9),
+                    borderRadius: dynamicModerateScale(10),
+                  }]}
+                  onPress={() => setShowDeleteAccountModal(false)}
+                >
+                  <Text style={[styles.signOutCancelButtonText, { 
+                    color: theme.colors.text,
+                    fontSize: getFontSize(10),
+                  }]}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.signOutConfirmButton, { 
+                    backgroundColor: '#cc0000',
+                    paddingVertical: dynamicModerateScale(9),
+                    borderRadius: dynamicModerateScale(10),
+                  }]}
+                  onPress={confirmDeleteAccount}
+                >
+                  <Text style={[styles.signOutConfirmButtonText, {
+                    fontSize: getFontSize(10),
+                  }]}>Delete Forever</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -3489,6 +3674,11 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(12),
     textAlign: 'center',
     lineHeight: moderateScale(18),
+  },
+  signOutModalSubMessage: {
+    fontSize: moderateScale(9),
+    textAlign: 'center',
+    lineHeight: moderateScale(14),
   },
   signOutModalButtons: {
     flexDirection: 'row',

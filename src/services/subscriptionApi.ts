@@ -30,6 +30,9 @@ export interface SubscriptionStatus {
   expiryDate?: string | null;
   autoRenew: boolean;
   status: 'active' | 'expired' | 'cancelled' | 'pending' | 'inactive';
+  // CRITICAL: Payment verification fields for UI accuracy
+  razorpaySubscriptionId?: string;
+  paymentId?: string;
 }
 
 export interface SubscriptionHistory {
@@ -201,6 +204,10 @@ class SubscriptionApiService {
         data?.razorpayKeyId ||
         response.data?.key ||
         response.data?.key_id;
+
+      // Clear transaction history cache to ensure the new PENDING transaction is visible
+      cacheService.clear(`transactions_unified_user_${userId}`);
+      console.log('[APP] 🧹 Cleared transaction cache on order creation');
 
       return {
         orderId,
@@ -377,7 +384,7 @@ class SubscriptionApiService {
                   planName: subscriptionData?.planName ?? null,
                   expiryDate: subscriptionData?.expiryDate ?? null,
                   autoRenew: Boolean(subscriptionData?.autoRenew),
-                  status: subscriptionData?.isActive ? "active" : "inactive"
+                  status: subscriptionData?.status?.toLowerCase() || (subscriptionData?.isActive ? "active" : "inactive")
                 },
                 message: 'Status fetched successfully'
               };
@@ -560,12 +567,14 @@ class SubscriptionApiService {
     orderId: string;
     paymentId: string;
     signature: string;
+    subscriptionId?: string;
     amount?: number;
     amountPaise?: number;
     currency?: string;
     planId?: string;
     email?: string;
     contact?: string;
+    isAutopay?: boolean;
   }): Promise<{ success: boolean; message: string; data?: any }> {
     try {
       const currentUser = authService.getCurrentUser();
@@ -585,6 +594,14 @@ class SubscriptionApiService {
         paymentId: paymentData.paymentId,
         signature: paymentData.signature,
       };
+
+      if (paymentData.subscriptionId) {
+        payload.subscriptionId = paymentData.subscriptionId;
+      }
+
+      if (paymentData.isAutopay) {
+        payload.isAutopay = paymentData.isAutopay;
+      }
 
       if (typeof paymentData.amount === 'number') {
         payload.amount = paymentData.amount;
@@ -619,12 +636,96 @@ class SubscriptionApiService {
       // Clear subscription status cache after payment verification
       this.clearStatusCache(userId);
       
+      // Clear transaction history cache
+      cacheService.clear(`transactions_unified_user_${userId}`);
+      console.log('[APP] 🧹 Cleared transaction cache after payment');
+      
       return response.data;
     } catch (error: any) {
       console.error('❌ Payment verification error:', error);
       
       // Provide more detailed error message
       const errorMessage = error.response?.data?.message || error.message || 'Payment verification failed';
+      throw new Error(errorMessage);
+    }
+  }
+
+  // Create Autopay subscription
+  async createAutopay(planId: string) {
+    try {
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id;
+
+      if (!userId) {
+        throw new Error('User not authenticated');
+      }
+
+      console.log('🔄 Creating Autopay subscription for user:', userId, 'Plan:', planId);
+
+      const response = await api.post('/api/mobile/subscription/create-autopay', {
+        planId,
+        userId,
+      });
+
+      console.log('✅ Autopay subscription created:', response.data);
+      
+      // Clear transaction history cache to ensure the new PENDING transaction is visible
+      cacheService.clear(`transactions_unified_user_${userId}`);
+      console.log('[APP] 🧹 Cleared transaction cache on autopay creation');
+
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Create Autopay error:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to create Autopay subscription';
+      throw new Error(errorMessage);
+    }
+  }
+
+  // Cancel Autopay subscription
+  async cancelAutopay() {
+    try {
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id;
+
+      if (!userId) {
+        throw new Error('User not authenticated');
+      }
+
+      console.log('🔄 Cancelling Autopay subscription for user:', userId);
+
+      const response = await api.post('/api/mobile/subscription/cancel-autopay');
+
+      // Clear subscription status cache after cancellation
+      this.clearStatusCache(userId);
+
+      console.log('✅ Autopay subscription cancelled:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Cancel Autopay error:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to cancel Autopay subscription';
+      throw new Error(errorMessage);
+    }
+  }
+
+  // Get Autopay status
+  async getAutopayStatus() {
+    try {
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id;
+
+      if (!userId) {
+        throw new Error('User not authenticated');
+      }
+
+      console.log('🔍 Fetching Autopay status for user:', userId);
+
+      const response = await api.get('/api/mobile/subscription/autopay-status');
+
+      console.log('✅ Autopay status fetched:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Get Autopay status error:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch Autopay status';
       throw new Error(errorMessage);
     }
   }

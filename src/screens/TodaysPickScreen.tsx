@@ -19,7 +19,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MainStackParamList } from '../navigation/AppNavigator';
+import { MainStackParamList } from '../navigation/types';
 import { Template } from '../services/dashboard';
 import { useTheme } from '../context/ThemeContext';
 import OptimizedImage from '../components/OptimizedImage';

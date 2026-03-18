@@ -323,6 +323,17 @@ class AuthApiService {
       throw error;
     }
   }
+
+  // Delete user account
+  async deleteUser(userId: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await api.delete(`/api/mobile/users/${userId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Delete user error:', error);
+      throw error;
+    }
+  }
 }
 
 export default new AuthApiService();

@@ -26,7 +26,7 @@ import downloadedPostersService, { DownloadedPoster } from '../services/download
 import downloadTrackingService, { DownloadedContent } from '../services/downloadTracking';
 import authService from '../services/auth';
 import cacheService from '../services/cacheService';
-import { MainStackParamList } from '../navigation/AppNavigator';
+import { MainStackParamList } from '../navigation/types';
 import { Template } from '../services/dashboard';
 import logger from '../utils/logger';
 

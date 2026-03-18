@@ -31,7 +31,7 @@ class TransactionHistoryService {
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache
 
   // Get all transactions from backend API (with caching)
-  async getTransactions(): Promise<Transaction[]> {
+  async getTransactions(options: { forceRefresh?: boolean } = {}): Promise<Transaction[]> {
     const currentUser = authService.getCurrentUser();
     const userId = currentUser?.id;
     
@@ -41,6 +41,11 @@ class TransactionHistoryService {
     }
 
     const cacheKey = `transactions_unified_user_${userId}`;
+
+    if (options.forceRefresh) {
+      cacheService.clear(cacheKey);
+      console.log(`[APP] 🧹 Force refresh: Cleared cache for ${cacheKey}`);
+    }
 
     return await cacheService.getOrFetch(
       cacheKey,

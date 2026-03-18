@@ -3,6 +3,12 @@ import transactionHistoryService, { Transaction } from '../services/transactionH
 import subscriptionApi, { SubscriptionStatus } from '../services/subscriptionApi';
 import authService from '../services/auth';
 
+interface AutopayState {
+  isAutopayActive: boolean;
+  nextBillingDate: string | null;
+  autopayLoading: boolean;
+}
+
 interface SubscriptionContextType {
   isSubscribed: boolean;
   setIsSubscribed: (value: boolean) => void;
@@ -26,6 +32,13 @@ interface SubscriptionContextType {
   clearTransactions: () => Promise<void>;
   clearSubscriptionData: () => void;
   checkPremiumAccess: (feature: string) => boolean;
+  // Autopay specific methods
+  autopayState: AutopayState;
+  enableAutopay: (planId: string) => Promise<void>;
+  disableAutopay: () => Promise<void>;
+  refreshAutopayStatus: () => Promise<void>;
+  // CRITICAL: Payment lock to prevent subscription updates during payment
+  setPaymentInProgress: (inProgress: boolean) => void;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
@@ -35,6 +48,7 @@ interface SubscriptionProviderProps {
 }
 
 export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ children }) => {
+  console.log('🏗️ [SubscriptionProvider] Rendering...');
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -49,9 +63,19 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
     quarterlySubscriptions: 0,
     yearlySubscriptions: 0,
   });
+  
+  // CRITICAL: Payment lock to prevent subscription updates during payment
+  const [paymentInProgress, setPaymentInProgress] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const lastRefreshTimeRef = useRef<number>(0);
   const isRefreshingRef = useRef<boolean>(false);
+  
+  // Autopay state
+  const [autopayState, setAutopayState] = useState<AutopayState>({
+    isAutopayActive: false,
+    nextBillingDate: null,
+    autopayLoading: false,
+  });
 
   // Monitor user changes and reset subscription state when user changes
   useEffect(() => {
@@ -83,6 +107,13 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
         yearlySubscriptions: 0,
       });
       
+      // Clear Autopay state
+      setAutopayState({
+        isAutopayActive: false,
+        nextBillingDate: null,
+        autopayLoading: false,
+      });
+      
       // Update current user ID
       setCurrentUserId(newUserId);
       
@@ -92,6 +123,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
         refreshSubscription();
         refreshPlans(); // Fetch plans
         refreshTransactions();
+        refreshAutopayStatus(); // Fetch Autopay status
       } else {
         console.log('⚠️ User logged out, subscription state cleared');
       }
@@ -107,6 +139,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       refreshSubscription();
       refreshPlans(); // Fetch plans
       refreshTransactions();
+      refreshAutopayStatus(); // Fetch Autopay status
     }
   }, []);
 
@@ -133,6 +166,12 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
   // Refresh subscription status from backend
   const refreshSubscription = useCallback(async (force = false) => {
     try {
+      // CRITICAL: Do not refresh subscription if payment is in progress
+      if (paymentInProgress) {
+        console.log('🚫 PAYMENT LOCK: Subscription refresh blocked - payment in progress');
+        return;
+      }
+      
       // Prevent duplicate API calls - use cached data if refreshed within last 5 seconds
       const now = Date.now();
       const cacheValidityMs = 5000; // 5 seconds
@@ -204,18 +243,21 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
           'status.endDate': status.endDate,
           'isNotExpired': isNotExpired,
           'status.planId': status.planId,
-          'status.planName': status.planName
+          'status.planName': status.planName,
+          'status.razorpaySubscriptionId': status?.razorpaySubscriptionId,
+          'status.paymentId': status?.paymentId
         });
         
-        // Safer access logic - check isActive and expiry
-        const accessGranted =
-          Boolean(status?.isActive) &&
-          (!status?.expiryDate || new Date(status.expiryDate) > new Date());
+        // Evaluate access based on backend isActive flag or explicit active status.
+        // For Autopay and webhooks, paymentId may not always be populated side-by-side with isActive.
+        const accessGranted = status?.isActive === true || normalizedStatus === 'active';
         
-        console.log("ACCESS_CHECK_RESULT", {
-          isActive: status?.isActive,
-          expiryDate: status?.expiryDate,
-          accessGranted
+        console.log('🔍 CRITICAL ACCESS CHECK - Payment Verified:', {
+          'status.status': status?.status,
+          'razorpaySubscriptionId': status?.razorpaySubscriptionId,
+          'paymentId': status?.paymentId,
+          'accessGranted': accessGranted,
+          'REASON': accessGranted ? 'PAYMENT VERIFIED' : 'PAYMENT NOT VERIFIED'
         });
         
         setIsSubscribed(Boolean(accessGranted));
@@ -260,9 +302,31 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       setIsLoading(false);
       isRefreshingRef.current = false;
       lastRefreshTimeRef.current = Date.now();
-      console.log('✅ Subscription refresh completed');
     }
-  }, []);
+  }, [paymentInProgress]);
+
+  // Polling mechanism for pending subscriptions
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout;
+    
+    // Check if the current subscription status is literally 'pending'
+    const isPending = subscriptionStatus?.status?.toLowerCase() === 'pending';
+    
+    if (isPending && currentUserId && !paymentInProgress) {
+      console.log('⏳ Subscription is PENDING. Starting active polling every 5 seconds...');
+      intervalId = setInterval(() => {
+        console.log('🔄 Checking if PENDING subscription has been activated...');
+        refreshSubscription(true); // Force bypass cache
+      }, 5000); // Poll every 5 seconds
+    }
+    
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+        console.log('⏹️ Stopped subscription polling loop.');
+      }
+    };
+  }, [subscriptionStatus?.status, currentUserId, paymentInProgress, refreshSubscription]);
 
   // Refresh plans from backend
   const refreshPlans = useCallback(async () => {
@@ -316,6 +380,23 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
     }
   }, []);
 
+  // Track previous status to detect transitions from PENDING to ACTIVE
+  const previousStatusRef = useRef<string | null>(null);
+
+  // Effect to watch for transitions from pending to active to automatically refresh transactions
+  useEffect(() => {
+    const currentNormalizedStatus = subscriptionStatus?.status?.toLowerCase() || null;
+    const previousStatus = previousStatusRef.current;
+    
+    if (previousStatus === 'pending' && currentNormalizedStatus === 'active') {
+      console.log('🔄 Subscription transitioned from PENDING to ACTIVE. Automatically refreshing transactions...');
+      refreshTransactions();
+    }
+    
+    // Update the ref for next render
+    previousStatusRef.current = currentNormalizedStatus;
+  }, [subscriptionStatus?.status, refreshTransactions]);
+
   // Add a new transaction
   const addTransaction = useCallback(async (transaction: Omit<Transaction, 'id' | 'timestamp'>) => {
     try {
@@ -355,6 +436,14 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       quarterlySubscriptions: 0,
       yearlySubscriptions: 0,
     });
+    
+    // Clear Autopay state
+    setAutopayState({
+      isAutopayActive: false,
+      nextBillingDate: null,
+      autopayLoading: false,
+    });
+    
     setCurrentUserId(null);
     console.log('✅ All subscription data cleared');
   }, []);
@@ -399,8 +488,8 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       'statusCheck': normalizedStatus === 'active'
     });
     
-    // Ensure both isActive === true AND status === 'active'
-    if (subscriptionStatus.isActive !== true || normalizedStatus !== 'active') {
+    // Ensure isActive === true OR status === 'active'
+    if (subscriptionStatus.isActive !== true && normalizedStatus !== 'active') {
       console.log(`🔒 Premium access denied for feature: ${feature} (subscription status: isActive=${subscriptionStatus.isActive}, status=${normalizedStatus})`);
       return false;
     }
@@ -408,6 +497,75 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
     console.log(`✅ Premium access granted for feature: ${feature}`);
     return true;
   }, [isSubscribed, subscriptionStatus]);
+
+  // Autopay methods
+  const enableAutopay = useCallback(async (planId: string) => {
+    try {
+      setAutopayState(prev => ({ ...prev, autopayLoading: true }));
+      
+      console.log('🔄 Enabling Autopay for plan:', planId);
+      
+      // ONLY call API and return response - NO state updates
+      const autopayDetails = await subscriptionApi.createAutopay(planId);
+      
+      console.log('✅ Autopay setup created:', autopayDetails);
+      
+      return autopayDetails;
+    } catch (error) {
+      console.error('❌ Error enabling Autopay:', error);
+      throw error;
+    } finally {
+      setAutopayState(prev => ({ ...prev, autopayLoading: false }));
+    }
+  }, []);
+
+  const disableAutopay = useCallback(async () => {
+    try {
+      setAutopayState(prev => ({ ...prev, autopayLoading: true }));
+      
+      console.log('🔄 Disabling Autopay');
+      
+      await subscriptionApi.cancelAutopay();
+      
+      // Update local state
+      setAutopayState({
+        isAutopayActive: false,
+        nextBillingDate: null,
+        autopayLoading: false,
+      });
+      
+      console.log('✅ Autopay disabled successfully');
+    } catch (error) {
+      console.error('❌ Error disabling Autopay:', error);
+      throw error;
+    } finally {
+      setAutopayState(prev => ({ ...prev, autopayLoading: false }));
+    }
+  }, []);
+
+  const refreshAutopayStatus = useCallback(async () => {
+    try {
+      console.log('🔄 Refreshing Autopay status');
+      
+      const autopayStatus = await subscriptionApi.getAutopayStatus();
+      
+      setAutopayState({
+        isAutopayActive: autopayStatus.isActive || false,
+        nextBillingDate: autopayStatus.nextBillingDate || null,
+        autopayLoading: false,
+      });
+      
+      console.log('✅ Autopay status refreshed:', autopayStatus);
+    } catch (error) {
+      console.error('❌ Error refreshing Autopay status:', error);
+      // Reset to inactive state on error
+      setAutopayState({
+        isAutopayActive: false,
+        nextBillingDate: null,
+        autopayLoading: false,
+      });
+    }
+  }, []);
 
   return (
     <SubscriptionContext.Provider value={{ 
@@ -425,6 +583,13 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       clearTransactions,
       clearSubscriptionData,
       checkPremiumAccess,
+      // Autopay properties and methods
+      autopayState,
+      enableAutopay,
+      disableAutopay,
+      refreshAutopayStatus,
+      // CRITICAL: Payment lock to prevent subscription updates during payment
+      setPaymentInProgress,
     }}>
       {children}
     </SubscriptionContext.Provider>
@@ -434,6 +599,7 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
 export const useSubscription = () => {
   const context = useContext(SubscriptionContext);
   if (context === undefined) {
+    console.error('❌ [useSubscription] Context is undefined! Must be used within a SubscriptionProvider.');
     throw new Error('useSubscription must be used within a SubscriptionProvider');
   }
   return context;

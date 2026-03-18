@@ -1,0 +1,22 @@
+Issue 2: The UI was not honoring the API's `isActive: true` response for Autopay subscriptions.
+
+Root Cause:
+The backend correctly registered the Autopay subscription and returned this payload:
+```json
+{
+  "success": true,
+  "subscription": {
+    "isActive": true,
+    "planId": "rzp_test",
+    "planName": "RZP_Test",
+    "expiryDate": "2026-04-17T13:59:29.729Z",
+    "autoRenew": true
+  }
+}
+```
+However, the `SubscriptionContext.tsx` was written to purposefully ignore `isActive: true` for security reasons left by a previous developer (it specifically required `status === 'active'` AND a non-empty `razorpaySubscriptionId` AND a non-empty `paymentId`). Because the webhook Autopay payload did not include the `paymentId` inside this specific status check endpoint, the Context forcibly denied access and set `isSubscribed` to false. 
+
+Fix Applied:
+I corrected the strict `accessGranted` check inside `src/contexts/SubscriptionContext.tsx` within the `refreshSubscription` and `checkPremiumAccess` methods. The context now correctly aligns with the backend's source of truth by accepting `status?.isActive === true || normalizedStatus === 'active'` without instantly rejecting missing `paymentId` values that occur natively during Autopay enrollment and webhooks.
+
+This allows the UI to finally activate when the API says the user is subscribed. The Android build updating in the background will reflect these changes!

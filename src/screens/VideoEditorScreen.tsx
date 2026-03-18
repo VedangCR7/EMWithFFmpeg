@@ -25,7 +25,7 @@ import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { MainStackParamList } from '../navigation/AppNavigator';
+import { MainStackParamList } from '../navigation/types';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { PanGestureHandler, State, PinchGestureHandler } from 'react-native-gesture-handler';
 import businessProfileService, { BusinessProfile } from '../services/businessProfile';

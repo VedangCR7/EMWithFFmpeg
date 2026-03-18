@@ -21,6 +21,7 @@ import { BusinessProfileTransaction } from '../services/businessProfile';
 import { Transaction } from '../services/transactionHistory';
 import transactionHistoryService from '../services/transactionHistory';
 import authService from '../services/auth';
+import cacheService from '../services/cacheService';
 
 // Compact spacing multiplier to reduce all spacing (matching HomeScreen)
 const COMPACT_MULTIPLIER = 0.5;
@@ -185,6 +186,13 @@ const TransactionHistoryScreen: React.FC = () => {
     console.log('================================================================================');
     console.log('⏰ Refresh Time:', new Date().toISOString());
     setRefreshing(true);
+    
+    const user = authService.getCurrentUser();
+    if (user?.id) {
+      await cacheService.clear(`transactions_unified_user_${user.id}`);
+      console.log('[APP] 🧹 Cache cleared on manual refresh');
+    }
+    
     await fetchAllTransactions();
     setRefreshing(false);
     console.log('================================================================================');

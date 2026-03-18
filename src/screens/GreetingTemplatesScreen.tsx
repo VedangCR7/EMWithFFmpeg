@@ -22,7 +22,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { MainStackParamList } from '../navigation/AppNavigator';
+import { MainStackParamList } from '../navigation/types';
 import { useTheme } from '../context/ThemeContext';
 import greetingTemplatesService, { GreetingCategory, GreetingTemplate } from '../services/greetingTemplates';
 import api from '../services/api';

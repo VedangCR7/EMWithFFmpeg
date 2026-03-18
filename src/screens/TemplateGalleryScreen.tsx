@@ -17,7 +17,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { MainStackParamList } from '../navigation/AppNavigator';
+import { MainStackParamList } from '../navigation/types';
 import { useTheme } from '../context/ThemeContext';
 import ImagePickerModal from '../components/ImagePickerModal';
 import OptimizedImage from '../components/OptimizedImage';
