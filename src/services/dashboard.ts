@@ -20,6 +20,9 @@ export interface Template {
   languages?: string[];
   tags?: string[];
   description?: string;
+  isGreeting?: boolean;
+  isBusiness?: boolean;
+  originalTemplate?: any;
 }
 
 export interface Category {

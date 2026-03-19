@@ -693,11 +693,9 @@ const TodaysPickScreen: React.FC = () => {
       // Load cached selections for TODAY first - if all exist, use them and skip API calls
       const cacheKey = `todays_pick_${dateString}`;
       
-      // TEMPORARY: Clear cache once to force fresh API fetch with correct Business Marketing Tips
-      await AsyncStorage.removeItem(cacheKey).catch(() => { });
-      console.log("🧹 TODAYS_POSTERS_CACHE cleared to remove stale data");
-      
+
       const cachedTodayData = await AsyncStorage.getItem(cacheKey).catch(() => null);
+
 
       if (cachedTodayData) {
         console.log('💾 [TodaysPickScreen] Found cached data, checking if valid...');

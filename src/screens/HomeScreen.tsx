@@ -792,14 +792,22 @@ const HomeScreen: React.FC = React.memo(() => {
     [userName]
   );
   const userAvatarUri = useMemo(() => {
-    const uri = (
-      selectedBusinessProfile?.logo ||
-      selectedBusinessProfile?.companyLogo ||
-      selectedBusinessProfile?.profileLogo ||
-      selectedBusinessProfile?.businessLogo ||
-      selectedBusinessProfile?.image ||
-      selectedBusinessProfile?.photo ||
-      selectedBusinessProfile?.banner ||
+    // If a business profile is selected, ONLY use its associated images
+    if (selectedBusinessProfile) {
+      return (
+        selectedBusinessProfile?.logo ||
+        selectedBusinessProfile?.companyLogo ||
+        selectedBusinessProfile?.profileLogo ||
+        selectedBusinessProfile?.businessLogo ||
+        selectedBusinessProfile?.image ||
+        selectedBusinessProfile?.photo ||
+        selectedBusinessProfile?.banner ||
+        null
+      );
+    }
+
+    // If no business is selected (personal profile), use user profile images
+    return (
       userProfile?.photo ||
       userProfile?.photoURL ||
       userProfile?.logo ||
@@ -807,12 +815,6 @@ const HomeScreen: React.FC = React.memo(() => {
       userProfile?.avatar ||
       null
     );
-    console.log('🖼️ [HOMESCREEN] userAvatarUri updated:', {
-      selectedBusinessProfileId: selectedBusinessProfile?.id,
-      selectedBusinessProfileName: selectedBusinessProfile?.name,
-      uri: uri
-    });
-    return uri;
   }, [userProfile, selectedBusinessProfile]);
 
   // Dynamic dimensions for responsive layout
@@ -2471,7 +2473,7 @@ const HomeScreen: React.FC = React.memo(() => {
       businessLegendQuoteTemplatesRaw.length,
       businessMarketingTipsTemplatesRaw.length,
       businessQuotesTemplatesRaw.length,
-    ].join(',');
+    ].join(',') + '-v2'; // Added v2 to force cache refresh after logic update
 
     // If lengths haven't changed, return cached result (optimization)
     if (greetingTemplatesCacheRef.current.lengthsSignature === currentLengthsSignature &&
@@ -2481,14 +2483,29 @@ const HomeScreen: React.FC = React.memo(() => {
 
     const all: any[] = [];
 
-    // Collect from all greeting sections (use Raw arrays for complete data)
-    if (businessEthicsTemplatesRaw.length > 0) all.push(...businessEthicsTemplatesRaw);
-    if (successMindsetTemplatesRaw.length > 0) all.push(...successMindsetTemplatesRaw);
-    if (socialMediaGrowthTemplatesRaw.length > 0) all.push(...socialMediaGrowthTemplatesRaw);
-    if (moneyAndFinanceTemplatesRaw.length > 0) all.push(...moneyAndFinanceTemplatesRaw);
-    if (businessLegendQuoteTemplatesRaw.length > 0) all.push(...businessLegendQuoteTemplatesRaw);
-    if (businessMarketingTipsTemplatesRaw.length > 0) all.push(...businessMarketingTipsTemplatesRaw);
-    if (businessQuotesTemplatesRaw.length > 0) all.push(...businessQuotesTemplatesRaw);
+    // Map with specific category names to ensure correct search grouping
+    // We explicitly overwrite the category because templates might have generic 'General' or 'Greeting' from API
+    if (businessEthicsTemplatesRaw.length > 0) {
+      all.push(...businessEthicsTemplatesRaw.map(t => ({ ...t, category: 'Business Ethics' })));
+    }
+    if (successMindsetTemplatesRaw.length > 0) {
+      all.push(...successMindsetTemplatesRaw.map(t => ({ ...t, category: 'Success Mindset' })));
+    }
+    if (socialMediaGrowthTemplatesRaw.length > 0) {
+      all.push(...socialMediaGrowthTemplatesRaw.map(t => ({ ...t, category: 'Social Media Growth' })));
+    }
+    if (moneyAndFinanceTemplatesRaw.length > 0) {
+      all.push(...moneyAndFinanceTemplatesRaw.map(t => ({ ...t, category: 'Money and Finance' })));
+    }
+    if (businessLegendQuoteTemplatesRaw.length > 0) {
+      all.push(...businessLegendQuoteTemplatesRaw.map(t => ({ ...t, category: 'Business Legend Quote' })));
+    }
+    if (businessMarketingTipsTemplatesRaw.length > 0) {
+      all.push(...businessMarketingTipsTemplatesRaw.map(t => ({ ...t, category: 'Business Marketing Tips' })));
+    }
+    if (businessQuotesTemplatesRaw.length > 0) {
+      all.push(...businessQuotesTemplatesRaw.map(t => ({ ...t, category: 'Business Quotes' })));
+    }
 
     // Convert greeting templates to Template format for unified search
     const converted = all.map(greetingTemplate => ({
@@ -2623,93 +2640,19 @@ const HomeScreen: React.FC = React.memo(() => {
         new Map(filtered.map(template => [template.id, template])).values()
       );
 
-      // Create structured results for immediate display
-      const structuredResults: SearchResultItem[] = [];
-      
-      // Add matching categories first
-      matchingCategories.forEach(category => {
-        const categoryTemplates = uniqueFiltered.filter(template => {
-          const templateCategory = template.category?.toLowerCase();
-          const categoryName = category.name.toLowerCase();
-          
-          // More inclusive matching logic
-          return templateCategory === categoryName ||
-                 templateCategory?.includes(categoryName) ||
-                 categoryName.includes(templateCategory) ||
-                 template.tags?.some((tag: string) => {
-                   const tagLower = tag.toLowerCase();
-                   // Skip language tags to prevent language buttons from appearing in categories
-                   if (tagLower === 'english' || tagLower === 'hindi' || tagLower === 'all') {
-                     return false;
-                   }
-                   return tagLower === categoryName || 
-                          tagLower.includes(categoryName) || 
-                          categoryName.includes(tagLower);
-                 });
-        });
-        
-        if (categoryTemplates.length > 0) {
-          structuredResults.push({
-            type: 'category',
-            data: {
-              name: category.name,
-              type: 'general',
-              templates: categoryTemplates
-            }
-          });
-        }
-      });
+      // Group all templates by category for consistent horizontal display
+      let structuredResults = groupTemplatesByCategory(uniqueFiltered);
 
-      matchingBusinessCategories.forEach(category => {
-        const categoryTemplates = uniqueFiltered.filter(template => {
-          const templateCategory = template.category?.toLowerCase();
-          const categoryName = category.name.toLowerCase();
-          
-          // More inclusive matching logic
-          return templateCategory === categoryName ||
-                 templateCategory?.includes(categoryName) ||
-                 categoryName.includes(templateCategory) ||
-                 template.tags?.some((tag: string) => {
-                   const tagLower = tag.toLowerCase();
-                   // Skip language tags to prevent language buttons from appearing in categories
-                   if (tagLower === 'english' || tagLower === 'hindi' || tagLower === 'all') {
-                     return false;
-                   }
-                   return tagLower === categoryName || 
-                          tagLower.includes(categoryName) || 
-                          categoryName.includes(tagLower);
-                 });
-        });
-        
-        if (categoryTemplates.length > 0) {
-          structuredResults.push({
-            type: 'category',
-            data: {
-              name: category.name,
-              type: 'business',
-              templates: categoryTemplates
-            }
-          });
-        }
-      });
-
-      // Add uncategorized templates
-      const categorizedTemplateIds = new Set();
-      structuredResults.forEach(item => {
-        if (item.type === 'category') {
-          item.data.templates.forEach((template: any) => {
-            categorizedTemplateIds.add(template.id);
-          });
-        }
-      });
-
-      uniqueFiltered.forEach(template => {
-        if (!categorizedTemplateIds.has(template.id)) {
-          structuredResults.push({
-            type: 'template',
-            data: template
-          });
-        }
+      // Prioritize categories that match the search query
+      structuredResults.sort((a, b) => {
+        if (a.type !== 'category' || b.type !== 'category') return 0;
+        const aMatches = matchingCategoryNames.includes(a.data.name.toLowerCase()) || 
+                         matchingBusinessCategoryNames.includes(a.data.name.toLowerCase());
+        const bMatches = matchingCategoryNames.includes(b.data.name.toLowerCase()) || 
+                         matchingBusinessCategoryNames.includes(b.data.name.toLowerCase());
+        if (aMatches && !bMatches) return -1;
+        if (!aMatches && bMatches) return 1;
+        return 0;
       });
 
       // Set initial results immediately
@@ -2723,7 +2666,7 @@ const HomeScreen: React.FC = React.memo(() => {
             const generalCategoryResultsPromises = matchingCategories.map(async (category) => {
               try {
                 const categoryTemplates = await greetingTemplatesService.searchTemplates(category.name);
-                return categoryTemplates;
+                return categoryTemplates.map(t => ({ ...t, category: category.name }));
               } catch (error) {
                 if (__DEV__) {
                   devWarn(`Failed to search category ${category.name}:`, error);
@@ -2777,6 +2720,7 @@ const HomeScreen: React.FC = React.memo(() => {
               isDownloaded: false,
               description: poster.description || '',
               tags: Array.isArray(poster.tags) ? poster.tags : [],
+              isGreeting: false,
               isBusiness: true,
               originalTemplate: poster,
             }));
@@ -2787,97 +2731,8 @@ const HomeScreen: React.FC = React.memo(() => {
               new Map(allResults.map(template => [template.id, template])).values()
             );
 
-            // Create structured search results with category headers
-            const structuredResults: SearchResultItem[] = [];
-            
-            // Add matching general categories with their templates
-            matchingCategories.forEach(category => {
-              const categoryTemplates = convertedGeneralCategoryResults.filter(template => {
-                const templateCategory = template.category?.toLowerCase();
-                const categoryName = category.name.toLowerCase();
-                
-                // More inclusive matching logic
-                return templateCategory === categoryName ||
-                       templateCategory?.includes(categoryName) ||
-                       categoryName.includes(templateCategory) ||
-                       template.tags?.some((tag: string) => {
-                         const tagLower = tag.toLowerCase();
-                         // Skip language tags to prevent language buttons from appearing in categories
-                         if (tagLower === 'english' || tagLower === 'hindi' || tagLower === 'all') {
-                           return false;
-                         }
-                         return tagLower === categoryName || 
-                                tagLower.includes(categoryName) || 
-                                categoryName.includes(tagLower);
-                       });
-              });
-              
-              structuredResults.push({
-                type: 'category',
-                data: {
-                  name: category.name,
-                  type: 'general',
-                  templates: categoryTemplates
-                }
-              });
-            });
-
-            // Add matching business categories with their templates
-            matchingBusinessCategories.forEach(category => {
-              const categoryTemplates = convertedBusinessCategoryResults.filter(template => {
-                const templateCategory = template.category?.toLowerCase();
-                const categoryName = category.name.toLowerCase();
-                
-                // More inclusive matching logic
-                return templateCategory === categoryName ||
-                       templateCategory?.includes(categoryName) ||
-                       categoryName.includes(templateCategory) ||
-                       template.tags?.some((tag: string) => {
-                         const tagLower = tag.toLowerCase();
-                         // Skip language tags to prevent language buttons from appearing in categories
-                         if (tagLower === 'english' || tagLower === 'hindi' || tagLower === 'all') {
-                           return false;
-                         }
-                         return tagLower === categoryName || 
-                                tagLower.includes(categoryName) || 
-                                categoryName.includes(tagLower);
-                       });
-              });
-              
-              structuredResults.push({
-                type: 'category',
-                data: {
-                  name: category.name,
-                  type: 'business',
-                  templates: categoryTemplates
-                }
-              });
-            });
-
-            // Add individual templates that don't belong to matched categories
-            const uncategorizedTemplates = finalUniqueResults.filter(template => {
-              const templateCategory = template.category?.toLowerCase();
-              const isInMatchingCategory = [...matchingCategories, ...matchingBusinessCategories].some(cat => {
-                const categoryName = cat.name.toLowerCase();
-                return templateCategory === categoryName ||
-                       templateCategory?.includes(categoryName) ||
-                       categoryName.includes(templateCategory) ||
-                       template.tags?.some((tag: string) => {
-                         const tagLower = tag.toLowerCase();
-                         return tagLower === categoryName || 
-                                tagLower.includes(categoryName) || 
-                                categoryName.includes(tagLower);
-                       });
-              });
-              return !isInMatchingCategory;
-            });
-
-            uncategorizedTemplates.forEach(template => {
-              structuredResults.push({
-                type: 'template',
-                data: template
-              });
-            });
+            // Group all templates by category for consistent horizontal display
+            const structuredResults = groupTemplatesByCategory(finalUniqueResults);
 
             if (currentRequestId === requestId) {
               setTemplates(structuredResults);
@@ -2908,7 +2763,7 @@ const HomeScreen: React.FC = React.memo(() => {
           const generalCategoryResultsPromises = matchingCategories.map(async (category) => {
             try {
               const categoryTemplates = await greetingTemplatesService.searchTemplates(category.name);
-              return categoryTemplates;
+              return categoryTemplates.map(t => ({ ...t, category: category.name }));
             } catch (error) {
               if (__DEV__) {
                 devWarn(`Failed to search category ${category.name}:`, error);
@@ -2956,18 +2811,33 @@ const HomeScreen: React.FC = React.memo(() => {
 
           if (currentRequestId === requestId) {
             // Merge API results with existing local results, preserving local results
-            setTemplates(prevTemplates => {
-              // Convert uniqueApiResults to structured format
-              const structuredApiResults = uniqueApiResults.map(template => ({
-                type: 'template' as const,
-                data: template
-              }));
-              
-              const combinedResults = [...prevTemplates, ...structuredApiResults];
-              return Array.from(
-                new Map(combinedResults.map(item => [item.type === 'template' ? item.data.id : item.data.name, item])).values()
-              );
-            });
+            if (currentRequestId === requestId) {
+              setTemplates(prevTemplates => {
+                // Group new API results using the unified helper
+                const structuredApiResults = groupTemplatesByCategory(uniqueApiResults);
+                
+                const combinedResults = [...prevTemplates, ...structuredApiResults];
+                
+                // Deduplicate categories by merging their templates
+                const categoryMap = new Map<string, SearchResultCategory>();
+                
+                combinedResults.forEach(item => {
+                  if (item.type === 'category') {
+                    const existing = categoryMap.get(item.data.name);
+                    if (existing) {
+                      // Merge templates into existing category
+                      const merged = [...existing.data.templates, ...item.data.templates];
+                      existing.data.templates = Array.from(new Map(merged.map(t => [t.id, t])).values());
+                    } else {
+                      // Clone to avoid accidental mutations of existing items in prevTemplates
+                      categoryMap.set(item.data.name, JSON.parse(JSON.stringify(item)));
+                    }
+                  }
+                });
+                
+                return Array.from(categoryMap.values());
+              });
+            }
           }
         } catch (error) {
           if (__DEV__) {
@@ -3046,6 +2916,37 @@ const HomeScreen: React.FC = React.memo(() => {
         }
       }
     }, 100);
+  }, []);
+
+  /**
+   * Helper function to group an array of templates into SearchResultItem categories.
+   * This ensures consistent horizontal layout with headers for all search results.
+   */
+  const groupTemplatesByCategory = useCallback((templates: Template[]): SearchResultItem[] => {
+    if (!templates.length) return [];
+    
+    // Deduplicate templates by ID
+    const uniqueTemplates = Array.from(new Map(templates.map(t => [t.id, t])).values());
+    
+    // Group by category name
+    const grouped: Record<string, Template[]> = {};
+    uniqueTemplates.forEach(template => {
+      const catName = template.category || 'General';
+      if (!grouped[catName]) {
+        grouped[catName] = [];
+      }
+      grouped[catName].push(template);
+    });
+    
+    // Convert to SearchResultCategory items
+    return Object.keys(grouped).map(catName => ({
+      type: 'category',
+      data: {
+        name: catName,
+        type: catName.toLowerCase().includes('business') ? 'business' : 'general',
+        templates: grouped[catName]
+      }
+    }));
   }, []);
 
   const handleSearch = useCallback(async () => {
@@ -3131,6 +3032,24 @@ const HomeScreen: React.FC = React.memo(() => {
         const generalCategoryResults = generalCategoryResultsArrays.flat();
         const businessCategoryResults = businessCategoryResultsArrays.flat();
 
+        // Convert direct API search results (mix of greeting and business)
+        const convertedDirectResults = (results || []).map((item: any) => {
+          const isGreeting = !!(item.content || item.isGreeting); // Simple heuristic
+          return {
+            id: item.id,
+            name: item.name || item.title || '',
+            thumbnail: item.thumbnail || item.image || '',
+            category: item.category || (isGreeting ? 'Greeting' : 'Business'),
+            downloads: item.downloads || 0,
+            isDownloaded: false,
+            description: item.description || (item.content?.text) || '',
+            tags: Array.isArray(item.tags) ? item.tags : [],
+            isGreeting: isGreeting,
+            isBusiness: !isGreeting,
+            originalTemplate: item,
+          };
+        });
+
         console.log('=��� [SEARCH DEBUG] General category results count:', generalCategoryResults.length);
         console.log('=��� [SEARCH DEBUG] Business category results count:', businessCategoryResults.length);
 
@@ -3145,6 +3064,7 @@ const HomeScreen: React.FC = React.memo(() => {
           description: greetingTemplate.content?.text || '',
           tags: (greetingTemplate as any).tags || [],
           isGreeting: true,
+          isBusiness: false,
           originalTemplate: greetingTemplate,
         }));
 
@@ -3158,21 +3078,23 @@ const HomeScreen: React.FC = React.memo(() => {
           isDownloaded: false,
           description: poster.description || '',
           tags: Array.isArray(poster.tags) ? poster.tags : [],
+          isGreeting: false,
           isBusiness: true,
           originalTemplate: poster,
         }));
 
         // Combine results and remove duplicates
-        const allResults = [...convertedGeneralCategoryResults, ...convertedBusinessCategoryResults];
+        const allResults = [
+          ...convertedDirectResults,
+          ...convertedGeneralCategoryResults,
+          ...convertedBusinessCategoryResults
+        ];
         const uniqueResults = Array.from(
           new Map(allResults.map(template => [template.id, template])).values()
         );
 
-        // Convert Template objects to SearchResultTemplate objects
-        const searchResultItems: SearchResultTemplate[] = uniqueResults.map(template => ({
-          type: 'template',
-          data: template
-        }));
+        // Group unique results by their actual category name for horizontal display
+        const searchResultItems = groupTemplatesByCategory(uniqueResults);
 
         console.log('=��� [SEARCH DEBUG] Total results before dedup:', allResults.length);
         console.log('=��� [SEARCH DEBUG] Unique results after dedup:', uniqueResults.length);
@@ -5205,6 +5127,8 @@ const HomeScreen: React.FC = React.memo(() => {
                 onChangeText={setSearchQuery}
                 autoFocus={true}
                 returnKeyType="search"
+                onSubmitEditing={handleSearch}
+                blurOnSubmit={true}
               />
               {searchQuery.length > 0 && (
                 <TouchableOpacity
