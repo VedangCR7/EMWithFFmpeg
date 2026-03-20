@@ -1,0 +1,43 @@
+Play Store Release Notes (v10)
+
+🔄 Version 10 - ARM64-Only Build & Enhanced 16 KB Support
+
+📱 What's New:
+- ✅ Removed 32-bit ARM (ARMv7) architecture support - app now builds exclusively for 64-bit ARM (ARM64-v8a)
+  - ARMv7 does not support 16 KB memory page sizes required by Play Store
+  - ARM64-only build ensures full compatibility with Android 15+ devices
+  - Smaller app size and improved performance on modern Android devices
+  - All devices from 2014 onwards support ARM64 architecture
+
+🔧 Technical Improvements:
+- Updated React Native architecture configuration to ARM64-v8a only
+- Added explicit ABI filters in build.gradle to ensure only 64-bit libraries are packaged
+- Optimized native library packaging for 16 KB page size alignment
+- Improved build configuration for Play Store compliance
+- Enhanced manifest metadata for 16 KB page size support
+
+🐛 Bug Fixes:
+- Resolved Play Store rejection for 16 KB page size incompatibility
+- Fixed architecture compatibility issues that affected Android 15+ devices
+- Ensured all native libraries are properly aligned for 16 KB page sizes
+
+📋 Additional Notes:
+- Version Code: 10
+- Version Name: 10
+- Target SDK: Android 15 (API 35)
+- Minimum SDK: Android 7.0 (API 24)
+- Supported Architecture: ARM64-v8a only (64-bit)
+
+📦 Build Configuration:
+- React Native Architectures: arm64-v8a only
+- NDK ABI Filters: arm64-v8a only
+- Use Legacy Packaging: false
+- Debug Symbol Level: FULL (for better crash reporting)
+
+⚠️ Important Notice:
+- This version is optimized for 64-bit Android devices only
+- Devices must support ARM64-v8a architecture (virtually all modern Android devices)
+- If you experience any issues, please ensure your device is running Android 7.0 or higher
+
+Thank you for using Market Brand! 🎉
+

@@ -1,0 +1,532 @@
+TRANSACTION HISTORY STATUS DEBUG REPORT
+=======================================
+
+DATE: 2026-03-04
+ANALYSIS: TRANSACTION HISTORY STATUS ISSUES INVESTIGATION
+
+-----------------------------------------------------
+
+ISSUES INVESTIGATED
+------------------
+
+1. **Subscription payment shows PENDING after Razorpay modal close**
+2. **Business profile payment failure does not appear in TransactionHistory**
+
+-----------------------------------------------------
+
+STEP 1 — SUBSCRIPTION FAILURE FLOW TRACE
+---------------------------------------
+
+**File:** src/screens/SubscriptionScreen.tsx
+
+**Razorpay Modal Configuration (Lines 489-494):**
+```typescript
+modal: {
+  ondismiss: () => {
+    setIsProcessing(false);
+    setPaymentInProgress(false);
+  },
+}
+```
+
+❌ **CRITICAL FINDING:** Modal ondismiss does NOT call reportPaymentFailure()
+
+**Error Handling (Lines 531-558):**
+```typescript
+// Record failed transaction only for actual errors, not cancellation
+if (error.code === 'PAYMENT_CANCELLED') {
+  // Do not record transaction for user cancellation
+  // Report failure to backend for analytics
+  if (orderDetails?.orderId) {
+    reportPaymentFailure(orderDetails.orderId, 'FAILED');
+  }
+} else {
+  try {
+    await addTransaction({
+      paymentId: 'pay_failed_' + Date.now(),
+      orderId: 'order_failed_' + Date.now(),
+      amount: amountInRupees,
+      currency: 'INR',
+      status: 'failed',
+      plan: selectedPlan,
+      planName: currentPlan.name,
+      description: `${currentPlan.name} Subscription - Failed`,
+      method: 'razorpay',
+      // ... metadata
+    });
+    // Report failure to backend
+    if (orderDetails?.orderId) {
+      reportPaymentFailure(orderDetails.orderId, 'FAILED');
+    }
+  } catch (txnError) {
+    console.error('Error recording failed transaction:', txnError);
+  }
+}
+```
+
+✅ **FINDING:** reportPaymentFailure() called only in catch block, not in modal ondismiss
+
+**OrderId Used:** orderDetails.orderId (from create-payment-order API)
+**Status Sent:** "FAILED"
+**API Endpoint:** POST /api/mobile/transactions/update-status
+
+-----------------------------------------------------
+
+STEP 2 — UPDATE STATUS API CALL VERIFICATION
+---------------------------------------------
+
+**Function:** reportPaymentFailure() (Lines 233-256)
+
+**API Call Details:**
+```typescript
+fetch(`${api.defaults.baseURL}/api/mobile/transactions/update-status`, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${await AsyncStorage.getItem('authToken')}`,
+  },
+  body: JSON.stringify({
+    orderId: orderId,
+    status: status
+  })
+})
+```
+
+**Payload Sent:**
+```json
+{
+  "orderId": "order_abc123",
+  "status": "FAILED"
+}
+```
+
+✅ **VERIFIED:** Correct orderId and status values
+✅ **VERIFIED:** Authorization header present
+✅ **VERIFIED:** Non-blocking implementation with error handling
+
+-----------------------------------------------------
+
+STEP 3 — BACKEND RESPONSE USAGE ANALYSIS
+----------------------------------------
+
+**Response Handling (Lines 248-251):**
+```typescript
+.catch(error => {
+  console.warn('⚠️ Failed to report payment status to backend:', error);
+  // Silently handle - don't show user-facing errors
+});
+```
+
+❌ **FINDING:** Backend response is NOT logged for success cases
+❌ **FINDING:** Only errors are logged, success responses are ignored
+
+**Console Logs:**
+- ✅ Success: "🔴 Reporting payment failure to backend: { orderId, status }"
+- ❌ Success response: No logging
+- ✅ Error: "⚠️ Failed to report payment status to backend:"
+
+-----------------------------------------------------
+
+STEP 4 — UNIFIED TRANSACTION FETCH TRACE
+---------------------------------------
+
+**File:** src/screens/TransactionHistoryScreen.tsx
+
+**Fetch Function (Lines 134-144):**
+```typescript
+const fetchAllTransactions = async () => {
+  try {
+    console.log('🔄 Fetching all transactions using unified API');
+    const transactions = await transactionHistoryService.getTransactions();
+    setTransactions(transactions);
+    console.log('✅ Unified transactions fetched:', transactions.length);
+  } catch (error) {
+    console.error('❌ Error fetching unified transactions:', error);
+    setTransactions([]);
+  }
+};
+```
+
+**Service File:** src/services/transactionHistory.ts
+
+**API Endpoint (Line 50):**
+```
+GET /api/mobile/transactions/unified
+```
+
+**Request Logging (Lines 51-61):**
+```typescript
+console.log('🔵 UNIFIED TRANSACTION API CALL - GET ALL TRANSACTIONS');
+console.log('📡 Endpoint:', endpoint);
+console.log('🔗 Full URL:', api.defaults.baseURL + endpoint);
+console.log('📤 Request Method: GET');
+console.log('⏰ Request Time:', new Date().toISOString());
+```
+
+**Response Logging (Lines 65-70):**
+```typescript
+console.log('📥 RESPONSE RECEIVED:');
+console.log('📊 Status Code:', response.status);
+console.log('📊 Status Text:', response.statusText);
+console.log('📊 Response Headers:', JSON.stringify(response.headers, null, 2));
+console.log('📊 Response Data (Full):', JSON.stringify(response.data, null, 2));
+```
+
+✅ **VERIFIED:** Comprehensive logging for both request and response
+✅ **VERIFIED:** Raw backend response is fully logged
+
+-----------------------------------------------------
+
+STEP 5 — TRANSACTION STATUS MAPPING ANALYSIS
+----------------------------------------------
+
+**Status Transformation (Line 113):**
+```typescript
+status: txn.status.toLowerCase(),
+```
+
+**Backend Status Values Expected:**
+- "SUCCESS" → "success"
+- "FAILED" → "failed" 
+- "PENDING" → "pending"
+- "CANCELLED" → "cancelled"
+
+**Frontend Status Type (Line 13):**
+```typescript
+status: 'success' | 'failed' | 'pending' | 'cancelled';
+```
+
+✅ **VERIFIED:** Status is normalized to lowercase
+✅ **VERIFIED:** All expected status values are supported
+
+**Statistics Calculation (Lines 160-162):**
+```typescript
+successful: transactions.filter(t => t.status === 'success').length,
+failed: transactions.filter(t => t.status === 'failed').length,
+pending: transactions.filter(t => t.status === 'pending').length,
+```
+
+✅ **VERIFIED:** Statistics use lowercase status values
+
+-----------------------------------------------------
+
+STEP 6 — BUSINESS PROFILE TYPE FILTER ANALYSIS
+----------------------------------------------
+
+**Type Mapping Logic (Lines 84-86):**
+```typescript
+if (txn.type === 'business_profile' || (txn.plan && txn.plan.toLowerCase().includes('business'))) {
+  plan = 'business_profile';
+  type = 'business_profile';
+}
+```
+
+**Filter Logic (Line 171):**
+```typescript
+if (filter === 'business_profile') return transaction.type === 'business_profile';
+```
+
+**Backend Type Values Expected:**
+- "business_profile" → ✅ Matches exactly
+- "BUSINESS_PROFILE" → ❌ Would not match
+- "BUSINESS" → ❌ Would not match
+
+**Plan Fallback (Lines 84-86):**
+- Checks if `txn.plan` includes "business" (case-insensitive)
+- This provides additional matching for business profile transactions
+
+✅ **VERIFIED:** Primary type check uses exact match "business_profile"
+✅ **VERIFIED:** Secondary check uses plan field with "business" substring
+⚠️ **POTENTIAL ISSUE:** Backend might send "BUSINESS_PROFILE" instead of "business_profile"
+
+-----------------------------------------------------
+
+STEP 7 — TRANSACTION LIST STATE VERIFICATION
+---------------------------------------------
+
+**State Management (Line 138):**
+```typescript
+setTransactions(transactions);
+```
+
+**Filtering Logic (Lines 169-174):**
+```typescript
+const filteredTransactions = transactions.filter(transaction => {
+  if (filter === 'all') return true;
+  if (filter === 'business_profile') return transaction.type === 'business_profile';
+  if (filter === 'subscription') return transaction.type === 'subscription';
+  return transaction.status === filter;
+});
+```
+
+**Console Logging (Lines 176-179):**
+```typescript
+console.log('🔄 Unified transactions:', {
+  total: transactions?.length || 0,
+  filtered: filteredTransactions?.length || 0
+});
+```
+
+✅ **VERIFIED:** No filters remove failed or business_profile transactions
+✅ **VERIFIED:** State is set directly from API response
+✅ **VERIFIED:** Filtering only affects display, not underlying data
+
+-----------------------------------------------------
+
+ROOT CAUSE ANALYSIS
+-------------------
+
+**ISSUE 1: Subscription payment shows PENDING after modal close**
+
+**Root Cause:** Modal ondismiss does NOT call reportPaymentFailure()
+
+**Flow Analysis:**
+```
+User closes Razorpay modal
+    ↓
+modal.ondismiss called (Lines 489-494)
+    ↓
+Only UI reset: setIsProcessing(false), setPaymentInProgress(false)
+    ↓
+NO reportPaymentFailure() call
+    ↓
+Backend never receives failure status
+    ↓
+Transaction remains in PENDING state in backend
+    ↓
+TransactionHistory shows PENDING
+```
+
+**Expected Flow:**
+```
+User closes Razorpay modal
+    ↓
+modal.ondismiss called
+    ↓
+reportPaymentFailure(orderDetails.orderId, 'FAILED')
+    ↓
+Backend updates transaction status to FAILED
+    ↓
+TransactionHistory shows FAILED
+```
+
+**ISSUE 2: Business profile payment failure does not appear**
+
+**Root Cause:** BusinessProfilesScreen modal ondismiss DOES call reportPaymentFailure() (recently fixed), but there might be a backend timing or type mismatch issue.
+
+**Recent Fix Applied:**
+- BusinessProfilesScreen.tsx now calls reportPaymentFailure() in modal ondismiss
+- Same implementation as SubscriptionScreen
+
+**Potential Remaining Issues:**
+1. **Backend Type Mismatch:** Backend might send "BUSINESS_PROFILE" instead of "business_profile"
+2. **Timing Issue:** Backend might not process the update-status call before the unified API fetch
+3. **Caching Issue:** TransactionHistory service has 5-minute cache that might serve stale data
+
+-----------------------------------------------------
+
+DETAILED FLOW COMPARISON
+------------------------
+
+**SUBSCRIPTION PAYMENT FAILURE (CURRENT BEHAVIOR):**
+```
+User closes modal
+    ↓
+modal.ondismiss: UI reset only
+    ↓
+NO backend call
+    ↓
+Backend transaction stays PENDING
+    ↓
+TransactionHistory shows PENDING ❌
+```
+
+**SUBSCRIPTION PAYMENT FAILURE (EXPECTED BEHAVIOR):**
+```
+User closes modal
+    ↓
+modal.ondismiss: UI reset + reportPaymentFailure()
+    ↓
+POST /api/mobile/transactions/update-status {orderId, status: "FAILED"}
+    ↓
+Backend updates transaction to FAILED
+    ↓
+TransactionHistory shows FAILED ✅
+```
+
+**BUSINESS PROFILE PAYMENT FAILURE (AFTER RECENT FIX):**
+```
+User closes modal
+    ↓
+modal.ondismiss: UI reset + reportPaymentFailure()
+    ↓
+POST /api/mobile/transactions/update-status {orderId, status: "FAILED"}
+    ↓
+Backend should update transaction to FAILED
+    ↓
+TransactionHistory should show FAILED
+```
+
+-----------------------------------------------------
+
+BACKEND RESPONSE ANALYSIS
+------------------------
+
+**Update Status API (POST /api/mobile/transactions/update-status):**
+- ✅ Request is properly formatted
+- ✅ Authorization header is present
+- ❌ Success response is NOT logged
+- ❌ No verification that backend actually updates the transaction
+
+**Unified Transactions API (GET /api/mobile/transactions/unified):**
+- ✅ Comprehensive logging of request and response
+- ✅ Raw backend data is logged
+- ✅ Status transformation to lowercase
+- ✅ Type mapping for business profiles
+
+**Missing Verification:**
+- No logging of update-status API success response
+- No confirmation that backend actually processes the status update
+- No correlation between update-status call and unified API response
+
+-----------------------------------------------------
+
+RECOMMENDED FIXES (ANALYSIS ONLY)
+----------------------------------
+
+**FIX 1: Add reportPaymentFailure to SubscriptionScreen modal ondismiss**
+
+**Location:** src/screens/SubscriptionScreen.tsx, Lines 489-494
+
+**Current Code:**
+```typescript
+modal: {
+  ondismiss: () => {
+    setIsProcessing(false);
+    setPaymentInProgress(false);
+  },
+}
+```
+
+**Recommended Code:**
+```typescript
+modal: {
+  ondismiss: () => {
+    // Report failure to backend
+    if (orderDetails?.orderId) {
+      reportPaymentFailure(orderDetails.orderId, 'FAILED');
+    }
+    setIsProcessing(false);
+    setPaymentInProgress(false);
+  },
+}
+```
+
+**FIX 2: Add success response logging to reportPaymentFailure**
+
+**Location:** src/screens/SubscriptionScreen.tsx, Lines 233-256
+
+**Current Code:**
+```typescript
+fetch(...).catch(error => {
+  console.warn('⚠️ Failed to report payment status to backend:', error);
+});
+```
+
+**Recommended Code:**
+```typescript
+fetch(...)
+  .then(response => {
+    if (response.ok) {
+      console.log('✅ Payment status reported to backend successfully');
+    } else {
+      console.warn('⚠️ Backend returned error for payment status update:', response.status);
+    }
+  })
+  .catch(error => {
+    console.warn('⚠️ Failed to report payment status to backend:', error);
+  });
+```
+
+**FIX 3: Add business profile type case-insensitive matching**
+
+**Location:** src/services/transactionHistory.ts, Lines 84-86
+
+**Current Code:**
+```typescript
+if (txn.type === 'business_profile' || (txn.plan && txn.plan.toLowerCase().includes('business'))) {
+```
+
+**Recommended Code:**
+```typescript
+if (txn.type?.toLowerCase() === 'business_profile' || (txn.plan && txn.plan.toLowerCase().includes('business'))) {
+```
+
+**FIX 4: Clear transaction cache after payment failure**
+
+**Location:** src/screens/SubscriptionScreen.tsx and BusinessProfilesScreen.tsx
+
+**Add after reportPaymentFailure call:**
+```typescript
+// Clear transaction cache to ensure fresh data
+cacheService.delete(`transactions_unified_user_${currentUser?.id}`);
+```
+
+-----------------------------------------------------
+
+VERIFICATION CHECKLIST
+---------------------
+
+**For Subscription PENDING Issue:**
+- ❌ Modal ondismiss calls reportPaymentFailure()
+- ❌ Backend receives update-status call
+- ❌ Backend updates transaction status
+- ❌ TransactionHistory reflects updated status
+
+**For Business Profile Missing Issue:**
+- ✅ Modal ondismiss calls reportPaymentFailure() (recently fixed)
+- ❓ Backend receives update-status call
+- ❓ Backend updates transaction status
+- ❓ Transaction type matches backend response
+- ❓ TransactionHistory shows updated transaction
+
+**Backend Communication:**
+- ❌ Update-status API success responses logged
+- ❌ Correlation between update and fetch verified
+- ❌ Transaction status changes confirmed
+
+**Data Consistency:**
+- ❌ Cache invalidation after status updates
+- ❌ Type case sensitivity handled
+- ❌ Status normalization verified
+
+-----------------------------------------------------
+
+SUMMARY
+-------
+
+**Issue 1 - Subscription PENDING:**
+- **Root Cause:** Modal ondismiss missing reportPaymentFailure call
+- **Impact:** Transactions remain PENDING instead of FAILED
+- **Fix Required:** Add reportPaymentFailure to modal ondismiss
+
+**Issue 2 - Business Profile Missing:**
+- **Root Cause:** Recently fixed in code, but backend timing or type mismatch possible
+- **Impact:** Failed transactions may not appear or appear with wrong type
+- **Fix Required:** Add logging, case-insensitive type matching, cache clearing
+
+**Backend Communication Gaps:**
+- No success response logging for update-status API
+- No verification that backend actually processes updates
+- No cache invalidation after status changes
+
+**Recommended Priority:**
+1. **HIGH:** Fix SubscriptionScreen modal ondismiss
+2. **MEDIUM:** Add success response logging
+3. **MEDIUM:** Add case-insensitive type matching
+4. **LOW:** Add cache clearing after updates
+
+-----------------------------------------------------
+
+END OF REPORT
+-------------

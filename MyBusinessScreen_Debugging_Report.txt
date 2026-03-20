@@ -1,0 +1,276 @@
+# MyBusinessScreen Business Profile Switching Debug Report
+
+## 1. Root Cause Analysis
+
+### PRIMARY ISSUE: Navigation Architecture Mismatch
+**Root Cause**: The "My Business" tab in the bottom navigation does NOT navigate to `MyBusinessScreen.tsx`. Instead, it navigates to `PosterPlayerScreen.tsx`.
+
+**File**: `src/navigation/AppNavigator.tsx` (Lines 1121-1129)
+```tsx
+<Tab.Screen
+  name="PosterPlayer"
+  component={PosterPlayerScreen}
+  initialParams={{ originScreen: "MainTabs" }}
+  options={{
+    title: 'My Business',
+    tabBarStyle: { display: 'none' },
+  }}
+/>
+```
+
+**Problem**: Users expect "My Business" tab to show `MyBusinessScreen`, but it actually shows `PosterPlayerScreen`.
+
+## 2. Screen Context Usage Analysis
+
+### MyBusinessScreen.tsx (Lines 119, 251)
+```tsx
+const { selectedBusinessProfile } = useBusinessProfile();
+
+const loadBusinessCategoryPosters = useCallback(async (isRefresh: boolean = false) => {
+  // ... 
+  const response = await businessCategoryPostersApi.getUserCategoryPosters(forceRefresh, selectedBusinessProfile?.id);
+  // ...
+}, [initialLoading, selectedBusinessProfile]); // ✅ DEPENDENCY IS CORRECT
+```
+
+**Analysis**: 
+- ✅ Context is correctly subscribed
+- ✅ selectedBusinessProfile is passed to API
+- ✅ useEffect dependency array includes selectedBusinessProfile
+- ✅ useCallback dependencies are correct
+
+### BusinessProfileContext.tsx (Lines 91-108)
+```tsx
+const setSelectedBusinessProfile = useCallback(async (profile: BusinessProfile | null) => {
+  try {
+    setSelectedBusinessProfileState(profile);
+    // Updates AsyncStorage and logs
+  } catch (error) {
+    console.error('❌ [BUSINESS PROFILE CONTEXT] Error saving selected profile:', error);
+  }
+}, [clearProfileCache]);
+```
+
+**Analysis**: Context updates correctly and persists to AsyncStorage.
+
+## 3. Data Fetching Logic Analysis
+
+### businessCategoryPostersApi.ts (Lines 184-263)
+```tsx
+async getUserCategoryPosters(isRefresh: boolean = false, preferredProfileId: string | null = null): Promise<BusinessCategoryPostersResponse> {
+  // ✅ CORRECTLY uses preferredProfileId parameter
+  if (preferredProfileId) {
+    const matchedProfile = userProfiles.find(profile => profile.id === preferredProfileId);
+    if (matchedProfile) {
+      profileToUse = matchedProfile;
+      // Uses matched profile's category/subcategory
+    }
+  }
+  return this.getPostersByCategory(targetCategory, 200, isRefresh, profileToUse.id);
+}
+```
+
+**Analysis**: 
+- ✅ API correctly uses preferredProfileId parameter
+- ✅ Fetches correct profile data when ID is provided
+- ✅ Uses profile's category/subcategory for API calls
+
+## 4. useEffect Dependency Arrays
+
+### MyBusinessScreen.tsx (Lines 251, 253-255)
+```tsx
+const loadBusinessCategoryPosters = useCallback(async (isRefresh: boolean = false) => {
+  // ... function body
+}, [initialLoading, selectedBusinessProfile]); // ✅ CORRECT
+
+useEffect(() => {
+  loadBusinessCategoryPosters();
+}, [loadBusinessCategoryPosters]); // ✅ CORRECT
+```
+
+**Analysis**: 
+- ✅ useEffect dependencies are correct
+- ✅ useCallback includes selectedBusinessProfile
+- ✅ Function will re-run when selectedBusinessProfile changes
+
+## 5. Bottom Tab Navigation Behavior
+
+### Critical Finding
+**MyBusinessScreen is NOT accessible via bottom tab navigation**
+
+**Navigation Structure**:
+- Home Tab → HomeScreen ✅
+- Templates Tab → TemplateGalleryScreen ✅  
+- **My Business Tab → PosterPlayerScreen ❌** (Should be MyBusinessScreen)
+- Greetings Tab → GreetingTemplatesScreen ✅
+- Profile Tab → ProfileScreen ✅
+
+**MyBusinessScreen.tsx is NOT registered in any navigator**:
+- Not imported in AppNavigator.tsx
+- No Stack.Screen or Tab.Screen references it
+- Only accessible via direct navigation calls
+
+## 6. API Layer Analysis
+
+### businessCategoryPostersApi.ts
+- ✅ Does NOT read profileId from AsyncStorage
+- ✅ Uses preferredProfileId parameter from screen
+- ✅ API calls use correct profile data when provided
+
+## 7. Local State Shadowing
+
+### MyBusinessScreen.tsx (Lines 115-121)
+```tsx
+const [businessCategoryPosters, setBusinessCategoryPosters] = useState<BusinessCategoryPoster[]>([]);
+const [postersLoading, setPostersLoading] = useState(false);
+const [initialLoading, setInitialLoading] = useState(true);
+const [userBusinessCategory, setUserBusinessCategory] = useState<string>('General');
+```
+
+**Analysis**: 
+- ✅ No local state shadowing issues
+- ✅ userBusinessCategory is updated from API response
+- ✅ All state updates correctly trigger re-renders
+
+## 8. Memoization Issues
+
+### MyBusinessScreen.tsx (Lines 309-358)
+```tsx
+const PosterItem = React.memo(({ item, index, cardWidth, cardHeight, columns, gap, onPress, theme }) => {
+  // Component implementation
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.item.id === nextProps.item.id &&
+    // ... other comparison logic
+  );
+});
+```
+
+**Analysis**: 
+- ✅ Memoization is for performance, not blocking updates
+- ✅ No memoization of business profile data
+- ✅ Component should re-render when selectedBusinessProfile changes
+
+## 9. Full Data Flow Analysis
+
+### Expected Flow (What SHOULD happen):
+1. User switches profile on HomeScreen
+2. setSelectedBusinessProfile(profileB) called
+3. BusinessProfileContext updates
+4. MyBusinessScreen receives new context value
+5. useCallback recreates loadBusinessCategoryPosters function
+6. useEffect triggers loadBusinessCategoryPosters()
+7. API called with new profileId
+8. New category data loads
+9. UI updates with new posters
+
+### Actual Flow (What ACTUALLY happens):
+1. User switches profile on HomeScreen ✅
+2. setSelectedBusinessProfile(profileB) called ✅
+3. BusinessProfileContext updates ✅
+4. **MyBusinessScreen never receives navigation** ❌
+5. **User sees PosterPlayerScreen instead** ❌
+6. PosterPlayerScreen may or may not update correctly ❌
+
+## 10. Step-by-Step Failure Flow
+
+### Primary Failure: Navigation Architecture
+1. **User clicks "My Business" tab**
+2. **Navigation goes to PosterPlayerScreen, NOT MyBusinessScreen**
+3. **MyBusinessScreen code is never executed**
+4. **Business profile switching has no effect on "My Business" tab**
+
+### Secondary Issue: PosterPlayerScreen Profile Handling
+1. **PosterPlayerScreen receives different navigation params**
+2. **May not properly react to business profile changes**
+3. **Shows different data than expected**
+
+## 11. Recommended Fix Strategy
+
+### IMMEDIATE FIX: Navigation Architecture
+**File**: `src/navigation/AppNavigator.tsx`
+
+**Change** (Lines 1121-1129):
+```tsx
+// CURRENT (INCORRECT):
+<Tab.Screen
+  name="PosterPlayer"
+  component={PosterPlayerScreen}
+  initialParams={{ originScreen: "MainTabs" }}
+  options={{
+    title: 'My Business',
+    tabBarStyle: { display: 'none' },
+  }}
+/>
+
+// CORRECT:
+<Tab.Screen
+  name="MyBusiness"
+  component={MyBusinessScreen}
+  options={{
+    title: 'My Business',
+    tabBarIcon: ({ color, size }) => (
+      <Icon name="business" size={size} color={color} />
+    ),
+  }}
+/>
+```
+
+### Required Changes:
+1. **Add MyBusinessScreen import** to AppNavigator.tsx
+2. **Add MyBusiness to TabParamList** interface
+3. **Replace PosterPlayer tab with MyBusiness tab**
+4. **Update PosterPlayer navigation** to be accessible from other screens
+
+### Additional TabParamList Update:
+```tsx
+export type TabParamList = {
+  Home: undefined;
+  Templates: undefined;
+  MyBusiness: undefined; // Add this
+  PosterPlayer: { originScreen?: string }; // Keep for direct navigation
+  Greetings: undefined;
+  Profile: undefined;
+};
+```
+
+## 12. Files Requiring Modification
+
+### Primary Files:
+1. **`src/navigation/AppNavigator.tsx`**
+   - Add MyBusinessScreen import
+   - Update TabParamList interface
+   - Replace PosterPlayer tab with MyBusiness tab
+
+2. **`src/navigation/AppNavigator.tsx` (TabParamList)**
+   - Add MyBusiness: undefined to TabParamList
+
+### Secondary Files (if needed):
+3. **`src/screens/PosterPlayerScreen.tsx`**
+   - Ensure proper business profile handling when accessed directly
+   - May need updates for business profile switching
+
+## 13. Verification Steps
+
+After implementing the fix:
+1. **Build and test navigation**
+2. **Verify "My Business" tab goes to MyBusinessScreen**
+3. **Test business profile switching**
+4. **Confirm MyBusinessScreen updates with new profile data**
+5. **Verify API calls use correct profileId**
+
+## 14. Root Cause Summary
+
+**The MyBusiness screen categories do not update when business profile switches because:**
+
+1. **PRIMARY**: Navigation architecture maps "My Business" tab to PosterPlayerScreen instead of MyBusinessScreen
+2. **SECONDARY**: MyBusinessScreen is completely inaccessible via bottom tab navigation
+3. **TERTIARY**: User never sees the screen that properly handles business profile switching
+
+**The MyBusinessScreen.tsx code itself is CORRECT** - it properly:
+- Subscribes to BusinessProfileContext
+- Uses selectedBusinessProfile in API calls
+- Has correct useEffect dependencies
+- Implements proper data loading logic
+
+**The issue is purely architectural** - wrong screen is mapped to the "My Business" tab.

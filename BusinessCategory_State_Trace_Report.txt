@@ -1,0 +1,397 @@
+# BUSINESS CATEGORY STATE TRACE REPORT
+# Generated: March 2026
+# Purpose: Complete data flow analysis of Business Category dropdown value
+
+===============================================================================
+1. DROPDOWN COMPONENT LOCATION
+===============================================================================
+
+PRIMARY LOCATION: HomeScreen.tsx
+File Path: src/screens/HomeScreen.tsx
+Lines: 4028-4091
+
+COMPONENT NAME: handleBusinessCategoryPress
+TYPE: Callback function, not a traditional dropdown
+
+BUSINESS CATEGORY SOURCE:
+- Business categories are displayed as cards in a grid layout
+- Located in BusinessCategoriesSection component
+- Categories are fetched from businessCategoriesService.getBusinessCategories()
+- Displayed as clickable cards with images and category names
+
+UI STRUCTURE:
+HomeScreen
+├── BusinessCategoriesSection (imported component)
+│   ├── Grid of BusinessCategoryCardItem components
+│   ├── Each card shows category image and name
+│   └── onCategoryPress prop calls handleBusinessCategoryPress
+└── Modal for "View All" categories
+    └── Same card structure in modal layout
+
+===============================================================================
+2. STATE VARIABLE DETAILS
+===============================================================================
+
+HOME SCREEN STATE VARIABLES:
+
+1. selectedCategory (Line 848)
+   - Type: useState<'business' | 'general'>('business')
+   - Purpose: Tab selection between business/general categories
+   - NOT related to business category selection
+
+2. businessCategories (Line 856)
+   - Type: useState<BusinessCategory[]>([])
+   - Purpose: Store fetched business categories list
+   - Source: businessCategoriesService.getBusinessCategories()
+
+3. businessCategoryPreviews (Line 858)
+   - Type: useState<Record<string, Template[]>>({})
+   - Purpose: Cache preview templates for each category
+   - Key: category.id, Value: Template array
+
+4. rotatingBusinessCategories (Line 860)
+   - Type: useState<Array<{ id: string; name: string }>>([])
+   - Purpose: Categories for rotating display in header button
+
+5. currentBusinessCategoryIndex (Line 861)
+   - Type: useState<number>(0)
+   - Purpose: Index for rotating category animation
+
+IMPORTANT NOTE:
+There is NO traditional dropdown state variable for business category selection.
+The "selection" happens through immediate navigation on card press.
+
+===============================================================================
+3. WHERE CATEGORY VALUE IS STORED
+===============================================================================
+
+STORAGE MECHANISMS:
+
+1. NAVIGATION PARAMETERS (Primary Storage)
+   - Location: Passed through navigation.navigate() calls
+   - File: HomeScreen.tsx, handleBusinessCategoryPress function
+   - Storage Type: Temporary, exists only during navigation
+   - Key: businessCategory: category.name (string)
+
+2. BUSINESS PROFILE CONTEXT (Secondary Storage)
+   - Location: src/context/BusinessProfileContext.tsx
+   - Storage Type: AsyncStorage + React Context
+   - Keys: 
+     * '@selected_business_profile' (JSON string)
+     * '@selected_business_profile_uid' (user ID for safety)
+   - Purpose: Stores user's selected business profile with category
+
+3. IN-MEMORY CACHE (Tertiary Storage)
+   - Location: businessCategoryPreviews state in HomeScreen
+   - Type: Record<string, Template[]>
+   - Purpose: Performance optimization for category previews
+
+4. API SERVICE CACHE (Quaternary Storage)
+   - Location: src/services/businessCategoryPostersApi.ts
+   - Type: Map<string, { data: BusinessCategoryPoster[]; timestamp: number }>
+   - Duration: 5 minutes
+   - Purpose: API response caching
+
+===============================================================================
+4. NAVIGATION USAGE
+===============================================================================
+
+NAVIGATION FLOW:
+
+1. FROM HOME SCREEN (handleBusinessCategoryPress)
+   ```typescript
+   navigation.navigate('PosterPlayer', {
+     selectedPoster: cachedTemplates[0],
+     relatedPosters: cachedTemplates.slice(1),
+     searchQuery: '',
+     templateSource: 'professional',
+     businessCategory: category.name,        // ← CATEGORY PASSED HERE
+     posterLimit: 6,
+   });
+   ```
+
+2. FROM APP NAVIGATOR (My Business Tab)
+   ```typescript
+   navigation.navigate('PosterPlayer', navigationParams);
+   // navigationParams includes:
+   businessCategory: response.data.category,  // ← FROM USER PROFILE
+   ```
+
+3. POSTER PLAYER SCREEN RECEIVES
+   - Route parameter: businessCategory (string)
+   - Used for API calls and filtering
+   - Stored in activeCategoryRef for race condition protection
+
+NAVIGATION PARAMETER TYPE:
+```typescript
+interface PosterPlayerRouteParams {
+  businessCategory?: string | { name: string };
+  // ... other params
+}
+```
+
+===============================================================================
+5. ASYNCSTORAGE USAGE
+===============================================================================
+
+BUSINESS CATEGORY STORAGE:
+
+1. DIRECT CATEGORY STORAGE: NOT FOUND
+   - No AsyncStorage keys for storing selected business category directly
+   - Category is not persisted separately from business profile
+
+2. BUSINESS PROFILE STORAGE (INDIRECT CATEGORY STORAGE)
+   - Key: '@selected_business_profile'
+   - Value: JSON string of BusinessProfile object
+   - Contains: category and subCategory fields
+   - Managed by: BusinessProfileContext.tsx
+
+3. USER SAFETY KEYS
+   - Key: '@selected_business_profile_uid'
+   - Purpose: Cross-user cache protection
+   - Value: Current user ID
+
+4. CACHE KEYS (NOT CATEGORY SPECIFIC)
+   - Key: CATEGORIES_CACHE_KEY (in GreetingTemplatesScreen)
+   - Key: CATEGORY_PREVIEWS_CACHE_KEY (in GreetingTemplatesScreen)
+   - Purpose: Greeting categories, NOT business categories
+
+===============================================================================
+6. GLOBAL STATE USAGE
+===============================================================================
+
+CONTEXT PROVIDERS:
+
+1. BUSINESS PROFILE CONTEXT
+   - File: src/context/BusinessProfileContext.tsx
+   - Provides: selectedBusinessProfile, setSelectedBusinessProfile
+   - Storage: AsyncStorage + React Context
+   - Category Access: selectedBusinessProfile.category
+
+2. THEME CONTEXT
+   - File: src/context/ThemeContext.tsx
+   - Purpose: UI theming only
+   - No category data
+
+3. SUBSCRIPTION CONTEXT
+   - File: src/contexts/SubscriptionContext.tsx
+   - Purpose: Subscription status only
+   - No category data
+
+REDUX/ZUSTAND: NOT FOUND
+- No Redux store detected
+- No Zustand store detected
+- State managed through React Context and local useState
+
+===============================================================================
+7. API USAGE
+===============================================================================
+
+PRIMARY API SERVICE: businessCategoryPostersApi.ts
+
+API ENDPOINTS:
+
+1. getPostersByCategory(category: string, limit?: number)
+   - URL: `/api/mobile/posters/category/${category}?limit=${limit}`
+   - Purpose: Get posters for specific business category
+   - Used by: HomeScreen.handleBusinessCategoryPress
+   - Cache: 5 minutes in-memory cache
+
+2. getUserCategoryPosters(isRefresh, preferredProfileId)
+   - Purpose: Get posters for user's business profile category
+   - Used by: AppNavigator.handlePosterPlayerShortcut
+   - Logic: 
+     * Get user's business profiles
+     * Use preferred profile or most recent
+     * Extract category/subcategory from profile
+     * Call getPostersByCategory with that category
+
+API RESPONSE STRUCTURE:
+```typescript
+interface BusinessCategoryPostersResponse {
+  success: boolean;
+  data: {
+    posters: BusinessCategoryPoster[];
+    category: string;    // ← CATEGORY NAME RETURNED
+    total: number;
+  };
+  message: string;
+}
+```
+
+===============================================================================
+8. FILES USING THE CATEGORY
+===============================================================================
+
+DIRECT USAGE FILES:
+
+1. HomeScreen.tsx
+   - Lines: 4028-4091 (handleBusinessCategoryPress)
+   - Purpose: Navigate to PosterPlayer with category
+
+2. AppNavigator.tsx
+   - Lines: 322-380 (loadPostersForUserCategory)
+   - Purpose: My Business tab navigation
+   - Lines: 382-384 (handlePosterPlayerShortcut)
+
+3. PosterPlayerScreen.tsx
+   - Lines: 987-1134 (business category fetching)
+   - Purpose: Display posters for category
+   - Lines: Multiple (category-based filtering)
+
+4. businessCategoryPostersApi.ts
+   - Lines: 58-183 (getPostersByCategory)
+   - Lines: 184-290 (getUserCategoryPosters)
+   - Purpose: API service layer
+
+INDIRECT USAGE FILES:
+
+5. BusinessProfileContext.tsx
+   - Stores category within business profile
+   - Purpose: Profile management
+
+6. BusinessCategoriesSection.tsx (component)
+   - Displays category cards
+   - Purpose: UI rendering
+
+7. BusinessProfileForm.tsx
+   - Category selection during registration
+   - Purpose: Profile creation
+
+===============================================================================
+9. FULL DATA FLOW DIAGRAM
+===============================================================================
+
+COMPLETE DATA FLOW MAP:
+
+┌─────────────────────────────────────────────────────────────────┐
+│                        USER INTERACTION                           │
+└─────────────────────────┬───────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              HOME SCREEN - BUSINESS CATEGORIES                  │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │  BusinessCategoriesSection → BusinessCategoryCardItem │    │
+│  │  (Grid of clickable category cards)                    │    │
+│  └─────────────────────────────────────────────────────────┘    │
+└─────────────────────────┬───────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              handleBusinessCategoryPress()                      │
+│  Input: category: BusinessCategory                               │
+│  Action: navigation.navigate('PosterPlayer', {                 │
+│    businessCategory: category.name,                            │
+│    selectedPoster: cachedTemplates[0],                         │
+│    relatedPosters: cachedTemplates.slice(1),                   │
+│    posterLimit: 6                                              │
+│  })                                                             │
+└─────────────────────────┬───────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    NAVIGATION SYSTEM                             │
+│  Route: PosterPlayer                                            │
+│  Params: businessCategory (string)                             │
+└─────────────────────────┬───────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                  POSTER PLAYER SCREEN                           │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │  useEffect(() => {                                      │    │
+│  │    const response = await businessCategoryPostersApi    │    │
+│  │      .getPostersByCategory(businessCategory, limit);    │    │
+│  │    setAllTemplates(convertedTemplates);                 │    │
+│  │  });                                                     │    │
+│  └─────────────────────────────────────────────────────────┘    │
+└─────────────────────────┬───────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    API SERVICE LAYER                            │
+│  businessCategoryPostersApi.getPostersByCategory()             │
+│  URL: /api/mobile/posters/category/{category}?limit={limit}    │
+│  Cache: 5 minutes in-memory Map                                │
+└─────────────────────────┬───────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      BACKEND API                               │
+│  Returns: BusinessCategoryPostersResponse                     │
+│  Data: posters[], category, total                              │
+└─────────────────────────┬───────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     UI RENDERING                                │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │  FlatList with RelatedPosterItem components              │    │
+│  │  Language filtering, responsive design                  │    │
+│  │  Image preloading, skeleton loading                      │    │
+│  └─────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────┘
+
+===============================================================================
+ALTERNATE FLOW: MY BUSINESS TAB
+===============================================================================
+
+┌─────────────────────────────────────────────────────────────────┐
+│                    MY BUSINESS TAB CLICK                         │
+└─────────────────────────┬───────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              APP NAVIGATOR - TAB BAR                           │
+│  handlePosterPlayerShortcut() → loadPostersForUserCategory()   │
+└─────────────────────────┬───────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                BUSINESS PROFILE CONTEXT                         │
+│  selectedBusinessProfile.category (from AsyncStorage)          │
+└─────────────────────────┬───────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              getUserCategoryPosters() API                      │
+│  Extract category from business profile                        │
+│  Call getPostersByCategory(profile.category)                    │
+└─────────────────────────┬───────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    SAME FLOW AS ABOVE                           │
+│  Navigate to PosterPlayer with businessCategory param           │
+└─────────────────────────────────────────────────────────────────┘
+
+===============================================================================
+KEY INSIGHTS
+===============================================================================
+
+1. NO TRADITIONAL DROPDOWN:
+   - Business categories are displayed as cards, not dropdown
+   - Selection triggers immediate navigation
+   - No persistent "selected category" state
+
+2. MULTIPLE SOURCES:
+   - HomeScreen: User clicks category card
+   - My Business Tab: User's business profile category
+   - Both end up in PosterPlayerScreen with same param
+
+3. STORAGE STRATEGY:
+   - Navigation params (temporary)
+   - Business profile context (persistent)
+   - API cache (performance)
+   - No direct category persistence
+
+4. DATA FLOW:
+   - Category name string flows through navigation
+   - Used for API calls to fetch posters
+   - No complex state management needed
+   - Simple and effective architecture
+
+===============================================================================
+END OF REPORT
+===============================================================================

@@ -1,0 +1,822 @@
+# Razorpay Autopay Integration Analysis Report
+## React Native Mobile App - EventMarketers
+
+Generated on: March 16, 2026
+Analysis Type: Payment Systems Architecture & Integration Strategy
+
+---
+
+## EXECUTIVE SUMMARY
+
+This report provides a comprehensive analysis of the React Native mobile app's current payment infrastructure and outlines a strategic approach for integrating Razorpay Autopay (recurring subscriptions) while maintaining existing manual payment functionality.
+
+**Key Findings:**
+- Well-structured payment system with Razorpay Checkout SDK already integrated
+- Robust subscription management with Context API state management  
+- Comprehensive error handling and caching mechanisms
+- Clean separation between UI components and API services
+- Ready foundation for Autopay integration with minimal disruption
+
+---
+
+## 1. MOBILE APP STRUCTURE OVERVIEW
+
+### Core Payment & Subscription Files:
+
+**Screens:**
+- `src/screens/SubscriptionScreen.tsx` - Main subscription interface (1,187 lines)
+- Payment flow UI with Razorpay checkout integration
+- Plan selection and payment processing
+
+**Services:**
+- `src/services/subscriptionApi.ts` - Subscription API service (634 lines)
+- `src/services/api.ts` - Base API client with auth and caching (292 lines)
+- `src/services/auth.ts` - Authentication service
+- `src/services/cacheService.ts` - Response caching service
+
+**Context & State Management:**
+- `src/contexts/SubscriptionContext.tsx` - Global subscription state (441 lines)
+- Real-time subscription status management
+- Transaction history and statistics tracking
+
+**Components:**
+- `src/components/PlanCard.tsx` - Subscription plan selection UI (168 lines)
+- `src/components/PaymentErrorModal.tsx` - Payment error handling (190 lines)
+
+**Types & Configuration:**
+- `src/types/react-native-razorpay.d.ts` - Razorpay type definitions
+- `src/constants/api.ts` - API endpoint definitions
+- `src/config/env.ts` - Environment configuration
+
+---
+
+## 2. CURRENT PAYMENT FLOW ANALYSIS
+
+### 2.1 Existing Payment Architecture
+
+**Current Flow:**
+```
+User selects plan → createPaymentOrder() → RazorpayCheckout.open() → verifyPayment() → activateSubscription()
+```
+
+### 2.2 Detailed Payment Process
+
+**Step 1: Plan Selection**
+- Plans fetched from `/api/mobile/subscription/plans`
+- Filtered to exclude PROMO plans
+- Dynamic pricing from backend API
+
+**Step 2: Order Creation**
+```typescript
+// API: POST /api/mobile/subscription/create-order
+const orderDetails = await subscriptionApi.createPaymentOrder({
+  planId: selectedPlan.id,
+  currency: 'INR',
+});
+```
+
+**Step 3: Razorpay Checkout**
+```typescript
+const options = {
+  key: resolvedKey,
+  amount: amountInPaise,
+  order_id: orderDetails.orderId,
+  currency: 'INR',
+  name: 'Market Brand',
+  description: `${selectedPlan.name} Subscription`,
+  prefill: {
+    email: currentUser?.email,
+    contact: currentUser?.phoneNumber,
+    name: currentUser?.name,
+  },
+  handler: async (response) => {
+    // Payment success handling
+  }
+};
+const data = await RazorpayCheckout.open(options);
+```
+
+**Step 4: Payment Verification**
+```typescript
+// API: POST /api/mobile/subscription/verify-payment
+const verifyResult = await subscriptionApi.verifyPayment({
+  orderId: response.razorpay_order_id,
+  paymentId: response.razorpay_payment_id,
+  signature: response.razorpay_signature,
+  amount: amountInRupees,
+  amountPaise: amountInPaise,
+  currency: 'INR',
+  planId: selectedPlan.id,
+  email: currentUserForTransaction?.email,
+  contact: currentUserForTransaction?.phoneNumber,
+});
+```
+
+**Step 5: Subscription Activation**
+- Cache clearing for subscription status
+- Context state updates
+- Navigation back to previous screen
+
+### 2.3 Payment Method Configuration
+
+**Current Payment Methods:**
+- UPI (Google Pay, PhonePe) - Intent flow only
+- Card payments (enabled but hidden in UI)
+- Netbanking, Wallets, EMI, Pay Later (disabled)
+
+**Configuration:**
+```typescript
+method: {
+  upi: true,
+  card: true,
+  netbanking: false,
+  wallet: false,
+  emi: false,
+  paylater: false,
+}
+```
+
+---
+
+## 3. API SERVICE ANALYSIS
+
+### 3.1 Current API Endpoints
+
+**Subscription API Service (`subscriptionApi.ts`):**
+
+**Active Endpoints:**
+- `getPlans()` - GET `/api/mobile/subscription/plans`
+- `createPaymentOrder()` - POST `/api/mobile/subscription/create-order`
+- `verifyPayment()` - POST `/api/mobile/subscription/verify-payment`
+- `getStatus()` - GET `/api/mobile/subscription/status`
+- `getHistory()` - GET `/api/mobile/subscription/history`
+- `cancel()` - POST `/api/mobile/subscription/cancel`
+
+**Authentication:**
+- Bearer token via AsyncStorage
+- Automatic token injection via axios interceptors
+- Token expiration handling with modal prompts
+
+### 3.2 API Architecture Strengths
+
+**Caching Strategy:**
+- Subscription plans: 15 minutes TTL
+- Subscription status: 10 seconds TTL (aggressive refresh)
+- User-specific cache keys
+- Stale data allowance for resilience
+
+**Error Handling:**
+- Comprehensive error categorization
+- Network vs. server error distinction
+- Graceful degradation for 404 endpoints
+- Detailed logging for debugging
+
+**Response Structure:**
+```typescript
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  message?: string;
+}
+```
+
+---
+
+## 4. SUBSCRIPTION UI ANALYSIS
+
+### 4.1 Current UI Components
+
+**SubscriptionScreen Features:**
+- Responsive design for multiple screen sizes
+- Real-time subscription status display
+- Plan comparison cards
+- Benefits grid layout
+- Payment processing states
+- Error modal integration
+
+**PlanCard Component:**
+- Popular badge highlighting
+- Feature list display
+- Selection indicators
+- Responsive sizing
+
+**PaymentErrorModal:**
+- Responsive modal design
+- Theme-aware styling
+- Touch-outside-to-close functionality
+
+### 4.2 UI State Management
+
+**Loading States:**
+- Plan fetching indicators
+- Payment processing overlays
+- Subscription status badges
+
+**Error States:**
+- Network error modals
+- Payment failure notifications
+- Configuration error handling
+
+---
+
+## 5. RAZORPAY AUTOPAY INTEGRATION STRATEGY
+
+### 5.1 Proposed Autopay Flow
+
+**New Autopay Flow:**
+```
+User selects plan + Enable Autopay → createAutopay() → RazorpayCheckout.open() with subscription_id → mandate approval → activateAutopaySubscription()
+```
+
+### 5.2 Backend API Integration
+
+**New Endpoints to Integrate:**
+```typescript
+// Autopay specific endpoints
+createAutopay(): POST /api/mobile/subscription/create-autopay
+cancelAutopay(): POST /api/mobile/subscription/cancel-autopay  
+getAutopayStatus(): GET /api/mobile/subscription/autopay-status
+```
+
+**Extension to subscriptionApi.ts:**
+```typescript
+// Add to SubscriptionApiService class
+async createAutopay(params: CreateAutopayParams): Promise<AutopayDetails> {
+  const response = await api.post('/api/mobile/subscription/create-autopay', {
+    planId: params.planId,
+    userId: authService.getCurrentUser()?.id,
+  });
+  
+  return {
+    subscriptionId: response.data.subscriptionId,
+    razorpayKey: response.data.razorpayKey,
+    amount: response.data.amount,
+    // ... other fields
+  };
+}
+
+async cancelAutopay(): Promise<{ success: boolean; message: string }> {
+  const response = await api.post('/api/mobile/subscription/cancel-autopay');
+  this.clearStatusCache();
+  return response.data;
+}
+
+async getAutopayStatus(): Promise<AutopayStatus> {
+  const response = await api.get('/api/mobile/subscription/autopay-status');
+  return response.data;
+}
+```
+
+### 5.3 Razorpay Checkout Modifications
+
+**Autopay-Specific Options:**
+```typescript
+const autopayOptions = {
+  ...baseOptions,
+  subscription_id: autopayDetails.subscriptionId, // New field
+  handler: async (response) => {
+    // Handle mandate approval
+    if (response.razorpay_subscription_id) {
+      // Autopay mandate approved
+      await activateAutopaySubscription(response);
+    }
+  }
+};
+```
+
+---
+
+## 6. CALLBACK HANDLING ANALYSIS
+
+### 6.1 Current Callback Structure
+
+**Success Handler:**
+```typescript
+handler: async (response) => {
+  // 1. Get current user
+  // 2. Verify payment with backend
+  // 3. Clear subscription cache
+  // 4. Fetch updated status
+  // 5. Update context state
+  // 6. Show success message
+  // 7. Navigate back
+}
+```
+
+**Error Handler:**
+```typescript
+.catch((error) => {
+  // Categorize error types
+  // Report failure to backend
+  // Show appropriate error modal
+  // Reset processing states
+})
+```
+
+### 6.2 Autopay Callback Requirements
+
+**Enhanced Success Handler for Autopay:**
+```typescript
+const handleAutopaySuccess = async (response) => {
+  try {
+    // Verify mandate approval
+    const mandateResult = await subscriptionApi.verifyAutopayMandate({
+      subscriptionId: response.razorpay_subscription_id,
+      paymentId: response.razorpay_payment_id,
+      signature: response.razorpay_signature,
+    });
+    
+    if (mandateResult.success) {
+      // Activate autopay subscription
+      await activateAutopaySubscription(selectedPlan.id);
+      
+      // Update UI to show autopay active
+      setAutopayActive(true);
+      
+      // Show autopay-specific success message
+      showAutopaySuccessMessage();
+    }
+  } catch (error) {
+    handleAutopayError(error);
+  }
+};
+```
+
+---
+
+## 7. STATE MANAGEMENT ANALYSIS
+
+### 7.1 Current State Architecture
+
+**SubscriptionContext State:**
+```typescript
+interface SubscriptionContextType {
+  isSubscribed: boolean;
+  subscriptionStatus: SubscriptionStatus | null;
+  isLoading: boolean;
+  plans: any[];
+  transactions: Transaction[];
+  transactionStats: TransactionStats;
+  refreshSubscription: () => Promise<void>;
+  refreshPlans: () => Promise<void>;
+  // ... other methods
+}
+```
+
+**State Management Strengths:**
+- User-specific state isolation
+- Automatic refresh on user changes
+- Cache invalidation on mutations
+- Loading state management
+- Error boundary handling
+
+### 7.2 Autopay State Extensions
+
+**Required State Additions:**
+```typescript
+interface AutopayState {
+  isAutopayActive: boolean;
+  autopayStatus: AutopayStatus | null;
+  nextBillingDate: string | null;
+  mandateId: string | null;
+  autopayLoading: boolean;
+}
+
+// Extend SubscriptionContext
+const [autopayState, setAutopayState] = useState<AutopayState>({
+  isAutopayActive: false,
+  autopayStatus: null,
+  nextBillingDate: null,
+  mandateId: null,
+  autopayLoading: false,
+});
+```
+
+**New Context Methods:**
+```typescript
+refreshAutopayStatus: () => Promise<void>;
+enableAutopay: (planId: string) => Promise<void>;
+disableAutopay: () => Promise<void>;
+getAutopayTransactions: () => Promise<AutopayTransaction[]>;
+```
+
+---
+
+## 8. NEW UI REQUIREMENTS FOR AUTOPAY
+
+### 8.1 SubscriptionScreen Enhancements
+
+**Autopay Toggle Component:**
+```typescript
+// Add to plan selection area
+<ToggleSwitch
+  label="Enable Auto-Renewal"
+  subtitle="Never miss a payment - renew automatically"
+  isEnabled={autopayEnabled}
+  onToggle={(enabled) => setAutopayEnabled(enabled)}
+  disabled={isSubscribed && !autopayEnabled}
+/>
+```
+
+**Autopay Status Display:**
+```typescript
+// Show when autopay is active
+<AutopayStatusCard
+  isActive={autopayState.isAutopayActive}
+  nextBillingDate={autopayState.nextBillingDate}
+  planName={selectedPlan?.name}
+  onCancel={() => disableAutopay()}
+/>
+```
+
+**Payment Button Modifications:**
+```typescript
+// Conditional button text and behavior
+<TouchableOpacity
+  onPress={autopayEnabled ? handleAutopayPayment : handleManualPayment}
+  disabled={paymentInProgress}
+>
+  <Text>
+    {autopayEnabled ? 'Enable Auto-Renewal' : 'Pay Now'}
+  </Text>
+</TouchableOpacity>
+```
+
+### 8.2 New Components Required
+
+**AutopayStatusCard Component:**
+- Display next billing date
+- Show active mandate details
+- Cancel autopay button
+- Plan information display
+
+**AutopayToggle Component:**
+- iOS/Android native toggle styling
+- Explanatory subtitle
+- Disabled state handling
+- Theme-aware colors
+
+**AutopayConfirmationModal:**
+- Mandate approval confirmation
+- Terms and conditions display
+- Billing cycle information
+- Cancel/confirm actions
+
+---
+
+## 9. ERROR HANDLING IMPROVEMENTS
+
+### 9.1 Autopay-Specific Error Types
+
+**Mandate Approval Errors:**
+```typescript
+const AUTOPAY_ERRORS = {
+  MANDATE_FAILED: 'MANDATE_FAILED',
+  INSUFFICIENT_FUNDS: 'INSUFFICIENT_FUNDS',
+  MANDATE_CANCELLED: 'MANDATE_CANCELLED',
+  BANK_DECLINED: 'BANK_DECLINED',
+  TECHNICAL_ERROR: 'TECHNICAL_ERROR',
+};
+```
+
+**Enhanced Error Handling:**
+```typescript
+const handleAutopayError = (error) => {
+  switch (error.code) {
+    case AUTOPAY_ERRORS.MANDATE_FAILED:
+      showErrorModal('Mandate Failed', 'The auto-pay mandate could not be approved. Please try again or contact your bank.');
+      break;
+    case AUTOPAY_ERRORS.INSUFFICIENT_FUNDS:
+      showErrorModal('Insufficient Funds', 'Your account has insufficient funds for the mandate setup.');
+      break;
+    case AUTOPAY_ERRORS.MANDATE_CANCELLED:
+      showErrorModal('Mandate Cancelled', 'You cancelled the auto-pay mandate. You can try again anytime.');
+      break;
+    default:
+      showErrorModal('Auto-Pay Error', 'Something went wrong with setting up auto-pay. Please try again.');
+  }
+};
+```
+
+### 9.2 Network Error Resilience
+
+**Retry Mechanisms:**
+```typescript
+const retryAutopaySetup = async (planId: string, maxRetries = 3) => {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await createAutopay(planId);
+    } catch (error) {
+      if (attempt === maxRetries) throw error;
+      await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+    }
+  }
+};
+```
+
+---
+
+## 10. INTEGRATION IMPLEMENTATION PLAN
+
+### 10.1 Phase 1: Backend Integration (1-2 days)
+
+**Tasks:**
+1. Extend `subscriptionApi.ts` with new Autopay methods
+2. Add TypeScript interfaces for Autopay types
+3. Update API endpoint constants
+4. Implement basic error handling
+
+**Files to Modify:**
+- `src/services/subscriptionApi.ts`
+- `src/types/react-native-razorpay.d.ts`
+- `src/constants/api.ts`
+
+### 10.2 Phase 2: State Management (1 day)
+
+**Tasks:**
+1. Extend SubscriptionContext with Autopay state
+2. Add Autopay refresh methods
+3. Implement cache invalidation for Autopay
+4. Add loading states
+
+**Files to Modify:**
+- `src/contexts/SubscriptionContext.tsx`
+
+### 10.3 Phase 3: UI Components (2-3 days)
+
+**Tasks:**
+1. Create AutopayToggle component
+2. Create AutopayStatusCard component
+3. Create AutopayConfirmationModal
+4. Modify SubscriptionScreen layout
+5. Update PlanCard for Autopay indication
+
+**Files to Create:**
+- `src/components/AutopayToggle.tsx`
+- `src/components/AutopayStatusCard.tsx`
+- `src/components/AutopayConfirmationModal.tsx`
+
+**Files to Modify:**
+- `src/screens/SubscriptionScreen.tsx`
+- `src/components/PlanCard.tsx`
+
+### 10.4 Phase 4: Payment Flow Integration (2 days)
+
+**Tasks:**
+1. Modify Razorpay checkout options for Autopay
+2. Implement Autopay success callback
+3. Add Autopay error handling
+4. Update payment flow logic
+
+**Files to Modify:**
+- `src/screens/SubscriptionScreen.tsx`
+
+### 10.5 Phase 5: Testing & Refinement (1-2 days)
+
+**Tasks:**
+1. Test Autopay creation flow
+2. Test Autopay cancellation
+3. Test error scenarios
+4. Performance optimization
+5. UI polish and responsiveness
+
+---
+
+## 11. RISK ANALYSIS & MITIGATION
+
+### 11.1 Technical Risks
+
+**Risk: Razorpay SDK Compatibility**
+- **Mitigation:** Verify Autopay support in current SDK version
+- **Fallback:** Manual payment flow remains intact
+
+**Risk: Backend API Changes**
+- **Mitigation:** Version-specific API endpoints
+- **Fallback:** Graceful degradation to manual payments
+
+**Risk: State Management Complexity**
+- **Mitigation:** Incremental state additions with clear separation
+- **Fallback:** Isolated Autopay state doesn't affect existing subscription state
+
+### 11.2 User Experience Risks
+
+**Risk: Confusion between Manual and Autopay**
+- **Mitigation:** Clear UI labeling and explanatory text
+- **Testing:** User acceptance testing with clear flows
+
+**Risk: Mandate Approval Failure**
+- **Mitigation:** Comprehensive error messages and retry options
+- **Fallback:** Manual payment option always available
+
+### 11.3 Business Logic Risks
+
+**Risk: Double Charging**
+- **Mitigation:** Backend validation and duplicate prevention
+- **Monitoring:** Transaction logging and alerts
+
+**Risk: Autopay Cancellation Issues**
+- **Mitigation:** Clear cancellation flow and confirmation
+- **Fallback:** Backend mandate cancellation API
+
+---
+
+## 12. BACKWARD COMPATIBILITY
+
+### 12.1 Existing Functionality Preservation
+
+**Manual Payments:**
+- No changes to existing manual payment flow
+- All current endpoints remain functional
+- Existing UI components unchanged unless specifically enhanced
+
+**Subscription Management:**
+- Current subscription status checking unchanged
+- Plan fetching and display logic preserved
+- Transaction history maintained
+
+**Error Handling:**
+- Existing error modal system enhanced, not replaced
+- Network error handling preserved
+- Authentication flow unchanged
+
+### 12.2 Migration Strategy
+
+**Gradual Rollout:**
+1. Feature flag for Autopay functionality
+2. A/B testing with user groups
+3. Monitoring and rollback capability
+
+**Data Compatibility:**
+- Existing subscription data structure unchanged
+- New Autopay fields added as optional
+- Database migration handled by backend
+
+---
+
+## 13. SECURITY CONSIDERATIONS
+
+### 13.1 Payment Security
+
+**Mandate Security:**
+- Secure storage of mandate IDs
+- Encrypted communication for Autopay APIs
+- Regular security audits of payment flow
+
+**Data Protection:**
+- Sensitive payment data not stored locally
+- Autopay status fetched from secure backend
+- Token-based authentication for all APIs
+
+### 13.2 Compliance Requirements
+
+**Razorpay Compliance:**
+- Follow Razorpay Autopay guidelines
+- Proper user consent for mandates
+- Clear terms and conditions display
+
+**Regulatory Compliance:**
+- Auto-debit regulations compliance
+- User cancellation rights
+- Transparent billing communication
+
+---
+
+## 14. MONITORING & ANALYTICS
+
+### 14.1 Autopay-Specific Metrics
+
+**Conversion Metrics:**
+- Autopay setup initiation rate
+- Mandate approval success rate
+- Autopay vs manual payment preference
+
+**Error Tracking:**
+- Mandate failure reasons
+- Autopay cancellation rate
+- Technical error frequency
+
+### 14.2 Implementation Monitoring
+
+**Performance Metrics:**
+- Autopay API response times
+- Checkout completion rates
+- UI loading times
+
+**Business Metrics:**
+- Recurring revenue impact
+- Customer retention improvement
+- Payment failure reduction
+
+---
+
+## 15. CONCLUSION & RECOMMENDATIONS
+
+### 15.1 Integration Feasibility
+
+**HIGH FEASIBILITY** - The current payment architecture is well-designed for Autopay integration:
+
+- ✅ Clean separation of concerns
+- ✅ Robust error handling framework  
+- ✅ Comprehensive state management
+- ✅ Modular component architecture
+- ✅ Strong API service layer
+
+### 15.2 Key Advantages
+
+**Technical Advantages:**
+- Minimal disruption to existing codebase
+- Leverages existing Razorpay integration
+- Reuses current state management patterns
+- Maintains backward compatibility
+
+**Business Advantages:**
+- Faster implementation timeline (7-10 days)
+- Lower development risk
+- Preserves current revenue streams
+- Enables gradual feature rollout
+
+### 15.3 Recommended Next Steps
+
+1. **Immediate (Week 1):** Begin backend API integration and type definitions
+2. **Short-term (Week 2):** Implement state management extensions and core UI components  
+3. **Medium-term (Week 3):** Complete payment flow integration and testing
+4. **Long-term (Week 4):** User acceptance testing and production deployment
+
+### 15.4 Success Criteria
+
+**Technical Success:**
+- Autopay creation flow works end-to-end
+- Manual payments remain fully functional
+- Error handling covers all scenarios
+- Performance meets current standards
+
+**Business Success:**
+- Autopay adoption rate meets targets
+- Payment failure rates decrease
+- User retention improves
+- Customer support burden reduces
+
+---
+
+## APPENDICES
+
+### Appendix A: Required TypeScript Interfaces
+
+```typescript
+interface AutopayDetails {
+  subscriptionId: string;
+  razorpayKey: string;
+  amount: number;
+  currency: string;
+  mandateId?: string;
+}
+
+interface AutopayStatus {
+  isActive: boolean;
+  subscriptionId: string;
+  nextBillingDate: string;
+  amount: number;
+  currency: string;
+  status: 'active' | 'cancelled' | 'expired' | 'pending';
+}
+
+interface CreateAutopayParams {
+  planId: string;
+  currency?: string;
+}
+```
+
+### Appendix B: New API Endpoints Summary
+
+| Endpoint | Method | Purpose | Status |
+|----------|--------|---------|---------|
+| `/api/mobile/subscription/create-autopay` | POST | Create Autopay subscription | New |
+| `/api/mobile/subscription/cancel-autopay` | POST | Cancel Autopay mandate | New |
+| `/api/mobile/subscription/autopay-status` | GET | Check Autopay status | New |
+| `/api/webhooks/razorpay` | POST | Razorpay webhook handler | Existing |
+
+### Appendix C: Testing Checklist
+
+**Unit Tests:**
+- [ ] Autopay API service methods
+- [ ] Autopay state management
+- [ ] Autopay UI components
+- [ ] Error handling scenarios
+
+**Integration Tests:**
+- [ ] End-to-end Autopay flow
+- [ ] Mandate approval process
+- [ ] Autopay cancellation
+- [ ] Network error resilience
+
+**User Acceptance Tests:**
+- [ ] Autopay setup flow clarity
+- [ ] Error message comprehensibility
+- [ ] UI responsiveness
+- [ ] Cross-platform compatibility
+
+---
+
+**Report End**
+
+*This analysis confirms that the EventMarketers mobile app is well-architected for Razorpay Autopay integration with minimal risk to existing functionality. The modular design and robust payment infrastructure provide a solid foundation for implementing recurring subscription payments.*

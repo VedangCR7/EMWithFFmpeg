@@ -1,0 +1,7 @@
+Play Store Release Notes (v6)
+-----------------------------
+
+- Version metadata updated to code 6 / name "6" for rollout readiness.
+- Fresh signed Android App Bundle generated via `gradlew bundleRelease`.
+- No feature or behavior changes; this build focuses on deployment prep.
+

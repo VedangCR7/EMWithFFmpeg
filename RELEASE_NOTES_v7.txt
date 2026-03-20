@@ -1,0 +1,18 @@
+Play Store Release Notes (v7)
+-----------------------------
+
+- Version 7 with 16 KB page size support for Android 15+ devices.
+- Fixed Razorpay payment verification flow - payments now properly verified with backend.
+- Improved subscription payment processing - order creation and verification now work correctly.
+- Enhanced language filtering - posters automatically filter by language when selected.
+- Improved image loading with better error handling and fallback placeholders.
+- Optimized image component with enhanced error logging and user feedback.
+- Fixed subscription pricing restored to ₹499 for Quarterly Pro plan.
+- Better error messages and debugging information throughout the app.
+
+Technical Improvements:
+- Added Android 16 KB page size support (required for Play Store compliance).
+- Enhanced payment verification API integration with proper order creation flow.
+- Improved poster language detection and filtering system.
+- Better image error handling with structured logging and user-friendly placeholders.
+
