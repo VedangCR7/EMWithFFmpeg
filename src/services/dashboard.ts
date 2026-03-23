@@ -53,7 +53,7 @@ class DashboardService {
   }
 
   // Search templates (mock data only)
-  async searchTemplates(query: string): Promise<Template[]> {
+  async searchTemplates(query: string): Promise<{ data: { parentCategory: string; categories: any[] } } | Template[]> {
     const templates = this.getMockTemplates();
     const searchLower = query.toLowerCase().trim();
     
@@ -61,26 +61,25 @@ class DashboardService {
       return [];
     }
     
-    return templates.filter(template => {
+    const filteredTemplates = templates.filter(template => {
       // Search in name
       if (template.name?.toLowerCase().includes(searchLower)) return true;
       
       // Search in category
       if (template.category?.toLowerCase().includes(searchLower)) return true;
       
-      // Search in tags array
-      if (template.tags && Array.isArray(template.tags)) {
-        const tagMatch = template.tags.some((tag: string) => 
-          tag?.toLowerCase().includes(searchLower)
-        );
-        if (tagMatch) return true;
-      }
+      // Search in tags
+      if (template.tags?.some((tag: string) => tag.toLowerCase().includes(searchLower))) return true;
       
       // Search in description (if available)
       if ((template as any).description?.toLowerCase().includes(searchLower)) return true;
       
       return false;
     });
+    
+    // For now, return flat array format
+    // TODO: Implement hierarchical response format when backend supports it
+    return filteredTemplates;
   }
 
   // Get templates by category (mock data only)
