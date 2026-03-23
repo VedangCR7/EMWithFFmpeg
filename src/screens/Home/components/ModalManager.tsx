@@ -129,7 +129,7 @@ const ModalManager: React.FC<ModalManagerProps> = ({
                 <View style={styles.upcomingEventsModalHeader}>
                   <Text style={styles.upcomingEventsModalTitle}>Business Categories</Text>
                   <TouchableOpacity onPress={closeBusinessCategoriesModal}>
-                    <Icon name="close" size={16} color={theme.colors.textSecondary} />
+                    <Icon name="close" size={20} color={theme.colors.textSecondary} />
                   </TouchableOpacity>
                 </View>
                 {!isBusinessCategoriesModalClosing && (
@@ -163,7 +163,7 @@ const ModalManager: React.FC<ModalManagerProps> = ({
                 <View style={styles.upcomingEventsModalHeader}>
                   <Text style={styles.upcomingEventsModalTitle}>General Categories</Text>
                   <TouchableOpacity onPress={() => {}}>
-                    <Icon name="close" size={16} color={theme.colors.textSecondary} />
+                    <Icon name="close" size={20} color={theme.colors.textSecondary} />
                   </TouchableOpacity>
                 </View>
                 <View style={styles.upcomingEventsModalBody}>
@@ -195,7 +195,7 @@ const ModalManager: React.FC<ModalManagerProps> = ({
                 <View style={styles.upcomingEventsModalHeader}>
                   <Text style={styles.upcomingEventsModalTitle}>Video Content</Text>
                   <TouchableOpacity onPress={closeVideosModal}>
-                    <Icon name="close" size={16} color={theme.colors.textSecondary} />
+                    <Icon name="close" size={20} color={theme.colors.textSecondary} />
                   </TouchableOpacity>
                 </View>
                 <View style={styles.upcomingEventsModalBody}>
@@ -226,8 +226,23 @@ const ModalManager: React.FC<ModalManagerProps> = ({
               <LinearGradient colors={['#f5f5f5', '#ffffff']} style={styles.upcomingEventsModalGradient}>
                 <View style={styles.upcomingEventsModalHeader}>
                   <Text style={styles.upcomingEventsModalTitle}>Customer Support</Text>
-                  <TouchableOpacity onPress={closeCustomerSupportModal}>
-                    <Icon name="close" size={16} color={theme.colors.textSecondary} />
+                  <TouchableOpacity 
+                    onPress={closeCustomerSupportModal}
+                    style={{
+                      width: 24,
+                      height: 24,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      borderRadius: 12,
+                      backgroundColor: 'rgba(0, 0, 0, 0.1)',
+                    }}
+                  >
+                    <Text style={{ 
+                      fontSize: 18, 
+                      color: theme.colors.textSecondary, 
+                      fontWeight: 'bold',
+                      lineHeight: 20,
+                    }}>×</Text>
                   </TouchableOpacity>
                 </View>
                 <View style={styles.upcomingEventsModalBody}>
@@ -273,7 +288,7 @@ const ModalManager: React.FC<ModalManagerProps> = ({
                 <View style={styles.upcomingEventsModalHeader}>
                   <Text style={styles.upcomingEventsModalTitle}>Business Ethics</Text>
                   <TouchableOpacity onPress={closeBusinessEthicsModal}>
-                    <Icon name="close" size={16} color={theme.colors.textSecondary} />
+                    <Icon name="close" size={20} color={theme.colors.textSecondary} />
                   </TouchableOpacity>
                 </View>
                 <View style={styles.upcomingEventsModalBody}>
@@ -305,7 +320,7 @@ const ModalManager: React.FC<ModalManagerProps> = ({
                 <View style={styles.upcomingEventsModalHeader}>
                   <Text style={styles.upcomingEventsModalTitle}>Success Mindset</Text>
                   <TouchableOpacity onPress={closeSuccessMindsetModal}>
-                    <Icon name="close" size={16} color={theme.colors.textSecondary} />
+                    <Icon name="close" size={20} color={theme.colors.textSecondary} />
                   </TouchableOpacity>
                 </View>
                 <View style={styles.upcomingEventsModalBody}>
@@ -337,7 +352,7 @@ const ModalManager: React.FC<ModalManagerProps> = ({
                 <View style={styles.upcomingEventsModalHeader}>
                   <Text style={styles.upcomingEventsModalTitle}>Social Media Growth</Text>
                   <TouchableOpacity onPress={closeSocialMediaGrowthModal}>
-                    <Icon name="close" size={16} color={theme.colors.textSecondary} />
+                    <Icon name="close" size={20} color={theme.colors.textSecondary} />
                   </TouchableOpacity>
                 </View>
                 <View style={styles.upcomingEventsModalBody}>
@@ -369,7 +384,7 @@ const ModalManager: React.FC<ModalManagerProps> = ({
                 <View style={styles.upcomingEventsModalHeader}>
                   <Text style={styles.upcomingEventsModalTitle}>Money and Finance</Text>
                   <TouchableOpacity onPress={closeMoneyAndFinanceModal}>
-                    <Icon name="close" size={16} color={theme.colors.textSecondary} />
+                    <Icon name="close" size={20} color={theme.colors.textSecondary} />
                   </TouchableOpacity>
                 </View>
                 <View style={styles.upcomingEventsModalBody}>
@@ -401,7 +416,7 @@ const ModalManager: React.FC<ModalManagerProps> = ({
                 <View style={styles.upcomingEventsModalHeader}>
                   <Text style={styles.upcomingEventsModalTitle}>Business Legend Quote</Text>
                   <TouchableOpacity onPress={closeBusinessLegendQuoteModal}>
-                    <Icon name="close" size={16} color={theme.colors.textSecondary} />
+                    <Icon name="close" size={20} color={theme.colors.textSecondary} />
                   </TouchableOpacity>
                 </View>
                 <View style={styles.upcomingEventsModalBody}>
@@ -433,7 +448,7 @@ const ModalManager: React.FC<ModalManagerProps> = ({
                 <View style={styles.upcomingEventsModalHeader}>
                   <Text style={styles.upcomingEventsModalTitle}>Business Marketing Tips</Text>
                   <TouchableOpacity onPress={closeBusinessMarketingTipsModal}>
-                    <Icon name="close" size={16} color={theme.colors.textSecondary} />
+                    <Icon name="close" size={20} color={theme.colors.textSecondary} />
                   </TouchableOpacity>
                 </View>
                 <View style={styles.upcomingEventsModalBody}>
@@ -465,7 +480,7 @@ const ModalManager: React.FC<ModalManagerProps> = ({
                 <View style={styles.upcomingEventsModalHeader}>
                   <Text style={styles.upcomingEventsModalTitle}>Business Quotes</Text>
                   <TouchableOpacity onPress={closeBusinessQuotesModal}>
-                    <Icon name="close" size={16} color={theme.colors.textSecondary} />
+                    <Icon name="close" size={20} color={theme.colors.textSecondary} />
                   </TouchableOpacity>
                 </View>
                 <View style={styles.upcomingEventsModalBody}>
@@ -492,7 +507,7 @@ const ModalManager: React.FC<ModalManagerProps> = ({
                 <View style={styles.upcomingEventsModalHeader}>
                   <Text style={styles.upcomingEventsModalTitle}>Featured Content</Text>
                   <TouchableOpacity onPress={closeFeaturedContentModal}>
-                    <Icon name="close" size={16} color={theme.colors.textSecondary} />
+                    <Icon name="close" size={20} color={theme.colors.textSecondary} />
                   </TouchableOpacity>
                 </View>
                 <View style={styles.upcomingEventsModalBody}>

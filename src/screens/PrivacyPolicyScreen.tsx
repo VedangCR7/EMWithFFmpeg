@@ -378,13 +378,12 @@ const PrivacyPolicyScreen = () => {
       backgroundColor: 'rgba(102, 126, 234, 0.08)',
       borderLeftWidth: 2,
       borderLeftColor: '#667eea',
-      alignItems: 'flex-start',
+      alignItems: 'center',
       // Dynamic spacing applied inline
     },
     bullet: {
       fontSize: moderateScale(isTablet ? 9 : 8), // Fixed text size
       color: '#667eea',
-      marginTop: moderateScale(2),
       fontWeight: '600',
       lineHeight: moderateScale(isTablet ? 9 * 1.45 : 8 * 1.45),
       includeFontPadding: false,

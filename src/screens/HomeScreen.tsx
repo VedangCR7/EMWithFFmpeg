@@ -2538,6 +2538,13 @@ const HomeScreen: React.FC = React.memo(() => {
     businessQuotesTemplatesRaw,
   ]);
 
+  // Lightweight hierarchy resolution for parent category search
+  const getChildCategoriesForParent = useCallback((parentCategoryName: string, categories: any[]) => {
+    return categories.filter(category => 
+      category.parentCategoryName?.toLowerCase() === parentCategoryName.toLowerCase()
+    );
+  }, []);
+
   // Debounced search handler - triggers search after user stops typing
   useEffect(() => {
     // If search query is empty, reset immediately (no debounce delay)
@@ -2582,6 +2589,19 @@ const HomeScreen: React.FC = React.memo(() => {
       );
       const matchingBusinessCategoryNames = matchingBusinessCategories.map(category => category.name.toLowerCase());
 
+      // ENHANCEMENT: Include child categories when parent is searched
+      const parentCategories = [...matchingCategories, ...matchingBusinessCategories];
+      const additionalChildCategories: any[] = [];
+      
+      parentCategories.forEach(parent => {
+        const childCategories = getChildCategoriesForParent(parent.name, [...filteredGreetingCategoriesList, ...businessCategories]);
+        additionalChildCategories.push(...childCategories);
+      });
+      
+      // Combine matching categories with their child categories
+      const allMatchingCategories = [...parentCategories, ...additionalChildCategories];
+      const allMatchingCategoryNames = allMatchingCategories.map(category => category.name.toLowerCase());
+
       // Combine greeting templates, calendar posters, and business category previews for unified search
       const allBusinessCategoryTemplates = Object.values(businessCategoryPreviews).flat();
       const allTemplates = [...allGreetingTemplates, ...calendarPosters, ...allBusinessCategoryTemplates];
@@ -2618,15 +2638,15 @@ const HomeScreen: React.FC = React.memo(() => {
           return true;
         }
 
-        // Check if template category matches any General Category name
-        if (template.category && matchingCategoryNames.some(catName =>
+        // Check if template category matches any General Category name (including child categories)
+        if (template.category && allMatchingCategoryNames.some(catName =>
           template.category?.toLowerCase().includes(catName)
         )) {
           return true;
         }
 
-        // Check if template category matches any Business Category name
-        if (template.category && matchingBusinessCategoryNames.some(catName =>
+        // Check if template category matches any Business Category name (including child categories)
+        if (template.category && allMatchingCategoryNames.some(catName =>
           template.category?.toLowerCase().includes(catName)
         )) {
           return true;
@@ -2643,13 +2663,11 @@ const HomeScreen: React.FC = React.memo(() => {
       // Group all templates by category for consistent horizontal display
       let structuredResults = groupTemplatesByCategory(uniqueFiltered);
 
-      // Prioritize categories that match the search query
+      // Prioritize categories that match search query (including parent-child hierarchy)
       structuredResults.sort((a, b) => {
         if (a.type !== 'category' || b.type !== 'category') return 0;
-        const aMatches = matchingCategoryNames.includes(a.data.name.toLowerCase()) || 
-                         matchingBusinessCategoryNames.includes(a.data.name.toLowerCase());
-        const bMatches = matchingCategoryNames.includes(b.data.name.toLowerCase()) || 
-                         matchingBusinessCategoryNames.includes(b.data.name.toLowerCase());
+        const aMatches = allMatchingCategoryNames.includes(a.data.name.toLowerCase());
+        const bMatches = allMatchingCategoryNames.includes(b.data.name.toLowerCase());
         if (aMatches && !bMatches) return -1;
         if (!aMatches && bMatches) return 1;
         return 0;
@@ -2659,11 +2677,11 @@ const HomeScreen: React.FC = React.memo(() => {
       setTemplates(structuredResults);
 
       // Then fetch General Category templates if search matches a category and update results
-      if (matchingCategories.length > 0 || matchingBusinessCategories.length > 0) {
+      if (allMatchingCategories.length > 0) {
         (async () => {
           try {
-            // Fetch General Category templates
-            const generalCategoryResultsPromises = matchingCategories.map(async (category) => {
+            // Fetch General Category templates (including child categories)
+            const generalCategoryResultsPromises = allMatchingCategories.map(async (category) => {
               try {
                 const categoryTemplates = await greetingTemplatesService.searchTemplates(category.name);
                 return categoryTemplates.map(t => ({ ...t, category: category.name }));
@@ -2675,8 +2693,8 @@ const HomeScreen: React.FC = React.memo(() => {
               }
             });
 
-            // Fetch Business Category templates
-            const businessCategoryResultsPromises = matchingBusinessCategories.map(async (category) => {
+            // Fetch Business Category templates (including child categories)
+            const businessCategoryResultsPromises = allMatchingCategories.map(async (category) => {
               try {
                 const categoryTemplates = await businessCategoryPostersApi.getPostersByCategory(category.name, 50);
                 return categoryTemplates.success && categoryTemplates.data?.posters ? categoryTemplates.data.posters : [];
@@ -2851,7 +2869,7 @@ const HomeScreen: React.FC = React.memo(() => {
 
     // Cleanup timeout on unmount or when searchQuery changes
     return () => clearTimeout(timeoutId);
-  }, [searchQuery, allGreetingTemplates, calendarPosters, currentRequestId, filteredGreetingCategoriesList, businessCategories, businessCategoryPreviews]);
+  }, [searchQuery, allGreetingTemplates, calendarPosters, currentRequestId, filteredGreetingCategoriesList, businessCategories, businessCategoryPreviews, getChildCategoriesForParent, groupTemplatesByCategory]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -5783,7 +5801,7 @@ const HomeScreen: React.FC = React.memo(() => {
                   onPress={closeBusinessCategoriesModal}
                   activeOpacity={0.7}
                 >
-                  <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>G��</Text>
+                  <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>×</Text>
                 </TouchableOpacity>
               </View>
             </LinearGradient>
@@ -5831,7 +5849,7 @@ const HomeScreen: React.FC = React.memo(() => {
                   style={styles.upcomingEventsCloseButton}
                   onPress={closeGeneralCategoriesModal}
                 >
-                  <Text style={styles.upcomingEventsCloseButtonText}>G��</Text>
+                  <Text style={styles.upcomingEventsCloseButtonText}>×</Text>
                 </TouchableOpacity>
               </View>
             </LinearGradient>
@@ -5908,7 +5926,7 @@ const HomeScreen: React.FC = React.memo(() => {
                   style={styles.upcomingEventsCloseButton}
                   onPress={closeVideosModal}
                 >
-                  <Text style={styles.upcomingEventsCloseButtonText}>G��</Text>
+                  <Text style={styles.upcomingEventsCloseButtonText}>×</Text>
                 </TouchableOpacity>
               </View>
             </LinearGradient>
@@ -5963,7 +5981,7 @@ const HomeScreen: React.FC = React.memo(() => {
                 onPress={closeCustomerSupportModal}
                 activeOpacity={0.7}
               >
-                <Text style={styles.customerSupportCloseButtonText}>G��</Text>
+                <Text style={styles.customerSupportCloseButtonText}>×</Text>
               </TouchableOpacity>
 
               {/* Contact Options */}
@@ -6041,7 +6059,7 @@ const HomeScreen: React.FC = React.memo(() => {
                   style={styles.upcomingEventsCloseButton}
                   onPress={closeBusinessEthicsModal}
                 >
-                  <Text style={styles.upcomingEventsCloseButtonText}>G��</Text>
+                  <Text style={styles.upcomingEventsCloseButtonText}>×</Text>
                 </TouchableOpacity>
               </View>
             </LinearGradient>
@@ -6088,7 +6106,7 @@ const HomeScreen: React.FC = React.memo(() => {
                   style={styles.upcomingEventsCloseButton}
                   onPress={closeSuccessMindsetModal}
                 >
-                  <Text style={styles.upcomingEventsCloseButtonText}>G��</Text>
+                  <Text style={styles.upcomingEventsCloseButtonText}>×</Text>
                 </TouchableOpacity>
               </View>
             </LinearGradient>
@@ -6135,7 +6153,7 @@ const HomeScreen: React.FC = React.memo(() => {
                   style={styles.upcomingEventsCloseButton}
                   onPress={closeSocialMediaGrowthModal}
                 >
-                  <Text style={styles.upcomingEventsCloseButtonText}>G��</Text>
+                  <Text style={styles.upcomingEventsCloseButtonText}>×</Text>
                 </TouchableOpacity>
               </View>
             </LinearGradient>
@@ -6182,7 +6200,7 @@ const HomeScreen: React.FC = React.memo(() => {
                   style={styles.upcomingEventsCloseButton}
                   onPress={closeMoneyAndFinanceModal}
                 >
-                  <Text style={styles.upcomingEventsCloseButtonText}>G��</Text>
+                  <Text style={styles.upcomingEventsCloseButtonText}>×</Text>
                 </TouchableOpacity>
               </View>
             </LinearGradient>
@@ -6229,7 +6247,7 @@ const HomeScreen: React.FC = React.memo(() => {
                   style={styles.upcomingEventsCloseButton}
                   onPress={closeBusinessLegendQuoteModal}
                 >
-                  <Text style={styles.upcomingEventsCloseButtonText}>G��</Text>
+                  <Text style={styles.upcomingEventsCloseButtonText}>×</Text>
                 </TouchableOpacity>
               </View>
             </LinearGradient>
@@ -6276,7 +6294,7 @@ const HomeScreen: React.FC = React.memo(() => {
                   style={styles.upcomingEventsCloseButton}
                   onPress={closeBusinessMarketingTipsModal}
                 >
-                  <Text style={styles.upcomingEventsCloseButtonText}>G��</Text>
+                  <Text style={styles.upcomingEventsCloseButtonText}>×</Text>
                 </TouchableOpacity>
               </View>
             </LinearGradient>
@@ -6323,7 +6341,7 @@ const HomeScreen: React.FC = React.memo(() => {
                   style={styles.upcomingEventsCloseButton}
                   onPress={closeBusinessQuotesModal}
                 >
-                  <Text style={styles.upcomingEventsCloseButtonText}>G��</Text>
+                  <Text style={styles.upcomingEventsCloseButtonText}>×</Text>
                 </TouchableOpacity>
               </View>
             </LinearGradient>
@@ -6360,7 +6378,7 @@ const HomeScreen: React.FC = React.memo(() => {
                   <Text style={styles.upcomingEventsModalTitle}>Featured Content</Text>
                 </View>
                 <TouchableOpacity style={styles.upcomingEventsCloseButton} onPress={closeFeaturedContentModal}>
-                  <Text style={styles.upcomingEventsCloseButtonText}>G��</Text>
+                  <Text style={styles.upcomingEventsCloseButtonText}>×</Text>
                 </TouchableOpacity>
               </View>
             </LinearGradient>

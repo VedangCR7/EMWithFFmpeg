@@ -19,43 +19,10 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { MainStackParamList } from '../navigation/types';
 import { useTheme } from '../context/ThemeContext';
 
-// Compact spacing multiplier to reduce all spacing (matching HomeScreen)
-const COMPACT_MULTIPLIER = 0.5;
-
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+const { width: screenWidth } = Dimensions.get('window');
 
 // Responsive helper functions (matching HomeScreen)
-const scale = (size: number) => (screenWidth / 375) * size;
-const verticalScale = (size: number) => (screenHeight / 667) * size;
-const moderateScale = (size: number, factor = 0.5) => size + (scale(size) - size) * factor;
-
-// Responsive design helpers
-const isSmallScreen = screenWidth < 375;
-const isMediumScreen = screenWidth >= 375 && screenWidth < 414;
-const isLargeScreen = screenWidth >= 414 && screenWidth < 768;
-const isTablet = screenWidth >= 768;
-const isLandscape = screenWidth > screenHeight;
-
-// Responsive spacing (Compact - reduced by 50%)
-const responsiveSpacing = {
-  xs: moderateScale(isSmallScreen ? 2 : isMediumScreen ? 3 : isLargeScreen ? 4 : isTablet ? 5 : 6),
-  sm: moderateScale(isSmallScreen ? 4 : isMediumScreen ? 5 : isLargeScreen ? 6 : isTablet ? 7 : 8),
-  md: moderateScale(isSmallScreen ? 6 : isMediumScreen ? 8 : isLargeScreen ? 9 : isTablet ? 10 : 12),
-  lg: moderateScale(isSmallScreen ? 8 : isMediumScreen ? 10 : isLargeScreen ? 12 : isTablet ? 14 : 16),
-  xl: moderateScale(isSmallScreen ? 10 : isMediumScreen ? 12 : isLargeScreen ? 14 : isTablet ? 16 : 20),
-  xxl: moderateScale(isSmallScreen ? 12 : isMediumScreen ? 14 : isLargeScreen ? 16 : isTablet ? 18 : 24),
-};
-
-// Responsive font sizes (Compact - reduced by 30-50%)
-const responsiveFontSize = {
-  xs: moderateScale(isSmallScreen ? 7 : isMediumScreen ? 7.5 : isLargeScreen ? 8 : isTablet ? 8.5 : 9),
-  sm: moderateScale(isSmallScreen ? 8 : isMediumScreen ? 8.5 : isLargeScreen ? 9 : isTablet ? 9.5 : 10),
-  md: moderateScale(isSmallScreen ? 9 : isMediumScreen ? 9.5 : isLargeScreen ? 10 : isTablet ? 10.5 : 11),
-  lg: moderateScale(isSmallScreen ? 10 : isMediumScreen ? 10.5 : isLargeScreen ? 11 : isTablet ? 11.5 : 12),
-  xl: moderateScale(isSmallScreen ? 11 : isMediumScreen ? 12 : isLargeScreen ? 13 : isTablet ? 14 : 15),
-  xxl: moderateScale(isSmallScreen ? 13 : isMediumScreen ? 14 : isLargeScreen ? 15 : isTablet ? 16 : 18),
-  xxxl: moderateScale(isSmallScreen ? 15 : isMediumScreen ? 16 : isLargeScreen ? 17 : isTablet ? 18 : 20),
-};
+const moderateScale = (size: number, factor = 0.5) => size + ((screenWidth / 375) * size - size) * factor;
 
 interface FAQItem {
   question: string;
@@ -108,11 +75,9 @@ const HelpSupportScreen: React.FC = () => {
   }, [route.params?.scrollToFAQ, faqSectionY]);
 
   const currentScreenWidth = dimensions.width;
-  const currentScreenHeight = dimensions.height;
   
   // Dynamic responsive scaling functions
   const dynamicScale = (size: number) => (currentScreenWidth / 375) * size;
-  const dynamicVerticalScale = (size: number) => (currentScreenHeight / 667) * size;
   const dynamicModerateScale = (size: number, factor = 0.5) => size + (dynamicScale(size) - size) * factor;
   
   // Responsive icon sizes (compact - 60% of original, slightly larger for small screens)
@@ -142,7 +107,6 @@ const HelpSupportScreen: React.FC = () => {
   
   // Device size detection
   const isTabletDevice = currentScreenWidth >= 768;
-  const isLandscapeMode = currentScreenWidth > currentScreenHeight;
 
   const faqs: FAQItem[] = [
     {
