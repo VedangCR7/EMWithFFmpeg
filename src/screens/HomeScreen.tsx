@@ -978,8 +978,8 @@ const HomeScreen: React.FC = React.memo(() => {
   const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Greeting categories state
-  const [greetingCategoriesList, setGreetingCategoriesList] = useState<Array<{ id: string; name: string; icon: string; color?: string; imageUrl?: string }>>([]);
-  const [allGreetingCategories, setAllGreetingCategories] = useState<Array<{ id: string; name: string; icon: string; color?: string; imageUrl?: string }>>([]);
+  const [greetingCategoriesList, setGreetingCategoriesList] = useState<Array<{ id: string; name: string; icon: string; color?: string; imageUrl?: string; parentCategoryName?: string }>>([]);
+  const [allGreetingCategories, setAllGreetingCategories] = useState<Array<{ id: string; name: string; icon: string; color?: string; imageUrl?: string; parentCategoryName?: string }>>([]);
   const [displayedCategoriesCount, setDisplayedCategoriesCount] = useState(5); // Start with 5 categories
   const [greetingCategoriesLoading, setGreetingCategoriesLoading] = useState(false);
   const [greetingCategoryImages, setGreetingCategoryImages] = useState<Record<string, string>>({});
@@ -2665,10 +2665,14 @@ const HomeScreen: React.FC = React.memo(() => {
       // Search in name, category, description, and tags
       const searchLower = searchQuery.toLowerCase();
 
-      // Check if search query matches any General Category name
+      // Check if search query matches any General Category name or parent category name
       const matchingCategories = filteredGreetingCategoriesList.filter(category =>
         category.name.toLowerCase().includes(searchLower) ||
-        searchLower.includes(category.name.toLowerCase())
+        searchLower.includes(category.name.toLowerCase()) ||
+        (category.parentCategoryName && (
+          category.parentCategoryName.toLowerCase().includes(searchLower) ||
+          searchLower.includes(category.parentCategoryName.toLowerCase())
+        ))
       );
       const matchingCategoryNames = matchingCategories.map(category => category.name.toLowerCase());
 
@@ -2864,11 +2868,15 @@ const HomeScreen: React.FC = React.memo(() => {
           // Search greeting templates via API
           const greetingResults = await greetingTemplatesService.searchTemplates(searchQuery);
 
-          // Check if search query matches any General Category name
+          // Check if search query matches any General Category name or parent category name
           const searchLower = searchQuery.toLowerCase();
           const matchingCategories = filteredGreetingCategoriesList.filter(category =>
             category.name.toLowerCase().includes(searchLower) ||
-            searchLower.includes(category.name.toLowerCase())
+            searchLower.includes(category.name.toLowerCase()) ||
+            (category.parentCategoryName && (
+              category.parentCategoryName.toLowerCase().includes(searchLower) ||
+              searchLower.includes(category.parentCategoryName.toLowerCase())
+            ))
           );
 
           // Search for templates in matching General Categories
@@ -3046,11 +3054,15 @@ const HomeScreen: React.FC = React.memo(() => {
     // Use local search immediately for better performance with API data
     const searchLower = searchQuery.toLowerCase();
 
-    // Check if search query matches any General Category name
+    // Check if search query matches any General Category name or parent category name
     const matchingCategoryNames = filteredGreetingCategoriesList
       .filter(category =>
         category.name.toLowerCase().includes(searchLower) ||
-        searchLower.includes(category.name.toLowerCase())
+        searchLower.includes(category.name.toLowerCase()) ||
+        (category.parentCategoryName && (
+          category.parentCategoryName.toLowerCase().includes(searchLower) ||
+          searchLower.includes(category.parentCategoryName.toLowerCase())
+        ))
       )
       .map(category => category.name.toLowerCase());
 
@@ -3067,6 +3079,8 @@ const HomeScreen: React.FC = React.memo(() => {
 
     // Debug logging
     console.log('= [SEARCH DEBUG] Search query:', searchQuery);
+    console.log('= [SEARCH DEBUG] General categories available:', filteredGreetingCategoriesList.map(c => c.name));
+    console.log('= [SEARCH DEBUG] General categories with parents:', filteredGreetingCategoriesList.filter(c => c.parentCategoryName).map(c => `${c.name} (parent: ${c.parentCategoryName})`));
     console.log('= [SEARCH DEBUG] Business categories available:', businessCategories.map(c => c.name));
     console.log('= [SEARCH DEBUG] Business categories with parents:', businessCategories.filter(c => c.parentCategoryName).map(c => `${c.name} (parent: ${c.parentCategoryName})`));
     console.log('= [SEARCH DEBUG] Matching business categories:', matchingBusinessCategoryNames);
@@ -5543,7 +5557,11 @@ const HomeScreen: React.FC = React.memo(() => {
             const searchLower = searchQuery.toLowerCase();
             const matchingCategories = filteredGreetingCategoriesList.filter(category =>
               category.name.toLowerCase().includes(searchLower) ||
-              searchLower.includes(category.name.toLowerCase())
+              searchLower.includes(category.name.toLowerCase()) ||
+              (category.parentCategoryName && (
+                category.parentCategoryName.toLowerCase().includes(searchLower) ||
+                searchLower.includes(category.parentCategoryName.toLowerCase())
+              ))
             );
 
             return (
