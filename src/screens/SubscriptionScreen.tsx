@@ -120,12 +120,24 @@ const SubscriptionScreen: React.FC = () => {
   });
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [paymentInProgress, setPaymentInProgressState] = useState(false);
+  
+  // Enhanced payment states for better UX
+  const [isAuthenticating, setIsAuthenticating] = useState(false); // During Razorpay checkout
+  const [isTransactionPending, setIsTransactionPending] = useState(false); // Post-payment, pre-activation
+  const [pollingAttempts, setPollingAttempts] = useState(0);
 
   // Wrapper to update both local and context payment states
   const updatePaymentInProgress = (inProgress: boolean) => {
     setPaymentInProgressState(inProgress);
     setPaymentInProgress(inProgress);
     console.log(`🔒 PAYMENT LOCK: ${inProgress ? 'ENGAGED' : 'RELEASED'}`);
+    
+    // Reset all enhanced states when payment is not in progress
+    if (!inProgress) {
+      setIsAuthenticating(false);
+      setIsTransactionPending(false);
+      setPollingAttempts(0);
+    }
   };
 
   // Filter out promo plans from purchasable plans
@@ -256,6 +268,59 @@ const SubscriptionScreen: React.FC = () => {
     }
   };
 
+  // Polling mechanism for transaction pending state
+  const pollSubscriptionStatus = useCallback(async (maxAttempts = 5, interval = 3000) => {
+    console.log(`⏳ Starting subscription polling - max attempts: ${maxAttempts}, interval: ${interval}ms`);
+    
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        console.log(`🔄 Polling attempt ${attempt}/${maxAttempts}`);
+        setPollingAttempts(attempt);
+        
+        // Force refresh subscription status
+        await refreshSubscription(true);
+        
+        // Check if subscription is now active
+        const currentUser = authService.getCurrentUser();
+        if (currentUser?.id) {
+          const statusResponse = await subscriptionApi.getStatus();
+          const subscriptionData = (statusResponse.data as any)?.subscription || (statusResponse.data as any)?.data || statusResponse.data;
+          const isActive = isStatusActive(subscriptionData);
+          
+          console.log(`📊 Polling result - Attempt ${attempt}: isActive=${isActive}`);
+          
+          if (isActive) {
+            console.log('✅ Subscription activated! Stopping polling.');
+            setIsSubscribed(true);
+            setIsTransactionPending(false);
+            updatePaymentInProgress(false);
+            
+            // Show success message
+            if (Platform.OS === 'android') {
+              ToastAndroid.show('🎉 Payment successful! Welcome to Pro!', ToastAndroid.LONG);
+            } else {
+              Alert.alert('🎉 Success', 'Payment successful! Welcome to Pro!');
+            }
+            
+            return true; // Success
+          }
+        }
+        
+        // Wait before next attempt (except for last attempt)
+        if (attempt < maxAttempts) {
+          console.log(`⏳ Waiting ${interval}ms before next attempt...`);
+          await new Promise(resolve => setTimeout(resolve, interval));
+        }
+        
+      } catch (error) {
+        console.error(`❌ Polling attempt ${attempt} failed:`, error);
+      }
+    }
+    
+    console.log(`⏱️ Polling completed after ${maxAttempts} attempts - subscription not activated`);
+    return false; // Failed to activate
+  }, [refreshSubscription, setIsSubscribed, updatePaymentInProgress]);
+
   // Handle payment with Razorpay
   const handlePayment = async () => {
     if (paymentInProgress) {
@@ -270,6 +335,7 @@ const SubscriptionScreen: React.FC = () => {
 
     updatePaymentInProgress(true);
     setIsProcessing(true);
+    setIsAuthenticating(true); // Start authenticating state
 
     const currentUser = authService.getCurrentUser();
     let amountInPaise = 100;
@@ -434,6 +500,10 @@ const SubscriptionScreen: React.FC = () => {
           console.log('💳 Payment success response:', response);
 
           try {
+            // Transition to transaction pending state immediately after payment success
+            setIsTransactionPending(true);
+            setIsAuthenticating(false);
+            
             // Get current user for transaction metadata
             const currentUserForTransaction = authService.getCurrentUser();
 
@@ -467,45 +537,33 @@ const SubscriptionScreen: React.FC = () => {
               console.log('🗑️ Subscription cache cleared for user:', userId);
             }
 
-            // Step 3: CRITICAL - Force fresh status refresh after payment
-            let active = false;
+            // Step 3: Start polling for subscription activation instead of immediate check
             if (verifyResult?.success) {
-              console.log('[APP] ✅ Payment verified, forcing UI update');
-              const statusResponse = await subscriptionApi.getStatus();
-              console.log('[APP] 📊 Full status response:', JSON.stringify(statusResponse.data, null, 2));
-
-              const subscriptionData = (statusResponse.data as any)?.subscription || (statusResponse.data as any)?.data || statusResponse.data;
-              const latestStatus = subscriptionData;
-
-              console.log('[APP] 📊 Parsed subscription:', latestStatus);
-
-              // Step 4: Update context (context handles state updates)
-              active = isStatusActive(latestStatus);
-              setIsSubscribed(active);
-
-              console.log('[APP] 🎯 Final UI state:', { active });
+              console.log('[APP] ✅ Payment verified, starting polling for activation');
+              
+              // Start polling for subscription activation
+              const activationSuccess = await pollSubscriptionStatus();
+              
+              if (activationSuccess) {
+                console.log('✅ Payment processing complete, navigating back');
+                navigation.goBack();
+              } else {
+                // Polling failed - show user-friendly message
+                console.warn('⚠️ Polling completed - subscription not yet activated');
+                setIsTransactionPending(false);
+                updatePaymentInProgress(false);
+                
+                Alert.alert(
+                  'Processing Payment',
+                  'Your payment was successful! Subscription activation may take a few moments. Please check your status after a short while.',
+                  [{ text: 'OK', onPress: () => navigation.goBack() }]
+                );
+              }
             } else {
               console.warn('[APP] ⚠️ Payment verification failed');
-            }
-
-            // Step 5: Do NOT refresh subscription - trust verified status
-            // await refreshSubscription(true); // ❌ AVOID - Could override verified status
-
-            // Step 6: Show success message and navigate
-            if (active) {
-              if (Platform.OS === 'android') {
-                ToastAndroid.show('🎉 Payment successful! Welcome to Pro!', ToastAndroid.LONG);
-              } else {
-                Alert.alert('🎉 Success', 'Payment successful! Welcome to Pro!');
-              }
-              console.log('✅ Payment processing complete, navigating back');
+              setIsTransactionPending(false);
               updatePaymentInProgress(false);
-              navigation.goBack();
-            } else {
-              // Subscription verification failed
-              console.warn('⚠️ Payment successful but subscription not activated');
-              updatePaymentInProgress(false);
-              showErrorModal('Subscription Activation Failed', 'Payment was successful but subscription could not be activated. Please contact support or check your subscription status.');
+              showErrorModal('Payment Verification Failed', 'Payment verification failed. Please contact support.');
             }
           } catch (error) {
             console.error('❌ Error processing successful payment:', error);
@@ -523,6 +581,10 @@ const SubscriptionScreen: React.FC = () => {
 
       console.log('💳 Opening Razorpay with options:', options);
       console.log('🧾 Razorpay checkout payload:', JSON.stringify(options, null, 2));
+      
+      // Transition from authenticating to normal processing during checkout
+      setIsAuthenticating(false);
+      
       const data = await RazorpayCheckout.open(options);
       console.log('📦 Payment data received:', JSON.stringify(data, null, 2));
 
@@ -594,6 +656,7 @@ const SubscriptionScreen: React.FC = () => {
 
     updatePaymentInProgress(true);
     setIsProcessing(true);
+    setIsAuthenticating(true); // Start authenticating state
 
     const currentUser = authService.getCurrentUser();
 
@@ -667,6 +730,10 @@ const SubscriptionScreen: React.FC = () => {
           console.log('💳 Autopay success response:', response);
 
           try {
+            // Transition to transaction pending state immediately after payment success
+            setIsTransactionPending(true);
+            setIsAuthenticating(false);
+            
             // CRITICAL: Verify payment before activating subscription
             if (!response.razorpay_payment_id || !response.razorpay_subscription_id) {
               console.error('❌ Invalid payment response:', response);
@@ -710,46 +777,34 @@ const SubscriptionScreen: React.FC = () => {
                 console.log('🗑️ Subscription cache cleared for user:', userId);
               }
 
-              // Step 3: CRITICAL - Force fresh status refresh after payment
-              let active = false;
+              // Step 3: Start polling for subscription activation instead of immediate check
               if (verifyResult?.success) {
-                console.log('[APP] ✅ Payment verified, forcing UI update');
-                const statusResponse = await subscriptionApi.getStatus();
-                console.log('[APP] 📊 Full status response:', JSON.stringify(statusResponse.data, null, 2));
-
-                const subscriptionData = (statusResponse.data as any)?.subscription || (statusResponse.data as any)?.data || statusResponse.data;
-                const latestStatus = subscriptionData;
-
-                console.log('[APP] 📊 Parsed subscription:', latestStatus);
-
-                // Step 4: Update UI state ONLY after successful payment verification
-                active = isStatusActive(latestStatus);
-                setIsSubscribed(active);
-
-                console.log('[APP] 🎯 Final UI state:', { active });
-              } else {
-                console.warn('[APP] ⚠️ Payment verification failed, UI not updated');
-              }
-
-              // SAFE: Only refresh context after payment verification complete
-              // await refreshSubscription(true); // ❌ AVOID - Could override verified status
-
-              // Show appropriate message based on exact subscription status
-              if (active) {
-                if (Platform.OS === 'android') {
-                  ToastAndroid.show('🎉 Subscription activated successfully!', ToastAndroid.LONG);
+                console.log('[APP] ✅ Payment verified, starting polling for activation');
+                
+                // Start polling for subscription activation
+                const activationSuccess = await pollSubscriptionStatus();
+                
+                if (activationSuccess) {
+                  console.log('✅ Autopay processing complete, navigating back');
+                  navigation.goBack();
                 } else {
-                  Alert.alert('🎉 Success', 'Subscription activated successfully!');
+                  // Polling failed - show user-friendly message for Autopay
+                  console.warn('⚠️ Polling completed - subscription not yet activated');
+                  setIsTransactionPending(false);
+                  updatePaymentInProgress(false);
+                  
+                  Alert.alert(
+                    'Processing Mandate',
+                    'Your mandate was approved! Subscription activation may take a few moments. Pro features will unlock once the payment is processed.',
+                    [{ text: 'OK', onPress: () => navigation.goBack() }]
+                  );
                 }
               } else {
-                Alert.alert(
-                  'Processing', 
-                  'Your mandate is approved! The first payment will be deducted by your bank in a few minutes. Pro features will unlock then.'
-                );
+                console.warn('[APP] ⚠️ Payment verification failed');
+                setIsTransactionPending(false);
+                updatePaymentInProgress(false);
+                showErrorModal('Payment Verification Failed', 'Mandate verification failed. Please contact support.');
               }
-              console.log('✅ Autopay processing complete, navigating back');
-              updatePaymentInProgress(false);
-              navigation.goBack();
             } else {
               console.warn('⚠️ Autopay response missing razorpay_subscription_id');
               updatePaymentInProgress(false);
@@ -771,6 +826,9 @@ const SubscriptionScreen: React.FC = () => {
       };
 
       console.log('🚪 Opening Razorpay with safe options:', safeOptions);
+
+      // Transition from authenticating to normal processing during checkout
+      setIsAuthenticating(false);
 
       // SAFE Razorpay checkout execution
       const result = await RazorpayCheckout.open(safeOptions);
@@ -1273,14 +1331,18 @@ const SubscriptionScreen: React.FC = () => {
             marginBottom: isTabletDevice ? dynamicModerateScale(8) : dynamicModerateScale(6),
           }]}
           onPress={handleAutopayPayment}
-          disabled={isProcessing || isSubscribed || paymentInProgress}
+          disabled={isProcessing || isSubscribed || paymentInProgress || isAuthenticating || isTransactionPending}
         >
           <LinearGradient
             colors={isSubscribed
               ? ['#28a745', '#20c997']
-              : isProcessing || paymentInProgress
-                ? ['#cccccc', '#999999']
-                : ['#667eea', '#764ba2']
+              : isAuthenticating
+                ? ['#ff9800', '#f57c00'] // Orange for authenticating
+                : isTransactionPending
+                  ? ['#2196f3', '#1976d2'] // Blue for transaction pending
+                  : isProcessing || paymentInProgress
+                    ? ['#cccccc', '#999999']
+                    : ['#667eea', '#764ba2']
             }
             style={[styles.upgradeButtonGradient, {
               paddingVertical: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(10),
@@ -1292,11 +1354,15 @@ const SubscriptionScreen: React.FC = () => {
             }]}>
               {isSubscribed
                 ? 'Already Pro'
-                : isProcessing || paymentInProgress
-                  ? 'Processing...'
-                  : selectedPlan
-                    ? `Subscribe - ₹${selectedPlan.price || selectedPlan.amount || 99}`
-                    : 'Select a Plan'
+                : isAuthenticating
+                  ? 'Authenticating...'
+                  : isTransactionPending
+                    ? `Transaction Pending...${pollingAttempts > 0 ? ` (${pollingAttempts}/5)` : ''}`
+                    : isProcessing || paymentInProgress
+                      ? 'Processing...'
+                      : selectedPlan
+                        ? `Subscribe - ₹${selectedPlan.price || selectedPlan.amount || 99}`
+                        : 'Select a Plan'
               }
             </Text>
           </LinearGradient>
