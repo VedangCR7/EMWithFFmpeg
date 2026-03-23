@@ -88,3 +88,7 @@ yarn-error.log
 
 # Backend folder (excluded from this repo)
 eventmarketersbackend-main/
+
+# AAB analysis directories (generated files)
+aab_*/
+**/aab_*/
