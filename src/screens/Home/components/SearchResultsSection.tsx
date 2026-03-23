@@ -18,8 +18,12 @@ interface SearchResultsSectionProps {
   theme: any;
   renderSearchCategoryItem: ({ item }: { item: any }) => React.ReactElement | null;
   renderTemplate: ({ item }: { item: SearchResultItem }) => React.ReactElement | null;
+  renderHierarchicalItem?: ({ item }: { item: any }) => React.ReactElement | null;
   keyExtractorCategory: (item: any, index: number) => string;
   styles: any;
+  isHierarchical?: boolean;
+  hierarchicalResults?: any;
+  hierarchicalItems?: any[];
 }
 
 const SearchResultsSection: React.FC<SearchResultsSectionProps> = ({
@@ -30,8 +34,12 @@ const SearchResultsSection: React.FC<SearchResultsSectionProps> = ({
   theme,
   renderSearchCategoryItem,
   renderTemplate,
+  renderHierarchicalItem,
   keyExtractorCategory,
   styles,
+  isHierarchical = false,
+  hierarchicalResults = null,
+  hierarchicalItems = [],
 }) => {
   if (!isSearching || searchQuery.trim() === '') {
     return null;
@@ -72,7 +80,30 @@ const SearchResultsSection: React.FC<SearchResultsSectionProps> = ({
             {matchingCategories.length > 0 ? 'Templates' : 'Search Results'}
           </Text>
         </View>
-        {templates.length > 0 ? (
+        
+        {/* Render hierarchical results if available */}
+        {isHierarchical && hierarchicalItems.length > 0 ? (
+          <FlatList
+            data={hierarchicalItems}
+            renderItem={renderHierarchicalItem}
+            keyExtractor={(item, index) => 
+              item.type === 'parentCategory' 
+                ? `parent-${item.data.name}-${index}` 
+                : item.type === 'childCategory'
+                ? `child-${item.data.name}-${index}`
+                : `template-${item.data.id}`
+            }
+            horizontal={false}
+            showsVerticalScrollIndicator={false}
+            nestedScrollEnabled={true}
+            removeClippedSubviews={true}
+            maxToRenderPerBatch={5}
+            windowSize={5}
+            initialNumToRender={3}
+            updateCellsBatchingPeriod={150}
+            contentContainerStyle={styles.verticalSearchList}
+          />
+        ) : templates.length > 0 ? (
           <FlatList
             key={`search-results-${templates.length}`}
             data={templates}
