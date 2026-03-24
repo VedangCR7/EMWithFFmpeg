@@ -734,7 +734,7 @@ const HomeScreen: React.FC = React.memo(() => {
         if (!currentUserId) return;
 
         try {
-          const profiles = await businessProfileService.getBusinessProfiles(currentUserId);
+          const profiles = await businessProfileService.getUserBusinessProfiles(currentUserId);
           if (isMounted) {
             setUserBusinessProfiles(profiles);
             // Let BusinessProfileContext handle auto-selection logic

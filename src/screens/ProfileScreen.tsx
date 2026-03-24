@@ -1325,14 +1325,12 @@ const ProfileScreen: React.FC = () => {
         await updateCacheTimestamp(userId);
         console.log('💾 Updated profile data cached');
         
-        // Clear business profile cache to force refresh on next visit
-        console.log('🔄 Clearing business profile cache after profile update');
+        // Skip business profile cache clearing - user profile update only
+        console.log('ℹ️ Skipping business profile cache clearing - user profile update only');
         try {
-          const businessProfileService = require('../services/businessProfile').default;
-          const currentUser = authService.getCurrentUser();
-          businessProfileService.clearCache(currentUser?.id);
+          console.log('🔄 Business profile cache preserved - only user profile was updated');
         } catch (error) {
-          console.error('Failed to clear business profile cache:', error);
+          console.warn('⚠️ Could not handle business profile cache preservation:', error);
         }
         
         // Clear business category posters cache to refresh My Business screen with new category posters
@@ -1344,20 +1342,12 @@ const ProfileScreen: React.FC = () => {
           console.error('Failed to clear business category posters cache:', error);
         }
         
-        // Trigger business profiles refresh in HomeScreen by emitting a custom event
-        console.log('🔄 Triggering business profiles refresh across app...');
+        // Skip business profile refresh event - user profile update only
+        console.log('ℹ️ Skipping business profile refresh event - user profile update only');
         try {
-          // Use a custom event to notify other screens to refresh business profiles
-          const eventEmitter = require('react-native').NativeModules?.EventEmitter || 
-            new (require('react-native').DeviceEventEmitter)();
-          
-          eventEmitter.emit('businessProfileUpdated', {
-            userId: currentUser?.id,
-            logoUrl: updatedLogo,
-            timestamp: Date.now()
-          });
+          console.log('🔄 Business profile refresh disabled - only user profile was updated');
         } catch (eventError) {
-          console.warn('⚠️ Could not emit business profile update event:', eventError);
+          console.warn('⚠️ Could not handle business profile refresh skip:', eventError);
         }
         
         // Fallback: try to update HomeScreen state directly if it's mounted
@@ -1573,69 +1563,10 @@ const ProfileScreen: React.FC = () => {
       console.log('✅ Profile picture updated in storage');
       console.log('💾 Profile picture cached');
       
-      // Step 6: Update ONLY the MAIN business profile (first profile from registration) with the new logo
+      // Step 6: Skip business profile update - only update user profile
       try {
-        console.log('✅ Step 6: Updating MAIN business profile with new logo...');
-        console.log('🔗 [STEP 6] Using uploaded URL:', uploadedLogoUrl);
-        
-        if (!userId) {
-          console.log('⚠️ No user ID available for business profile update, skipping');
-        } else {
-          console.log('🔍 User ID for business profile update:', userId);
-          const businessProfileService = require('../services/businessProfile').default;
-          
-          const profiles = await businessProfileService.getUserBusinessProfiles(userId);
-          console.log(`📋 Found ${profiles.length} business profiles`);
-          
-          if (profiles.length > 0) {
-            // Sort to get the FIRST/MAIN profile (created during registration)
-            const sortedByDate = [...profiles].sort((a: any, b: any) => 
-              new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-            );
-            
-            const mainProfile = sortedByDate[0]; // First profile = user's main profile
-            const otherProfiles = sortedByDate.slice(1); // All other profiles
-            
-            console.log(`📍 MAIN profile identified: ${mainProfile.name} (created: ${mainProfile.createdAt})`);
-            
-            // Update MAIN profile with new logo (using uploaded URL, not local path)
-            try {
-              await businessProfileService.updateBusinessProfile(mainProfile.id, {
-                logo: uploadedLogoUrl, // Use HTTPS URL from server
-              });
-              console.log(`✅ Logo updated for MAIN profile: ${mainProfile.name}`);
-              console.log(`🔗 [STEP 6] Main profile now uses: ${uploadedLogoUrl}`);
-            } catch (error) {
-              console.error(`❌ Failed to update logo for main profile:`, error);
-            }
-            
-            // REMOVE user's logo FROM other business profiles
-            console.log(`📋 Checking ${otherProfiles.length} other profiles for cleanup...`);
-            let removedCount = 0;
-            for (const profile of otherProfiles) {
-              const profileLogo = profile.logo || profile.companyLogo;
-              const oldUserLogo = currentUser?.logo || currentUser?.companyLogo;
-              if (profileLogo && (profileLogo === oldUserLogo || profileLogo === imageUri || profileLogo === uploadedLogoUrl)) {
-                try {
-                  await businessProfileService.updateBusinessProfile(profile.id, {
-                    logo: '', // Clear logo from non-main profiles
-                  });
-                  removedCount++;
-                } catch (error) {
-                  console.error(`❌ Failed to remove logo from ${profile.name}:`, error);
-                }
-              }
-            }
-            
-            if (removedCount > 0) {
-              console.log(`✅ Removed user logo from ${removedCount} other profiles`);
-            }
-            
-            businessProfileService.clearCache();
-          } else {
-            console.log('ℹ️ No business profiles found, skipping logo sync');
-          }
-        }
+        console.log('✅ Step 6: Skipping business profile update - user profile only');
+        console.log('ℹ️ Business profile will no longer be automatically updated when user profile image changes');
         console.log('✅ Step 6 complete');
       } catch (error) {
         console.error('❌ Step 6 failed:', error);

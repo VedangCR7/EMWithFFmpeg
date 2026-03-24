@@ -54,7 +54,6 @@ const BusinessProfilesScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const [profiles, setProfiles] = useState<any[]>([]);
   const [allProfiles, setAllProfiles] = useState<any[]>([]); // Cache all profiles for instant filtering
-  const [mainProfileId, setMainProfileId] = useState<string | null>(null); // Track the main/primary profile ID
   const [imageRefreshKey, setImageRefreshKey] = useState(Date.now()); // Key to force image refresh
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -134,133 +133,7 @@ const BusinessProfilesScreen: React.FC = () => {
       // Try to get user-specific profiles from API first
       const apiProfiles = await businessProfileService.getUserBusinessProfiles(userId);
       
-      // Auto-sync ALL user profile fields to the MAIN/FIRST business profile (user's profile from registration)
-      if (apiProfiles.length > 0) {
-        // Sort to ensure we get the oldest profile (created during registration)
-        const sortedByDate = [...apiProfiles].sort((a, b) => 
-          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-        );
-        
-        const mainProfile = sortedByDate[0]; // First profile = user's main profile
-        const otherProfiles = sortedByDate.slice(1); // All other profiles
-        
-        // Check if ANY user profile field needs to be synced
-        const userName = currentUser?._originalCompanyName || currentUser?.companyName || currentUser?.name;
-        const userPhone = currentUser?.phoneNumber || currentUser?.phone;
-        const userEmail = currentUser?.email;
-        const userAddress = currentUser?._originalAddress || currentUser?.address || '';
-        const userWebsite = currentUser?._originalWebsite || currentUser?.website || '';
-        const userCategory = currentUser?._originalCategory || currentUser?.category || '';
-        const userDescription = currentUser?._originalDescription || currentUser?.description || '';
-        const userAlternatePhone = currentUser?._originalAlternatePhone || currentUser?.alternatePhone || '';
-        const userLogo = currentUser?.logo || currentUser?.companyLogo || '';
-        
-        // CRITICAL: Sync ALL user fields to MAIN profile (registered profile)
-        // This is the user's primary profile created during registration
-        const needsSync = 
-          mainProfile.name !== userName ||
-          mainProfile.phone !== userPhone ||
-          mainProfile.email !== userEmail ||
-          mainProfile.address !== userAddress ||
-          mainProfile.website !== userWebsite ||
-          mainProfile.category !== userCategory ||
-          mainProfile.description !== userDescription ||
-          mainProfile.alternatePhone !== userAlternatePhone ||
-          (mainProfile.logo || mainProfile.companyLogo || '') !== userLogo;
-        
-        if (needsSync) {
-          console.log('🔄 Auto-syncing ALL user data to MAIN business profile (registered profile)...');
-          console.log('📍 Target profile:', mainProfile.name, '(created:', mainProfile.createdAt, ')');
-          console.log('📋 Syncing ALL user fields:');
-          console.log('   - Name:', userName);
-          console.log('   - Phone:', userPhone);
-          console.log('   - Email:', userEmail);
-          console.log('   - Address:', userAddress);
-          console.log('   - Website:', userWebsite);
-          console.log('   - Category:', userCategory);
-          console.log('   - Description:', userDescription);
-          console.log('   - Alternate Phone:', userAlternatePhone);
-          console.log('   - Logo:', userLogo ? 'Yes' : 'No');
-          console.log('🔒 ONLY syncing to MAIN profile - other profiles remain independent');
-          
-          try {
-            // Sync ALL user fields to MAIN business profile (this is the registered profile)
-            await businessProfileService.updateBusinessProfile(mainProfile.id, {
-              name: userName,
-              phone: userPhone,
-              email: userEmail,
-              address: userAddress,
-              website: userWebsite,
-              category: userCategory,
-              description: userDescription,
-              alternatePhone: userAlternatePhone,
-              companyLogo: userLogo,
-            });
-            
-            // Update the profile in the array (ALL synced fields)
-            mainProfile.name = userName;
-            mainProfile.phone = userPhone;
-            mainProfile.email = userEmail;
-            mainProfile.address = userAddress;
-            mainProfile.website = userWebsite;
-            mainProfile.category = userCategory;
-            mainProfile.description = userDescription;
-            mainProfile.alternatePhone = userAlternatePhone;
-            mainProfile.logo = userLogo;
-            mainProfile.companyLogo = userLogo;
-            
-            console.log(`✅ ALL user fields synced to MAIN profile: ${userName}`);
-            
-            // Clear cache after sync
-            businessProfileService.clearCache();
-            
-            // Clear business category posters cache to refresh My Business screen with new category posters
-            console.log('🔄 Clearing business category posters cache after profile sync');
-            try {
-              const businessCategoryPostersApi = require('../services/businessCategoryPostersApi').default;
-              businessCategoryPostersApi.clearCache();
-            } catch (error) {
-              console.error('Failed to clear business category posters cache:', error);
-            }
-          } catch (error) {
-            console.error(`❌ Failed to sync user data to main profile:`, error);
-          }
-        } else {
-          console.log('ℹ️ Main profile already has all current user data, skipping sync');
-        }
-        
-        // REMOVE user's logo FROM other business profiles (they should have their own logos)
-        if (userLogo) {
-          let removedCount = 0;
-          for (const profile of otherProfiles) {
-            const profileLogo = profile.logo || profile.companyLogo;
-            // If other profile has the user's logo, remove it
-            if (profileLogo === userLogo) {
-              console.log(`🗑️ Removing user logo from other profile: ${profile.name}`);
-              try {
-                await businessProfileService.updateBusinessProfile(profile.id, {
-                  companyLogo: '', // Clear the logo
-                });
-                
-                // Update in array
-                profile.logo = '';
-                profile.companyLogo = '';
-                
-                console.log(`✅ User logo removed from: ${profile.name}`);
-                removedCount++;
-              } catch (error) {
-                console.error(`❌ Failed to remove logo from ${profile.name}:`, error);
-              }
-            }
-          }
-          
-          if (removedCount > 0) {
-            console.log(`✅ Removed user logo from ${removedCount} other business profiles`);
-            businessProfileService.clearCache();
-          }
-        }
-      }
-      
+      // All profiles loaded successfully - no special auto-sync needed
       if (apiProfiles.length > 0) {
         // Sort profiles by creation date - OLDEST first (so first profile created stays at index 0)
         const sortedProfiles = apiProfiles.sort((a, b) => 
@@ -271,15 +144,8 @@ const BusinessProfilesScreen: React.FC = () => {
         setAllProfiles(sortedProfiles);
         setProfiles(sortedProfiles);
         
-        // Set the first profile (oldest) as the main/primary profile (from registration)
-        // This is set only once when profiles are initially loaded
-        if (!mainProfileId && sortedProfiles[0]?.id) {
-          setMainProfileId(sortedProfiles[0].id);
-          console.log('📍 Main profile ID set to:', sortedProfiles[0].id, '-', sortedProfiles[0].name);
-        }
-        
         console.log('✅ Loaded user-specific business profiles from API:', sortedProfiles.length);
-        console.log('🔍 First profile (Your Profile):', sortedProfiles[0]?.name, '- Created:', sortedProfiles[0]?.createdAt);
+        console.log('🔍 Total profiles loaded:', sortedProfiles.length);
         
         // Log logo URLs for debugging
         sortedProfiles.forEach((profile, index) => {
@@ -300,7 +166,7 @@ const BusinessProfilesScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [mainProfileId]);
+  }, []);
 
   useEffect(() => {
     loadBusinessProfiles();
@@ -432,11 +298,14 @@ const BusinessProfilesScreen: React.FC = () => {
   const confirmDeleteProfile = useCallback(async () => {
     if (!profileToDelete) return;
     
+    console.log('🗑️ [DELETE] Deleting profile:', profileToDelete);
+    
     try {
       await businessProfileService.deleteBusinessProfile(profileToDelete);
       // Update both displayed profiles and cached profiles
       setProfiles(prev => prev.filter(p => p.id !== profileToDelete));
       setAllProfiles(prev => prev.filter(p => p.id !== profileToDelete));
+      
       setSuccessMessage('Business profile deleted successfully');
       setShowSuccessModal(true);
       console.log('✅ Business profile deleted:', profileToDelete);
@@ -456,6 +325,7 @@ const BusinessProfilesScreen: React.FC = () => {
   }, [profileToDelete]);
 
   const handleEditProfile = useCallback((profile: any) => {
+    console.log('🔧 [EDIT] Editing profile:', profile.id, profile.name);
     setEditingProfile(profile);
     setShowForm(true);
   }, []);
@@ -986,13 +856,11 @@ const BusinessProfilesScreen: React.FC = () => {
   // Memoized BusinessCard component for better performance
   const BusinessCard = React.memo<{
     item: any;
-    mainProfileId: string | null;
     imageRefreshKey: number;
     theme: any;
     onEdit: (item: any) => void;
     onDelete: (id: string) => void;
-  }>(({ item, mainProfileId, imageRefreshKey, theme, onEdit, onDelete }) => {
-    const isUserOwnProfile = mainProfileId !== null && item.id === mainProfileId;
+  }>(({ item, imageRefreshKey, theme, onEdit, onDelete }) => {
     
     return (
       <View style={[styles.businessCard, { backgroundColor: theme.colors.cardBackground }]}>
@@ -1050,9 +918,6 @@ const BusinessProfilesScreen: React.FC = () => {
             <View style={styles.businessInfo}>
               <Text style={[styles.businessName, { color: theme.colors.text }]}>
                 {item.name || 'Business Name'}
-                {isUserOwnProfile && (
-                  <Text style={[styles.userBadge, { color: theme.colors.primary }]}> (Your Profile)</Text>
-                )}
               </Text>
               {(item.subcategory || item.subCategory) && (
                 <Text style={[styles.businessCategory, { color: theme.colors.primary }]}>
@@ -1062,23 +927,21 @@ const BusinessProfilesScreen: React.FC = () => {
             </View>
           </View>
           
-          {/* Only show edit/delete buttons for additional business profiles, not user's own profile */}
-          {!isUserOwnProfile && (
-            <View style={styles.cardActions}>
-              <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: `${theme.colors.primary}20` }]}
-                onPress={() => onEdit(item)}
-              >
-                <Icon name="edit" size={16} color={theme.colors.primary} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: `${theme.colors.error}20` }]}
-                onPress={() => onDelete(item.id)}
-              >
-                <Icon name="delete" size={16} color={theme.colors.error} />
-              </TouchableOpacity>
-            </View>
-          )}
+          {/* Show edit/delete buttons for all business profiles */}
+          <View style={styles.cardActions}>
+            <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: `${theme.colors.primary}20` }]}
+              onPress={() => onEdit(item)}
+            >
+              <Icon name="edit" size={16} color={theme.colors.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: `${theme.colors.error}20` }]}
+              onPress={() => onDelete(item.id)}
+            >
+              <Icon name="delete" size={16} color={theme.colors.error} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {item.description && (
@@ -1165,7 +1028,6 @@ const BusinessProfilesScreen: React.FC = () => {
       prevProps.item.address === nextProps.item.address &&
       prevProps.item.website === nextProps.item.website &&
       JSON.stringify(prevProps.item.services) === JSON.stringify(nextProps.item.services) &&
-      prevProps.mainProfileId === nextProps.mainProfileId &&
       prevProps.imageRefreshKey === nextProps.imageRefreshKey &&
       prevProps.theme.colors.primary === nextProps.theme.colors.primary &&
       prevProps.theme.colors.text === nextProps.theme.colors.text
@@ -1176,14 +1038,13 @@ const BusinessProfilesScreen: React.FC = () => {
     return (
       <BusinessCard
         item={item}
-        mainProfileId={mainProfileId}
         imageRefreshKey={imageRefreshKey}
         theme={theme}
         onEdit={handleEditProfile}
         onDelete={handleDeleteProfile}
       />
     );
-  }, [mainProfileId, imageRefreshKey, theme, handleEditProfile, handleDeleteProfile]);
+  }, [imageRefreshKey, theme, handleEditProfile, handleDeleteProfile]);
 
   const keyExtractor = useCallback((item: any) => item.id, []);
 

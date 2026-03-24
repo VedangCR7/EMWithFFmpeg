@@ -353,6 +353,14 @@ class BusinessProfileService {
         );
       }
       
+      // SAFETY GUARD: Prevent accidental logo updates from user profile sync
+      // Only allow logo updates if they come from explicit business profile operations
+      if (data.logo !== undefined || data.companyLogo !== undefined) {
+        console.warn('⚠️ [SAFETY] Logo update detected in business profile update');
+        console.warn('⚠️ [SAFETY] This should only happen from explicit business profile operations, not user profile sync');
+        // Allow the update but log warning for debugging - remove this block if you want to block completely
+      }
+      
       // Map frontend data to backend format - only include fields that are provided
       const backendData: any = {};
       
