@@ -1,5 +1,4 @@
 import api, { resetTokenExpirationFlag } from './api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import authService from './auth';
 import authApi from './authApi';
 
@@ -159,22 +158,79 @@ class LoginAPIsService {
       console.log('🗑️ Clearing all caches before registration...');
       await this.clearAllCaches();
 
-      const response = await api.post('/api/mobile/auth/register', {
-        email: data.email,
-        password: data.password,
-        companyName: data.companyName,
-        phone: data.phoneNumber, // Backend expects 'phone', not 'phoneNumber'
-        // Additional fields from registration form
-        description: data.description,
-        category: data.category,
-        subCategory: data.subCategory || data.subcategory,
-        address: data.address,
-        alternatePhone: data.alternatePhone,
-        website: data.website,
-        companyLogo: data.companyLogo,
-        displayName: data.displayName,
-        promoCode: data.promoCode,
-      });
+      let response: any;
+
+      // Check if companyLogo is a local file path that needs to be uploaded
+      if (data.companyLogo && this.isLocalFilePath(data.companyLogo)) {
+        console.log('📤 [REGISTRATION] Logo is a local file, using multipart form data');
+        
+        // Create FormData for file upload
+        const formData = new FormData();
+        
+        // Add all text fields
+        formData.append('email', data.email);
+        formData.append('password', data.password);
+        formData.append('companyName', data.companyName);
+        formData.append('phone', data.phoneNumber);
+        
+        // Add optional fields if they exist
+        if (data.description) formData.append('description', data.description);
+        if (data.category) formData.append('category', data.category);
+        if (data.subCategory) formData.append('subCategory', data.subCategory);
+        if (data.subcategory) formData.append('subcategory', data.subcategory);
+        if (data.address) formData.append('address', data.address);
+        if (data.alternatePhone) formData.append('alternatePhone', data.alternatePhone);
+        if (data.website) formData.append('website', data.website);
+        if (data.displayName) formData.append('displayName', data.displayName);
+        if (data.promoCode) formData.append('promoCode', data.promoCode);
+        
+        // Add the image file
+        const filename = data.companyLogo.split('/').pop() || 'logo.jpg';
+        const fileExtension = filename.split('.').pop()?.toLowerCase() || 'jpg';
+        
+        let mimeType = 'image/jpeg';
+        if (fileExtension === 'png') mimeType = 'image/png';
+        else if (fileExtension === 'gif') mimeType = 'image/gif';
+        else if (fileExtension === 'webp') mimeType = 'image/webp';
+        
+        console.log('📋 [REGISTRATION] File info:', { filename, fileExtension, mimeType });
+        
+        formData.append('companyLogo', {
+          uri: data.companyLogo,
+          type: mimeType,
+          name: filename,
+        } as any);
+        
+        console.log('📡 [REGISTRATION] Sending multipart request to /api/mobile/auth/register');
+        
+        response = await api.post('/api/mobile/auth/register', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+          timeout: 30000, // 30 second timeout for file upload
+        });
+        
+      } else {
+        console.log('📤 [REGISTRATION] No local logo file, using regular JSON request');
+        
+        // Regular JSON request when no local file needs to be uploaded
+        response = await api.post('/api/mobile/auth/register', {
+          email: data.email,
+          password: data.password,
+          companyName: data.companyName,
+          phone: data.phoneNumber, // Backend expects 'phone', not 'phoneNumber'
+          // Additional fields from registration form
+          description: data.description,
+          category: data.category,
+          subCategory: data.subCategory || data.subcategory,
+          address: data.address,
+          alternatePhone: data.alternatePhone,
+          website: data.website,
+          companyLogo: data.companyLogo, // Will be null or URL if already uploaded
+          displayName: data.displayName,
+          promoCode: data.promoCode,
+        });
+      }
 
       if (response.data.success) {
         // Handle email verification required response
@@ -339,7 +395,7 @@ class LoginAPIsService {
           const profileResponse = await authApi.getProfile(user.id);
           if (profileResponse.success && profileResponse.data) {
             // CRITICAL: Exclude companyName from API to prevent business profile contamination
-            const { companyName: apiCompanyName, businessProfiles, ...cleanApiData } = profileResponse.data as any;
+            const { companyName: apiCompanyName, ...cleanApiData } = profileResponse.data as any;
 
             // Sync logo from API response (prefer 'logo' field, fallback to 'companyLogo')
             const apiLogo = cleanApiData.logo || cleanApiData.companyLogo || user.logo || user.companyLogo;
@@ -713,6 +769,20 @@ class LoginAPIsService {
   // ========================================
   // HELPER METHODS
   // ========================================
+
+  /**
+   * Helper: Check if a URL is a local file path
+   */
+  private isLocalFilePath(url: string): boolean {
+    if (!url) return false;
+    return (
+      url.startsWith('file://') ||
+      url.startsWith('content://') ||
+      url.startsWith('/storage/') ||
+      url.startsWith('/data/') ||
+      url.includes('\\') // Windows paths
+    );
+  }
 
   /**
    * Clear all service caches

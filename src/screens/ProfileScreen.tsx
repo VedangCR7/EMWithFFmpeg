@@ -2232,43 +2232,10 @@ const ProfileScreen: React.FC = () => {
                   placeholder="Enter your company name"
                   placeholderTextColor={theme.colors.textSecondary}
                   returnKeyType="next"
-                  onSubmitEditing={handleEditSubmitEditing('editDescription')}
-                />
-              </View>
-
-              {/* Description */}
-              <View style={[styles.inputGroup, {
-                marginBottom: dynamicModerateScale(12),
-              }]}>
-                <Text style={[styles.inputLabel, { 
-                  color: theme.colors.text,
-                  fontSize: getFontSize(9),
-                  marginBottom: dynamicModerateScale(3),
-                }]}>Description</Text>
-                <TextInput
-                  ref={registerEditInputRef('editDescription')}
-                  style={[styles.textArea, { 
-                    backgroundColor: theme.colors.surface,
-                    borderColor: theme.colors.border,
-                    color: theme.colors.text,
-                    paddingHorizontal: dynamicModerateScale(10),
-                    paddingVertical: dynamicModerateScale(7),
-                    fontSize: getFontSize(10),
-                    borderRadius: dynamicModerateScale(10),
-                    minHeight: dynamicModerateScale(55),
-                  }]}
-                  value={editFormData.description}
-                  onChangeText={(text) => setEditFormData({...editFormData, description: text})}
-                  placeholder="Describe your business..."
-                  placeholderTextColor={theme.colors.textSecondary}
-                  multiline
-                  numberOfLines={3}
-                  textAlignVertical="top"
-                  returnKeyType="next"
-                  blurOnSubmit
                   onSubmitEditing={handleEditSubmitEditing('editPhone')}
                 />
               </View>
+
 
               {/* Business Category section hidden */}
               {false && (
@@ -2372,31 +2339,23 @@ const ProfileScreen: React.FC = () => {
                 }]}>Phone Number *</Text>
                 <TextInput
                   ref={registerEditInputRef('editPhone')}
-                  style={[styles.textInput, { 
-                    backgroundColor: theme.colors.surface,
-                    borderColor: phoneValidationError ? '#ff4444' : theme.colors.border,
-                    color: theme.colors.text,
+                  style={[styles.textInput, styles.readOnlyInput, { 
+                    backgroundColor: theme.colors.inputBackground,
+                    borderColor: theme.colors.border,
+                    color: theme.colors.textSecondary,
                     paddingHorizontal: dynamicModerateScale(10),
                     paddingVertical: dynamicModerateScale(7),
                     fontSize: getFontSize(10),
                     borderRadius: dynamicModerateScale(10),
                   }]}
                   value={editFormData.phone}
-                  onChangeText={(text) => {
-                    // Only allow digits
-                    const digitsOnly = text.replace(/\D/g, '');
-                    setEditFormData({...editFormData, phone: digitsOnly});
-                    
-                    // Validate as user types
-                    const error = validatePhone(digitsOnly);
-                    setPhoneValidationError(error);
-                  }}
+                  editable={false}
                   placeholder="Enter 10 digit phone number"
                   placeholderTextColor={theme.colors.textSecondary}
                   keyboardType="phone-pad"
                   maxLength={10}
                   returnKeyType="next"
-                  onSubmitEditing={handleEditSubmitEditing('editAlternatePhone')}
+                  onSubmitEditing={handleEditSubmitEditing('editEmail')}
                 />
                 {phoneValidationError ? (
                   <Text style={[styles.validationError, { 
@@ -2408,80 +2367,8 @@ const ProfileScreen: React.FC = () => {
                     {phoneValidationError}
                   </Text>
                 ) : null}
-                {!phoneValidationError && editFormData.phone.trim() && editFormData.phone.replace(/\D/g, '').length === 10 ? (
-                  <Text style={[styles.validationSuccess, { 
-                    color: '#4CAF50',
-                    fontSize: getFontSize(8),
-                    marginTop: dynamicModerateScale(2),
-                    marginLeft: dynamicModerateScale(2),
-                  }]}>
-                    ✓ Valid phone number
-                  </Text>
-                ) : null}
               </View>
 
-              {/* Alternate Phone */}
-              <View style={[styles.inputGroup, {
-                marginBottom: dynamicModerateScale(12),
-              }]}>
-                <Text style={[styles.inputLabel, { 
-                  color: theme.colors.text,
-                  fontSize: getFontSize(9),
-                  marginBottom: dynamicModerateScale(3),
-                }]}>Alternate Phone</Text>
-                <TextInput
-                  ref={registerEditInputRef('editAlternatePhone')}
-                  style={[styles.textInput, { 
-                    backgroundColor: theme.colors.surface,
-                    borderColor: alternatePhoneValidationError ? '#ff4444' : theme.colors.border,
-                    color: theme.colors.text,
-                    paddingHorizontal: dynamicModerateScale(10),
-                    paddingVertical: dynamicModerateScale(7),
-                    fontSize: getFontSize(10),
-                    borderRadius: dynamicModerateScale(10),
-                  }]}
-                  value={editFormData.alternatePhone}
-                  onChangeText={(text) => {
-                    // Only allow digits
-                    const digitsOnly = text.replace(/\D/g, '');
-                    setEditFormData({...editFormData, alternatePhone: digitsOnly});
-                    
-                    // Validate as user types (optional field)
-                    if (digitsOnly.trim()) {
-                      const error = validatePhone(digitsOnly);
-                      setAlternatePhoneValidationError(error);
-                    } else {
-                      setAlternatePhoneValidationError(''); // Clear error if empty
-                    }
-                  }}
-                  placeholder="Enter 10 digit alternate phone (optional)"
-                  placeholderTextColor={theme.colors.textSecondary}
-                  keyboardType="phone-pad"
-                  maxLength={10}
-                  returnKeyType="next"
-                  onSubmitEditing={handleEditSubmitEditing('editEmail')}
-                />
-                {alternatePhoneValidationError ? (
-                  <Text style={[styles.validationError, { 
-                    color: '#ff4444',
-                    fontSize: getFontSize(8),
-                    marginTop: dynamicModerateScale(2),
-                    marginLeft: dynamicModerateScale(2),
-                  }]}>
-                    {alternatePhoneValidationError}
-                  </Text>
-                ) : null}
-                {!alternatePhoneValidationError && editFormData.alternatePhone.trim() && editFormData.alternatePhone.replace(/\D/g, '').length === 10 ? (
-                  <Text style={[styles.validationSuccess, { 
-                    color: '#4CAF50',
-                    fontSize: getFontSize(8),
-                    marginTop: dynamicModerateScale(2),
-                    marginLeft: dynamicModerateScale(2),
-                  }]}>
-                    ✓ Valid phone number
-                  </Text>
-                ) : null}
-              </View>
 
               {/* Email */}
               <View style={[styles.inputGroup, {
@@ -2494,90 +2381,26 @@ const ProfileScreen: React.FC = () => {
                 }]}>Email *</Text>
                 <TextInput
                 ref={registerEditInputRef('editEmail')}
-                  style={[styles.textInput, { 
-                    backgroundColor: theme.colors.surface,
+                  style={[styles.textInput, styles.readOnlyInput, { 
+                    backgroundColor: theme.colors.inputBackground,
                     borderColor: theme.colors.border,
-                    color: theme.colors.text,
+                    color: theme.colors.textSecondary,
                     paddingHorizontal: dynamicModerateScale(10),
                     paddingVertical: dynamicModerateScale(7),
                     fontSize: getFontSize(10),
                     borderRadius: dynamicModerateScale(10),
                   }]}
                   value={editFormData.email}
-                  onChangeText={(text) => setEditFormData({...editFormData, email: text})}
+                  editable={false}
                   placeholder="Enter your email"
                   placeholderTextColor={theme.colors.textSecondary}
                   keyboardType="email-address"
                   autoCapitalize="none"
-                returnKeyType="next"
-                onSubmitEditing={handleEditSubmitEditing('editWebsite')}
-                />
-              </View>
-
-              {/* Website */}
-              <View style={[styles.inputGroup, {
-                marginBottom: dynamicModerateScale(12),
-              }]}>
-                <Text style={[styles.inputLabel, { 
-                  color: theme.colors.text,
-                  fontSize: getFontSize(9),
-                  marginBottom: dynamicModerateScale(3),
-                }]}>Website</Text>
-                <TextInput
-                ref={registerEditInputRef('editWebsite')}
-                  style={[styles.textInput, { 
-                    backgroundColor: theme.colors.surface,
-                    borderColor: theme.colors.border,
-                    color: theme.colors.text,
-                    paddingHorizontal: dynamicModerateScale(10),
-                    paddingVertical: dynamicModerateScale(7),
-                    fontSize: getFontSize(10),
-                    borderRadius: dynamicModerateScale(10),
-                  }]}
-                  value={editFormData.website}
-                  onChangeText={(text) => setEditFormData({...editFormData, website: text})}
-                  placeholder="Enter your website URL"
-                  placeholderTextColor={theme.colors.textSecondary}
-                  keyboardType="url"
-                  autoCapitalize="none"
-                returnKeyType="next"
-                onSubmitEditing={handleEditSubmitEditing('editAddress')}
-                />
-              </View>
-
-              {/* Address */}
-              <View style={[styles.inputGroup, {
-                marginBottom: dynamicModerateScale(12),
-              }]}>
-                <Text style={[styles.inputLabel, { 
-                  color: theme.colors.text,
-                  fontSize: getFontSize(9),
-                  marginBottom: dynamicModerateScale(3),
-                }]}>Address</Text>
-                <TextInput
-                ref={registerEditInputRef('editAddress')}
-                  style={[styles.textArea, { 
-                    backgroundColor: theme.colors.surface,
-                    borderColor: theme.colors.border,
-                    color: theme.colors.text,
-                    paddingHorizontal: dynamicModerateScale(10),
-                    paddingVertical: dynamicModerateScale(7),
-                    fontSize: getFontSize(10),
-                    borderRadius: dynamicModerateScale(10),
-                    minHeight: dynamicModerateScale(55),
-                  }]}
-                  value={editFormData.address}
-                  onChangeText={(text) => setEditFormData({...editFormData, address: text})}
-                  placeholder="Enter your business address"
-                  placeholderTextColor={theme.colors.textSecondary}
-                  multiline
-                  numberOfLines={2}
-                  textAlignVertical="top"
                 returnKeyType="done"
-                blurOnSubmit
-                onSubmitEditing={handleEditSubmitEditing()}
                 />
               </View>
+
+
             </ScrollView>
 
             <View style={[styles.modalFooter, {
@@ -3387,12 +3210,19 @@ const styles = StyleSheet.create({
     marginTop: moderateScale(3),
     marginLeft: moderateScale(3),
     fontWeight: '500',
+    textDecorationLine: 'none',
   },
   validationSuccess: {
     fontSize: moderateScale(9),
     marginTop: moderateScale(3),
     marginLeft: moderateScale(3),
     fontWeight: '500',
+    textDecorationLine: 'none',
+  },
+  readOnlyInput: {
+    opacity: 0.7,
+    backgroundColor: 'rgba(128, 128, 128, 0.1)',
+    borderColor: 'rgba(128, 128, 128, 0.3)',
   },
   textArea: {
     borderWidth: 1,
