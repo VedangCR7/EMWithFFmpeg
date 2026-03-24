@@ -474,7 +474,7 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
         
         // For new profiles, we need to create the profile first, then upload the image
         // So we'll submit the form without the logo, then upload it after getting the profile ID
-        const formDataWithoutLogo = { ...formData, companyLogo: '' };
+        const formDataWithoutLogo = { ...formData, companyLogo: '', logo: '' };
         
         console.log('✅ [BUSINESS FORM] Form validation passed, submitting to parent (without logo)');
         onSubmit(formDataWithoutLogo, formData.companyLogo); // Pass original logo URI separately
