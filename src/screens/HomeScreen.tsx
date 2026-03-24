@@ -674,30 +674,26 @@ const HomeScreen: React.FC = React.memo(() => {
   // Clear business profile selection when user changes
   useEffect(() => {
     const unsubscribe = authService.onAuthStateChanged(user => {
-      console.log('= [HOMESCREEN] Auth state changed, new user:', user?.id || 'null');
       setUserProfile(user);
 
       if (!user) {
-        console.log('= [HOMESCREEN] User logged out, clearing business profile selection');
         setUserBusinessProfiles([]);
       }
     });
+
     return unsubscribe;
   }, []);
 
-  // Listen for business profile update events from ProfileScreen
+  // Setup business profile update listener with proper dependencies
   useEffect(() => {
     let isMounted = true;
     
     const handleBusinessProfileUpdate = (event: any) => {
       if (!isMounted) return;
       
-      console.log('🔄 [HOMESCREEN] Business profile update event received:', event);
-      
       // Refresh business profiles if this is for current user
       const currentUserId = userProfile?.id || authService.getCurrentUser()?.id;
       if (event.userId === currentUserId) {
-        console.log('🔄 [HOMESCREEN] Refreshing business profiles due to logo update...');
         refreshBusinessProfiles();
       }
     };
@@ -707,18 +703,16 @@ const HomeScreen: React.FC = React.memo(() => {
       if (!isMounted) return;
       
       if (event.type === 'SET_BUSINESS_PROFILES_REFRESH') {
-        console.log('🔄 [HOMESCREEN] Navigation refresh event received, refreshing business profiles...');
         refreshBusinessProfiles();
       }
     };
 
     try {
       // Use React Native's DeviceEventEmitter for cross-screen communication
-      const eventEmitter = require('react-native').NativeModules?.EventEmitter || 
-        new (require('react-native').DeviceEventEmitter)();
+      const { DeviceEventEmitter } = require('react-native');
       
-      const businessProfileSubscription = eventEmitter.addListener('businessProfileUpdated', handleBusinessProfileUpdate);
-      const navigationSubscription = eventEmitter.addListener('SET_BUSINESS_PROFILES_REFRESH', handleNavigationDispatch);
+      const businessProfileSubscription = DeviceEventEmitter.addListener('businessProfileUpdated', handleBusinessProfileUpdate);
+      const navigationSubscription = DeviceEventEmitter.addListener('SET_BUSINESS_PROFILES_REFRESH', handleNavigationDispatch);
       
       return () => {
         isMounted = false;
@@ -726,32 +720,28 @@ const HomeScreen: React.FC = React.memo(() => {
         navigationSubscription?.remove?.();
       };
     } catch (error) {
-      console.warn('⚠️ [HOMESCREEN] Could not setup business profile update listener:', error);
+      // Silently handle setup error to prevent console spam
     }
-  }, [userProfile]);
+  }, [userProfile?.id]);
 
   // Refresh business profiles when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       let isMounted = true;
-      console.log('🔄 [HOMESCREEN] Screen focused - refreshing business profiles...');
 
       const loadProfiles = async () => {
         const currentUserId = userProfile?.id || authService.getCurrentUser()?.id;
         if (!currentUserId) return;
 
         try {
-          setBusinessProfilesLoadingState(true);
-          const profiles = await businessProfileService.getUserBusinessProfiles(currentUserId);
-
-          if (!isMounted) return;
-
-          setUserBusinessProfiles(profiles);
-
-          // Let BusinessProfileContext handle auto-selection logic
-          await initializeSelectedProfile(profiles);
+          const profiles = await businessProfileService.getBusinessProfiles(currentUserId);
+          if (isMounted) {
+            setUserBusinessProfiles(profiles);
+            // Let BusinessProfileContext handle auto-selection logic
+            await initializeSelectedProfile(profiles);
+          }
         } catch (error) {
-          console.error('Error refreshing business profiles:', error);
+          if (__DEV__) console.error('Error refreshing business profiles:', error);
         } finally {
           if (isMounted) {
             setBusinessProfilesLoadingState(false);
@@ -761,13 +751,10 @@ const HomeScreen: React.FC = React.memo(() => {
 
       loadProfiles();
 
-      // Also refresh subscription status
-      refreshSubscription(true);
-
       return () => {
         isMounted = false;
       };
-    }, [userProfile?.id, initializeSelectedProfile, refreshSubscription])
+    }, [userProfile?.id, initializeSelectedProfile])
   );
 
   const refreshBusinessProfiles = useCallback(async () => {
@@ -966,6 +953,7 @@ const HomeScreen: React.FC = React.memo(() => {
   const [businessCategories, setBusinessCategories] = useState<BusinessCategory[]>([]);
   const [businessCategoriesLoading, setBusinessCategoriesLoading] = useState(false);
   const [businessCategoryPreviews, setBusinessCategoryPreviews] = useState<Record<string, Template[]>>({});
+  const [isBusinessCategoriesHighlighted, setIsBusinessCategoriesHighlighted] = useState(false);
   // Rotating business categories for button display
   const [rotatingBusinessCategories, setRotatingBusinessCategories] = useState<Array<{ id: string; name: string }>>([]);
   const [currentBusinessCategoryIndex, setCurrentBusinessCategoryIndex] = useState(0);
@@ -973,9 +961,159 @@ const HomeScreen: React.FC = React.memo(() => {
 
   // Track if animations have been initialized
   const animationsInitializedRef = useRef(false);
-  // Highlight state for business categories section
-  const [isBusinessCategoriesHighlighted, setIsBusinessCategoriesHighlighted] = useState(false);
-  const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hierarchicalDisplayData = useMemo(() => {
+    if (!isSearching || searchQuery.trim() === '') return { matchedNames: [], hierarchicalData: [] };
+    
+    const searchLower = searchQuery.toLowerCase();
+    const matchingBusinessCategories = businessCategories.filter(category =>
+      category.name.toLowerCase().includes(searchLower) ||
+      searchLower.includes(category.name.toLowerCase()) ||
+      (category.parentCategoryName && (
+        category.parentCategoryName.toLowerCase().includes(searchLower) ||
+        searchLower.includes(category.parentCategoryName.toLowerCase())
+      ))
+    );
+
+    const matchedBusinessParentCategoryNames = [...new Set(
+      matchingBusinessCategories
+        .filter(cat => cat.parentCategoryName)
+        .map(cat => cat.parentCategoryName)
+    )];
+
+    const matchedBusinessDirectNames = [...new Set(
+      matchingBusinessCategories
+        .filter(cat => !cat.parentCategoryName)
+        .map(cat => cat.name)
+    )];
+
+    const matchedGeneralParentCategoryNames = [...new Set(
+      matchingGeneralCategories
+        .filter(cat => cat.parentCategoryName)
+        .map(cat => cat.parentCategoryName)
+    )];
+
+    const matchedGeneralDirectNames = [...new Set(
+      matchingGeneralCategories
+        .filter(cat => !cat.parentCategoryName)
+        .map(cat => cat.name)
+    )];
+
+    const allMatchedParentCategoryNames = [...new Set([
+      ...matchedBusinessParentCategoryNames,
+      ...matchedBusinessDirectNames,
+      ...matchedGeneralParentCategoryNames,
+      ...matchedGeneralDirectNames
+    ])];
+
+    // Use existing hierarchicalResults (already normalized) + allHierarchicalData
+    const combinedHierarchicalData = [
+      ...hierarchicalResults ? [hierarchicalResults] : [],
+      ...allHierarchicalData
+    ];
+
+    return {
+      matchedNames: allMatchedParentCategoryNames,
+      hierarchicalData: combinedHierarchicalData
+    };
+  }, [isSearching, searchQuery, businessCategories, filteredGreetingCategoriesList, hierarchicalResults, allHierarchicalData]);
+
+  // Update allHierarchicalData state when hierarchical data changes
+  useEffect(() => {
+    setAllHierarchicalData(hierarchicalDisplayData.hierarchicalData);
+  }, [hierarchicalDisplayData.hierarchicalData]);
+
+  // Fetch templates for general categories when hierarchical data changes
+  useEffect(() => {
+    const fetchGeneralCategoryTemplates = async () => {
+      if (!isSearching || searchQuery.trim() === '') return;
+      
+      const searchLower = searchQuery.toLowerCase();
+      const matchingGeneralCategories = filteredGreetingCategoriesList.filter(category =>
+        category.name.toLowerCase().includes(searchLower) ||
+        searchLower.includes(category.name.toLowerCase()) ||
+        (category.parentCategoryName && (
+          category.parentCategoryName.toLowerCase().includes(searchLower) ||
+          searchLower.includes(category.parentCategoryName.toLowerCase())
+        ))
+      );
+
+      if (matchingGeneralCategories.length === 0) return;
+
+      // Create hierarchical structure for general categories
+      const parentCategories = new Set<string>();
+      const childCategoriesMap = new Map<string, any[]>();
+
+      matchingGeneralCategories.forEach(category => {
+        if (category.parentCategoryName) {
+          parentCategories.add(category.parentCategoryName);
+          if (!childCategoriesMap.has(category.parentCategoryName)) {
+            childCategoriesMap.set(category.parentCategoryName, []);
+          }
+          childCategoriesMap.get(category.parentCategoryName)!.push({
+            id: category.id,
+            name: category.name,
+            icon: category.icon,
+            imageUrl: category.imageUrl,
+            color: category.color,
+            templates: []
+          });
+        } else {
+          // Direct match (no parent) - don't add to parentCategories to avoid duplicates
+          // Parent category names are already handled by search results display logic
+        }
+      });
+
+      const generalHierarchicalData = Array.from(parentCategories).map(parentName => ({
+        parentCategory: parentName,
+        categories: childCategoriesMap.get(parentName) || []
+      }));
+
+      // Fetch templates for each child category
+      const enhancedGeneralHierarchicalData = await Promise.all(
+        generalHierarchicalData.map(async (parentData) => {
+          const enhancedCategories = await Promise.all(
+            parentData.categories.map(async (childCategory) => {
+              try {
+                const categoryTemplates = await greetingTemplatesService.searchTemplates(childCategory.name);
+                return {
+                  ...childCategory,
+                  templates: categoryTemplates || []
+                };
+              } catch (error) {
+                if (__DEV__) {
+                  devWarn(`Failed to fetch templates for general category ${childCategory.name}:`, error);
+                }
+                return {
+                  ...childCategory,
+                  templates: []
+                };
+              }
+            })
+          );
+          return {
+            ...parentData,
+            categories: enhancedCategories
+          };
+        })
+      );
+
+      // Normalize general category data using the same function as business categories
+      const normalizedGeneralData = enhancedGeneralHierarchicalData.map(data => 
+        normalizeCategoryData(data, 'general')
+      );
+
+      // Update allHierarchicalData with normalized general category data
+      setAllHierarchicalData(prevData => {
+        // Combine business and general hierarchical data
+        const businessData = prevData.filter(data => 
+          !normalizedGeneralData.some(generalData => generalData.parentCategory === data.parentCategory)
+        );
+        return [...businessData, ...normalizedGeneralData];
+      });
+    };
+
+    fetchGeneralCategoryTemplates();
+  }, [isSearching, searchQuery, filteredGreetingCategoriesList, normalizeCategoryData]);
 
   // Greeting categories state
   const [greetingCategoriesList, setGreetingCategoriesList] = useState<Array<{ id: string; name: string; icon: string; color?: string; imageUrl?: string; parentCategoryName?: string }>>([]);
@@ -1043,6 +1181,7 @@ const HomeScreen: React.FC = React.memo(() => {
   const greetingSectionsLoadedRef = useRef(false);
   const greetingModalPrefetchInProgressRef = useRef(false);
   const businessCategoriesLoadedRef = useRef(false);
+  const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const animateCategoryChange = useCallback(() => {
     Animated.sequence([
@@ -1075,7 +1214,8 @@ const HomeScreen: React.FC = React.memo(() => {
   }, [businessCategoryFadeAnim]);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [templates, setTemplates] = useState<SearchResultItem[]>([]);
-  const [hierarchicalResults, setHierarchicalResults] = useState<HierarchicalSearchResult | null>(null);
+  const [hierarchicalResults, setHierarchicalResults] = useState<{ parentCategory: string; categories: any[] } | null>(null);
+  const [allHierarchicalData, setAllHierarchicalData] = useState<any[]>([]);
   const [isHierarchical, setIsHierarchical] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [calendarRefreshKey, setCalendarRefreshKey] = useState(0);
@@ -2603,16 +2743,50 @@ const HomeScreen: React.FC = React.memo(() => {
   }, []);
 
   /**
-   * Helper function to convert hierarchical response to renderable format
+   * Unified normalization function for both business and general categories
+   * Converts any category data to common HierarchicalSearchResult format
    */
-  const convertHierarchicalToSearchResults = useCallback((hierarchicalData: HierarchicalSearchResult): HierarchicalSearchItem[] => {
+  const normalizeCategoryData = useCallback((data: any, categoryType: 'business' | 'general'): HierarchicalSearchResult => {
+    return {
+      parentCategory: data.parentCategory,
+      categories: data.categories.map((category: any) => ({
+        name: category.name,
+        // Normalize templates/images field
+        templates: categoryType === 'business' ? (category.images || []) : (category.templates || []),
+        // Include image-related fields for rendering
+        id: category.id,
+        icon: category.icon,
+        imageUrl: category.imageUrl,
+        color: category.color
+      }))
+    };
+  }, []);
+
+  /**
+   * Helper function to convert hierarchical response to renderable format
+   * Now works with unified data structure
+   */
+  const convertHierarchicalToSearchResults = useCallback((hierarchicalData: HierarchicalSearchResult, skipParentCategory: boolean = false): HierarchicalSearchItem[] => {
     const items: HierarchicalSearchItem[] = [];
+    const addedParentCategories = new Set<string>();
     
-    // Add parent category header
-    items.push({
-      type: 'parentCategory',
-      data: { name: hierarchicalData.parentCategory }
-    });
+    // Add parent category header (deduplicated) - skip for general categories
+    if (!skipParentCategory && !addedParentCategories.has(hierarchicalData.parentCategory)) {
+      items.push({
+        type: 'parentCategory',
+        data: { 
+          name: hierarchicalData.parentCategory,
+          // Find parent category data for image
+          ...(hierarchicalData.categories[0] && {
+            id: hierarchicalData.categories[0].id,
+            icon: hierarchicalData.categories[0].icon,
+            imageUrl: hierarchicalData.categories[0].imageUrl,
+            color: hierarchicalData.categories[0].color
+          })
+        }
+      });
+      addedParentCategories.add(hierarchicalData.parentCategory);
+    }
     
     // Add child categories with their templates
     hierarchicalData.categories.forEach(childCategory => {
@@ -2620,7 +2794,12 @@ const HomeScreen: React.FC = React.memo(() => {
         type: 'childCategory',
         data: {
           name: childCategory.name,
-          templates: childCategory.images
+          templates: childCategory.templates,
+          // Include image fields for rendering
+          id: childCategory.id,
+          icon: childCategory.icon,
+          imageUrl: childCategory.imageUrl,
+          color: childCategory.color
         }
       });
     });
@@ -3077,15 +3256,6 @@ const HomeScreen: React.FC = React.memo(() => {
     );
     const matchingBusinessCategoryNames = matchingBusinessCategories.map(category => category.name.toLowerCase());
 
-    // Debug logging
-    console.log('= [SEARCH DEBUG] Search query:', searchQuery);
-    console.log('= [SEARCH DEBUG] General categories available:', filteredGreetingCategoriesList.map(c => c.name));
-    console.log('= [SEARCH DEBUG] General categories with parents:', filteredGreetingCategoriesList.filter(c => c.parentCategoryName).map(c => `${c.name} (parent: ${c.parentCategoryName})`));
-    console.log('= [SEARCH DEBUG] Business categories available:', businessCategories.map(c => c.name));
-    console.log('= [SEARCH DEBUG] Business categories with parents:', businessCategories.filter(c => c.parentCategoryName).map(c => `${c.name} (parent: ${c.parentCategoryName})`));
-    console.log('= [SEARCH DEBUG] Matching business categories:', matchingBusinessCategoryNames);
-    console.log('= [SEARCH DEBUG] Matching greeting categories:', matchingCategoryNames);
-
     // Local search removed - only API search for greeting templates
     setTemplates([]);
 
@@ -3099,10 +3269,11 @@ const HomeScreen: React.FC = React.memo(() => {
 
         // Check if response contains hierarchical data
         if (isHierarchicalResponse(results)) {
-          // Handle hierarchical response
+          // Handle hierarchical response with unified normalization
           if (currentRequestId === requestId && isSearching) {
-            const hierarchicalResults = results as { data: { parentCategory: string; categories: any[] } };
-            setHierarchicalResults(hierarchicalResults.data);
+            const businessHierarchicalData = results as { data: { parentCategory: string; categories: any[] } };
+            const normalizedBusinessData = normalizeCategoryData(businessHierarchicalData.data, 'business');
+            setHierarchicalResults(normalizedBusinessData);
             setIsHierarchical(true);
             setTemplates([]); // Clear flat results
           }
@@ -3164,9 +3335,6 @@ const HomeScreen: React.FC = React.memo(() => {
         const generalCategoryResults = generalCategoryResultsArrays.flat();
         const businessCategoryResults = businessCategoryResultsArrays.flat();
 
-        console.log('=🔍 [SEARCH DEBUG] General category results count:', generalCategoryResults.length);
-        console.log('=🔍 [SEARCH DEBUG] Business category results count:', businessCategoryResults.length);
-
         // Convert general category results to Template format
         const convertedGeneralCategoryResults = generalCategoryResults.map(greetingTemplate => ({
           id: greetingTemplate.id,
@@ -3208,10 +3376,6 @@ const HomeScreen: React.FC = React.memo(() => {
 
         // Group unique results by their actual category name for horizontal display
         const searchResultItems = groupTemplatesByCategory(uniqueResults);
-
-        console.log('=��� [SEARCH DEBUG] Total results before dedup:', allResults.length);
-        console.log('=��� [SEARCH DEBUG] Unique results after dedup:', uniqueResults.length);
-        console.log('=��� [SEARCH DEBUG] Business templates in results:', convertedBusinessCategoryResults.length);
 
         // Only update if this is still the current request and we're still searching
         if (currentRequestId === requestId && isSearching) {
@@ -3337,7 +3501,7 @@ const HomeScreen: React.FC = React.memo(() => {
   const handleWhatsAppPress = useCallback(async () => {
     try {
       const phoneNumber = '918551941415'; // Phone number without + sign for WhatsApp (8551941415 with country code 91)
-      const message = 'Hello, I need support';
+      const message = 'I need support';
       const url = `whatsapp://send?phone=${phoneNumber}&text=${encodeURIComponent(message)}`;
 
       const canOpen = await Linking.canOpenURL(url);
@@ -3702,7 +3866,7 @@ const HomeScreen: React.FC = React.memo(() => {
       default:
         return null;
     }
-  }, [handleTemplatePress, theme, cardWidth]);
+  }, [handleTemplatePress, theme, cardWidth, filteredGreetingCategoriesList, businessCategories, memoizedGreetingCategoryImages]);
 
 
   const handleVideoCardPress = useCallback(() => {
@@ -5564,40 +5728,70 @@ const HomeScreen: React.FC = React.memo(() => {
               ))
             );
 
+            // Add business category matching using same pattern as general categories
+            const matchingBusinessCategories = businessCategories.filter(category =>
+              category.name.toLowerCase().includes(searchLower) ||
+              searchLower.includes(category.name.toLowerCase()) ||
+              (category.parentCategoryName && (
+                category.parentCategoryName.toLowerCase().includes(searchLower) ||
+                searchLower.includes(category.parentCategoryName.toLowerCase())
+              ))
+            );
+
+            // Extract parent category names from both general and business categories
+            const matchedGeneralParentNames = [...new Set(
+              matchingCategories
+                .filter(cat => cat.parentCategoryName)
+                .map(cat => cat.parentCategoryName)
+            )];
+            const matchedBusinessParentNames = [...new Set(
+              matchingBusinessCategories
+                .filter(cat => cat.parentCategoryName)
+                .map(cat => cat.parentCategoryName)
+            )];
+
+            // Also include direct category names if they don't have parents (fallback)
+            const matchedGeneralDirectNames = [...new Set(
+              matchingCategories
+                .filter(cat => !cat.parentCategoryName)
+                .map(cat => cat.name)
+            )];
+            const matchedBusinessDirectNames = [...new Set(
+              matchingBusinessCategories
+                .filter(cat => !cat.parentCategoryName)
+                .map(cat => cat.name)
+            )];
+
+            // Combine all matched category names (prioritize parent names)
+            const allMatchedNames = [...new Set([
+              ...matchedGeneralParentNames,
+              ...matchedBusinessParentNames,
+              ...matchedGeneralDirectNames,
+              ...matchedBusinessDirectNames
+            ])];
+
             return (
               <>
-                {/* Show matching General Categories */}
-                {matchingCategories.length > 0 && (
-                  <View style={styles.templatesSection}>
-                    <View style={styles.sectionHeader}>
-                      <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
-                        Categories
+                  
+                  {/* Show matching category names */}
+                  {allMatchedNames.length > 0 && (
+                    <View style={styles.matchedCategoryNameContainer}>
+                      <Text style={[styles.matchedCategoryNameText, { color: theme.colors.text, fontWeight: 'bold' }]}>
+                        {allMatchedNames.join(', ')}
                       </Text>
                     </View>
-                    <FlatList
-                      data={matchingCategories}
-                      renderItem={renderSearchCategoryItem}
-                      keyExtractor={keyExtractorCategory}
-                      horizontal={true}
-                      showsHorizontalScrollIndicator={false}
-                      nestedScrollEnabled={true}
-                      contentContainerStyle={styles.horizontalList}
-                    />
-                  </View>
-                )}
-
-                {/* Show matching Templates */}
-                <View style={styles.templatesSection}>
-                  <View style={styles.sectionHeader}>
-                    <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
-                      {matchingCategories.length > 0 ? 'Templates' : 'Search Results'}
-                    </Text>
-                  </View>
-                  
+                  )}
+                                    
                   {/* Render hierarchical results if available */}
-                  {isHierarchical && hierarchicalResults ? (
+                  {allHierarchicalData.length > 0 ? (
                     <FlatList
-                      data={convertHierarchicalToSearchResults(hierarchicalResults)}
+                      data={allHierarchicalData.flatMap((data: any) => {
+              // Check if this is general category data by checking if it has the structure from normalizedGeneralData
+              const isGeneralCategory = data.categories && data.categories.length > 0 && 
+                data.categories[0] && data.categories[0].templates !== undefined;
+              
+              return convertHierarchicalToSearchResults(data, isGeneralCategory);
+            })}
                       renderItem={renderHierarchicalItem}
                       keyExtractor={(item, index) => 
                         item.type === 'parentCategory' 
@@ -5643,7 +5837,6 @@ const HomeScreen: React.FC = React.memo(() => {
                       </Text>
                     </View>
                   ) : null}
-                </View>
               </>
             );
           })()}
@@ -6745,6 +6938,33 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: moderateScale(12),
     fontWeight: '500',
+  },
+  searchResultsTextContainer: {
+    paddingHorizontal: moderateScale(16),
+    paddingVertical: moderateScale(8),
+    backgroundColor: 'transparent',
+  },
+  searchResultsTitle: {
+    fontSize: moderateScale(12),
+    fontWeight: '500',
+    marginBottom: moderateScale(4),
+    opacity: 0.7,
+  },
+  searchResultsText: {
+    fontSize: moderateScale(14),
+    fontWeight: '600',
+  },
+  matchedCategoryNameContainer: {
+    paddingHorizontal: moderateScale(16),
+    paddingVertical: moderateScale(12),
+    marginBottom: moderateScale(8),
+    backgroundColor: 'transparent',
+  },
+  matchedCategoryNameText: {
+    fontSize: moderateScale(16),
+    fontWeight: '600',
+    lineHeight: moderateScale(22),
+    letterSpacing: moderateScale(0.2),
   },
   clearIcon: {
     marginLeft: moderateScale(4),
