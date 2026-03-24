@@ -164,7 +164,7 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
   };
 
   // Get high quality image URL for preview (full quality, maximum resolution)
-  const getHighQualityImageUrl = (poster: Template | null): string => {
+  const getHighQualityImageUrl = useCallback((poster: Template | null): string => {
     if (!poster) return '';
 
     // Check if poster has a previewUrl property (cast to any to access)
@@ -247,7 +247,7 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
 
     const paramString = params.toString();
     return paramString ? `${urlWithoutParams}?${paramString}` : urlWithoutParams;
-  };
+  }, [screenWidth]);
 
   // Extract theme colors for gradient overlay
   const themeColors = theme.colors || {};
@@ -575,7 +575,7 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
 
     navigation.navigate('PosterEditor', {
       selectedImage: {
-        uri: selectedPoster.thumbnail || selectedPoster.thumbnailUrl || '',
+        uri: getHighQualityImageUrl(selectedPoster),
         title: selectedPoster.name,
         description: selectedPoster.category,
       },
@@ -583,7 +583,7 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
       selectedTemplateId: selectedPoster.id,
       selectedBusinessProfile: selectedBusinessProfile,
     });
-  }, [navigation, selectedPoster, selectedLanguage, selectedBusinessProfile]);
+  }, [navigation, selectedPoster, selectedLanguage, selectedBusinessProfile, getHighQualityImageUrl]);
 
   // Language options
   const languages = [
