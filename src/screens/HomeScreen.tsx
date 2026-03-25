@@ -20,6 +20,7 @@ import {
   Linking,
   Platform,
   InteractionManager,
+  Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Video from 'react-native-video';
@@ -101,6 +102,11 @@ type SearchResultItem = SearchResultCategory | SearchResultTemplate;
 interface ChildCategory {
   name: string;
   images: Template[];
+  templates?: Template[];
+  id?: string | number;
+  icon?: string;
+  imageUrl?: string;
+  color?: string;
 }
 
 interface HierarchicalSearchResult {
@@ -701,7 +707,7 @@ const HomeScreen: React.FC = React.memo(() => {
 
   // Search and Hierarchical results state
   const [hierarchicalResults, setHierarchicalResults] = useState<{ parentCategory: string; categories: any[] } | null>(null);
-  const [allHierarchicalData, setAllHierarchicalData] = useState<any[]>([]);
+  const [generalHierarchicalData, setGeneralHierarchicalData] = useState<any[]>([]);
   const [isHierarchical, setIsHierarchical] = useState(false);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [templates, setTemplates] = useState<SearchResultItem[]>([]);
@@ -1061,22 +1067,17 @@ const HomeScreen: React.FC = React.memo(() => {
       ...matchedGeneralDirectNames
     ])];
 
-    // Use existing hierarchicalResults (already normalized) + allHierarchicalData
+    // Use existing hierarchicalResults (already normalized) + generalHierarchicalData
     const combinedHierarchicalData = [
       ...hierarchicalResults ? [hierarchicalResults] : [],
-      ...allHierarchicalData
+      ...generalHierarchicalData
     ];
 
     return {
       matchedNames: allMatchedParentCategoryNames,
       hierarchicalData: combinedHierarchicalData
     };
-  }, [isSearching, searchQuery, businessCategories, filteredGreetingCategoriesList, hierarchicalResults, allHierarchicalData]);
-
-  // Update allHierarchicalData state when hierarchical data changes
-  useEffect(() => {
-    setAllHierarchicalData(hierarchicalDisplayData.hierarchicalData);
-  }, [hierarchicalDisplayData.hierarchicalData]);
+  }, [isSearching, searchQuery, businessCategories, filteredGreetingCategoriesList, hierarchicalResults, generalHierarchicalData]);
 
   // Fetch templates for general categories when hierarchical data changes
   useEffect(() => {
@@ -1158,8 +1159,8 @@ const HomeScreen: React.FC = React.memo(() => {
         normalizeCategoryData(data, 'general')
       );
 
-      // Update allHierarchicalData with normalized general category data
-      setAllHierarchicalData(prevData => {
+      // Update generalHierarchicalData with normalized general category data
+      setGeneralHierarchicalData(prevData => {
         // Combine business and general hierarchical data
         const businessData = prevData.filter(data => 
           !normalizedGeneralData.some(generalData => generalData.parentCategory === data.parentCategory)
@@ -5833,9 +5834,9 @@ const HomeScreen: React.FC = React.memo(() => {
                   )}
                                     
                   {/* Render hierarchical results if available */}
-                  {allHierarchicalData.length > 0 ? (
+                  {hierarchicalDisplayData.hierarchicalData.length > 0 ? (
                     <FlatList
-                      data={allHierarchicalData.flatMap((data: any) => {
+                      data={hierarchicalDisplayData.hierarchicalData.flatMap((data: any) => {
               // Check if this is general category data by checking if it has the structure from normalizedGeneralData
               const isGeneralCategory = data.categories && data.categories.length > 0 && 
                 data.categories[0] && data.categories[0].templates !== undefined;
