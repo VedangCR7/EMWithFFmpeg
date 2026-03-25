@@ -708,6 +708,7 @@ class BusinessProfileService {
   }
 
   // Create payment order for business profile purchase
+  /** @deprecated Use subscriptionApi.createBusinessProfileAutopay instead */
   async createBusinessProfilePaymentOrder(params?: { amount?: number; currency?: string }) {
     try {
       const currentUser = authService.getCurrentUser();
@@ -739,6 +740,7 @@ class BusinessProfileService {
   }
 
   // Verify payment for business profile creation
+  /** @deprecated Subscription mandates are verified via webhooks; use subscriptionApi.getBusinessProfileSubscriptionStatus for status checks */
   async verifyBusinessProfilePayment(paymentData: {
     orderId: string;
     paymentId: string;
@@ -831,6 +833,7 @@ class BusinessProfileService {
   }
 
   // Check if user has paid for additional business profile creation
+  /** @deprecated Use subscriptionApi.getBusinessProfileSubscriptionStatus instead */
   async checkBusinessProfilePaymentStatus(): Promise<{ hasPaid: boolean; message?: string }> {
     try {
       const currentUser = authService.getCurrentUser();

@@ -283,7 +283,7 @@ class SubscriptionApiService {
     }
   }
 
-  // Get subscription status (with caching - 3 min TTL)
+  // Get subscription status (with caching - 10 sec TTL)
   async getStatus(): Promise<SubscriptionResponse> {
     try {
       const currentUser = authService.getCurrentUser();
@@ -318,50 +318,10 @@ class SubscriptionApiService {
             const response = await api.get('/api/mobile/subscription/status');
             
             console.log('📊 Subscription API response:', response.data);
-            console.log('SUBSCRIPTION_RAW_API_RESPONSE', response.data);
-            console.log('🔍 Raw subscription data:', JSON.stringify(response.data, null, 2));
             
-            // Check if response has the expected structure
             if (response.data.success) {
-              // ISSUE: Backend returns response.data.subscription, not response.data.data
               const subscriptionData = response.data?.subscription ?? response.data?.data ?? null;
-              console.log("SUBSCRIPTION_API_PARSING - Checking response structure:", {
-                'response.data.subscription': response.data?.subscription,
-                'response.data.data': response.data?.data,
-                'final_subscriptionData': subscriptionData
-              });
-              console.log("SUBSCRIPTION_PARSED_DATA", subscriptionData);
               
-              if (!subscriptionData) {
-                console.warn("SUBSCRIPTION_STATUS_EMPTY_RESPONSE");
-              }
-              
-              console.log("SUBSCRIPTION_FIELDS", {
-                planId: subscriptionData?.planId,
-                planName: subscriptionData?.planName,
-                expiryDate: subscriptionData?.expiryDate,
-                isActive: subscriptionData?.isActive
-              });
-              
-              console.log("Parsed subscription:", subscriptionData);
-              console.log("Subscription fields check:", {
-                hasIsActive: !!subscriptionData?.isActive,
-                isActive: subscriptionData?.isActive,
-                hasStatus: !!subscriptionData?.status,
-                status: subscriptionData?.status,
-                hasDaysRemaining: !!subscriptionData?.daysRemaining,
-                daysRemaining: subscriptionData?.daysRemaining,
-                hasExpiryDate: !!subscriptionData?.expiryDate,
-                expiryDate: subscriptionData?.expiryDate,
-                hasEndDate: !!subscriptionData?.endDate,
-                endDate: subscriptionData?.endDate,
-                hasPlan: !!subscriptionData?.plan,
-                plan: subscriptionData?.plan,
-                hasPlanId: !!subscriptionData?.planId,
-                planId: subscriptionData?.planId
-              });
-              
-              // Return default if subscription data is null/undefined
               if (!subscriptionData) {
                 return {
                   success: true,
@@ -391,10 +351,6 @@ class SubscriptionApiService {
             }
           } catch (backendError: any) {
             console.log('⚠️ Backend subscription status API error:', backendError.message);
-            
-            if (backendError.response?.status !== 404) {
-              console.error('Backend subscription status error:', backendError);
-            }
           }
           
           return {
@@ -414,8 +370,6 @@ class SubscriptionApiService {
       );
     } catch (error: any) {
       console.error('Get subscription status error:', error);
-      
-      // Return default status instead of throwing
       return {
         success: true,
         data: {
@@ -427,6 +381,84 @@ class SubscriptionApiService {
         },
         message: 'No active subscription'
       };
+    }
+  }
+
+  // Get subscription status for a specific business profile
+  async getBusinessProfileSubscriptionStatus(businessProfileId: string): Promise<SubscriptionResponse> {
+    try {
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id;
+      
+      if (!userId) {
+        throw new Error('User not authenticated');
+      }
+
+      const cacheKey = `subscription_status_profile_${businessProfileId}`;
+      const CACHE_TTL = 10 * 1000; // 10 seconds
+
+      return await cacheService.getOrFetch(
+        cacheKey,
+        async () => {
+          console.log('🔍 Fetching subscription status for business profile:', businessProfileId);
+          
+          try {
+            const response = await api.get(`/api/mobile/subscription/status`, {
+              params: { businessProfileId }
+            });
+            
+            if (response.data.success) {
+              const subscriptionData = response.data?.subscription ?? response.data?.data ?? null;
+              
+              if (!subscriptionData) {
+                return {
+                  success: true,
+                  data: {
+                    isActive: false,
+                    plan: null,
+                    expiryDate: null,
+                    autoRenew: false,
+                    status: "inactive"
+                  },
+                  message: 'No subscription data found'
+                };
+              }
+              
+              return {
+                success: true,
+                data: {
+                  isActive: Boolean(subscriptionData?.isActive),
+                  planId: subscriptionData?.planId ?? null,
+                  planName: subscriptionData?.planName ?? null,
+                  expiryDate: subscriptionData?.expiryDate ?? null,
+                  autoRenew: Boolean(subscriptionData?.autoRenew),
+                  status: subscriptionData?.status?.toLowerCase() || (subscriptionData?.isActive ? "active" : "inactive")
+                },
+                message: 'Status fetched successfully'
+              };
+            }
+          } catch (backendError: any) {
+            console.log('⚠️ Backend profile subscription status API error:', backendError.message);
+          }
+          
+          return {
+            success: true,
+            data: {
+              isActive: false,
+              plan: null,
+              expiryDate: null,
+              autoRenew: false,
+              status: 'inactive'
+            },
+            message: 'No active subscription'
+          };
+        },
+        CACHE_TTL,
+        true // Allow stale data
+      );
+    } catch (error: any) {
+      console.error('Get profile subscription status error:', error);
+      throw error;
     }
   }
 
@@ -646,6 +678,47 @@ class SubscriptionApiService {
       
       // Provide more detailed error message
       const errorMessage = error.response?.data?.message || error.message || 'Payment verification failed';
+      throw new Error(errorMessage);
+    }
+  }
+
+  // Create Autopay subscription for a business profile
+  async createBusinessProfileAutopay(params: {
+    planId: string;
+    businessProfileId: string;
+    subscriptionCategory: 'BUSINESS_PROFILE';
+    customerEmail?: string;
+    customerPhone?: string;
+  }) {
+    try {
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id;
+
+      if (!userId) {
+        throw new Error('User not authenticated');
+      }
+
+      console.log('🔄 Creating Business Profile Autopay subscription:', {
+        userId,
+        planId: params.planId,
+        businessProfileId: params.businessProfileId,
+      });
+
+      const response = await api.post('/api/mobile/subscription/create-autopay', {
+        planId: params.planId,
+        businessProfileId: params.businessProfileId,
+        subscriptionCategory: params.subscriptionCategory,
+        customerEmail: params.customerEmail,
+        customerPhone: params.customerPhone,
+        userId, // Include userId for consistency with other autopay calls
+      });
+
+      console.log('✅ Business Profile Autopay subscription created:', response.data);
+
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Create Business Profile Autopay error:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to create business profile autopay subscription';
       throw new Error(errorMessage);
     }
   }
