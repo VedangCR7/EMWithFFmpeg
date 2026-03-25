@@ -28,6 +28,7 @@ import BottomSheet from '../components/BottomSheet';
 import RazorpayCheckout from 'react-native-razorpay';
 import { RAZORPAY_KEY_ID } from '@env';
 import { useSubscription } from '../contexts/SubscriptionContext';
+import { useBusinessProfile } from '../context/BusinessProfileContext';
 import subscriptionApi from '../services/subscriptionApi';
 import responsiveUtils, { 
   responsiveSpacing, 
@@ -57,6 +58,7 @@ const BusinessProfilesScreen: React.FC = () => {
     getBusinessProfileSubscription, 
     refreshBusinessProfileSubscription 
   } = useSubscription();
+  const { setSelectedBusinessProfile, selectedBusinessProfile } = useBusinessProfile();
   const insets = useSafeAreaInsets();
   const [profiles, setProfiles] = useState<any[]>([]);
   const [allProfiles, setAllProfiles] = useState<any[]>([]); // Cache all profiles for instant filtering
@@ -179,19 +181,14 @@ const BusinessProfilesScreen: React.FC = () => {
     loadBusinessProfiles();
   }, [loadBusinessProfiles]);
 
-  // Refresh subscription status for all profiles when screen is focused
+  // Handled by the consolidated useFocusEffect below
+  /*
   useFocusEffect(
     useCallback(() => {
-      if (profiles.length > 0) {
-        profiles.forEach(profile => {
-          if (profile.id) {
-            refreshBusinessProfileSubscription(profile.id);
-          }
-        });
-      }
+      // ...
     }, [profiles.length, refreshBusinessProfileSubscription])
   ); 
-    // Load pending profile data from AsyncStorage on mount
+  */    // Load pending profile data from AsyncStorage on mount
     const loadPendingData = async () => {
       try {
         const storedPendingData = await AsyncStorage.getItem('pending_business_profile_data');
@@ -260,19 +257,26 @@ const BusinessProfilesScreen: React.FC = () => {
     }
   }, [pendingProfileData, loadBusinessProfiles]);
 
-  // Refresh profiles when screen comes into focus
+  // Consolidated useFocusEffect for refreshing profiles and subscriptions
   useFocusEffect(
     useCallback(() => {
-      console.log('🔄 BusinessProfilesScreen focused - refreshing profiles...');
+      console.log('🔄 BusinessProfilesScreen focused - refreshing profiles and subscriptions...');
       setImageRefreshKey(Date.now());
       loadBusinessProfiles();
       
       // Refresh sub statuses when screen focuses
       if (profiles && profiles.length > 0) {
         profiles.forEach(p => {
-          if (p.id) refreshBusinessProfileSubscription(p.id);
+          if (p.id) {
+            console.log(`📡 Refreshing subscription status for: ${p.id}`);
+            refreshBusinessProfileSubscription(p.id);
+          }
         });
+      } else {
+        // Even if no local profiles yet, try refreshing the list to fetch them
+        loadBusinessProfiles();
       }
+      
       // Check if payment was completed and create profile if needed
       checkPaymentAndCreateProfile();
     }, [loadBusinessProfiles, profiles.length, refreshBusinessProfileSubscription, checkPaymentAndCreateProfile])
@@ -306,6 +310,97 @@ const BusinessProfilesScreen: React.FC = () => {
     }, 300);
     return () => clearTimeout(timeoutId);
   }, [searchQuery, filterProfiles]);
+
+  const handlePayNow = useCallback(async () => {
+    if (!pendingProfileDataRef.current) {
+      setErrorMessage('No business profile data found.');
+      setShowErrorModal(true);
+      return;
+    }
+    const businessProfileId = pendingProfileDataRef.current.id;
+    try {
+      setIsProcessingPayment(true);
+      setShowPaymentModal(false);
+      const currentUser = authService.getCurrentUser();
+      const subscriptionData = await subscriptionApi.createBusinessProfileAutopay({
+        planId: 'plan_business_profile_standard',
+        businessProfileId,
+        subscriptionCategory: 'BUSINESS_PROFILE',
+        customerEmail: currentUser?.email,
+        customerPhone: currentUser?.phone || currentUser?.phoneNumber,
+      });
+
+      if (!subscriptionData?.subscriptionId) throw new Error('Failed to create subscription mandate.');
+
+      const options: any = {
+        description: 'Business Profile Subscription',
+        key: subscriptionData.razorpayKey || RAZORPAY_KEY_ID,
+        subscription_id: subscriptionData.subscriptionId,
+        name: 'Market Brand',
+        prefill: {
+          email: currentUser?.email || '',
+          contact: currentUser?.phone || currentUser?.phoneNumber || '',
+          name: currentUser?.name || currentUser?.companyName || 'User',
+        },
+        theme: { color: theme.colors.primary || '#667eea' },
+      };
+
+      try {
+        await RazorpayCheckout.open(options);
+        setSuccessMessage('Subscription mandate approved successfully! Your profile will be activated once the payment is verified.');
+        setShowSuccessModal(true);
+        refreshBusinessProfileSubscription(businessProfileId);
+        loadBusinessProfiles();
+      } catch (e: any) {
+        if (e?.code !== 2) {
+          setErrorMessage(e?.description || 'Subscription mandate approval failed.');
+          setShowErrorModal(true);
+        }
+      }
+    } catch (error: any) {
+      setErrorMessage(error.message || 'Payment flow failed.');
+      setShowErrorModal(true);
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  }, [theme.colors.primary, refreshBusinessProfileSubscription, loadBusinessProfiles]);
+
+  const handleProfileSelect = useCallback(async (profile: any) => {
+    const subscription = getBusinessProfileSubscription(profile.id);
+    const status = subscription?.status?.toLowerCase();
+    
+    if (status !== 'active') {
+      const message = status === 'pending' 
+        ? "This business profile will unlock after your Razorpay subscription is activated (usually takes a few minutes)."
+        : status === 'expired'
+          ? "This business profile is locked because the subscription has expired. Please renew to continue."
+          : "This business profile is locked until the subscription is activated.";
+          
+      setErrorMessage(message);
+      
+      // Store this profile as the pending one so handlePayNow can use its ID
+      setPendingProfileData(profile);
+      pendingProfileDataRef.current = profile;
+      
+      setShowPaymentModal(true);
+      return;
+    }
+
+    try {
+      await setSelectedBusinessProfile(profile);
+      setSuccessMessage(`${profile.name} selected as active business profile`);
+      setShowSuccessModal(true);
+    } catch (error: any) {
+      setErrorMessage(error.message || 'Failed to select business profile');
+      setShowErrorModal(true);
+    }
+  }, [getBusinessProfileSubscription, setSelectedBusinessProfile]);
+
+  const initiatePaymentForProfile = useCallback((profile: any) => {
+    setPendingProfileData(profile);
+    pendingProfileDataRef.current = profile;
+    handlePayNow();
+  }, [handlePayNow]);
 
   const handleDeleteProfile = useCallback((profileId: string) => {
     setProfileToDelete(profileId);
@@ -386,60 +481,6 @@ const BusinessProfilesScreen: React.FC = () => {
     );
   });
 
-  const handlePayNow = useCallback(async () => {
-    if (!pendingProfileDataRef.current) {
-      setErrorMessage('No business profile data found.');
-      setShowErrorModal(true);
-      return;
-    }
-    const businessProfileId = pendingProfileDataRef.current.id;
-    try {
-      setIsProcessingPayment(true);
-      setShowPaymentModal(false);
-      const currentUser = authService.getCurrentUser();
-      const subscriptionData = await subscriptionApi.createBusinessProfileAutopay({
-        planId: 'plan_business_profile_standard',
-        businessProfileId,
-        subscriptionCategory: 'BUSINESS_PROFILE',
-        customerEmail: currentUser?.email,
-        customerPhone: currentUser?.phone || currentUser?.phoneNumber,
-      });
-
-      if (!subscriptionData?.subscriptionId) throw new Error('Failed to create subscription mandate.');
-
-      const options: any = {
-        description: 'Business Profile Subscription',
-        key: subscriptionData.razorpayKey || RAZORPAY_KEY_ID,
-        subscription_id: subscriptionData.subscriptionId,
-        name: 'Market Brand',
-        prefill: {
-          email: currentUser?.email || '',
-          contact: currentUser?.phone || currentUser?.phoneNumber || '',
-          name: currentUser?.name || currentUser?.companyName || 'User',
-        },
-        theme: { color: theme.colors.primary || '#667eea' },
-      };
-
-      try {
-        await RazorpayCheckout.open(options);
-        setSuccessMessage('Subscription mandate approved successfully! Your profile will be activated once the payment is verified.');
-        setShowSuccessModal(true);
-        refreshBusinessProfileSubscription(businessProfileId);
-        loadBusinessProfiles();
-      } catch (e: any) {
-        if (e?.code !== 2) {
-          setErrorMessage(e?.description || 'Subscription mandate approval failed.');
-          setShowErrorModal(true);
-        }
-      }
-    } catch (error: any) {
-      setErrorMessage(error.message || 'Payment flow failed.');
-      setShowErrorModal(true);
-    } finally {
-      setIsProcessingPayment(false);
-    }
-  }, [theme.colors.primary, refreshBusinessProfileSubscription, loadBusinessProfiles]);
-
   const handleFormSubmit = useCallback(async (formData: any, pendingLogoUri?: string) => {
     if (!editingProfile) {
       setFormLoading(true);
@@ -497,9 +538,37 @@ const BusinessProfilesScreen: React.FC = () => {
     theme: any;
     onEdit: (item: any) => void;
     onDelete: (id: string) => void;
-  }>(({ item, imageRefreshKey, theme, onEdit, onDelete }) => {
+    onSelect: (item: any) => void;
+    onPay: (item: any) => void;
+    subscription: any;
+  }>(({ item, imageRefreshKey, theme, onEdit, onDelete, onSelect, onPay, subscription }) => {
+    const isLocked = subscription?.status?.toLowerCase() !== 'active';
+    const isSelected = item.id === selectedBusinessProfile?.id;
+
     return (
-      <View style={[styles.businessCard, { backgroundColor: theme.colors.cardBackground }]}>
+      <TouchableOpacity 
+        style={[
+          styles.businessCard, 
+          { backgroundColor: theme.colors.cardBackground },
+          isSelected && { borderColor: theme.colors.primary, borderWidth: 2 }
+        ]}
+        onPress={() => onSelect(item)}
+        activeOpacity={isLocked ? 0.9 : 0.7}
+      >
+        {isLocked && (
+          <View style={styles.lockOverlay}>
+            <View style={[styles.lockBadge, { backgroundColor: theme.colors.surface }]}>
+              <Icon name="lock" size={24} color={theme.colors.error} />
+              <Text style={[styles.lockText, { color: theme.colors.text }]}>Subscription Required</Text>
+              <TouchableOpacity 
+                style={[styles.activateButton, { backgroundColor: theme.colors.primary }]}
+                onPress={() => onPay(item)}
+              >
+                <Text style={styles.activateButtonText}>Activate Now</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
         <View style={styles.cardHeader}>
           <View style={styles.businessInfoWithLogo}>
             <View style={styles.logoContainer}>
@@ -629,7 +698,7 @@ const BusinessProfilesScreen: React.FC = () => {
             </View>
           </View>
         )}
-      </View>
+      </TouchableOpacity>
     );
   }, (prevProps, nextProps) => {
     // Only re-render if item data, mainProfileId, imageRefreshKey, or theme changes
@@ -659,9 +728,12 @@ const BusinessProfilesScreen: React.FC = () => {
         theme={theme}
         onEdit={handleEditProfile}
         onDelete={handleDeleteProfile}
+        onSelect={handleProfileSelect}
+        onPay={initiatePaymentForProfile}
+        subscription={getBusinessProfileSubscription(item.id)}
       />
     );
-  }, [imageRefreshKey, theme, handleEditProfile, handleDeleteProfile]);
+  }, [imageRefreshKey, theme, handleEditProfile, handleDeleteProfile, handleProfileSelect, initiatePaymentForProfile, getBusinessProfileSubscription]);
 
   const keyExtractor = useCallback((item: any) => item.id, []);
 
@@ -1607,6 +1679,46 @@ const styles = StyleSheet.create({
     fontSize: Math.min(screenWidth * 0.033, 13),
     fontWeight: '700',
     color: '#ffffff',
+  },
+  // Lock UI Styles
+  lockOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    zIndex: 10,
+    borderRadius: Math.max(10, responsiveSize.cardBorderRadius * 0.8),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  lockBadge: {
+    padding: 20,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 10,
+    width: '80%',
+  },
+  lockText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginTop: 10,
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  activateButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    minWidth: 120,
+    alignItems: 'center',
+  },
+  activateButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
 

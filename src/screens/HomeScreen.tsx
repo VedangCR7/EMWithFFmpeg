@@ -1,4 +1,4 @@
-﻿// HomeScreen comprehensively optimized for all device sizes with ultra-compact header, search bar, and content sizing
+// HomeScreen comprehensively optimized for all device sizes with ultra-compact header, search bar, and content sizing
 // Performance optimizations: FastImage for better image loading and caching, lazy loading for lists
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
@@ -666,10 +666,67 @@ const HomeScreen: React.FC = React.memo(() => {
   const [userProfile, setUserProfile] = useState(() => authService.getCurrentUser());
   const [userBusinessProfiles, setUserBusinessProfiles] = useState<BusinessProfile[]>([]);
   const [businessProfilesLoadingState, setBusinessProfilesLoadingState] = useState(false);
-  const { selectedBusinessProfile, setSelectedBusinessProfile, initializeSelectedProfile, isLoading: isContextLoading } = useBusinessProfile();
+  const { selectedBusinessProfile, setSelectedBusinessProfile, initializeSelectedProfile, isLoading: isContextLoading, isSubscriptionActive } = useBusinessProfile();
   const selectedBusinessProfileId = selectedBusinessProfile?.id || null;
   const [isBusinessProfileDropdownVisible, setIsBusinessProfileDropdownVisible] = useState(false);
   const [businessProfileDropdownPosition, setBusinessProfileDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
+
+  // --- Relocated State and Callbacks to fix hoisting ---
+  const [activeTab, setActiveTab] = useState('trending');
+  const [selectedCategory, setSelectedCategory] = useState<'business' | 'general'>('business');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchBarVisible, setIsSearchBarVisible] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+
+  // Business categories state
+  const [businessCategories, setBusinessCategories] = useState<BusinessCategory[]>([]);
+  const [businessCategoriesLoading, setBusinessCategoriesLoading] = useState(false);
+  const [businessCategoryPreviews, setBusinessCategoryPreviews] = useState<Record<string, Template[]>>({});
+  const [isBusinessCategoriesHighlighted, setIsBusinessCategoriesHighlighted] = useState(false);
+  const [rotatingBusinessCategories, setRotatingBusinessCategories] = useState<Array<{ id: string; name: string }>>([]);
+  const [currentBusinessCategoryIndex, setCurrentBusinessCategoryIndex] = useState(0);
+  const businessCategoryFadeAnim = useRef(new Animated.Value(1)).current;
+
+  // Greeting categories state
+  const [greetingCategoriesList, setGreetingCategoriesList] = useState<Array<{ id: string; name: string; icon: string; color?: string; imageUrl?: string; parentCategoryName?: string }>>([]);
+  const [allGreetingCategories, setAllGreetingCategories] = useState<Array<{ id: string; name: string; icon: string; color?: string; imageUrl?: string; parentCategoryName?: string }>>([]);
+  const [displayedCategoriesCount, setDisplayedCategoriesCount] = useState(5);
+  const [greetingCategoriesLoading, setGreetingCategoriesLoading] = useState(false);
+  const [greetingCategoryImages, setGreetingCategoryImages] = useState<Record<string, string>>({});
+  const memoizedGreetingCategoryImages = useMemo(() => greetingCategoryImages, [greetingCategoryImages]);
+
+  const filteredGreetingCategoriesList = useMemo(() => {
+    return greetingCategoriesList.slice(0, displayedCategoriesCount);
+  }, [greetingCategoriesList, displayedCategoriesCount]);
+
+  // Search and Hierarchical results state
+  const [hierarchicalResults, setHierarchicalResults] = useState<{ parentCategory: string; categories: any[] } | null>(null);
+  const [allHierarchicalData, setAllHierarchicalData] = useState<any[]>([]);
+  const [isHierarchical, setIsHierarchical] = useState(false);
+  const [banners, setBanners] = useState<Banner[]>([]);
+  const [templates, setTemplates] = useState<SearchResultItem[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [calendarRefreshKey, setCalendarRefreshKey] = useState(0);
+  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [currentRequestId, setCurrentRequestId] = useState(0);
+  const [disableBackgroundUpdates, setDisableBackgroundUpdates] = useState(false);
+
+  const normalizeCategoryData = useCallback((data: any, categoryType: 'business' | 'general'): HierarchicalSearchResult => {
+    return {
+      parentCategory: data.parentCategory,
+      categories: data.categories.map((category: any) => ({
+        name: category.name,
+        templates: categoryType === 'business' ? (category.images || []) : (category.templates || []),
+        id: category.id,
+        icon: category.icon,
+        imageUrl: category.imageUrl,
+        color: category.color
+      }))
+    };
+  }, []);
+  // --- End Relocated Block ---
+
 
   // Clear business profile selection when user changes
   useEffect(() => {
@@ -941,23 +998,13 @@ const HomeScreen: React.FC = React.memo(() => {
   const modalCardGap = useMemo(() => getModerateScale(3), [getModerateScale]);
 
 
-  const [activeTab, setActiveTab] = useState('trending');
-  const [selectedCategory, setSelectedCategory] = useState<'business' | 'general'>('business');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isSearchBarVisible, setIsSearchBarVisible] = useState(false);
+
   const [greetingCategories, setGreetingCategories] = useState<Array<{ id: string; name: string }>>([]);
   const [currentCategoryIndex, setCurrentCategoryIndex] = useState(0);
   const categoryFadeAnim = useRef(new Animated.Value(1)).current;
 
   // Business categories state
-  const [businessCategories, setBusinessCategories] = useState<BusinessCategory[]>([]);
-  const [businessCategoriesLoading, setBusinessCategoriesLoading] = useState(false);
-  const [businessCategoryPreviews, setBusinessCategoryPreviews] = useState<Record<string, Template[]>>({});
-  const [isBusinessCategoriesHighlighted, setIsBusinessCategoriesHighlighted] = useState(false);
-  // Rotating business categories for button display
-  const [rotatingBusinessCategories, setRotatingBusinessCategories] = useState<Array<{ id: string; name: string }>>([]);
-  const [currentBusinessCategoryIndex, setCurrentBusinessCategoryIndex] = useState(0);
-  const businessCategoryFadeAnim = useRef(new Animated.Value(1)).current;
+
 
   // Track if animations have been initialized
   const animationsInitializedRef = useRef(false);
@@ -985,6 +1032,15 @@ const HomeScreen: React.FC = React.memo(() => {
         .filter(cat => !cat.parentCategoryName)
         .map(cat => cat.name)
     )];
+
+    const matchingGeneralCategories = filteredGreetingCategoriesList.filter(category =>
+      category.name.toLowerCase().includes(searchLower) ||
+      searchLower.includes(category.name.toLowerCase()) ||
+      (category.parentCategoryName && (
+        category.parentCategoryName.toLowerCase().includes(searchLower) ||
+        searchLower.includes(category.parentCategoryName.toLowerCase())
+      ))
+    );
 
     const matchedGeneralParentCategoryNames = [...new Set(
       matchingGeneralCategories
@@ -1115,21 +1171,7 @@ const HomeScreen: React.FC = React.memo(() => {
     fetchGeneralCategoryTemplates();
   }, [isSearching, searchQuery, filteredGreetingCategoriesList, normalizeCategoryData]);
 
-  // Greeting categories state
-  const [greetingCategoriesList, setGreetingCategoriesList] = useState<Array<{ id: string; name: string; icon: string; color?: string; imageUrl?: string; parentCategoryName?: string }>>([]);
-  const [allGreetingCategories, setAllGreetingCategories] = useState<Array<{ id: string; name: string; icon: string; color?: string; imageUrl?: string; parentCategoryName?: string }>>([]);
-  const [displayedCategoriesCount, setDisplayedCategoriesCount] = useState(5); // Start with 5 categories
-  const [greetingCategoriesLoading, setGreetingCategoriesLoading] = useState(false);
-  const [greetingCategoryImages, setGreetingCategoryImages] = useState<Record<string, string>>({});
-  const memoizedGreetingCategoryImages = useMemo(() => greetingCategoryImages, [greetingCategoryImages]);
 
-  // Show all categories with placeholders (don't filter by image availability)
-  // Limit to displayed count for lazy loading
-  const filteredGreetingCategoriesList = useMemo(() => {
-    // Return only the first displayedCategoriesCount items for lazy loading
-    // Show placeholders for categories without images - images will load progressively
-    return greetingCategoriesList.slice(0, displayedCategoriesCount);
-  }, [greetingCategoriesList, displayedCategoriesCount]);
 
   const generalCategoryModalColumns = modalColumns;
   const {
@@ -1212,18 +1254,7 @@ const HomeScreen: React.FC = React.memo(() => {
       }),
     ]).start();
   }, [businessCategoryFadeAnim]);
-  const [banners, setBanners] = useState<Banner[]>([]);
-  const [templates, setTemplates] = useState<SearchResultItem[]>([]);
-  const [hierarchicalResults, setHierarchicalResults] = useState<{ parentCategory: string; categories: any[] } | null>(null);
-  const [allHierarchicalData, setAllHierarchicalData] = useState<any[]>([]);
-  const [isHierarchical, setIsHierarchical] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [calendarRefreshKey, setCalendarRefreshKey] = useState(0);
-  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
-  const [currentRequestId, setCurrentRequestId] = useState(0);
-  const [disableBackgroundUpdates, setDisableBackgroundUpdates] = useState(false);
+
   const [isBusinessCategoriesModalVisible, setIsBusinessCategoriesModalVisible] = useState(false);
   const [isVideosModalVisible, setIsVideosModalVisible] = useState(false);
   const [showVideoComingSoonModal, setShowVideoComingSoonModal] = useState(false);
@@ -2746,21 +2777,8 @@ const HomeScreen: React.FC = React.memo(() => {
    * Unified normalization function for both business and general categories
    * Converts any category data to common HierarchicalSearchResult format
    */
-  const normalizeCategoryData = useCallback((data: any, categoryType: 'business' | 'general'): HierarchicalSearchResult => {
-    return {
-      parentCategory: data.parentCategory,
-      categories: data.categories.map((category: any) => ({
-        name: category.name,
-        // Normalize templates/images field
-        templates: categoryType === 'business' ? (category.images || []) : (category.templates || []),
-        // Include image-related fields for rendering
-        id: category.id,
-        icon: category.icon,
-        imageUrl: category.imageUrl,
-        color: category.color
-      }))
-    };
-  }, []);
+  // normalizeCategoryData moved to top of component to fix hoisting issues
+
 
   /**
    * Helper function to convert hierarchical response to renderable format
@@ -3413,6 +3431,22 @@ const HomeScreen: React.FC = React.memo(() => {
   }, [businessCategoryPreviews]);
 
   const handleTemplatePress = useCallback((template: Template | VideoContent | any) => {
+    // Check for active subscription if a business profile is selected
+    if (!isSubscriptionActive && selectedBusinessProfile) {
+      Alert.alert(
+        "Subscription Required",
+        "This profile is currently locked. Please activate your subscription in the Business Profiles screen to use this template.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { 
+            text: "Activate Now", 
+            onPress: () => navigation.navigate('BusinessProfiles' as any) 
+          }
+        ]
+      );
+      return;
+    }
+
     // Navigate immediately using optimized O(1) lookups
     // Check for video match using O(1) lookup
     const matchedVideo = videoContentMap.get(template.id);
@@ -3706,6 +3740,22 @@ const HomeScreen: React.FC = React.memo(() => {
     });
 
     const handleBannerPress = () => {
+      // Check for active subscription if a business profile is selected
+      if (!isSubscriptionActive && selectedBusinessProfile) {
+        Alert.alert(
+          "Subscription Required",
+          "This profile is currently locked. Please activate your subscription in the Business Profiles screen to use this feature.",
+          [
+            { text: "Cancel", style: "cancel" },
+            { 
+              text: "Activate Now", 
+              onPress: () => navigation.navigate('BusinessProfiles' as any) 
+            }
+          ]
+        );
+        return;
+      }
+
       // Find the clicked featured content item
       const clickedFeaturedContent = featuredContent.find(fc => fc.id === item.id);
 

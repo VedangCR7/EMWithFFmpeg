@@ -2,11 +2,13 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useCa
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BusinessProfile } from '../services/businessProfile';
 import authService from '../services/auth';
+import { useSubscription } from '../contexts/SubscriptionContext';
 
 interface BusinessProfileContextType {
   selectedBusinessProfile: BusinessProfile | null;
   setSelectedBusinessProfile: (profile: BusinessProfile | null) => Promise<void>;
   initializeSelectedProfile: (profiles: BusinessProfile[]) => Promise<void>;
+  isSubscriptionActive: boolean;
   isLoading: boolean;
 }
 
@@ -22,6 +24,13 @@ interface BusinessProfileProviderProps {
 export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = ({ children }) => {
   const [selectedBusinessProfile, setSelectedBusinessProfileState] = useState<BusinessProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { getBusinessProfileSubscription } = useSubscription();
+
+  const isSubscriptionActive = useCallback((profileId: string | undefined): boolean => {
+    if (!profileId) return false;
+    const subscription = getBusinessProfileSubscription(profileId);
+    return subscription?.status?.toLowerCase() === 'active';
+  }, [getBusinessProfileSubscription]);
 
   // Clear cache helper
   const clearProfileCache = useCallback(async () => {
@@ -89,6 +98,11 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
 
   // Update AsyncStorage when selected profile changes
   const setSelectedBusinessProfile = useCallback(async (profile: BusinessProfile | null) => {
+    if (profile && !isSubscriptionActive(profile.id)) {
+      console.warn('🚫 [BUSINESS PROFILE CONTEXT] Cannot select profile without active subscription:', profile.name);
+      return;
+    }
+
     try {
       setSelectedBusinessProfileState(profile);
 
@@ -105,20 +119,27 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
     } catch (error) {
       console.error('❌ [BUSINESS PROFILE CONTEXT] Error saving selected profile:', error);
     }
-  }, [clearProfileCache]);
+  }, [clearProfileCache, isSubscriptionActive]);
 
   // Centralized initialization logic: select first profile only if none selected
   const initializeSelectedProfile = useCallback(async (profiles: BusinessProfile[]) => {
     if (profiles.length > 0 && !selectedBusinessProfile && !isLoading) {
-      console.log('🏁 [BUSINESS PROFILE CONTEXT] Initializing first profile:', profiles[0].name);
-      await setSelectedBusinessProfile(profiles[0]);
+      // Find the first profile that has an active subscription
+      const firstActiveProfile = profiles.find(p => isSubscriptionActive(p.id));
+      if (firstActiveProfile) {
+        console.log('🏁 [BUSINESS PROFILE CONTEXT] Initializing first active profile:', firstActiveProfile.name);
+        await setSelectedBusinessProfile(firstActiveProfile);
+      } else {
+        console.log('🏁 [BUSINESS PROFILE CONTEXT] No active profiles found to initialize');
+      }
     }
-  }, [selectedBusinessProfile, isLoading, setSelectedBusinessProfile]);
+  }, [selectedBusinessProfile, isLoading, setSelectedBusinessProfile, isSubscriptionActive]);
 
   const value: BusinessProfileContextType = {
     selectedBusinessProfile,
     setSelectedBusinessProfile,
     initializeSelectedProfile,
+    isSubscriptionActive: isSubscriptionActive(selectedBusinessProfile?.id),
     isLoading,
   };
 
