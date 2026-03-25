@@ -332,6 +332,14 @@ const BusinessProfilesScreen: React.FC = () => {
 
       if (!subscriptionData?.subscriptionId) throw new Error('Failed to create subscription mandate.');
 
+      // Validate that we have a correct Razorpay subscription ID
+      if (!subscriptionData.subscriptionId.startsWith("sub_")) {
+        console.error("❌ Invalid subscription ID for Razorpay:", subscriptionData.subscriptionId);
+        throw new Error("Invalid Razorpay subscription ID.");
+      }
+
+      console.log("✅ Using Razorpay subscription ID:", subscriptionData.subscriptionId);
+
       const options: any = {
         description: 'Business Profile Subscription',
         key: subscriptionData.razorpayKey || RAZORPAY_KEY_ID,
@@ -352,13 +360,59 @@ const BusinessProfilesScreen: React.FC = () => {
         refreshBusinessProfileSubscription(businessProfileId);
         loadBusinessProfiles();
       } catch (e: any) {
+        console.error('❌ Razorpay checkout error:', {
+          code: e?.code,
+          description: e?.description,
+          message: e?.message,
+          source: e?.source,
+          step: e?.step,
+          reason: e?.reason
+        });
+        
         if (e?.code !== 2) {
-          setErrorMessage(e?.description || 'Subscription mandate approval failed.');
+          // Handle payment cancellation and other errors with simple messages
+          let errorMessage = 'Payment Failed';
+          
+          // Check for payment cancellation in multiple ways
+          if (e?.code === 0 || 
+              e?.code === 'PAYMENT_CANCELLED' ||
+              e?.reason === 'payment_cancelled' ||
+              e?.step === 'payment_authentication' ||
+              (e?.description && e.description.includes('cancelled')) ||
+              (e?.description && e.description.includes('delay in response'))) {
+            errorMessage = 'Payment Failed';
+          } else if (e?.code === 'NETWORK_ERROR') {
+            errorMessage = 'Network error. Please check your connection and try again.';
+          } else if (e?.code === 'INVALID_OPTIONS') {
+            errorMessage = 'Invalid payment configuration. Please contact support.';
+          }
+          
+          setErrorMessage(errorMessage);
           setShowErrorModal(true);
         }
       }
     } catch (error: any) {
-      setErrorMessage(error.message || 'Payment flow failed.');
+      console.error('❌ Payment flow error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        code: error.code,
+        description: error.description,
+        stack: error.stack
+      });
+      
+      // Provide specific error messages
+      let errorMessage = error.message || 'Payment flow failed.';
+      
+      if (error.code === 'PAYMENT_CANCELLED') {
+        errorMessage = 'Payment was cancelled. Please try again.';
+      } else if (error.code === 'NETWORK_ERROR') {
+        errorMessage = 'Network error. Please check your connection and try again.';
+      } else if (error.code === 'INVALID_OPTIONS') {
+        errorMessage = 'Invalid payment configuration. Please contact support.';
+      }
+      
+      setErrorMessage(errorMessage);
       setShowErrorModal(true);
     } finally {
       setIsProcessingPayment(false);

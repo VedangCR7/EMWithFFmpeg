@@ -30,9 +30,6 @@ export interface SubscriptionStatus {
   expiryDate?: string | null;
   autoRenew: boolean;
   status: 'active' | 'expired' | 'cancelled' | 'pending' | 'inactive';
-  // CRITICAL: Payment verification fields for UI accuracy
-  razorpaySubscriptionId?: string;
-  paymentId?: string;
 }
 
 export interface SubscriptionHistory {
@@ -205,10 +202,6 @@ class SubscriptionApiService {
         response.data?.key ||
         response.data?.key_id;
 
-      // Clear transaction history cache to ensure the new PENDING transaction is visible
-      cacheService.clear(`transactions_unified_user_${userId}`);
-      console.log('[APP] 🧹 Cleared transaction cache on order creation');
-
       return {
         orderId,
         amount,
@@ -283,7 +276,7 @@ class SubscriptionApiService {
     }
   }
 
-  // Get subscription status (with caching - 10 sec TTL)
+  // Get subscription status (with caching - 3 min TTL)
   async getStatus(): Promise<SubscriptionResponse> {
     try {
       const currentUser = authService.getCurrentUser();
@@ -318,10 +311,50 @@ class SubscriptionApiService {
             const response = await api.get('/api/mobile/subscription/status');
             
             console.log('📊 Subscription API response:', response.data);
+            console.log('SUBSCRIPTION_RAW_API_RESPONSE', response.data);
+            console.log('🔍 Raw subscription data:', JSON.stringify(response.data, null, 2));
             
+            // Check if response has the expected structure
             if (response.data.success) {
+              // ISSUE: Backend returns response.data.subscription, not response.data.data
               const subscriptionData = response.data?.subscription ?? response.data?.data ?? null;
+              console.log("SUBSCRIPTION_API_PARSING - Checking response structure:", {
+                'response.data.subscription': response.data?.subscription,
+                'response.data.data': response.data?.data,
+                'final_subscriptionData': subscriptionData
+              });
+              console.log("SUBSCRIPTION_PARSED_DATA", subscriptionData);
               
+              if (!subscriptionData) {
+                console.warn("SUBSCRIPTION_STATUS_EMPTY_RESPONSE");
+              }
+              
+              console.log("SUBSCRIPTION_FIELDS", {
+                planId: subscriptionData?.planId,
+                planName: subscriptionData?.planName,
+                expiryDate: subscriptionData?.expiryDate,
+                isActive: subscriptionData?.isActive
+              });
+              
+              console.log("Parsed subscription:", subscriptionData);
+              console.log("Subscription fields check:", {
+                hasIsActive: !!subscriptionData?.isActive,
+                isActive: subscriptionData?.isActive,
+                hasStatus: !!subscriptionData?.status,
+                status: subscriptionData?.status,
+                hasDaysRemaining: !!subscriptionData?.daysRemaining,
+                daysRemaining: subscriptionData?.daysRemaining,
+                hasExpiryDate: !!subscriptionData?.expiryDate,
+                expiryDate: subscriptionData?.expiryDate,
+                hasEndDate: !!subscriptionData?.endDate,
+                endDate: subscriptionData?.endDate,
+                hasPlan: !!subscriptionData?.plan,
+                plan: subscriptionData?.plan,
+                hasPlanId: !!subscriptionData?.planId,
+                planId: subscriptionData?.planId
+              });
+              
+              // Return default if subscription data is null/undefined
               if (!subscriptionData) {
                 return {
                   success: true,
@@ -344,13 +377,17 @@ class SubscriptionApiService {
                   planName: subscriptionData?.planName ?? null,
                   expiryDate: subscriptionData?.expiryDate ?? null,
                   autoRenew: Boolean(subscriptionData?.autoRenew),
-                  status: subscriptionData?.status?.toLowerCase() || (subscriptionData?.isActive ? "active" : "inactive")
+                  status: subscriptionData?.isActive ? "active" : "inactive"
                 },
                 message: 'Status fetched successfully'
               };
             }
           } catch (backendError: any) {
             console.log('⚠️ Backend subscription status API error:', backendError.message);
+            
+            if (backendError.response?.status !== 404) {
+              console.error('Backend subscription status error:', backendError);
+            }
           }
           
           return {
@@ -370,6 +407,8 @@ class SubscriptionApiService {
       );
     } catch (error: any) {
       console.error('Get subscription status error:', error);
+      
+      // Return default status instead of throwing
       return {
         success: true,
         data: {
@@ -599,14 +638,12 @@ class SubscriptionApiService {
     orderId: string;
     paymentId: string;
     signature: string;
-    subscriptionId?: string;
     amount?: number;
     amountPaise?: number;
     currency?: string;
     planId?: string;
     email?: string;
     contact?: string;
-    isAutopay?: boolean;
   }): Promise<{ success: boolean; message: string; data?: any }> {
     try {
       const currentUser = authService.getCurrentUser();
@@ -626,14 +663,6 @@ class SubscriptionApiService {
         paymentId: paymentData.paymentId,
         signature: paymentData.signature,
       };
-
-      if (paymentData.subscriptionId) {
-        payload.subscriptionId = paymentData.subscriptionId;
-      }
-
-      if (paymentData.isAutopay) {
-        payload.isAutopay = paymentData.isAutopay;
-      }
 
       if (typeof paymentData.amount === 'number') {
         payload.amount = paymentData.amount;
@@ -668,10 +697,6 @@ class SubscriptionApiService {
       // Clear subscription status cache after payment verification
       this.clearStatusCache(userId);
       
-      // Clear transaction history cache
-      cacheService.clear(`transactions_unified_user_${userId}`);
-      console.log('[APP] 🧹 Cleared transaction cache after payment');
-      
       return response.data;
     } catch (error: any) {
       console.error('❌ Payment verification error:', error);
@@ -682,7 +707,7 @@ class SubscriptionApiService {
     }
   }
 
-  // Create Autopay subscription for a business profile
+  // Create autopay subscription for business profile
   async createBusinessProfileAutopay(params: {
     planId: string;
     businessProfileId: string;
@@ -698,28 +723,64 @@ class SubscriptionApiService {
         throw new Error('User not authenticated');
       }
 
-      console.log('🔄 Creating Business Profile Autopay subscription:', {
-        userId,
-        planId: params.planId,
-        businessProfileId: params.businessProfileId,
+      console.log('🔄 Creating Business Profile Autopay subscription:', params);
+
+      const payload = {
+        ...params,
+        userId
+      };
+
+      const response = await api.post(
+        '/api/mobile/subscription/create-autopay',
+        payload
+      );
+
+      console.log('📡 Autopay API response:', response.data);
+      
+      // Prioritize root-level fields from backend response
+      const root = response.data || {};
+      const nested = root.data || {};
+
+      console.log("🔍 Response structure:", {
+        'root.subscriptionId': root.subscriptionId,
+        'root.razorpaySubscriptionId': root.razorpaySubscriptionId,
+        'nested.razorpaySubscription.subscriptionId': nested?.razorpaySubscription?.subscriptionId,
+        'nested.subscription.razorpaySubscriptionId': nested?.subscription?.razorpaySubscriptionId,
+        'nested.subscription.subscriptionId': nested?.subscription?.subscriptionId
       });
 
-      const response = await api.post('/api/mobile/subscription/create-autopay', {
-        planId: params.planId,
-        businessProfileId: params.businessProfileId,
-        subscriptionCategory: params.subscriptionCategory,
-        customerEmail: params.customerEmail,
-        customerPhone: params.customerPhone,
-        userId, // Include userId for consistency with other autopay calls
-      });
+      // Always prioritize flat fields from backend
+      const subscriptionId =
+        root.subscriptionId ||
+        root.razorpaySubscriptionId ||
+        nested?.razorpaySubscription?.subscriptionId ||
+        nested?.subscription?.razorpaySubscriptionId ||
+        nested?.subscription?.subscriptionId;
 
-      console.log('✅ Business Profile Autopay subscription created:', response.data);
+      console.log("🎯 Final Razorpay Subscription ID:", subscriptionId);
 
-      return response.data;
+      if (!subscriptionId || !subscriptionId.startsWith("sub_")) {
+        console.error("❌ Invalid subscription ID:", subscriptionId);
+        throw new Error("Invalid Razorpay subscription ID received from backend.");
+      }
+
+      return {
+        ...root,
+        subscriptionId
+      };
+
     } catch (error: any) {
-      console.error('❌ Create Business Profile Autopay error:', error);
-      const errorMessage = error.response?.data?.message || error.message || 'Failed to create business profile autopay subscription';
-      throw new Error(errorMessage);
+      console.error('❌ createBusinessProfileAutopay error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+
+      throw new Error(
+        error.response?.data?.message ||
+        error.message ||
+        'Failed to create subscription mandate'
+      );
     }
   }
 
@@ -741,11 +802,6 @@ class SubscriptionApiService {
       });
 
       console.log('✅ Autopay subscription created:', response.data);
-      
-      // Clear transaction history cache to ensure the new PENDING transaction is visible
-      cacheService.clear(`transactions_unified_user_${userId}`);
-      console.log('[APP] 🧹 Cleared transaction cache on autopay creation');
-
       return response.data;
     } catch (error: any) {
       console.error('❌ Create Autopay error:', error);

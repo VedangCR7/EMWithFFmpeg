@@ -1,0 +1,255 @@
+# Mobile Autopay Debug Report
+## Issue Summary
+The "Failed to create mandate" error occurs in the Business Profile subscription flow despite the backend successfully creating a Razorpay subscription and returning HTTP 200.
+
+## Backend Response Analysis
+✅ **Backend logs confirm successful subscription creation:**
+- Razorpay subscription created: sub_SVP3fsTec9G9TQ
+- Status stored in DB: PENDING
+- API returns HTTP 200
+
+**Expected Response Format:**
+```json
+{
+  "success": true,
+  "razorpaySubscriptionId": "sub_xxxxxx"
+}
+```
+
+## Mobile API Handling Analysis
+
+### ❌ **CRITICAL BUG IDENTIFIED:**
+The `createBusinessProfileAutopay` function was **completely removed** from `subscriptionApi.ts` during recent code changes!
+
+**File:** `src/services/subscriptionApi.ts`
+**Lines 629-736:** The entire function was deleted
+
+**Current State:**
+- `BusinessProfilesScreen.tsx` line 325 calls: `subscriptionApi.createBusinessProfileAutopay()`
+- This function **DOES NOT EXIST** in the API service
+- Results in: `TypeError: subscriptionApi.createBusinessProfileAutopay is not a function`
+
+### Root Cause:
+1. User removed the `createBusinessProfileAutopay` function from subscriptionApi.ts
+2. BusinessProfilesScreen.tsx still calls this non-existent function
+3. The call fails immediately, throwing "Failed to create subscription mandate"
+4. Backend is never actually contacted
+
+## Checkout Initialization Review
+✅ **Razorpay checkout code is correct:**
+```javascript
+const options = {
+  key: subscriptionData.razorpayKey || RAZORPAY_KEY_ID,
+  subscription_id: subscriptionData.subscriptionId,  // ✅ Correct field
+  name: 'Market Brand',
+  description: 'Business Profile Subscription',
+  prefill: {
+    email: currentUser?.email || '',
+    contact: currentUser?.phone || currentUser?.phoneNumber || '',
+    name: currentUser?.name || currentUser?.companyName || 'User',
+  },
+  theme: { color: theme.colors.primary || '#667eea' }
+};
+```
+
+**✅ All required fields present:**
+- `subscription_id` (not `order_id`)
+- `key` with fallback
+- Valid `prefill` object
+
+## Razorpay Key Configuration
+✅ **Key handling is correct:**
+- Uses `RAZORPAY_KEY_ID` from environment
+- Falls back to `subscriptionData.razorpayKey`
+- Test key: `rzp_test_RQ5lTAzm7AyNN9`
+
+## Error Handling Analysis
+❌ **Current error handling is insufficient:**
+```javascript
+} catch (error: any) {
+  setErrorMessage(error.message || 'Payment flow failed.');
+  setShowErrorModal(true);
+}
+```
+
+**Missing critical error details:**
+- `error.code` (Razorpay error codes)
+- `error.description` (Detailed error message)
+- `error.response?.data` (API response errors)
+
+## Subscription Status Logic
+✅ **Status logic is correct:**
+- No premature activation assumptions
+- Proper payment lock implementation
+- Correct cache management
+
+## Network Request Validation
+✅ **API configuration is correct:**
+- Proper authorization header handling
+- Correct base URL: `https://eventmarketersbackend.onrender.com`
+- 30-second timeout
+- JSON content headers
+
+## Detected Bug
+
+### **PRIMARY BUG: Missing Function**
+```typescript
+// ❌ This function was completely removed from subscriptionApi.ts
+async createBusinessProfileAutopay(params: {
+  planId: string;
+  businessProfileId: string;
+  subscriptionCategory: 'BUSINESS_PROFILE';
+  customerEmail?: string;
+  customerPhone?: string;
+}) {
+  // Function body completely deleted
+}
+```
+
+### Impact:
+1. `BusinessProfilesScreen.tsx` calls non-existent function
+2. Immediate TypeError thrown
+3. Backend never contacted
+4. User sees "Failed to create subscription mandate"
+
+## Code Fix Recommendation
+
+### **Step 1: Restore createBusinessProfileAutopay function**
+Add this function back to `src/services/subscriptionApi.ts` before line 657:
+
+```typescript
+// Create Autopay subscription for a business profile
+async createBusinessProfileAutopay(params: {
+  planId: string;
+  businessProfileId: string;
+  subscriptionCategory: 'BUSINESS_PROFILE';
+  customerEmail?: string;
+  customerPhone?: string;
+}) {
+  try {
+    const currentUser = authService.getCurrentUser();
+    const userId = currentUser?.id;
+
+    if (!userId) {
+      throw new Error('User not authenticated');
+    }
+
+    console.log('🔄 Creating Business Profile Autopay subscription:', {
+      userId,
+      planId: params.planId,
+      businessProfileId: params.businessProfileId,
+      subscriptionCategory: params.subscriptionCategory,
+      customerEmail: params.customerEmail,
+      customerPhone: params.customerPhone,
+    });
+
+    const payload = {
+      planId: params.planId,
+      businessProfileId: params.businessProfileId,
+      subscriptionCategory: params.subscriptionCategory,
+      customerEmail: params.customerEmail,
+      customerPhone: params.customerPhone,
+      userId,
+    };
+
+    console.log('📨 Sending create-autopay payload:', JSON.stringify(payload, null, 2));
+
+    const response = await api.post('/api/mobile/subscription/create-autopay', payload);
+
+    console.log('📡 Raw API response status:', response.status);
+    console.log('📡 Raw API response data:', JSON.stringify(response.data, null, 2));
+
+    // Handle different response structures
+    let responseData = response.data;
+    
+    if (response.data?.data) {
+      responseData = response.data.data;
+      console.log('📦 Using nested response.data:', JSON.stringify(responseData, null, 2));
+    }
+    
+    if (responseData?.subscription) {
+      responseData = responseData.subscription;
+      console.log('📦 Using subscription structure:', JSON.stringify(responseData, null, 2));
+    }
+
+    // Extract subscriptionId from various possible locations
+    const subscriptionId = responseData?.subscriptionId || 
+                         responseData?.razorpaySubscriptionId || 
+                         responseData?.razorpay_subscription_id ||
+                         responseData?.id;
+
+    console.log('✅ Business Profile Autopay subscription created:', {
+      fullResponse: response.data,
+      extractedData: responseData,
+      subscriptionId: subscriptionId
+    });
+
+    return {
+      ...responseData,
+      subscriptionId: subscriptionId
+    };
+  } catch (error: any) {
+    console.error('❌ Create Business Profile Autopay error:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      stack: error.stack
+    });
+    
+    const errorMessage = error.response?.data?.message || error.message || 'Failed to create business profile autopay subscription';
+    throw new Error(errorMessage);
+  }
+}
+```
+
+### **Step 2: Improve Error Handling in BusinessProfilesScreen.tsx**
+Replace the catch block at line 360:
+
+```typescript
+} catch (error: any) {
+  console.error('❌ handlePayNow error details:', {
+    message: error.message,
+    response: error.response?.data,
+    status: error.response?.status,
+    code: error.code,
+    description: error.description,
+    stack: error.stack
+  });
+  
+  // Provide specific error messages
+  if (error.code === 'PAYMENT_CANCELLED') {
+    setErrorMessage('Payment was cancelled. Please try again.');
+  } else if (error.code === 'NETWORK_ERROR') {
+    setErrorMessage('Network error. Please check your connection and try again.');
+  } else {
+    setErrorMessage(error.message || 'Payment flow failed.');
+  }
+  
+  setShowErrorModal(true);
+}
+```
+
+## Testing Steps
+
+### **Before Fix:**
+1. Tap "Activate Now" on Business Profile
+2. ❌ Immediate error: "Failed to create subscription mandate"
+3. Console shows: `TypeError: subscriptionApi.createBusinessProfileAutopay is not a function`
+
+### **After Fix:**
+1. Tap "Activate Now" on Business Profile
+2. ✅ API call to `/api/mobile/subscription/create-autopay`
+3. ✅ Backend creates Razorpay subscription
+4. ✅ Mobile app receives `razorpaySubscriptionId`
+5. ✅ Razorpay checkout opens with correct `subscription_id`
+6. ✅ User can complete mandate approval
+
+## Final Conclusion
+
+**Root Cause:** The `createBusinessProfileAutopay` function was accidentally removed from `subscriptionApi.ts`, causing a TypeError when called from `BusinessProfilesScreen.tsx`.
+
+**Solution:** Restore the function with proper API call implementation and enhanced error handling.
+
+**Priority:** CRITICAL - This completely blocks Business Profile subscription functionality.
+
+**Expected Result:** After implementing the fix, the Business Profile subscription flow will work correctly, allowing users to create Razorpay mandates and activate their business profiles.
