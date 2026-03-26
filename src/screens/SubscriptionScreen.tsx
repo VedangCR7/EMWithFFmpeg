@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -27,6 +27,7 @@ import subscriptionApi, { SubscriptionPlan, SubscriptionStatus } from '../servic
 import authService from '../services/auth';
 import api from '../services/api';
 import cacheService from '../services/cacheService';
+import { startSubscriptionPolling } from '../utils/subscriptionPolling';
 
 // Compact spacing multiplier to reduce all spacing (matching HomeScreen)
 const COMPACT_MULTIPLIER = 0.5;
@@ -125,6 +126,17 @@ const SubscriptionScreen: React.FC = () => {
   const [isAuthenticating, setIsAuthenticating] = useState(false); // During Razorpay checkout
   const [isTransactionPending, setIsTransactionPending] = useState(false); // Post-payment, pre-activation
   const [pollingAttempts, setPollingAttempts] = useState(0);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingCleanupRef.current) {
+        pollingCleanupRef.current();
+      }
+    };
+  }, []);
+
+  const pollingCleanupRef = useRef<(() => void) | null>(null);
 
   // Wrapper to update both local and context payment states
   const updatePaymentInProgress = (inProgress: boolean) => {
@@ -333,6 +345,12 @@ const SubscriptionScreen: React.FC = () => {
       return;
     }
 
+    // Stop existing polling before starting a new payment flow
+    if (pollingCleanupRef.current) {
+      pollingCleanupRef.current();
+      pollingCleanupRef.current = null;
+    }
+
     updatePaymentInProgress(true);
     setIsProcessing(true);
     setIsAuthenticating(true); // Start authenticating state
@@ -539,26 +557,40 @@ const SubscriptionScreen: React.FC = () => {
 
             // Step 3: Start polling for subscription activation instead of immediate check
             if (verifyResult?.success) {
-              console.log('[APP] ✅ Payment verified, starting polling for activation');
+              console.log('[APP] ✅ Payment verified, starting polling for activation (5m window)');
               
-              // Start polling for subscription activation
-              const activationSuccess = await pollSubscriptionStatus();
-              
-              if (activationSuccess) {
-                console.log('✅ Payment processing complete, navigating back');
-                navigation.goBack();
-              } else {
-                // Polling failed - show user-friendly message
-                console.warn('⚠️ Polling completed - subscription not yet activated');
-                setIsTransactionPending(false);
-                updatePaymentInProgress(false);
-                
-                Alert.alert(
-                  'Processing Payment',
-                  'Your payment was successful! Subscription activation may take a few moments. Please check your status after a short while.',
-                  [{ text: 'OK', onPress: () => navigation.goBack() }]
-                );
-              }
+              // Use the new modular polling helper
+              pollingCleanupRef.current = startSubscriptionPolling(
+                () => {
+                  // onActive: Subscription is now active!
+                  console.log('✅ Subscription activated via polling!');
+                  setIsSubscribed(true);
+                  setIsTransactionPending(false);
+                  updatePaymentInProgress(false);
+                  
+                  if (Platform.OS === 'android') {
+                    ToastAndroid.show('🎉 Subscription activated! Welcome to Pro!', ToastAndroid.LONG);
+                  }
+                  
+                  // Final refresh of context to ensure everything is updated
+                  refreshSubscription(true);
+                  
+                  // Close screen once active
+                  navigation.goBack();
+                },
+                () => {
+                  // onTimeout: 5 minutes passed
+                  console.warn('⚠️ Polling timed out - subscription not yet activated');
+                  setIsTransactionPending(false);
+                  updatePaymentInProgress(false);
+                  
+                  Alert.alert(
+                    'Processing Payment',
+                    'Your payment was successful! Subscription activation may take a few moments. Please check your status after a short while.',
+                    [{ text: 'OK', onPress: () => navigation.goBack() }]
+                  );
+                }
+              );
             } else {
               console.warn('[APP] ⚠️ Payment verification failed');
               setIsTransactionPending(false);
@@ -646,6 +678,12 @@ const SubscriptionScreen: React.FC = () => {
     if (isSubscribed) {
       showErrorModal('Already Subscribed', 'You are already a Pro subscriber!');
       return;
+    }
+
+    // Stop existing polling before starting a new payment flow
+    if (pollingCleanupRef.current) {
+      pollingCleanupRef.current();
+      pollingCleanupRef.current = null;
     }
 
     // CRITICAL: Check if plan is selected before proceeding
@@ -779,26 +817,40 @@ const SubscriptionScreen: React.FC = () => {
 
               // Step 3: Start polling for subscription activation instead of immediate check
               if (verifyResult?.success) {
-                console.log('[APP] ✅ Payment verified, starting polling for activation');
+                console.log('[APP] ✅ Autopay payment verified, starting polling for activation');
                 
-                // Start polling for subscription activation
-                const activationSuccess = await pollSubscriptionStatus();
-                
-                if (activationSuccess) {
-                  console.log('✅ Autopay processing complete, navigating back');
-                  navigation.goBack();
-                } else {
-                  // Polling failed - show user-friendly message for Autopay
-                  console.warn('⚠️ Polling completed - subscription not yet activated');
-                  setIsTransactionPending(false);
-                  updatePaymentInProgress(false);
-                  
-                  Alert.alert(
-                    'Processing Mandate',
-                    'Your mandate was approved! Subscription activation may take a few moments. Pro features will unlock once the payment is processed.',
-                    [{ text: 'OK', onPress: () => navigation.goBack() }]
-                  );
-                }
+                // Use the new modular polling helper
+                pollingCleanupRef.current = startSubscriptionPolling(
+                  () => {
+                    // onActive: Subscription is now active!
+                    console.log('✅ Autopay subscription activated!');
+                    setIsSubscribed(true);
+                    setIsTransactionPending(false);
+                    updatePaymentInProgress(false);
+                    
+                    if (Platform.OS === 'android') {
+                      ToastAndroid.show('🎉 Mandate approved! Welcome to Pro!', ToastAndroid.LONG);
+                    }
+                    
+                    // Final refresh of context
+                    refreshSubscription(true);
+                    
+                    // Close screen
+                    navigation.goBack();
+                  },
+                  () => {
+                    // onTimeout: 5 minutes passed
+                    console.warn('⚠️ Polling timed out - mandate not yet fully active');
+                    setIsTransactionPending(false);
+                    updatePaymentInProgress(false);
+                    
+                    Alert.alert(
+                      'Processing Mandate',
+                      'Your mandate was approved! Subscription activation may take a few moments. Pro features will unlock once the payment is processed.',
+                      [{ text: 'OK', onPress: () => navigation.goBack() }]
+                    );
+                  }
+                );
               } else {
                 console.warn('[APP] ⚠️ Payment verification failed');
                 setIsTransactionPending(false);

@@ -380,10 +380,10 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { selectedImage, selectedLanguage, selectedTemplateId, selectedBusinessProfile: selectedBusinessProfileParam } = route.params;
-  const { isSubscribed, checkPremiumAccess, refreshSubscription } = useSubscription();
+  const { isSubscribed, checkPremiumAccess, refreshSubscription, isSubscriptionActive } = useSubscription();
   const { isDarkMode, theme } = useTheme();
   const { selectedBusinessProfile } = useBusinessProfile();
-  const isActive = selectedBusinessProfile?.subscriptionStatus?.toUpperCase() === "ACTIVE";
+  const isActive = isSubscriptionActive;
 
   const activeBusinessProfile = selectedBusinessProfile;
 

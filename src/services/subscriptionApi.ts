@@ -30,6 +30,8 @@ export interface SubscriptionStatus {
   expiryDate?: string | null;
   autoRenew: boolean;
   status: 'active' | 'expired' | 'cancelled' | 'pending' | 'inactive';
+  razorpaySubscriptionId?: string;
+  paymentId?: string;
 }
 
 export interface SubscriptionHistory {
@@ -644,6 +646,8 @@ class SubscriptionApiService {
     planId?: string;
     email?: string;
     contact?: string;
+    subscriptionId?: string;
+    isAutopay?: boolean;
   }): Promise<{ success: boolean; message: string; data?: any }> {
     try {
       const currentUser = authService.getCurrentUser();
@@ -663,6 +667,14 @@ class SubscriptionApiService {
         paymentId: paymentData.paymentId,
         signature: paymentData.signature,
       };
+
+      if (paymentData.subscriptionId) {
+        payload.subscriptionId = paymentData.subscriptionId;
+      }
+
+      if (paymentData.isAutopay !== undefined) {
+        payload.isAutopay = paymentData.isAutopay;
+      }
 
       if (typeof paymentData.amount === 'number') {
         payload.amount = paymentData.amount;

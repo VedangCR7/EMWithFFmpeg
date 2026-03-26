@@ -45,6 +45,7 @@ import responsiveUtils, {
   isLandscape 
 } from '../utils/responsiveUtils';
 import logger from '../utils/logger';
+import { startSubscriptionPolling } from '../utils/subscriptionPolling';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -81,6 +82,16 @@ const BusinessProfilesScreen: React.FC = () => {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const navigation = useNavigation();
   const pendingProfileDataRef = useRef<any>(null);
+  const pollingCleanupRef = useRef<(() => void) | null>(null);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingCleanupRef.current) {
+        pollingCleanupRef.current();
+      }
+    };
+  }, []);
 
   // Memoized mock data for immediate loading
   const mockProfiles = useMemo(() => [
@@ -315,6 +326,13 @@ const BusinessProfilesScreen: React.FC = () => {
       return;
     }
     const businessProfileId = pendingProfileDataRef.current.id;
+
+    // Stop existing polling before starting a new payment flow
+    if (pollingCleanupRef.current) {
+      pollingCleanupRef.current();
+      pollingCleanupRef.current = null;
+    }
+
     try {
       setIsProcessingPayment(true);
       setShowPaymentModal(false);
@@ -337,9 +355,16 @@ const BusinessProfilesScreen: React.FC = () => {
 
       console.log("✅ Using Razorpay subscription ID:", subscriptionData.subscriptionId);
 
+      // CRITICAL: Ensure Razorpay key is a valid string to prevent native crash
+      const razorpayKey = subscriptionData.razorpayKey || RAZORPAY_KEY_ID || 'rzp_live_SSISrKJIaF1CMy';
+      
+      console.log('💳 Opening Razorpay checkout for profile:', businessProfileId);
+      console.log('🆔 Subscription ID:', subscriptionData.subscriptionId);
+      console.log('🔑 Using Razorpay Key:', razorpayKey ? 'FOUND' : 'MISSING');
+
       const options: any = {
         description: 'Business Profile Subscription',
-        key: subscriptionData.razorpayKey || RAZORPAY_KEY_ID,
+        key: razorpayKey,
         subscription_id: subscriptionData.subscriptionId,
         name: 'Market Brand',
         prefill: {
@@ -348,12 +373,43 @@ const BusinessProfilesScreen: React.FC = () => {
           name: currentUser?.name || currentUser?.companyName || 'User',
         },
         theme: { color: theme.colors.primary || '#667eea' },
+        method: {
+          upi: true,
+          card: true,
+          netbanking: false,
+          wallet: false,
+          emi: false,
+          paylater: false,
+        },
       };
 
       try {
-        await RazorpayCheckout.open(options);
-        setSuccessMessage('Subscription mandate approved successfully! Your profile will be activated once the payment is verified.');
-        setShowSuccessModal(true);
+        console.log('🚀 Triggering Razorpay native checkout...');
+        const razorpayResult = await RazorpayCheckout.open(options);
+        console.log('✅ Razorpay checkout result:', razorpayResult);
+        
+        // Start polling for activation status
+        console.log('✅ Payment successful, starting polling (5m window)');
+        pollingCleanupRef.current = startSubscriptionPolling(
+          () => {
+            // onActive: Subscription is now active!
+            console.log('✅ Subscription activated! Refreshing profiles.');
+            setSuccessMessage('Subscription activated! Your profile is now ready.');
+            setShowSuccessModal(true);
+            
+            // Refresh profiles to show updated status
+            loadBusinessProfiles();
+            refreshBusinessProfileSubscription(businessProfileId);
+          },
+          () => {
+            // onTimeout: 5 minutes passed
+            console.warn('⚠️ Polling timed out - activation may take longer');
+            setSuccessMessage('Subscription mandate approved successfully! Your profile will be activated once the payment is verified.');
+            setShowSuccessModal(true);
+          }
+        );
+
+        // Immediate single refresh as fallback
         refreshBusinessProfileSubscription(businessProfileId);
         loadBusinessProfiles();
       } catch (e: any) {
@@ -389,23 +445,21 @@ const BusinessProfilesScreen: React.FC = () => {
         }
       }
     } catch (error: any) {
-      console.error('❌ Payment flow error:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        code: error.code,
-        description: error.description,
-        stack: error.stack
-      });
+      console.error('❌ Payment flow error:', error);
       
       // Provide specific error messages
-      let errorMessage = error.message || 'Payment flow failed.';
+      let errorMessage = 'Payment flow failed.';
+      if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error && error.message) {
+        errorMessage = error.message;
+      }
       
-      if (error.code === 'PAYMENT_CANCELLED') {
+      if (error && error.code === 'PAYMENT_CANCELLED') {
         errorMessage = 'Payment was cancelled. Please try again.';
-      } else if (error.code === 'NETWORK_ERROR') {
+      } else if (error && error.code === 'NETWORK_ERROR') {
         errorMessage = 'Network error. Please check your connection and try again.';
-      } else if (error.code === 'INVALID_OPTIONS') {
+      } else if (error && error.code === 'INVALID_OPTIONS') {
         errorMessage = 'Invalid payment configuration. Please contact support.';
       }
       

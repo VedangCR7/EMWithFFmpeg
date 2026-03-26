@@ -442,6 +442,14 @@ class AuthService {
     this.saveUserToStorage(user).catch(error => {
       console.error('❌ Failed to persist user to storage:', error);
     });
+    // Explicitly notify listeners so React components update immediately
+    this.notifyAuthStateListeners(user);
+  }
+
+  // Centralized check for subscription status
+  isSubscriptionActive(): boolean {
+    const status = this.currentUser?.subscriptionStatus;
+    return status === 'Active' || status === 'ACTIVE';
   }
 
   // Debug helper: Check AsyncStorage status

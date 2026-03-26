@@ -663,7 +663,7 @@ const convertBusinessPosterToTemplate = (poster: any, categoryName: string): Tem
 
 const HomeScreen: React.FC = React.memo(() => {
   const { isDarkMode, theme } = useTheme();
-  const { refreshSubscription } = useSubscription();
+  const { isSubscriptionActive, refreshSubscription } = useSubscription();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<StackNavigationProp<MainStackParamList>>();
 
@@ -673,7 +673,7 @@ const HomeScreen: React.FC = React.memo(() => {
   const [userBusinessProfiles, setUserBusinessProfiles] = useState<BusinessProfile[]>([]);
   const [businessProfilesLoadingState, setBusinessProfilesLoadingState] = useState(false);
   const { selectedBusinessProfile, setSelectedBusinessProfile, initializeSelectedProfile, isLoading: isContextLoading } = useBusinessProfile();
-  const isActive = selectedBusinessProfile?.subscriptionStatus?.toUpperCase() === "ACTIVE";
+  const isActive = isSubscriptionActive;
   const selectedBusinessProfileId = selectedBusinessProfile?.id || null;
   const [isBusinessProfileDropdownVisible, setIsBusinessProfileDropdownVisible] = useState(false);
   const [businessProfileDropdownPosition, setBusinessProfileDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);

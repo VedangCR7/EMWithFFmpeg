@@ -296,7 +296,10 @@ RelatedPosterItem.displayName = 'RelatedPosterItem';
 type PosterPlayerScreenRouteProp = RouteProp<MainStackParamList, 'PosterPlayer'>;
 type PosterPlayerScreenNavigationProp = StackNavigationProp<MainStackParamList, 'PosterPlayer'>;
 
+import { useSubscription } from '../contexts/SubscriptionContext';
+
 const PosterPlayerScreen: React.FC = () => {
+  const { isSubscribed, checkPremiumAccess, refreshSubscription, isSubscriptionActive } = useSubscription();
   const { theme } = useTheme();
   const themeColors = theme.colors || {};
   const primaryColor = themeColors.primary || '#764ba2';

@@ -22,6 +22,7 @@ import ComingSoonModal from '../components/ComingSoonModal';
 import OptimizedImage from '../components/OptimizedImage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useBusinessProfile } from '../context/BusinessProfileContext';
+import { useSubscription } from '../contexts/SubscriptionContext';
 
 // Compact spacing multiplier to reduce all spacing (matching HomeScreen)
 const COMPACT_MULTIPLIER = 0.5;
@@ -143,45 +144,8 @@ const MyBusinessScreen: React.FC = () => {
   const dynamicVerticalScale = (size: number) => (currentScreenHeight / 667) * size;
   const dynamicModerateScale = (size: number, factor = 0.5) => size + (dynamicScale(size) - size) * factor;
 
-  const isActive = selectedBusinessProfile?.subscriptionStatus?.toUpperCase() === "ACTIVE";
-
-  if (!isActive) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#D4DAF5' }}>
-        <StatusBar barStyle="dark-content" />
-        <Icon name="lock" size={64} color={theme.colors.primary} />
-        <Text style={{ 
-          fontSize: 18, 
-          fontWeight: 'bold', 
-          marginTop: 16, 
-          color: theme.colors.text 
-        }}>
-          Subscription Required
-        </Text>
-        <Text style={{ 
-          fontSize: 14, 
-          marginTop: 8, 
-          color: theme.colors.textSecondary,
-          textAlign: 'center',
-          paddingHorizontal: 40
-        }}>
-          Please activate your business profile subscription to access this screen.
-        </Text>
-        <TouchableOpacity
-          style={{
-            marginTop: 24,
-            paddingHorizontal: 32,
-            paddingVertical: 12,
-            backgroundColor: theme.colors.primary,
-            borderRadius: 8
-          }}
-          onPress={() => navigation.navigate('BusinessProfiles')}
-        >
-          <Text style={{ color: '#fff', fontWeight: 'bold' }}>View Business Profiles</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  const { isSubscriptionActive } = useSubscription();
+  const isActive = isSubscriptionActive;
 
   // Responsive icon sizes (compact - 60% of original)
   const getIconSize = (baseSize: number) => {
@@ -413,6 +377,44 @@ const MyBusinessScreen: React.FC = () => {
   }, [cardWidth, cardHeight, columns, gap, handlePosterPress, theme]);
 
   const keyExtractor = useCallback((item: BusinessCategoryPoster) => item.id, []);
+
+  if (!isActive) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#D4DAF5' }}>
+        <StatusBar barStyle="dark-content" />
+        <Icon name="lock" size={64} color={theme.colors.primary} />
+        <Text style={{ 
+          fontSize: 18, 
+          fontWeight: 'bold', 
+          marginTop: 16, 
+          color: theme.colors.text 
+        }}>
+          Subscription Required
+        </Text>
+        <Text style={{ 
+          fontSize: 14, 
+          marginTop: 8, 
+          color: theme.colors.textSecondary,
+          textAlign: 'center',
+          paddingHorizontal: 40
+        }}>
+          Please activate your business profile subscription to access this screen.
+        </Text>
+        <TouchableOpacity
+          style={{
+            marginTop: 24,
+            paddingHorizontal: 32,
+            paddingVertical: 12,
+            backgroundColor: theme.colors.primary,
+            borderRadius: 8
+          }}
+          onPress={() => navigation.navigate('BusinessProfiles')}
+        >
+          <Text style={{ color: '#fff', fontWeight: 'bold' }}>View Business Profiles</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   // Pastel gradient colors for smooth, airy background (lightened)
   const pastelGradientColors = [

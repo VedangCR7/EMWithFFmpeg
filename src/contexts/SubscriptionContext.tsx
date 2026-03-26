@@ -43,6 +43,8 @@ interface SubscriptionContextType {
   refreshBusinessProfileSubscription: (profileId: string) => Promise<void>;
   // CRITICAL: Payment lock to prevent subscription updates during payment
   setPaymentInProgress: (inProgress: boolean) => void;
+  // Centralized subscription status check
+  isSubscriptionActive: boolean;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
@@ -154,7 +156,24 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
   useEffect(() => {
     const handleAuthStateChange = (user: any) => {
       const newUserId = user?.id || null;
-      console.log('🔔 Auth state changed, new user ID:', newUserId);
+      console.log('🔔 Auth state changed, updating subscription context. User:', newUserId, 'Status:', user?.subscriptionStatus);
+      
+      // Update our isSubscribed and subscriptionStatus states from the profile API source
+      if (user) {
+        const isCurrentlyActive = authService.isSubscriptionActive();
+        setIsSubscribed(isCurrentlyActive);
+        
+        // Only update subscriptionStatus if we don't have one or if the source changed
+        if (user.subscriptionStatus) {
+          // If we have a fuller object from subscriptionApi, we might want to keep it,
+          // but at minimum check the status string.
+          setSubscriptionStatus(prev => ({
+            ...(prev || {}),
+            status: user.subscriptionStatus.toLowerCase(),
+            isActive: isCurrentlyActive
+          } as any));
+        }
+      }
       
       // Trigger user change detection
       setCurrentUserId(newUserId);
@@ -628,6 +647,8 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       refreshBusinessProfileSubscription,
       // CRITICAL: Payment lock to prevent subscription updates during payment
       setPaymentInProgress,
+      // Centralized subscription status check based on profile API
+      isSubscriptionActive: isSubscribed || authService.isSubscriptionActive(),
     }}>
       {children}
     </SubscriptionContext.Provider>
