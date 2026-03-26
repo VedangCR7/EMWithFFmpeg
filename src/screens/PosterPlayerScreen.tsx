@@ -229,7 +229,6 @@ const RelatedPosterItem: React.FC<RelatedPosterItemProps> = React.memo(({
           uri={imageUrl}
           style={styles.relatedPosterImage}
           resizeMode="cover"
-          mode="thumbnail"
         />
       ) : (
         <View style={[styles.relatedPosterImage, { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.05)' }]}>
@@ -805,7 +804,8 @@ const PosterPlayerScreen: React.FC = () => {
   const preloadImages = useCallback((posters: Template[], startIndex: number = 0, count: number = 20) => {
     const imagesToPreload = posters.slice(startIndex, startIndex + count);
     imagesToPreload.forEach(poster => {
-      const imageUrl = poster.thumbnail || (poster as any).previewUrl || (poster as any).content?.background;
+      // Use high-quality image URL for preloading to ensure crisp grid images
+      const imageUrl = getHighQualityImageUrl(poster);
       if (imageUrl && !preloadedImagesRef.current.has(imageUrl)) {
         preloadedImagesRef.current.add(imageUrl);
         Image.prefetch(imageUrl).catch(() => {
@@ -813,7 +813,7 @@ const PosterPlayerScreen: React.FC = () => {
         });
       }
     });
-  }, []);
+  }, [getHighQualityImageUrl]);
 
   // Preload images when filteredPosters change (reduced batch sizes for better performance)
   useEffect(() => {
@@ -1131,7 +1131,7 @@ const PosterPlayerScreen: React.FC = () => {
     };
 
     fetchBusinessCategoryPosters();
-  }, [businessCategory, posterLimit, initialPoster, selectedLanguage, setAllTemplates]);
+  }, [businessCategory, posterLimit, initialPoster, setAllTemplates]);
 
   // Fetch greeting category templates when greetingCategory is provided
   useEffect(() => {
@@ -2062,7 +2062,7 @@ const PosterPlayerScreen: React.FC = () => {
     };
 
     fetchGreetingCategoryTemplates();
-  }, [greetingCategory, convertedInitialPoster.id, selectedLanguage, setAllTemplates]);
+  }, [greetingCategory, convertedInitialPoster.id, setAllTemplates]);
 
   // Fetch calendar posters when calendarDate is provided
   useEffect(() => {
@@ -3011,9 +3011,9 @@ const PosterPlayerScreen: React.FC = () => {
   }, [currentPoster?.id, currentPoster, getHighQualityImageUrl]);
 
   const renderRelatedPoster = useCallback(({ item }: { item: Template }) => {
-    // Prioritize thumbnailUrl for grid preview performance (smaller, optimized images)
-    // Fallback to thumbnail, then imageUrl for compatibility
-    const thumbnailUrl = (item as any).thumbnailUrl || item.thumbnail || '';
+    // Use high-quality image URL for grid preview instead of low-quality thumbnail
+    // This ensures crisp images in the grid while maintaining performance
+    const highQualityImageUrl = getHighQualityImageUrl(item);
 
     // Check if this item is selected - compare by ID first, then by thumbnail URL as fallback
     // Use currentPoster directly for more reliable comparison
@@ -3037,13 +3037,13 @@ const PosterPlayerScreen: React.FC = () => {
         item={item}
         cardWidth={cardWidth}
         cardHeight={cardHeight}
-        imageUrl={thumbnailUrl}
+        imageUrl={highQualityImageUrl}
         onPress={handlePosterSelect}
         isSelected={isSelected}
         overlayColors={previewOverlayColors}
       />
     );
-  }, [cardWidth, cardHeight, handlePosterSelect, currentPoster, previewOverlayColors]);
+  }, [cardWidth, cardHeight, handlePosterSelect, currentPoster, previewOverlayColors, getHighQualityImageUrl]);
 
 
   // Animated skeleton component for loading state
