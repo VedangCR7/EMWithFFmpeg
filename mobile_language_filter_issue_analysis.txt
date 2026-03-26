@@ -1,0 +1,231 @@
+# Mobile Language Filter Issue Analysis Report
+
+## ISSUE DESCRIPTION
+When a user clicks on a DATE image from the HomeScreen, the app navigates to PosterPlayerScreen and correctly displays posters belonging to that specific date. However, when the user presses a LANGUAGE filter button on PosterPlayerScreen, the posters change and start showing different images belonging to the user's business instead of only the posters associated with the selected date.
+
+## 1. NAVIGATION FLOW
+
+### HomeScreen → PosterPlayerScreen Navigation
+- **Source**: `HorizontalFestivalCalendar.tsx` line 634-645
+- **Navigation Call**:
+```typescript
+navigation.navigate('PosterPlayer', {
+  selectedPoster: poster,
+  relatedPosters: selectedDatePosters.filter(p => p.id !== poster.id),
+  calendarDate: dateString,
+  originScreen: 'Calendar',
+  selectedBusinessProfile: selectedBusinessProfile,
+  selectedBusinessProfileId: selectedBusinessProfile?.id,
+  businessCategory: selectedBusinessProfile?.category,
+});
+```
+
+### Key Navigation Parameters Passed
+- `calendarDate: dateString` - The selected date (e.g., "2025-03-02")
+- `selectedPoster: poster` - The specific poster clicked
+- `relatedPosters: selectedDatePosters.filter(p => p.id !== poster.id)` - Other posters for the same date
+- `originScreen: 'Calendar'` - Indicates navigation source
+- `selectedBusinessProfile` - User's business profile context
+
+## 2. DATA FLOW FROM HOMESCREEN → POSTERPLAYERSCREEN
+
+### Initial Poster Loading (Correct Behavior)
+- **Trigger**: `useEffect` with dependency `[calendarDate, initialPoster]` (line 2067-2166)
+- **API Call**: `calendarApi.getPostersByDate(calendarDate)` (line 2093)
+- **Data Processing**: Converts CalendarPoster to Template format (lines 2101-2121)
+- **State Update**: `setAllTemplates(ensuredTemplates)` (line 2138)
+- **Current Poster Set**: First poster from date-specific templates (line 2149-2153)
+
+### Date-Specific Template Loading Logic
+```typescript
+const fetchCalendarPosters = async () => {
+  const response = await calendarApi.getPostersByDate(calendarDate);
+  // Converts CalendarPoster to Template format
+  // Sets allTemplates with date-specific posters only
+  // Preserves calendarDate context
+};
+```
+
+## 3. LANGUAGE FILTER LOGIC
+
+### Language Filter Button Handler
+- **Function**: `handleLanguageChange` (line 2770-2810)
+- **Trigger**: User clicks language filter button (line 3230)
+- **Behavior**:
+  1. Marks user manually selected language: `userManuallySelectedLanguageRef.current = true`
+  2. Sets selected language: `setSelectedLanguage(languageId)`
+  3. **NO API CALLS MADE** - filtering is done locally
+  4. Updates current poster to first matching template from `allTemplates`
+
+### Language Filtering Implementation
+- **Method**: Local filtering using `templateContainsLanguage` function
+- **Data Source**: `allTemplates` state (should contain date-specific posters)
+- **Filtered Results**: `filteredPosters` useMemo (line 747-802)
+
+## 4. API CALLS TRIGGERED
+
+### Expected API Calls
+1. **Initial Load**: `calendarApi.getPostersByDate(calendarDate)` - ✅ CORRECT
+2. **Language Filter**: **NO API CALLS** - Local filtering only - ✅ CORRECT
+
+### ACTUAL PROBLEMATIC API CALLS
+**ROOT CAUSE IDENTIFIED**: `selectedLanguage` is included in useEffect dependencies, causing unintended API refetch:
+
+#### Business Category useEffect (Line 1134)
+```typescript
+}, [businessCategory, posterLimit, initialPoster, selectedLanguage, setAllTemplates]);
+```
+
+#### Greeting Category useEffect (Line 2065)  
+```typescript
+}, [greetingCategory, convertedInitialPoster.id, selectedLanguage, setAllTemplates]);
+```
+
+**CRITICAL ISSUE**: When user changes language filter, these useEffect hooks trigger API calls that fetch BUSINESS or GREETING templates, replacing the date-specific templates!
+
+## 5. STATE VARIABLES USED
+
+### Key State Variables
+- `allTemplates` - Contains current poster dataset (should be date-specific)
+- `selectedLanguage` - Current language filter ('all', 'english', 'hindi')
+- `calendarDate` - Selected date from navigation params
+- `currentPoster` - Currently displayed poster
+- `filteredPosters` - Computed filtered list based on language
+
+### State Management Flow
+1. **Initial**: `allTemplates` = date-specific posters ✅
+2. **Language Change**: `selectedLanguage` updates
+3. **PROBLEM**: useEffect triggers API call → `allTemplates` overwritten with business/greeting posters ❌
+4. **Result**: `filteredPosters` now filters business/greeting posters instead of date posters
+
+## 6. CACHE INSPECTION FINDINGS
+
+### Cache Analysis
+- **React State Cache**: `allTemplates` state gets overwritten by wrong API calls
+- **API Response Cache**: No caching issues detected
+- **AsyncStorage**: Used for business profiles only, not poster data
+- **useMemo Dependencies**: `filteredPosters` correctly depends on `allTemplates`
+
+### Cache Issue Summary
+The problem is NOT cache-related. The issue is that `allTemplates` state is being overwritten by incorrect API calls when language changes.
+
+## 7. ROOT CAUSE OF THE BUG
+
+### PRIMARY ROOT CAUSE
+**`selectedLanguage` is incorrectly included in useEffect dependencies for business and greeting category fetching, causing API calls to trigger when language filter is changed.**
+
+### Specific Problem Locations
+1. **Line 1134**: Business category useEffect includes `selectedLanguage` in dependencies
+2. **Line 2065**: Greeting category useEffect includes `selectedLanguage` in dependencies
+
+### Why This Affects Calendar Dates
+- When user navigates from calendar date, `calendarDate` is set
+- Language filter change triggers `setSelectedLanguage()`
+- useEffect dependencies include `selectedLanguage` → API calls trigger
+- Business/greeting APIs fetch different templates → overwrite `allTemplates`
+- Date-specific context is lost
+
+## 8. EXACT CODE LOCATION WHERE ISSUE OCCURS
+
+### File: `src/screens/PosterPlayerScreen.tsx`
+
+#### Problem Line 1134 (Business Category)
+```typescript
+}, [businessCategory, posterLimit, initialPoster, selectedLanguage, setAllTemplates]);
+```
+
+#### Problem Line 2065 (Greeting Category)  
+```typescript
+}, [greetingCategory, convertedInitialPoster.id, selectedLanguage, setAllTemplates]);
+```
+
+#### Correct Line 2166 (Calendar Category)
+```typescript
+}, [calendarDate, initialPoster]); // ✅ CORRECT - No selectedLanguage dependency
+```
+
+## 9. EXPLANATION OF WHY BUSINESS IMAGES ARE APPEARING
+
+### Step-by-Step Breakdown
+
+1. **User clicks date image** → Navigation with `calendarDate` parameter
+2. **PosterPlayerScreen loads** → `calendarApi.getPostersByDate()` fetches date-specific posters
+3. **`allTemplates` set** → Contains only date-specific posters ✅
+4. **User clicks language filter** → `handleLanguageChange()` called
+5. **`setSelectedLanguage()` triggered** → Language state updates
+6. **useEffect dependencies trigger** → Business/greeting category API calls execute
+7. **Wrong API responses** → Business/greeting templates fetched
+8. **`allTemplates` overwritten** → Date-specific posters replaced with business posters ❌
+9. **`filteredPosters` recomputed** → Now filters business posters instead of date posters
+10. **Result**: Business images appear instead of date-specific images
+
+### Why Business Specifically?
+- The business category useEffect runs even when `businessCategory` is undefined/null
+- API calls fetch templates based on business profile context
+- User's business profile determines which business posters appear
+
+## 10. RECOMMENDED FIX
+
+### Primary Fix: Remove selectedLanguage from useEffect Dependencies
+
+#### Fix 1: Business Category useEffect (Line 1134)
+**CHANGE FROM**:
+```typescript
+}, [businessCategory, posterLimit, initialPoster, selectedLanguage, setAllTemplates]);
+```
+
+**CHANGE TO**:
+```typescript
+}, [businessCategory, posterLimit, initialPoster, setAllTemplates]);
+```
+
+#### Fix 2: Greeting Category useEffect (Line 2065)
+**CHANGE FROM**:
+```typescript
+}, [greetingCategory, convertedInitialPoster.id, selectedLanguage, setAllTemplates]);
+```
+
+**CHANGE TO**:
+```typescript
+}, [greetingCategory, convertedInitialPoster.id, setAllTemplates]);
+```
+
+### Rationale
+- Language filtering is handled locally via `filteredPosters` useMemo
+- No API refetch needed when language changes
+- Calendar date loading already works correctly (no selectedLanguage dependency)
+- Business and greeting categories should follow the same pattern
+
+### Additional Safeguards
+1. Add conditional checks to prevent API calls when not applicable:
+```typescript
+// In business category useEffect
+if (!businessCategory) return;
+
+// In greeting category useEffect  
+if (!greetingCategory) return;
+```
+
+2. Ensure `activeCategoryRef` checks prevent race conditions
+
+## 11. FILES THAT NEED MODIFICATION
+
+### Primary File
+- `src/screens/PosterPlayerScreen.tsx`
+  - Line 1134: Remove `selectedLanguage` from business category useEffect dependencies
+  - Line 2065: Remove `selectedLanguage` from greeting category useEffect dependencies
+
+### Verification Files (No Changes Needed)
+- `src/components/HorizontalFestivalCalendar.tsx` - Navigation logic is correct
+- `src/screens/HomeScreen.tsx` - Navigation flow is correct
+- `src/services/calendarApi.ts` - API functions work correctly
+
+## SUMMARY
+
+The language filter bug is caused by incorrect useEffect dependencies that trigger unrelated API calls when the language filter is changed. The fix is simple: remove `selectedLanguage` from the dependency arrays of business and greeting category useEffect hooks, following the same pattern already correctly implemented for calendar date loading.
+
+This will ensure that:
+1. Language filtering remains a local operation
+2. Date-specific posters are preserved when language changes
+3. Only the intended category-specific useEffect hooks run
+4. Business images only appear when actually viewing business categories
