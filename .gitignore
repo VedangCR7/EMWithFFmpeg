@@ -92,3 +92,7 @@ eventmarketersbackend-main/
 # AAB analysis directories (generated files)
 aab_*/
 **/aab_*/
+
+# Git credentials and temporary files
+**/git-credentials
+**/repo_evaluator_*
