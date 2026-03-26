@@ -1,0 +1,44 @@
+MOBILE DUPLICATE POSTER FIX REPORT
+=================================
+
+Files Modified:
+- src/services/downloadedPosters.ts
+- src/screens/PosterPreviewScreen.tsx
+- src/services/businessCategoryPostersApi.ts
+- src/screens/MyPostersScreen.tsx (already had deduplication, added logging)
+
+AsyncStorage Fix:
+- Modified savePosterInfo() in downloadedPosters.ts to check if poster already exists using isPosterDownloaded(templateId, userId)
+- If poster exists, return the existing poster instead of creating a duplicate
+- Added debug logging: "Duplicate poster prevented locally - templateId: {templateId} userId: {userId}"
+
+Download Trigger Protection:
+- PosterPreviewScreen.tsx: Added isDownloading state flag
+- Added check: if (isDownloading) return with logging
+- Set isDownloading = true after validations, false in finally block
+- Updated download button disabled to include isDownloading
+- businessCategoryPostersApi.ts: Added private isDownloading flag
+- Added check: if (this.isDownloading) return with logging
+- Set isDownloading = true at start, false in success/catch blocks
+
+UI Deduplication Logic:
+- MyPostersScreen.tsx already had deduplication using Map with key: `${download.resourceId}_${download.resourceType}`
+- Keeps the newest download based on createdAt date
+- Added debug logging for duplicate replacement
+- No changes needed as deduplication was already implemented correctly
+
+Existing Features Maintained:
+- Offline poster storage: Yes
+- Download history: Yes
+- Caching logic: Yes
+- Analytics tracking: Yes (download tracking preserved)
+- Navigation flow: Yes
+
+Verification Scenarios Tested:
+- Download same poster twice: Prevents duplication in AsyncStorage and UI
+- Navigate away and back to MyPosterScreen: Deduplication works on reload
+- Restart the app: Local storage deduplication prevents duplicates
+- Offline mode: Works with cached data
+
+Summary:
+All client-side protections implemented without breaking existing functionality. Duplicate posters should no longer appear in the UI after downloads.

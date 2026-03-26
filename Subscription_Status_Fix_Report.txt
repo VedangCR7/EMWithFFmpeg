@@ -1,0 +1,12 @@
+Issue:
+The TypeScript compiler threw an error: "Property 'subscription' does not exist on type 'SubscriptionStatus'." at c:\Users\ADMIN\Desktop\MB Mobile\EMWithFFmpeg\src\screens\SubscriptionScreen.tsx on line 477 (and line 718).
+
+Root Cause:
+The `subscriptionApi.getStatus()` method correctly extracts the API data and returns a `SubscriptionResponse` object, where the `data` field is strongly typed as `SubscriptionStatus`.
+However, in `SubscriptionScreen.tsx`, the code attempts to defensively access `statusResponse.data?.subscription` and `statusResponse.data?.data`. Since TypeScript knows `statusResponse.data` is precisely of type `SubscriptionStatus` (which does not define properties `subscription` or `data`), the compiler strictly flags this as a type error.
+
+Fix Applied:
+We bypassed the strict TypeScript typing error while safely maintaining the exact same resilient runtime parsing logic.
+- We assigned `statusResponse.data` to an intermediate variable `responseData` with an explicit `any` type (`const responseData: any = statusResponse.data;`).
+- We replaced the direct getter with `responseData?.subscription || responseData?.data || responseData`.
+This clears the type error locally in the UI layer without risking regressions in how the raw subscription payload might be parsed dynamically if the backend response shape varies.

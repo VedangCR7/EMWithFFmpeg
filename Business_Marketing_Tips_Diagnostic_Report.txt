@@ -1,0 +1,43 @@
+DIAGNOSTIC REPORT: MISSING BUSINESS MARKETING TIPS IN TODAYSPICKSCREEN
+
+SECTION 1 — Files involved
+- src/screens/TodaysPickScreen.tsx: Handles the selection logic, daily shuffling, and UI rendering for Today's Picks.
+- src/services/greetingTemplates.ts: Provides getTemplatesByCategory call and performs initial server-side/client-side data filtering.
+- src/services/businessCategoryPostersApi.ts: Used for fetching business category posters which serve as a fallback.
+- src/context/BusinessProfileContext.tsx: Supplies the business profile used for fetching personalized business content.
+
+SECTION 2 — Data flow for Today's Picks
+1. Trigger: TodaysPickScreen component mounts and calls loadTodayPosters().
+2. Fetch: Parallel API calls are made to greetingTemplatesService (for Motivational and Marketing Tips) and businessCategoryPostersApi (for Business posters).
+3. Service Filtering: greetingTemplatesService.getTemplatesByCategory('Business Marketing Tips') fetches data and filters it based on strict category name matches.
+4. Selection: TodaysPickScreen receives the templates and applies a "Recent Days" filter (AsyncStorage check for last 7 days) to ensure the user doesn't see the same tip twice in a week.
+5. Shuffle: A seeded random selection picks a single tip for the day.
+6. Display: The component filters the final list by the user's selected language before rendering the sections.
+
+SECTION 3 — Category filtering logic
+- Frontend Filter (Strict): In greetingTemplates.ts, templates are filtered using:
+  (template.category || '').toLowerCase().trim() === 'business marketing tips'.
+- Fallback Filter: If no regular templates are found, the service looks into 'businessCategoryImages' in the response but again applies a strict string match for 'business marketing tips'.
+- Sectioning Filter: TodaysPickScreen again filters all collected posters by the string 'Business Marketing Tips' to place them in the correct UI section.
+
+SECTION 4 — Where Business Marketing Tips disappears
+- Point 1 (greetingTemplates.ts:257): Items disappear here if the backend uses a different name (e.g., "Marketing Tips" or "Business Tips").
+- Point 2 (TodaysPickScreen.tsx:972): availableTemplates becomes empty if all available tips have been seen in the last 7 days (7-day exhaustion).
+- Point 3 (TodaysPickScreen.tsx:1165): If the tip passes Point 1 and 2, it can still be removed by selectedLanguage filtering if it lacks specific language tags (it defaults to English-only).
+
+SECTION 5 — Root cause of the issue
+1. Overly Strict Matching: The primary cause is the requirement for an exact case-insensitive match for the string "Business Marketing Tips". Any slight naming deviation from the backend results in zero templates.
+2. Pool Exhaustion: The 7-day exclusion logic (getRecentDaysBatch) is likely too aggressive for this specific category if the total number of marketing tips is small.
+3. Language Exclusion: The templateContainsLanguage logic correctly identifies language-less templates as 'English', which causes them to disappear for users who have Hindi or Marathi selected.
+
+SECTION 6 — Evidence from the code
+- src/services/greetingTemplates.ts (Lines 257, 305): Strict category equality checks (===) prevent fuzzy matching or fallback to similar categories.
+- src/screens/TodaysPickScreen.tsx (Line 969): The filtering !recentDays.includes(t.id) can return zero items if the marketing tip pool is smaller than the 7-day window.
+- src/screens/TodaysPickScreen.tsx (Line 224-230): templateContainsLanguage returns false for non-english languages if tags are empty.
+- src/screens/TodaysPickScreen.tsx (Lines 696-704): Existing "TEMPORARY" cache clearing logic confirms that synchronization issues with this category were already suspected.
+
+SECTION 7 — Recommended fix strategy
+1. Relax Category Matching: Update greetingTemplates.ts to use .includes('marketing') or a predefined list of valid marketing-related category strings.
+2. Add Pool Safety: Modify the selection logic in TodaysPickScreen to ignore the 7-day exclusion filter if availableTemplates.length becomes 0, ensuring *something* is always shown.
+3. Language Agnostic: Explicitly mark "Business Marketing Tips" as language-agnostic or ensure they have all-language tags on the backend.
+4. Verification Logging: Implement temporary logging of the raw, unfiltered API response status for this specific category to identify the exact string being sent by the server.
