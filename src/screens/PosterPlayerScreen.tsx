@@ -993,6 +993,14 @@ const PosterPlayerScreen: React.FC = () => {
       return;
     }
 
+    // FIX #3: If calendarDate is also active, the calendar context takes priority.
+    // Do NOT fetch business category posters when the user is browsing a specific
+    // calendar date — doing so would overwrite the date-scoped allTemplates state.
+    if (calendarDate) {
+      console.log('🚫 [BUSINESS FETCH] Skipped — calendarDate context is active:', calendarDate);
+      return;
+    }
+
     // Track active category to prevent other useEffects from overwriting templates
     let categoryName: string;
     if (typeof businessCategory === 'object' && businessCategory?.name) {
@@ -1134,7 +1142,13 @@ const PosterPlayerScreen: React.FC = () => {
     };
 
     fetchBusinessCategoryPosters();
-  }, [businessCategory, posterLimit, initialPoster, selectedLanguage, setAllTemplates]);
+  // FIX #2: selectedLanguage intentionally removed from deps.
+  // Language filtering is done in-memory by the filteredPosters useMemo and
+  // does NOT require a new API call. Having selectedLanguage here caused the
+  // business-category API to re-fire every time the user pressed a language
+  // button, overwriting the date-scoped allTemplates with business posters.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [businessCategory, posterLimit, initialPoster, setAllTemplates, calendarDate]);
 
   // Fetch greeting category templates when greetingCategory is provided
   useEffect(() => {

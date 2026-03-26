@@ -1,0 +1,441 @@
+================================================================================
+  MOBILE APP BUG ANALYSIS REPORT
+  Issue: Language Filter Showing Business Posters Instead of Date Posters
+  Generated: 2026-03-26
+================================================================================
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. NAVIGATION FLOW
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+SOURCE FILE : src/components/HorizontalFestivalCalendar.tsx
+
+When a user taps a DATE image on the HomeScreen:
+  1. HomeScreen renders <HorizontalFestivalCalendar /> component
+  2. User selects a calendar date → handleDateSelect() fires → fetches posters
+     via calendarApi.getPostersByDate(dateString)
+  3. User taps a poster thumbnail → handlePosterPress(poster, dateString) fires
+
+handlePosterPress() navigates to PosterPlayer with these params (lines 634-645):
+
+  navigation.navigate('PosterPlayer', {
+    selectedPoster:           poster,
+    relatedPosters:           selectedDatePosters.filter(p => p.id !== poster.id),
+    calendarDate:             dateString,          ← CORRECT: date context
+    originScreen:             'Calendar',
+    selectedBusinessProfile:  selectedBusinessProfile,
+    selectedBusinessProfileId: selectedBusinessProfile?.id,
+    businessCategory:         selectedBusinessProfile?.category,  ← ⚠️ BUG SOURCE
+  });
+
+Key observation: BOTH calendarDate AND businessCategory are sent simultaneously.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. DATA FLOW: HomeScreen → PosterPlayerScreen
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  HomeScreen
+    └── HorizontalFestivalCalendar (date picker + poster thumbnails)
+          └── handlePosterPress() called on poster tap
+                └── navigation.navigate('PosterPlayer', { calendarDate, businessCategory, ...})
+                                                                  ↑              ↑
+                                              CORRECT context   POISON PARAM (leaks business context)
+
+PosterPlayerScreen receives route.params:
+  - calendarDate          = "2025-03-26"     (correct, date-scoped)
+  - businessCategory      = "Salon"          (wrong! business context leaking in)
+
+Both params are TRUTHY so TWO separate useEffects activate:
+
+  useEffect A (line 991):  if (!businessCategory) return; → RUNS ✓
+  useEffect B (line 2071): if (!calendarDate) return;     → RUNS ✓
+
+Both effects race to write allTemplates state. Calendar effect runs first and
+correctly sets date-scoped posters. But the business effect ALSO runs and sets
+business-category posters on top (see Section 4 for exact timing).
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. LANGUAGE FILTER LOGIC
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Language filter buttons (All / English / Hindi) reside in PosterPlayerScreen.tsx
+around lines 603-608:
+
+  const languages = useMemo(() => [
+    { id: 'all',     name: 'All',     code: 'ALL' },
+    { id: 'english', name: 'English', code: 'EN' },
+    { id: 'hindi',   name: 'Hindi',   code: 'HI' },
+  ], []);
+
+When user presses a language button:
+  → setSelectedLanguage(languageId) is called
+  → userManuallySelectedLanguageRef.current = true
+
+filteredPosters (lines 750-805) is a useMemo that filters allTemplates by
+selectedLanguage. It does NOT fetch any new data — filtering is purely
+frontend/in-memory.
+
+However, there is a critical side-effect: the businessCategory useEffect
+has selectedLanguage in its dependency array (see Section 4).
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+4. API CALLS TRIGGERED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+On entering PosterPlayerScreen (from calendar date tap):
+  [A] useEffect for businessCategory fires → calls:
+      businessCategoryPostersApi.getPostersByCategory(categoryName, limit)
+      Endpoint: /api/mobile/posters/category/{businessCategory}
+      This returns ALL posters for the business (e.g., all "Salon" posters).
+
+  [B] useEffect for calendarDate fires → calls:
+      calendarApi.getPostersByDate(calendarDate)
+      Endpoint: /api/mobile/calendar/posters/{date}
+      This returns ONLY posters for that specific date.
+
+On pressing language filter button:
+  → selectedLanguage state changes
+  → [A] businessCategory useEffect RE-FIRES because its dependency array
+      at line 1137 includes selectedLanguage:
+
+      }, [businessCategory, posterLimit, initialPoster, selectedLanguage, setAllTemplates]);
+                                                                ↑
+                                              ⚠️ CRITICAL BUG: This forces a
+                                              full API re-fetch every time the
+                                              language filter is changed
+
+  → fetchBusinessCategoryPosters() executes again
+  → businessCategoryPostersApi.getPostersByCategory() is called AGAIN
+  → setAllTemplates(ensuredTemplates) overwrites the calendar date posters
+     with business category posters
+
+  [B] calendarDate useEffect does NOT re-fire (its deps are [calendarDate, initialPoster])
+      so it cannot correct the overwritten state.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+5. STATE VARIABLES USED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  State Variable             Type         Role
+  ─────────────────────────  ───────────  ────────────────────────────────────
+  allTemplates               Template[]   Master list of posters. Gets overwritten
+                                          by businessCategory effect when language
+                                          filter is pressed.
+  filteredPosters            Template[]   useMemo derived from allTemplates +
+                                          selectedLanguage. No independent state.
+  selectedLanguage           string       Current language filter ('all', 'english',
+                                          'hindi'). Changing this triggers the bug.
+  calendarDate               string       Route param. Scopes initial poster fetch.
+  businessCategory           string       Route param. ⚠️ Incorrectly passed from
+                                          calendar nav. Triggers business API fetch.
+  activeCategoryRef          ref          Tracks which category type is "active".
+                                          Set to 'calendar' by calendarDate effect,
+                                          but then overwritten to 'business' by the
+                                          businessCategory effect.
+  userManuallySelectedLanguageRef ref     Prevents auto language detection after
+                                          manual selection. Does NOT prevent the
+                                          business API re-fetch.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6. CACHE INSPECTION FINDINGS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  (a) calendarApi (src/services/calendarApi.ts)
+      - Uses cacheService with cacheKey = "calendar_posters_date_{date}"
+      - Cache TTL = 2 minutes
+      - Also does clearCategoryCache() before fetching in business mode
+      - Calendar cache is SEPARATE from business cache — no cross-contamination
+        from the cache layer itself
+
+  (b) businessCategoryPostersApi
+      - Also uses cacheService with its own key per category name
+      - Line 1025: businessCategoryPostersApi.clearCategoryCache(categoryName)
+        is explicitly called BEFORE each fetch — meaning business posters are
+        always freshly fetched, never stale
+
+  (c) React Query / Axios caching
+      - No React Query or Axios interceptor-level caching found in the codebase
+      - All caching is done through the custom cacheService
+
+  (d) AsyncStorage
+      - AsyncStorage is used only for business profile persistence
+        (useBusinessProfile context), NOT for poster data
+
+  (e) useMemo / useCallback caching
+      - filteredPosters (useMemo) depends on allTemplates which gets overwritten
+        — this causes stale calendar poster data to be replaced silently
+      - setAllTemplates is wrapped in useCallback with [businessCategory,
+        greetingCategory, calendarDate] in its deps — the ref + logging wrapper
+        is correct but cannot prevent the overwrite
+
+  (f) FlatList keyExtractor
+      - No custom keyExtractor issues found that would cause stale UI
+
+  CACHE CONCLUSION:
+      Cache is NOT the primary cause of the bug. The issue is pure React state
+      overwrite caused by a misplaced navigation param and a misplaced dependency.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+7. ROOT CAUSE OF THE BUG
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  There are TWO compounding bugs that work together to produce the symptom:
+
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │  BUG #1 (Navigation) — Poison Parameter                                  │
+  │                                                                          │
+  │  File: src/components/HorizontalFestivalCalendar.tsx, Line 643          │
+  │                                                                          │
+  │  businessCategory: selectedBusinessProfile?.category,                    │
+  │                                                                          │
+  │  The calendar navigator passes the user's business profile category      │
+  │  (e.g., "Salon") as `businessCategory` to PosterPlayerScreen.           │
+  │  This was likely intended to enable branded overlays, but it             │
+  │  inadvertently activates the business-category poster fetching           │
+  │  useEffect, which is supposed to only run when the user is browsing      │
+  │  business categories — NOT when browsing calendar dates.                 │
+  └──────────────────────────────────────────────────────────────────────────┘
+
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │  BUG #2 (useEffect dependency) — Re-fetch on Language Change             │
+  │                                                                          │
+  │  File: src/screens/PosterPlayerScreen.tsx, Line 1137                    │
+  │                                                                          │
+  │  }, [businessCategory, posterLimit, initialPoster,                       │
+  │      selectedLanguage,    ← ⚠️ THIS IS THE TRIGGER                      │
+  │      setAllTemplates]);                                                   │
+  │                                                                          │
+  │  selectedLanguage is in the businessCategory useEffect's dependency      │
+  │  array. Every time the user taps a language button, selectedLanguage     │
+  │  changes, which causes the entire businessCategory useEffect to re-run.  │
+  │  This fires a new API call to /api/mobile/posters/category/{category}   │
+  │  and the response OVERWRITES allTemplates with business posters,         │
+  │  erasing the calendar date posters that were correctly loaded.           │
+  └──────────────────────────────────────────────────────────────────────────┘
+
+  COMBINED EFFECT:
+    1. HorizontalFestivalCalendar sends businessCategory in nav params
+    2. PosterPlayerScreen receives it → both calendar + business useEffects run
+    3. Calendar effect correctly loads date posters into allTemplates
+    4. Business effect also loads business posters into allTemplates (race condition)
+    5. User taps language filter → selectedLanguage changes
+    6. Business useEffect fires AGAIN due to selectedLanguage in deps
+    7. Business API re-fetches and DEFINITIVELY overwrites allTemplates
+    8. Calendar date context is completely lost
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+8. EXACT CODE LOCATIONS WHERE THE ISSUE OCCURS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  LOCATION 1 — Root trigger (wrong param passed)
+  ───────────────────────────────────────────────
+  File   : src/components/HorizontalFestivalCalendar.tsx
+  Lines  : 634–645  (handlePosterPress function)
+
+    navigation.navigate('PosterPlayer', {
+      selectedPoster: poster,
+      relatedPosters: selectedDatePosters.filter(p => p.id !== poster.id),
+      calendarDate: dateString,
+      originScreen: 'Calendar',
+      selectedBusinessProfile: selectedBusinessProfile,
+      selectedBusinessProfileId: selectedBusinessProfile?.id,
+      businessCategory: selectedBusinessProfile?.category,   ← LINE 643: BUG #1
+    });
+
+  LOCATION 2 — Re-fetch on language change (useEffect dependency)
+  ────────────────────────────────────────────────────────────────
+  File   : src/screens/PosterPlayerScreen.tsx
+  Line   : 1137  (end of businessCategory useEffect dependency array)
+
+    }, [businessCategory, posterLimit, initialPoster, selectedLanguage, setAllTemplates]);
+                                                      ↑
+                                                      LINE 1137: BUG #2
+                                                      selectedLanguage causes re-fetch
+
+  LOCATION 3 — activeCategoryRef gets overwritten
+  ────────────────────────────────────────────────
+  File   : src/screens/PosterPlayerScreen.tsx
+  Lines  : 1007–1013  (inside businessCategory useEffect)
+
+    activeCategoryRef.current = { type: 'business', value: categoryName };
+
+  This overwrites the 'calendar' type that was set by the calendarDate effect
+  at line 2092, removing the race-condition guard for the calendar fetch.
+
+  LOCATION 4 — allTemplates overwrite
+  ────────────────────────────────────────────────
+  File   : src/screens/PosterPlayerScreen.tsx
+  Line   : 1077
+
+    setAllTemplates(ensuredTemplates);
+
+  This call inside fetchBusinessCategoryPosters() overwrites calendar posters.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+9. WHY BUSINESS IMAGES APPEAR INSTEAD OF DATE POSTERS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Step-by-step sequence after user presses a language filter:
+
+  1. User taps "Hindi" button on PosterPlayerScreen.
+  2. React calls setSelectedLanguage('hindi').
+  3. selectedLanguage state changes from 'all' → 'hindi'.
+  4. React re-evaluates all useEffects whose deps include selectedLanguage.
+  5. The businessCategory useEffect (line 991) has selectedLanguage in its deps
+     (line 1137) → React QUEUES this effect to re-run.
+  6. fetchBusinessCategoryPosters() executes:
+       - Clears business category cache: clearCategoryCache(categoryName)
+       - Calls API: /api/mobile/posters/category/Salon?limit=1000
+       - Receives ~N business posters (e.g., all Salon posters)
+       - Calls setAllTemplates(ensuredTemplates) → OVERWRITES calendar posters
+  7. React re-renders: allTemplates now contains Salon business posters
+  8. filteredPosters (useMemo) recomputes from new allTemplates filtered by
+     selectedLanguage='hindi' → shows Hindi Salon posters
+  9. User sees Salon/business images instead of the date-specific festival images.
+
+  The calendar date posters are GONE from state. There is no mechanism to
+  restore them without navigating back and re-entering the screen.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+10. RECOMMENDED FIX
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  FIX #1 — Remove businessCategory from calendar navigation params (PRIMARY FIX)
+  ──────────────────────────────────────────────────────────────────────────────
+  File: src/components/HorizontalFestivalCalendar.tsx, Lines 634–645
+
+  CURRENT (buggy):
+    navigation.navigate('PosterPlayer', {
+      selectedPoster: poster,
+      relatedPosters: selectedDatePosters.filter(p => p.id !== poster.id),
+      calendarDate: dateString,
+      originScreen: 'Calendar',
+      selectedBusinessProfile: selectedBusinessProfile,
+      selectedBusinessProfileId: selectedBusinessProfile?.id,
+      businessCategory: selectedBusinessProfile?.category,  ← REMOVE THIS LINE
+    });
+
+  FIXED:
+    navigation.navigate('PosterPlayer', {
+      selectedPoster: poster,
+      relatedPosters: selectedDatePosters.filter(p => p.id !== poster.id),
+      calendarDate: dateString,
+      originScreen: 'Calendar',
+      selectedBusinessProfile: selectedBusinessProfile,
+      selectedBusinessProfileId: selectedBusinessProfile?.id,
+      // businessCategory intentionally NOT passed — we are in calendar context,
+      // not business category context. Passing it activates the business poster
+      // API fetch which overwrites calendar date posters.
+    });
+
+  Why this works: Without businessCategory in route.params, the business
+  useEffect in PosterPlayerScreen returns early (line 992: if (!businessCategory) return)
+  and only the calendarDate useEffect runs. Business profile branding (logo,
+  overlay) is still available via selectedBusinessProfile param.
+
+  ─────────────────────────────────────────────────────────────────────────────
+
+  FIX #2 — Remove selectedLanguage from businessCategory useEffect deps
+  (DEFENSIVE FIX — prevents re-fetch on language change even if Fix #1 is missed)
+  ──────────────────────────────────────────────────────────────────────────────
+  File: src/screens/PosterPlayerScreen.tsx, Line 1137
+
+  CURRENT (buggy):
+    }, [businessCategory, posterLimit, initialPoster, selectedLanguage, setAllTemplates]);
+
+  FIXED:
+    }, [businessCategory, posterLimit, initialPoster, setAllTemplates]);
+    // selectedLanguage removed — language filtering is done in filteredPosters
+    // (useMemo) and does NOT require re-fetching from the API.
+
+  Why this works: The actual language filtering is already handled by the
+  filteredPosters useMemo (lines 750–805), which reads allTemplates and applies
+  templateContainsLanguage() on them. No API re-fetch is needed when the
+  language changes — filtering is entirely frontend/in-memory.
+
+  ─────────────────────────────────────────────────────────────────────────────
+
+  FIX #3 — Add calendarDate guard inside businessCategory useEffect
+  (BELT & SUSPENDERS — prevents the two effects from firing concurrently)
+  ──────────────────────────────────────────────────────────────────────────────
+  File: src/screens/PosterPlayerScreen.tsx, Lines 991–993
+
+  CURRENT:
+    useEffect(() => {
+      if (!businessCategory) {
+        return;
+      }
+
+  FIXED:
+    useEffect(() => {
+      if (!businessCategory) {
+        return;
+      }
+      // If calendarDate is also provided, calendar context takes priority.
+      // Do NOT fetch business category posters when browsing calendar dates.
+      if (calendarDate) {
+        return;
+      }
+
+  Why this works: Even if businessCategory is accidentally passed alongside
+  calendarDate in future navigation calls, the business useEffect will abort
+  early and yield to the calendar useEffect.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+11. FILES THAT NEED MODIFICATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Priority  File                                              Change
+  ────────  ─────────────────────────────────────────────    ────────────────
+  HIGH      src/components/HorizontalFestivalCalendar.tsx    Remove line 643:
+                                                             businessCategory param
+                                                             from navigation call
+
+  HIGH      src/screens/PosterPlayerScreen.tsx               Line 1137: remove
+                                                             selectedLanguage from
+                                                             businessCategory
+                                                             useEffect dep array
+
+  MEDIUM    src/screens/PosterPlayerScreen.tsx               Lines 991-993: add
+                                                             calendarDate guard at
+                                                             top of businessCategory
+                                                             useEffect
+
+  LOW       src/navigation/types.ts                          (Optional) Add type
+                                                             documentation noting
+                                                             businessCategory and
+                                                             calendarDate are
+                                                             mutually exclusive
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SUMMARY TABLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Question                                Answer
+  ──────────────────────────────────────  ────────────────────────────────────
+  Is selectedDate preserved?              YES — calendarDate param is correct
+  Does language filter fetch new data?    YES — it re-triggers businessCategory
+                                          useEffect due to selectedLanguage dep
+  Which API is called on language press?  /api/mobile/posters/category/{cat}
+  Does date param get passed in filter?   NO — business API ignores calendarDate
+  Is filtering done frontend or backend?  Should be frontend; but bug causes a
+                                          full backend re-fetch for the wrong API
+  Is cache the root cause?               NO — cache is separate and correct
+  Is allTemplates overwritten?            YES — by the business category effect
+  What triggers the overwrite?            Pressing any language filter button
+
+================================================================================
+END OF REPORT
+================================================================================

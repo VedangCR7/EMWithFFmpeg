@@ -28,11 +28,11 @@ import businessCategoriesService from '../services/businessCategoriesService';
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 // Create a stable FloatingInput component outside the main component
-const FloatingInput = React.memo(({ 
-  value, 
-  onChangeText, 
-  field, 
-  placeholder, 
+const FloatingInput = React.memo(({
+  value,
+  onChangeText,
+  field,
+  placeholder,
   focusedField,
   setFocusedField,
   theme,
@@ -64,7 +64,7 @@ const FloatingInput = React.memo(({
       ref={inputRef}
       style={[
         styles.input,
-        { 
+        {
           backgroundColor: theme.colors.inputBackground,
           color: theme.colors.text,
           borderColor: theme.colors.border
@@ -159,21 +159,21 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
     }
   };
 
-  
+
   // Fetch business categories from API
   useEffect(() => {
     const fetchCategories = async () => {
       if (!visible) return; // Only fetch when form is visible
-      
+
       setLoadingCategories(true);
       try {
         console.log('📡 [BUSINESS PROFILE FORM] Fetching business categories...');
         const response = await businessCategoriesService.getBusinessCategories();
-        
+
         if (response.success && response.categories && response.categories.length > 0) {
           // Store all categories data for filtering
           setAllCategoriesData(response.categories);
-          
+
           // Extract unique parentCategoryName values for Business Category dropdown
           const parentCategoryNames: string[] = [];
           response.categories.forEach(cat => {
@@ -182,7 +182,7 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
             }
           });
           const uniqueParentCategories = [...new Set(parentCategoryNames)].sort();
-          
+
           setBusinessCategories(uniqueParentCategories);
           console.log('✅ [BUSINESS PROFILE FORM] Business categories loaded:', uniqueParentCategories.length);
           console.log('📋 [BUSINESS PROFILE FORM] Business categories:', uniqueParentCategories);
@@ -206,14 +206,14 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
   // Filter subcategories based on selected business category
   const fetchSubcategories = (selectedBusinessCategory: string) => {
     console.log('📡 [BUSINESS PROFILE FORM] Filtering subcategories for business category:', selectedBusinessCategory);
-    
+
     // Filter categories where parentCategoryName matches the selected business category
     const filteredSubcategories = allCategoriesData.filter(category => {
       return category.parentCategoryName === selectedBusinessCategory;
     });
-    
+
     console.log('📋 [BUSINESS PROFILE FORM] Found subcategories:', filteredSubcategories.length);
-    
+
     // Map to the expected format for the dropdown
     const subcategoryOptions = filteredSubcategories.map(category => ({
       id: category.id,
@@ -224,7 +224,7 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
       icon: category.icon,
       color: category.color
     }));
-    
+
     setSubcategories(subcategoryOptions);
     setLoadingSubcategories(false);
   };
@@ -258,7 +258,7 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
 
   const handleInputChange = (field: string, value: string) => {
     console.log('🔍 [BUSINESS FORM] Field changed:', { field, value });
-    
+
     // Real-time phone validation with digit count
     if (field === 'phone') {
       // Only allow digits
@@ -267,13 +267,13 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
         ...prev,
         [field]: digitsOnly,
       }));
-      
+
       // Validate as user types with digit count
       const error = validatePhone(digitsOnly);
       setPhoneValidationError(error);
       return;
     }
-    
+
     // Real-time alternate phone validation with digit count
     if (field === 'alternatePhone') {
       // Only allow digits
@@ -282,7 +282,7 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
         ...prev,
         [field]: digitsOnly,
       }));
-      
+
       // Validate as user types (optional field)
       if (digitsOnly.trim()) {
         const error = validatePhone(digitsOnly);
@@ -292,7 +292,7 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
       }
       return;
     }
-    
+
     // Handle business category selection - filter subcategories
     if (field === 'category') {
       setFormData(prev => ({
@@ -300,7 +300,7 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
         [field]: value,
         subcategory: '', // Reset subcategory when business category changes
       }));
-      
+
       // Filter subcategories for the selected business category
       if (value) {
         setLoadingSubcategories(true);
@@ -330,7 +330,7 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
   const handleImageSelected = async (imageUri: string) => {
     setLogoImage(imageUri);
     setShowImagePickerModal(false);
-    
+
     // For new profile creation, we'll upload during form submission
     // For existing profile editing, upload immediately
     if (profile?.id) {
@@ -456,9 +456,9 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
   const handleSubmit = async () => {
     console.log('🔍 [BUSINESS FORM] Register button clicked');
     console.log('🔍 [BUSINESS FORM] Form data being submitted:', formData);
-    
+
     const validation = validateForm();
-    
+
     if (!validation.isValid) {
       console.log('⚠️ [BUSINESS FORM] Validation failed:', validation.errors);
       setValidationErrors(validation.errors);
@@ -471,14 +471,14 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
       try {
         setUploadingImage(true);
         console.log('📤 [BUSINESS FORM] Uploading logo for new profile creation...');
-        
+
         // For new profiles, we need to create the profile first, then upload the image
         // So we'll submit the form without the logo, then upload it after getting the profile ID
         const formDataWithoutLogo = { ...formData, companyLogo: '', logo: '' };
-        
+
         console.log('✅ [BUSINESS FORM] Form validation passed, submitting to parent (without logo)');
         onSubmit(formDataWithoutLogo, formData.companyLogo); // Pass original logo URI separately
-        
+
       } catch (error) {
         console.error('❌ [BUSINESS FORM] Failed to prepare logo upload:', error);
         Alert.alert('Upload Failed', 'Failed to prepare logo upload. Please try again.');
@@ -491,7 +491,7 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
     }
   };
 
-  
+
 
   return (
     <>
@@ -501,610 +501,609 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
         presentationStyle="pageSheet"
         onRequestClose={onClose}
       >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.container}
-      >
-        <LinearGradient
-          colors={theme.colors.gradient}
-          style={styles.gradientBackground}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.container}
         >
-          {/* Header */}
-          <View style={styles.header}>
-            <TouchableOpacity 
-              onPress={onClose} 
-              style={[styles.closeButton, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)' }]}
-            >
-              <Text style={[styles.closeButtonText, { color: isDarkMode ? '#ffffff' : '#1a1a1a' }]}>CLOSE</Text>
-            </TouchableOpacity>
-            <Text style={[styles.headerTitle, { color: isDarkMode ? '#ffffff' : '#1a1a1a' }]}>
-              {profile ? 'Edit Business Profile' : 'Business Registration'}
-            </Text>
-            <TouchableOpacity 
-              onPress={handleSubmit} 
-              style={[
-                styles.saveButton, 
-                { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(102,126,234,0.15)' },
-                (loading || uploadingImage) && styles.saveButtonDisabled
-              ]}
-              disabled={loading || uploadingImage}
-            >
-              {(loading || uploadingImage) ? (
-                <ActivityIndicator size="small" color={isDarkMode ? '#ffffff' : '#667eea'} />
-              ) : (
-                <Text style={[styles.saveButtonText, { color: isDarkMode ? '#ffffff' : '#667eea' }]}>{profile ? 'SAVE' : 'REGISTER'}</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView 
-            style={styles.content} 
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="none"
+          <LinearGradient
+            colors={theme.colors.gradient}
+            style={styles.gradientBackground}
           >
-            {/* Company Information */}
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: isDarkMode ? '#ffffff' : '#1a1a1a' }]}>Company Information *</Text>
-              
-                             <FloatingInput
-                 value={formData.name}
-                 onChangeText={(value) => handleInputChange('name', value)}
-                 field="name"
-                 placeholder="Enter company name *"
-                 focusedField={focusedField}
-                 setFocusedField={setFocusedField}
-                 theme={theme}
-                inputRef={registerInputRef('name')}
-                onSubmitEditing={handleSubmitEditing('phone')}
-               />
-
-              {/* Company Logo Upload */}
-              <View style={styles.inputContainer}>
-                <Text style={[styles.sectionTitle, { color: isDarkMode ? '#ffffff' : '#1a1a1a' }]}>
-                  Company Logo
-                </Text>
-                <View style={[
-                  styles.logoUploadContainer,
-                  { 
-                    backgroundColor: theme.colors.inputBackground,
-                    borderColor: theme.colors.border
-                  },
-                  focusedField === 'logo' && [styles.inputFocused, { borderColor: theme.colors.primary }]
-                ]}>
-                  {logoImage ? (
-                    <View style={styles.logoPreviewContainer}>
-                      <View style={styles.logoPreviewWrapper}>
-                        <Image source={{ uri: logoImage }} style={styles.logoPreview} />
-                        {uploadingImage && (
-                          <View style={styles.logoUploadOverlay}>
-                            <ActivityIndicator size="small" color="#ffffff" />
-                            <Text style={styles.uploadingText}>Uploading...</Text>
-                          </View>
-                        )}
-                        <View style={styles.logoOverlay}>
-                          <Icon name="photo" size={24} color="#ffffff" />
-                        </View>
-                      </View>
-                      <View style={styles.logoActionButtons}>
-                        <TouchableOpacity 
-                          style={styles.logoActionButton}
-                          onPress={handleImagePickerPress}
-                          disabled={uploadingImage}
-                        >
-                          <Icon name="edit" size={16} color="#ffffff" style={styles.buttonIcon} />
-                          <Text style={styles.logoActionButtonText}>Change</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity 
-                          style={[styles.logoActionButton, styles.removeLogoButton]}
-                          onPress={() => {
-                            setLogoImage(null);
-                            setFormData(prev => ({ ...prev, companyLogo: '' }));
-                          }}
-                          disabled={uploadingImage}
-                        >
-                          <Icon name="delete" size={16} color="#ffffff" style={styles.buttonIcon} />
-                          <Text style={styles.logoActionButtonText}>Remove</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                                     ) : (
-                     <View style={styles.logoPlaceholder}>
-                       <TouchableOpacity 
-                         style={styles.uploadAreaButton}
-                         onPress={handleUploadAreaClick}
-                       >
-                         <View style={styles.logoIconContainer}>
-                           <Icon name="add-a-photo" size={24} color="#667eea" />
-                         </View>
-                                                   <Text style={[styles.logoPlaceholderTitle, { color: theme.colors.text }]}>Upload Company Logo</Text>
-                          <Text style={[styles.logoPlaceholderSubtext, { color: theme.colors.textSecondary }]}>Tap to select from gallery or take a photo</Text>
-                       </TouchableOpacity>
-                     </View>
-                   )}
-                </View>
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Text style={[styles.sectionTitle, { color: isDarkMode ? '#ffffff' : '#1a1a1a' }]}>
-                  Business Category {profile ? '' : '*'}
-                </Text>
-                {profile ? (
-                  // Edit mode: Show category as read-only
-                  <View style={[
-                    styles.pickerContainer,
-                    styles.pickerContainerDisabled,
-                    { 
-                      backgroundColor: theme.colors.inputBackground,
-                      borderColor: theme.colors.border,
-                      opacity: 0.6
-                    }
-                  ]}>
-                    <Text style={[styles.pickerText, { color: theme.colors.textSecondary }]}>
-                      {formData.category || 'No category'}
-                    </Text>
-                    <Icon name="lock" size={16} color={theme.colors.textSecondary} style={{ marginLeft: 8 }} />
-                  </View>
+            {/* Header */}
+            <View style={styles.header}>
+              <TouchableOpacity
+                onPress={onClose}
+                style={[styles.closeButton, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)' }]}
+              >
+                <Text style={[styles.closeButtonText, { color: isDarkMode ? '#ffffff' : '#1a1a1a' }]}>CLOSE</Text>
+              </TouchableOpacity>
+              <Text style={[styles.headerTitle, { color: isDarkMode ? '#ffffff' : '#1a1a1a' }]}>
+                {profile ? 'Edit Business Profile' : 'Business Registration'}
+              </Text>
+              <TouchableOpacity
+                onPress={handleSubmit}
+                style={[
+                  styles.saveButton,
+                  { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(102,126,234,0.15)' },
+                  (loading || uploadingImage) && styles.saveButtonDisabled
+                ]}
+                disabled={loading || uploadingImage}
+              >
+                {(loading || uploadingImage) ? (
+                  <ActivityIndicator size="small" color={isDarkMode ? '#ffffff' : '#667eea'} />
                 ) : (
-                  // New profile mode: Allow category selection
-                  <>
-                    {/* Selected Category Display */}
-                    <View style={styles.selectedCategoryContainer}>
-                      <TextInput
-                        style={[
-                          styles.selectedCategoryInput,
-                          { 
-                            color: theme.colors.text,
-                            borderColor: formData.category ? theme.colors.primary : theme.colors.border,
-                            backgroundColor: theme.colors.inputBackground,
-                          }
-                        ]}
-                        value={formData.category}
-                        placeholder="Select your business category *"
-                        placeholderTextColor={theme.colors.textSecondary}
-                        editable={false}
-                        pointerEvents="none"
-                      />
-                    </View>
-                    
-                    {/* Category Options */}
-                    {loadingCategories ? (
-                      <View style={styles.categoryLoadingContainer}>
-                        <ActivityIndicator size="small" color={theme.colors.primary} />
-                        <Text style={[styles.categoryLoadingText, { color: theme.colors.textSecondary }]}>
-                          Loading categories...
-                        </Text>
-                      </View>
-                    ) : businessCategories.length === 0 ? (
-                      <View style={styles.categoryEmptyContainer}>
-                        <Icon name="info-outline" size={20} color={theme.colors.textSecondary} />
-                        <Text style={[styles.categoryEmptyText, { color: theme.colors.textSecondary }]}>
-                          No categories available. Please try again later.
-                        </Text>
-                      </View>
-                    ) : (
-                      <ScrollView 
-                        horizontal 
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.categoryScrollContent}
-                      >
-                        {businessCategories.map((category) => (
-                          <TouchableOpacity
-                            key={category}
-                            style={[
-                              styles.categoryOption,
-                              { 
-                                backgroundColor: formData.category === category 
-                                  ? theme.colors.primary 
-                                  : (isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(102,126,234,0.1)'),
-                                borderColor: formData.category === category 
-                                  ? theme.colors.primary 
-                                  : (isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(102,126,234,0.3)'),
-                              },
-                              formData.category === category && {
-                                shadowColor: theme.colors.primary,
-                                shadowOffset: { width: 0, height: 2 },
-                                shadowOpacity: 0.3,
-                                shadowRadius: 4,
-                                elevation: 5,
-                              }
-                            ]}
-                            onPress={() => handleInputChange('category', category)}
-                          >
-                            <Text style={[
-                              styles.categoryOptionText,
-                              { 
-                                color: formData.category === category 
-                                  ? '#ffffff' 
-                                  : (isDarkMode ? '#ffffff' : theme.colors.primary)
-                              },
-                              formData.category === category && styles.categoryOptionTextSelected
-                            ]}>
-                              {category}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </ScrollView>
-                    )}
-                  </>
+                  <Text style={[styles.saveButtonText, { color: isDarkMode ? '#ffffff' : '#667eea' }]}>{profile ? 'SAVE' : 'REGISTER'}</Text>
                 )}
-                {profile && (
-                  <Text style={[styles.categoryDisabledHint, { color: theme.colors.textSecondary }]}>
-                    Business category cannot be changed after creation
-                  </Text>
-                )}
-              </View>
+              </TouchableOpacity>
             </View>
 
-            {/* Subcategory Field - Only show if category is selected and subcategories exist */}
-            {!profile && formData.category && subcategories.length > 0 && (
-              <View style={styles.inputContainer}>
-                <Text style={[styles.sectionTitle, { color: isDarkMode ? '#ffffff' : '#1a1a1a' }]}>
-                  Business Subcategory *
-                </Text>
-                
-                {/* Selected Subcategory Display */}
-                <View style={[
-                  styles.pickerContainer,
-                  {
-                    backgroundColor: theme.colors.inputBackground,
-                    borderColor: theme.colors.border
-                  },
-                  focusedField === 'subcategory' && [styles.inputFocused, { borderColor: theme.colors.primary }]
-                ]}>
-                  {loadingSubcategories ? (
-                    <View style={styles.categoryLoadingContainer}>
-                      <ActivityIndicator size="small" color={theme.colors.primary} />
-                      <Text style={[styles.pickerText, { color: theme.colors.textSecondary, marginLeft: 8 }]}>
-                        Loading subcategories...
+            <ScrollView
+              style={styles.content}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="none"
+            >
+              {/* Company Information */}
+              <View style={styles.section}>
+                <Text style={[styles.sectionTitle, { color: isDarkMode ? '#ffffff' : '#1a1a1a' }]}>Company Information *</Text>
+
+                <FloatingInput
+                  value={formData.name}
+                  onChangeText={(value) => handleInputChange('name', value)}
+                  field="name"
+                  placeholder="Enter company name *"
+                  focusedField={focusedField}
+                  setFocusedField={setFocusedField}
+                  theme={theme}
+                  inputRef={registerInputRef('name')}
+                  onSubmitEditing={handleSubmitEditing('phone')}
+                />
+
+                {/* Company Logo Upload */}
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.sectionTitle, { color: isDarkMode ? '#ffffff' : '#1a1a1a' }]}>
+                    Company Logo
+                  </Text>
+                  <View style={[
+                    styles.logoUploadContainer,
+                    {
+                      backgroundColor: theme.colors.inputBackground,
+                      borderColor: theme.colors.border
+                    },
+                    focusedField === 'logo' && [styles.inputFocused, { borderColor: theme.colors.primary }]
+                  ]}>
+                    {logoImage ? (
+                      <View style={styles.logoPreviewContainer}>
+                        <View style={styles.logoPreviewWrapper}>
+                          <Image source={{ uri: logoImage }} style={styles.logoPreview} />
+                          {uploadingImage && (
+                            <View style={styles.logoUploadOverlay}>
+                              <ActivityIndicator size="small" color="#ffffff" />
+                              <Text style={styles.uploadingText}>Uploading...</Text>
+                            </View>
+                          )}
+                          <View style={styles.logoOverlay}>
+                            <Icon name="photo" size={24} color="#ffffff" />
+                          </View>
+                        </View>
+                        <View style={styles.logoActionButtons}>
+                          <TouchableOpacity
+                            style={styles.logoActionButton}
+                            onPress={handleImagePickerPress}
+                            disabled={uploadingImage}
+                          >
+                            <Icon name="edit" size={16} color="#ffffff" style={styles.buttonIcon} />
+                            <Text style={styles.logoActionButtonText}>Change</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.logoActionButton, styles.removeLogoButton]}
+                            onPress={() => {
+                              setLogoImage(null);
+                              setFormData(prev => ({ ...prev, companyLogo: '' }));
+                            }}
+                            disabled={uploadingImage}
+                          >
+                            <Icon name="delete" size={16} color="#ffffff" style={styles.buttonIcon} />
+                            <Text style={styles.logoActionButtonText}>Remove</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ) : (
+                      <View style={styles.logoPlaceholder}>
+                        <TouchableOpacity
+                          style={styles.uploadAreaButton}
+                          onPress={handleUploadAreaClick}
+                        >
+                          <View style={styles.logoIconContainer}>
+                            <Icon name="add-a-photo" size={24} color="#667eea" />
+                          </View>
+                          <Text style={[styles.logoPlaceholderTitle, { color: theme.colors.text }]}>Upload Company Logo</Text>
+                          <Text style={[styles.logoPlaceholderSubtext, { color: theme.colors.textSecondary }]}>Tap to select from gallery or take a photo</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.sectionTitle, { color: isDarkMode ? '#ffffff' : '#1a1a1a' }]}>
+                    Business Category {profile ? '' : '*'}
+                  </Text>
+                  {profile ? (
+                    // Edit mode: Show category as read-only
+                    <View style={[
+                      styles.pickerContainer,
+                      styles.pickerContainerDisabled,
+                      {
+                        backgroundColor: theme.colors.inputBackground,
+                        borderColor: theme.colors.border,
+                        opacity: 0.6
+                      }
+                    ]}>
+                      <Text style={[styles.pickerText, { color: theme.colors.textSecondary }]}>
+                        {formData.category || 'No category'}
                       </Text>
+                      <Icon name="lock" size={16} color={theme.colors.textSecondary} style={{ marginLeft: 8 }} />
                     </View>
                   ) : (
-                    <Text style={[styles.pickerText, { color: formData.subcategory ? theme.colors.text : theme.colors.textSecondary }]}>
-                      {formData.subcategory || 'Select business subcategory'}
+                    // New profile mode: Allow category selection
+                    <>
+                      {/* Selected Category Display */}
+                      <View style={styles.selectedCategoryContainer}>
+                        <TextInput
+                          style={[
+                            styles.selectedCategoryInput,
+                            {
+                              color: theme.colors.text,
+                              borderColor: formData.category ? theme.colors.primary : theme.colors.border,
+                              backgroundColor: theme.colors.inputBackground,
+                            }
+                          ]}
+                          value={formData.category}
+                          placeholder="Select your business category *"
+                          placeholderTextColor={theme.colors.textSecondary}
+                          editable={false}
+                          pointerEvents="none"
+                        />
+                      </View>
+
+                      {/* Category Options */}
+                      {loadingCategories ? (
+                        <View style={styles.categoryLoadingContainer}>
+                          <ActivityIndicator size="small" color={theme.colors.primary} />
+                          <Text style={[styles.categoryLoadingText, { color: theme.colors.textSecondary }]}>
+                            Loading categories...
+                          </Text>
+                        </View>
+                      ) : businessCategories.length === 0 ? (
+                        <View style={styles.categoryEmptyContainer}>
+                          <Icon name="info-outline" size={20} color={theme.colors.textSecondary} />
+                          <Text style={[styles.categoryEmptyText, { color: theme.colors.textSecondary }]}>
+                            No categories available. Please try again later.
+                          </Text>
+                        </View>
+                      ) : (
+                        <ScrollView
+                          horizontal
+                          showsHorizontalScrollIndicator={false}
+                          contentContainerStyle={styles.categoryScrollContent}
+                        >
+                          {businessCategories.map((category) => (
+                            <TouchableOpacity
+                              key={category}
+                              style={[
+                                styles.categoryOption,
+                                {
+                                  backgroundColor: formData.category === category
+                                    ? theme.colors.primary
+                                    : (isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(102,126,234,0.1)'),
+                                  borderColor: formData.category === category
+                                    ? theme.colors.primary
+                                    : (isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(102,126,234,0.3)'),
+                                },
+                                formData.category === category && {
+                                  shadowColor: theme.colors.primary,
+                                  shadowOffset: { width: 0, height: 2 },
+                                  shadowOpacity: 0.3,
+                                  shadowRadius: 4,
+                                  elevation: 5,
+                                }
+                              ]}
+                              onPress={() => handleInputChange('category', category)}
+                            >
+                              <Text style={[
+                                styles.categoryOptionText,
+                                {
+                                  color: formData.category === category
+                                    ? '#ffffff'
+                                    : (isDarkMode ? '#ffffff' : theme.colors.primary)
+                                },
+                                formData.category === category && styles.categoryOptionTextSelected
+                              ]}>
+                                {category}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      )}
+                    </>
+                  )}
+                  {profile && (
+                    <Text style={[styles.categoryDisabledHint, { color: theme.colors.textSecondary }]}>
+                      Business category cannot be changed after creation
                     </Text>
                   )}
                 </View>
-                
-                {/* Subcategory Options */}
-                {loadingSubcategories ? (
-                  <View style={styles.categoryOptions}>
-                    <Text style={[styles.categoryLoadingText, { color: theme.colors.textSecondary }]}>
-                      Loading subcategories...
-                    </Text>
-                  </View>
-                ) : subcategories.length === 0 ? (
-                  <View style={styles.categoryOptions}>
-                    <Text style={[styles.categoryLoadingText, { color: theme.colors.textSecondary }]}>
-                      No subcategories available for this category.
-                    </Text>
-                  </View>
-                ) : (
-                  <View style={styles.categoryOptions}>
-                    {subcategories.map((subcategory) => (
-                      <TouchableOpacity
-                        key={subcategory.id || subcategory.name}
-                        style={[
-                          styles.categoryOption,
-                          { 
-                            backgroundColor: formData.subcategory === subcategory.name 
-                              ? theme.colors.primary 
-                              : (isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(102,126,234,0.1)'),
-                            borderWidth: 1,
-                            borderColor: formData.subcategory === subcategory.name 
-                              ? theme.colors.primary 
-                              : (isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(102,126,234,0.2)')
-                          }
-                        ]}
-                        onPress={() => handleInputChange('subcategory', subcategory.name)}
-                      >
-                        <Text style={[
-                          styles.categoryOptionText,
-                          { 
-                            color: formData.subcategory === subcategory.name 
-                              ? '#ffffff' 
-                              : (isDarkMode ? '#ffffff' : theme.colors.primary)
-                          },
-                          formData.subcategory === subcategory.name && styles.categoryOptionTextSelected
-                        ]}>
-                          {subcategory.name}
+              </View>
+
+              {/* Subcategory Field - Only show if category is selected and subcategories exist */}
+              {!profile && formData.category && subcategories.length > 0 && (
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.sectionTitle, { color: isDarkMode ? '#ffffff' : '#1a1a1a' }]}>
+                    Business Subcategory *
+                  </Text>
+
+                  {/* Selected Subcategory Display */}
+                  <View style={[
+                    styles.pickerContainer,
+                    {
+                      backgroundColor: theme.colors.inputBackground,
+                      borderColor: theme.colors.border
+                    },
+                    focusedField === 'subcategory' && [styles.inputFocused, { borderColor: theme.colors.primary }]
+                  ]}>
+                    {loadingSubcategories ? (
+                      <View style={styles.categoryLoadingContainer}>
+                        <ActivityIndicator size="small" color={theme.colors.primary} />
+                        <Text style={[styles.pickerText, { color: theme.colors.textSecondary, marginLeft: 8 }]}>
+                          Loading subcategories...
                         </Text>
-                      </TouchableOpacity>
-                    ))}
+                      </View>
+                    ) : (
+                      <Text style={[styles.pickerText, { color: formData.subcategory ? theme.colors.text : theme.colors.textSecondary }]}>
+                        {formData.subcategory || 'Select business subcategory'}
+                      </Text>
+                    )}
                   </View>
-                )}
-              </View>
-            )}
 
-            {/* Contact Information */}
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: isDarkMode ? '#ffffff' : '#1a1a1a' }]}>Contact Information</Text>
-              
-              {/* Phone Number with Validation */}
-              <View style={styles.inputContainer}>
-                <Text style={[styles.inputLabel, { color: isDarkMode ? '#ffffff' : '#1a1a1a' }]}>Phone Number *</Text>
-                <TextInput
-                  ref={registerInputRef('phone')}
-                  style={[
-                    styles.input,
-                    { 
-                      backgroundColor: theme.colors.inputBackground,
-                      color: theme.colors.text,
-                      borderColor: phoneValidationError ? '#ff4444' : theme.colors.border
-                    },
-                    focusedField === 'phone' && [styles.inputFocused, { borderColor: phoneValidationError ? '#ff4444' : theme.colors.primary }]
-                  ]}
-                  value={formData.phone}
-                  onChangeText={(value) => handleInputChange('phone', value)}
-                  onFocus={() => setFocusedField('phone')}
-                  onBlur={() => setFocusedField(null)}
-                  placeholder="Enter 10 digit phone number"
-                  placeholderTextColor={theme.colors.textSecondary}
-                  keyboardType="phone-pad"
-                  maxLength={10}
-                  autoCapitalize="none"
-                  blurOnSubmit={false}
-                  returnKeyType="next"
-                  autoCorrect={false}
-                  spellCheck={false}
-                  textContentType="none"
-                  onSubmitEditing={handleSubmitEditing('alternatePhone')}
+                  {/* Subcategory Options */}
+                  {loadingSubcategories ? (
+                    <View style={styles.categoryOptions}>
+                      <Text style={[styles.categoryLoadingText, { color: theme.colors.textSecondary }]}>
+                        Loading subcategories...
+                      </Text>
+                    </View>
+                  ) : subcategories.length === 0 ? (
+                    <View style={styles.categoryOptions}>
+                      <Text style={[styles.categoryLoadingText, { color: theme.colors.textSecondary }]}>
+                        No subcategories available for this category.
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={styles.categoryOptions}>
+                      {subcategories.map((subcategory) => (
+                        <TouchableOpacity
+                          key={subcategory.id || subcategory.name}
+                          style={[
+                            styles.categoryOption,
+                            {
+                              backgroundColor: formData.subcategory === subcategory.name
+                                ? theme.colors.primary
+                                : (isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(102,126,234,0.1)'),
+                              borderWidth: 1,
+                              borderColor: formData.subcategory === subcategory.name
+                                ? theme.colors.primary
+                                : (isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(102,126,234,0.2)')
+                            }
+                          ]}
+                          onPress={() => handleInputChange('subcategory', subcategory.name)}
+                        >
+                          <Text style={[
+                            styles.categoryOptionText,
+                            {
+                              color: formData.subcategory === subcategory.name
+                                ? '#ffffff'
+                                : (isDarkMode ? '#ffffff' : theme.colors.primary)
+                            },
+                            formData.subcategory === subcategory.name && styles.categoryOptionTextSelected
+                          ]}>
+                            {subcategory.name}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* Contact Information */}
+              <View style={styles.section}>
+                <Text style={[styles.sectionTitle, { color: isDarkMode ? '#ffffff' : '#1a1a1a' }]}>Contact Information</Text>
+
+                {/* Phone Number with Validation */}
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    ref={registerInputRef('phone')}
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: theme.colors.inputBackground,
+                        color: theme.colors.text,
+                        borderColor: phoneValidationError ? '#ff4444' : theme.colors.border
+                      },
+                      focusedField === 'phone' && [styles.inputFocused, { borderColor: phoneValidationError ? '#ff4444' : theme.colors.primary }]
+                    ]}
+                    value={formData.phone}
+                    onChangeText={(value) => handleInputChange('phone', value)}
+                    onFocus={() => setFocusedField('phone')}
+                    onBlur={() => setFocusedField(null)}
+                    placeholder="Enter 10 digit phone number *"
+                    placeholderTextColor={theme.colors.textSecondary}
+                    keyboardType="phone-pad"
+                    maxLength={10}
+                    autoCapitalize="none"
+                    blurOnSubmit={false}
+                    returnKeyType="next"
+                    autoCorrect={false}
+                    spellCheck={false}
+                    textContentType="none"
+                    onSubmitEditing={handleSubmitEditing('alternatePhone')}
+                  />
+                  {phoneValidationError ? (
+                    <Text style={[styles.validationError, { color: '#ff4444' }]}>
+                      {phoneValidationError}
+                    </Text>
+                  ) : null}
+                  {!phoneValidationError && formData.phone.trim() && formData.phone.replace(/\D/g, '').length === 10 ? (
+                    <Text style={[styles.validationSuccess, { color: '#4CAF50' }]}>
+                      ✓ Valid phone number
+                    </Text>
+                  ) : null}
+                </View>
+
+                {/* Alternate Phone Number with Validation */}
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    ref={registerInputRef('alternatePhone')}
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: theme.colors.inputBackground,
+                        color: theme.colors.text,
+                        borderColor: alternatePhoneValidationError ? '#ff4444' : theme.colors.border
+                      },
+                      focusedField === 'alternatePhone' && [styles.inputFocused, { borderColor: alternatePhoneValidationError ? '#ff4444' : theme.colors.primary }]
+                    ]}
+                    value={formData.alternatePhone || ''}
+                    onChangeText={(value) => handleInputChange('alternatePhone', value)}
+                    onFocus={() => setFocusedField('alternatePhone')}
+                    onBlur={() => setFocusedField(null)}
+                    placeholder="Enter 10 digit alternate phone (optional)"
+                    placeholderTextColor={theme.colors.textSecondary}
+                    keyboardType="phone-pad"
+                    maxLength={10}
+                    autoCapitalize="none"
+                    blurOnSubmit={false}
+                    returnKeyType="next"
+                    autoCorrect={false}
+                    spellCheck={false}
+                    textContentType="none"
+                    onSubmitEditing={handleSubmitEditing('email')}
+                  />
+                  {alternatePhoneValidationError ? (
+                    <Text style={[styles.validationError, { color: '#ff4444' }]}>
+                      {alternatePhoneValidationError}
+                    </Text>
+                  ) : null}
+                  {!alternatePhoneValidationError && formData.alternatePhone && formData.alternatePhone.trim() && formData.alternatePhone.replace(/\D/g, '').length === 10 ? (
+                    <Text style={[styles.validationSuccess, { color: '#4CAF50' }]}>
+                      ✓ Valid phone number
+                    </Text>
+                  ) : null}
+                </View>
+
+                <FloatingInput
+                  value={formData.email}
+                  onChangeText={(value) => handleInputChange('email', value)}
+                  field="email"
+                  placeholder="Enter email address *"
+                  keyboardType="email-address"
+                  focusedField={focusedField}
+                  setFocusedField={setFocusedField}
+                  theme={theme}
+                  inputRef={registerInputRef('email')}
+                  onSubmitEditing={handleSubmitEditing('website')}
                 />
-                {phoneValidationError ? (
-                  <Text style={[styles.validationError, { color: '#ff4444' }]}>
-                    {phoneValidationError}
-                  </Text>
-                ) : null}
-                {!phoneValidationError && formData.phone.trim() && formData.phone.replace(/\D/g, '').length === 10 ? (
-                  <Text style={[styles.validationSuccess, { color: '#4CAF50' }]}>
-                    ✓ Valid phone number
-                  </Text>
-                ) : null}
-              </View>
 
-              {/* Alternate Phone Number with Validation */}
-              <View style={styles.inputContainer}>
-                <TextInput
-                  ref={registerInputRef('alternatePhone')}
-                  style={[
-                    styles.input,
-                    { 
-                      backgroundColor: theme.colors.inputBackground,
-                      color: theme.colors.text,
-                      borderColor: alternatePhoneValidationError ? '#ff4444' : theme.colors.border
-                    },
-                    focusedField === 'alternatePhone' && [styles.inputFocused, { borderColor: alternatePhoneValidationError ? '#ff4444' : theme.colors.primary }]
-                  ]}
-                  value={formData.alternatePhone || ''}
-                  onChangeText={(value) => handleInputChange('alternatePhone', value)}
-                  onFocus={() => setFocusedField('alternatePhone')}
-                  onBlur={() => setFocusedField(null)}
-                  placeholder="Enter 10 digit alternate phone (optional)"
-                  placeholderTextColor={theme.colors.textSecondary}
-                  keyboardType="phone-pad"
-                  maxLength={10}
-                  autoCapitalize="none"
-                  blurOnSubmit={false}
-                  returnKeyType="next"
-                  autoCorrect={false}
-                  spellCheck={false}
-                  textContentType="none"
-                  onSubmitEditing={handleSubmitEditing('email')}
+                <FloatingInput
+                  value={formData.website || ''}
+                  onChangeText={(value) => handleInputChange('website', value)}
+                  field="website"
+                  placeholder="Enter company website URL"
+                  keyboardType="url"
+                  focusedField={focusedField}
+                  setFocusedField={setFocusedField}
+                  theme={theme}
+                  inputRef={registerInputRef('website')}
+                  onSubmitEditing={handleSubmitEditing('address')}
                 />
-                {alternatePhoneValidationError ? (
-                  <Text style={[styles.validationError, { color: '#ff4444' }]}>
-                    {alternatePhoneValidationError}
-                  </Text>
-                ) : null}
-                {!alternatePhoneValidationError && formData.alternatePhone && formData.alternatePhone.trim() && formData.alternatePhone.replace(/\D/g, '').length === 10 ? (
-                  <Text style={[styles.validationSuccess, { color: '#4CAF50' }]}>
-                    ✓ Valid phone number
-                  </Text>
-                ) : null}
+
+                <FloatingInput
+                  value={formData.address}
+                  onChangeText={(value) => handleInputChange('address', value)}
+                  field="address"
+                  placeholder="Enter company address"
+                  multiline
+                  numberOfLines={2}
+                  focusedField={focusedField}
+                  setFocusedField={setFocusedField}
+                  theme={theme}
+                  inputRef={registerInputRef('address')}
+                  returnKeyType="done"
+                  blurOnSubmit
+                  onSubmitEditing={handleSubmitEditing()}
+                />
               </View>
+            </ScrollView>
+          </LinearGradient>
+        </KeyboardAvoidingView>
+      </Modal>
 
-               <FloatingInput
-                 value={formData.email}
-                 onChangeText={(value) => handleInputChange('email', value)}
-                 field="email"
-                 placeholder="Enter email address *"
-                 keyboardType="email-address"
-                 focusedField={focusedField}
-                 setFocusedField={setFocusedField}
-                 theme={theme}
-                 inputRef={registerInputRef('email')}
-                 onSubmitEditing={handleSubmitEditing('website')}
-               />
-
-               <FloatingInput
-                 value={formData.website || ''}
-                 onChangeText={(value) => handleInputChange('website', value)}
-                 field="website"
-                 placeholder="Enter company website URL"
-                 keyboardType="url"
-                 focusedField={focusedField}
-                 setFocusedField={setFocusedField}
-                 theme={theme}
-                 inputRef={registerInputRef('website')}
-                 onSubmitEditing={handleSubmitEditing('address')}
-               />
-
-               <FloatingInput
-                 value={formData.address}
-                 onChangeText={(value) => handleInputChange('address', value)}
-                 field="address"
-                 placeholder="Enter company address"
-                 multiline
-                 numberOfLines={2}
-                 focusedField={focusedField}
-                 setFocusedField={setFocusedField}
-                 theme={theme}
-                 inputRef={registerInputRef('address')}
-                 returnKeyType="done"
-                 blurOnSubmit
-                 onSubmitEditing={handleSubmitEditing()}
-               />
-            </View>
-          </ScrollView>
-        </LinearGradient>
-      </KeyboardAvoidingView>
-    </Modal>
-
-    {/* Upload Options Modal */}
-    <Modal
-      visible={showUploadModal}
-      transparent={true}
-      animationType="fade"
-      onRequestClose={() => setShowUploadModal(false)}
-      statusBarTranslucent={true}
-    >
-      <TouchableOpacity 
-        style={styles.modalOverlay}
-        activeOpacity={1}
-        onPress={() => setShowUploadModal(false)}
+      {/* Upload Options Modal */}
+      <Modal
+        visible={showUploadModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowUploadModal(false)}
+        statusBarTranslucent={true}
       >
-                <TouchableOpacity 
+        <TouchableOpacity
+          style={styles.modalOverlay}
           activeOpacity={1}
-          onPress={() => {}} // Prevent closing when tapping inside modal
+          onPress={() => setShowUploadModal(false)}
         >
-          <View style={[styles.uploadModalContainer, { backgroundColor: theme.colors.surface }]}>
-            <View style={styles.uploadModalHeader}>
-              <Text style={[styles.uploadModalTitle, { color: theme.colors.text }]}>Upload Company Logo</Text>
-              <TouchableOpacity 
-                style={[styles.closeModalButton, { backgroundColor: theme.colors.inputBackground }]}
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => { }} // Prevent closing when tapping inside modal
+          >
+            <View style={[styles.uploadModalContainer, { backgroundColor: theme.colors.surface }]}>
+              <View style={styles.uploadModalHeader}>
+                <Text style={[styles.uploadModalTitle, { color: theme.colors.text }]}>Upload Company Logo</Text>
+                <TouchableOpacity
+                  style={[styles.closeModalButton, { backgroundColor: theme.colors.inputBackground }]}
+                  onPress={() => setShowUploadModal(false)}
+                  activeOpacity={0.7}
+                >
+                  <Icon name="close" size={Math.min(screenWidth * 0.06, 24)} color={theme.colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.uploadModalScrollContent}
+                keyboardShouldPersistTaps="handled"
+              >
+                <Text style={[styles.uploadModalSubtitle, { color: theme.colors.textSecondary }]}>
+                  Choose how you want to add your company logo
+                </Text>
+
+                <View style={styles.uploadModalOptions}>
+                  <TouchableOpacity
+                    style={[styles.uploadModalOption, { backgroundColor: theme.colors.inputBackground, borderColor: theme.colors.border }]}
+                    onPress={handleImagePickerPress}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.uploadModalOptionIcon, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+                      <Icon name="photo-library" size={Math.min(screenWidth * 0.07, 28)} color={theme.colors.primary} />
+                    </View>
+                    <View style={styles.uploadModalOptionContent}>
+                      <Text style={[styles.uploadModalOptionTitle, { color: theme.colors.text }]}>Gallery</Text>
+                      <Text style={[styles.uploadModalOptionSubtitle, { color: theme.colors.textSecondary }]}>Choose from your photos</Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.uploadModalOption, { backgroundColor: theme.colors.inputBackground, borderColor: theme.colors.border }]}
+                    onPress={handleImagePickerPress}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.uploadModalOptionIcon, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+                      <Icon name="camera-alt" size={Math.min(screenWidth * 0.07, 28)} color={theme.colors.primary} />
+                    </View>
+                    <View style={styles.uploadModalOptionContent}>
+                      <Text style={[styles.uploadModalOptionTitle, { color: theme.colors.text }]}>Camera</Text>
+                      <Text style={[styles.uploadModalOptionSubtitle, { color: theme.colors.textSecondary }]}>Take a new photo</Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+
+              <TouchableOpacity
+                style={[styles.cancelModalButton, { backgroundColor: theme.colors.inputBackground, borderColor: theme.colors.border }]}
                 onPress={() => setShowUploadModal(false)}
-                activeOpacity={0.7}
               >
-                <Icon name="close" size={Math.min(screenWidth * 0.06, 24)} color={theme.colors.textSecondary} />
+                <Text style={[styles.cancelModalText, { color: theme.colors.textSecondary }]}>Cancel</Text>
               </TouchableOpacity>
             </View>
-            
-            <ScrollView 
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.uploadModalScrollContent}
-              keyboardShouldPersistTaps="handled"
-            >
-              <Text style={[styles.uploadModalSubtitle, { color: theme.colors.textSecondary }]}>
-                Choose how you want to add your company logo
-              </Text>
-              
-              <View style={styles.uploadModalOptions}>
-                <TouchableOpacity 
-                  style={[styles.uploadModalOption, { backgroundColor: theme.colors.inputBackground, borderColor: theme.colors.border }]}
-                    onPress={handleImagePickerPress}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.uploadModalOptionIcon, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-                    <Icon name="photo-library" size={Math.min(screenWidth * 0.07, 28)} color={theme.colors.primary} />
-                  </View>
-                  <View style={styles.uploadModalOptionContent}>
-                    <Text style={[styles.uploadModalOptionTitle, { color: theme.colors.text }]}>Gallery</Text>
-                    <Text style={[styles.uploadModalOptionSubtitle, { color: theme.colors.textSecondary }]}>Choose from your photos</Text>
-                  </View>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[styles.uploadModalOption, { backgroundColor: theme.colors.inputBackground, borderColor: theme.colors.border }]}
-                    onPress={handleImagePickerPress}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.uploadModalOptionIcon, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-                    <Icon name="camera-alt" size={Math.min(screenWidth * 0.07, 28)} color={theme.colors.primary} />
-                  </View>
-                  <View style={styles.uploadModalOptionContent}>
-                    <Text style={[styles.uploadModalOptionTitle, { color: theme.colors.text }]}>Camera</Text>
-                    <Text style={[styles.uploadModalOptionSubtitle, { color: theme.colors.textSecondary }]}>Take a new photo</Text>
-                  </View>
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
-            
-            <TouchableOpacity 
-              style={[styles.cancelModalButton, { backgroundColor: theme.colors.inputBackground, borderColor: theme.colors.border }]}
-              onPress={() => setShowUploadModal(false)}
-            >
-              <Text style={[styles.cancelModalText, { color: theme.colors.textSecondary }]}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
+          </TouchableOpacity>
         </TouchableOpacity>
-      </TouchableOpacity>
-    </Modal>
+      </Modal>
 
-    {/* Image Picker Modal */}
-    <ImagePickerModal
-      visible={showImagePickerModal}
-      onClose={handleCloseImagePicker}
-      onImageSelected={handleImageSelected}
-    />
+      {/* Image Picker Modal */}
+      <ImagePickerModal
+        visible={showImagePickerModal}
+        onClose={handleCloseImagePicker}
+        onImageSelected={handleImageSelected}
+      />
 
-    {/* Validation Error Modal */}
-    <Modal
-      visible={showValidationModal}
-      transparent={true}
-      animationType="fade"
-      onRequestClose={() => setShowValidationModal(false)}
-      statusBarTranslucent={true}
-    >
-      <TouchableOpacity 
-        style={styles.modalOverlay}
-        activeOpacity={1}
-        onPress={() => setShowValidationModal(false)}
+      {/* Validation Error Modal */}
+      <Modal
+        visible={showValidationModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowValidationModal(false)}
+        statusBarTranslucent={true}
       >
-        <TouchableOpacity 
+        <TouchableOpacity
+          style={styles.modalOverlay}
           activeOpacity={1}
-          onPress={() => {}} // Prevent closing when tapping inside modal
+          onPress={() => setShowValidationModal(false)}
         >
-          <View style={[styles.validationModalContainer, { backgroundColor: theme.colors.surface }]}>
-            <View style={styles.validationModalHeader}>
-              <View style={[styles.validationIconContainer, { backgroundColor: `${theme.colors.error}20` }]}>
-                <Icon name="error-outline" size={Math.min(screenWidth * 0.08, 32)} color={theme.colors.error} />
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => { }} // Prevent closing when tapping inside modal
+          >
+            <View style={[styles.validationModalContainer, { backgroundColor: theme.colors.surface }]}>
+              <View style={styles.validationModalHeader}>
+                <View style={[styles.validationIconContainer, { backgroundColor: `${theme.colors.error}20` }]}>
+                  <Icon name="error-outline" size={Math.min(screenWidth * 0.08, 32)} color={theme.colors.error} />
+                </View>
+                <Text
+                  style={[styles.validationModalTitle, { color: theme.colors.text }]}
+                >
+                  Validation Error
+                </Text>
+                <TouchableOpacity
+                  style={[styles.closeModalButton, { backgroundColor: theme.colors.inputBackground }]}
+                  onPress={() => setShowValidationModal(false)}
+                  activeOpacity={0.7}
+                >
+                  <Icon name="close" size={Math.min(screenWidth * 0.06, 24)} color={theme.colors.textSecondary} />
+                </TouchableOpacity>
               </View>
-              <Text 
-                style={[styles.validationModalTitle, { color: theme.colors.text }]}
+
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.validationModalScrollContent}
+                keyboardShouldPersistTaps="handled"
               >
-                Validation Error
-              </Text>
-              <TouchableOpacity 
-                style={[styles.closeModalButton, { backgroundColor: theme.colors.inputBackground }]}
+                <Text style={[styles.validationModalSubtitle, { color: theme.colors.textSecondary }]}>
+                  Please fix the following errors:
+                </Text>
+
+                <View style={styles.validationErrorsList}>
+                  {validationErrors.map((error, index) => (
+                    <View key={index} style={styles.validationErrorItem}>
+                      <Icon name="error" size={Math.min(screenWidth * 0.04, 16)} color={theme.colors.error} />
+                      <Text style={[styles.validationErrorText, { color: theme.colors.text }]}>{error}</Text>
+                    </View>
+                  ))}
+                </View>
+              </ScrollView>
+
+              <TouchableOpacity
+                style={[styles.validationModalButton, { backgroundColor: theme.colors.primary }]}
                 onPress={() => setShowValidationModal(false)}
-                activeOpacity={0.7}
               >
-                <Icon name="close" size={Math.min(screenWidth * 0.06, 24)} color={theme.colors.textSecondary} />
+                <Text style={styles.validationModalButtonText}>OK</Text>
               </TouchableOpacity>
             </View>
-            
-            <ScrollView 
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.validationModalScrollContent}
-              keyboardShouldPersistTaps="handled"
-            >
-              <Text style={[styles.validationModalSubtitle, { color: theme.colors.textSecondary }]}>
-                Please fix the following errors:
-              </Text>
-              
-              <View style={styles.validationErrorsList}>
-                {validationErrors.map((error, index) => (
-                  <View key={index} style={styles.validationErrorItem}>
-                    <Icon name="error" size={Math.min(screenWidth * 0.04, 16)} color={theme.colors.error} />
-                    <Text style={[styles.validationErrorText, { color: theme.colors.text }]}>{error}</Text>
-                  </View>
-                ))}
-              </View>
-            </ScrollView>
-            
-            <TouchableOpacity 
-              style={[styles.validationModalButton, { backgroundColor: theme.colors.primary }]}
-              onPress={() => setShowValidationModal(false)}
-            >
-              <Text style={styles.validationModalButtonText}>OK</Text>
-            </TouchableOpacity>
-          </View>
+          </TouchableOpacity>
         </TouchableOpacity>
-      </TouchableOpacity>
-    </Modal>
-  </>
-);
- };
+      </Modal>
+    </>
+  );
+};
 
 const styles = StyleSheet.create({
   container: {

@@ -29,6 +29,7 @@ import cacheService from '../services/cacheService';
 import { MainStackParamList } from '../navigation/types';
 import { Template } from '../services/dashboard';
 import logger from '../utils/logger';
+import DownloadedImagePreview from '../components/DownloadedImagePreview';
 
 type MyPostersScreenNavigationProp = StackNavigationProp<MainStackParamList, 'MyPosters'>;
 
@@ -376,40 +377,9 @@ const MyPostersScreen: React.FC = () => {
   };
 
   const handleViewPoster = (poster: DownloadedPoster) => {
-    // Convert DownloadedPoster to Template format
-    // Use imageUri (full image) for main display, not thumbnailUri
-    const selectedTemplate: Template = {
-      id: poster.id,
-      name: poster.title || 'Downloaded Poster',
-      thumbnail: poster.imageUri || poster.thumbnailUri || '', // Use main image first
-      category: poster.category || 'Uncategorized',
-      downloads: 0,
-      isDownloaded: true,
-    };
-
-    // Get other posters as related posters (exclude the selected one)
-    const relatedTemplates: Template[] = posters
-      .filter(p => p.id !== poster.id)
-      .map(p => ({
-        id: p.id,
-        name: p.title || 'Downloaded Poster',
-        thumbnail: p.imageUri || p.thumbnailUri || '', // Use main image first
-        category: p.category || 'Uncategorized',
-        downloads: 0,
-        isDownloaded: true,
-      }));
-
-    logger.log('📱 [MY POSTERS] Navigating to PosterPlayer');
-    logger.log('Selected Poster:', selectedTemplate);
-    logger.log('Using imageUri:', poster.imageUri);
-    logger.log('Related Posters Count:', relatedTemplates.length);
-
-    // Navigate to PosterPlayerScreen
-    navigation.navigate('PosterPlayer', {
-      selectedPoster: selectedTemplate,
-      relatedPosters: relatedTemplates,
-      searchQuery: '',
-    });
+    logger.log('📱 [MY POSTERS] Opening preview modal for downloaded poster:', poster.id);
+    setSelectedPoster(poster);
+    setPreviewModalVisible(true);
   };
 
   const renderPosterItem = useCallback(({ item, index }: { item: DownloadedPoster; index: number }) => {
@@ -519,56 +489,7 @@ const MyPostersScreen: React.FC = () => {
     </View>
   );
 
-  const renderPreviewModal = () => {
-    if (!selectedPoster) return null;
 
-    return (
-      <Modal
-        visible={previewModalVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setPreviewModalVisible(false)}
-      >
-        <View style={styles.previewModalOverlay}>
-          {/* Close Button */}
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={() => setPreviewModalVisible(false)}
-          >
-            <Icon name="close" size={28} color="#ffffff" />
-          </TouchableOpacity>
-
-          {/* Image Preview */}
-          <View style={styles.previewImageContainer}>
-            {(selectedPoster.thumbnailUri || selectedPoster.imageUri) ? (
-              <Image
-                source={{ uri: selectedPoster.thumbnailUri || selectedPoster.imageUri }}
-                style={styles.previewImage}
-                resizeMode="contain"
-                onError={() => {
-                  console.log("🖼️ [MY POSTERS] Preview image cache missing, trying fallback");
-                  // Try the other URL as fallback
-                  if (selectedPoster.thumbnailUri !== selectedPoster.imageUri) {
-                    setTimeout(() => {
-                      // This will trigger re-render with the other URL
-                    }, 100);
-                  }
-                }}
-                onLoad={() => {
-                  console.log(`✅ [MY POSTERS] Preview image loaded for ${selectedPoster.id}`);
-                }}
-              />
-            ) : (
-              <View style={styles.previewImagePlaceholder}>
-                <Icon name="image" size={80} color="#999" />
-                <Text style={styles.previewPlaceholderText}>No Image Available</Text>
-              </View>
-            )}
-          </View>
-        </View>
-      </Modal>
-    );
-  };
 
   return (
     <SafeAreaView 
@@ -668,7 +589,11 @@ const MyPostersScreen: React.FC = () => {
       </LinearGradient>
       
       {/* Preview Modal */}
-      {renderPreviewModal()}
+      <DownloadedImagePreview
+        visible={previewModalVisible}
+        selectedPoster={selectedPoster}
+        onClose={() => setPreviewModalVisible(false)}
+      />
     </SafeAreaView>
   );
 };

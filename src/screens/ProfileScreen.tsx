@@ -630,14 +630,36 @@ const ProfileScreen: React.FC = () => {
           // Load download stats from backend API
           try {
             const downloadsResponse = await downloadTrackingService.getUserDownloads(userId);
+            
+            // Deduplicate downloads to match MyPostersScreen logic and prevent double-counting
+            const rawDownloads = downloadsResponse.downloads || [];
+            const validDownloads = rawDownloads.filter((download: any) => {
+              const url = download.fileUrl || download.thumbnail;
+              return url && typeof url === 'string' && url.trim() !== '' && 
+                (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('file://'));
+            });
+            
+            const uniqueMap = new Map<string, any>();
+            validDownloads.forEach((download: any) => {
+              const existing = uniqueMap.get(download.resourceId);
+              if (!existing) {
+                uniqueMap.set(download.resourceId, download);
+              } else {
+                if (new Date(download.createdAt || 0) > new Date(existing.createdAt || 0)) {
+                  uniqueMap.set(download.resourceId, download);
+                }
+              }
+            });
+            const uniqueDownloads = Array.from(uniqueMap.values());
+            
             const posterStatsData = {
-              total: downloadsResponse.downloads?.length || 0,
-              recentCount: downloadsResponse.downloads?.filter((d: any) => {
+              total: uniqueDownloads.length,
+              recentCount: uniqueDownloads.filter((d: any) => {
                 const downloadDate = new Date(d.createdAt);
                 const weekAgo = new Date();
                 weekAgo.setDate(weekAgo.getDate() - 7);
                 return downloadDate >= weekAgo;
-              }).length || 0,
+              }).length,
             };
             setPosterStats(posterStatsData);
             
@@ -769,14 +791,36 @@ const ProfileScreen: React.FC = () => {
       // Fetch fresh download stats
       try {
         const downloadsResponse = await downloadTrackingService.getUserDownloads(userId);
+        
+        // Deduplicate downloads to match MyPostersScreen logic and prevent double-counting
+        const rawDownloads = downloadsResponse.downloads || [];
+        const validDownloads = rawDownloads.filter((download: any) => {
+          const url = download.fileUrl || download.thumbnail;
+          return url && typeof url === 'string' && url.trim() !== '' && 
+            (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('file://'));
+        });
+        
+        const uniqueMap = new Map<string, any>();
+        validDownloads.forEach((download: any) => {
+          const existing = uniqueMap.get(download.resourceId);
+          if (!existing) {
+            uniqueMap.set(download.resourceId, download);
+          } else {
+            if (new Date(download.createdAt || 0) > new Date(existing.createdAt || 0)) {
+              uniqueMap.set(download.resourceId, download);
+            }
+          }
+        });
+        const uniqueDownloads = Array.from(uniqueMap.values());
+        
         const posterStatsData = {
-          total: downloadsResponse.downloads?.length || 0,
-          recentCount: downloadsResponse.downloads?.filter((d: any) => {
+          total: uniqueDownloads.length,
+          recentCount: uniqueDownloads.filter((d: any) => {
             const downloadDate = new Date(d.createdAt);
             const weekAgo = new Date();
             weekAgo.setDate(weekAgo.getDate() - 7);
             return downloadDate >= weekAgo;
-          }).length || 0,
+          }).length,
         };
         setPosterStats(posterStatsData);
         await setCachedData(CACHE_KEYS.DOWNLOAD_STATS, posterStatsData);
