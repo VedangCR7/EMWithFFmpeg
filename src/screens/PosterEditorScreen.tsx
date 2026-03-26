@@ -382,9 +382,32 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
   const { selectedImage, selectedLanguage, selectedTemplateId, selectedBusinessProfile: selectedBusinessProfileParam } = route.params;
   const { isSubscribed, checkPremiumAccess, refreshSubscription } = useSubscription();
   const { isDarkMode, theme } = useTheme();
-  const { selectedBusinessProfile } = useBusinessProfile();
+  const { selectedBusinessProfile, isSubscriptionActive } = useBusinessProfile();
 
   const activeBusinessProfile = selectedBusinessProfile;
+
+  // Enforce subscription locking: if business profile is selected but inactive, block usage
+  useEffect(() => {
+    if (selectedBusinessProfile && !isSubscriptionActive) {
+      Alert.alert(
+        "Subscription Required",
+        "This business profile is currently locked. Please activate your subscription to edit posters for this business.",
+        [
+          { 
+            text: "Go Back", 
+            onPress: () => navigation.goBack() 
+          },
+          { 
+            text: "Activate Now", 
+            onPress: () => {
+              (navigation as any).navigate('BusinessProfiles');
+            } 
+          }
+        ],
+        { cancelable: false }
+      );
+    }
+  }, [selectedBusinessProfile, isSubscriptionActive, navigation]);
 
   // Debug logging for active profile changes
   useEffect(() => {

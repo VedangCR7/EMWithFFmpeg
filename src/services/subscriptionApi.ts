@@ -30,9 +30,6 @@ export interface SubscriptionStatus {
   expiryDate?: string | null;
   autoRenew: boolean;
   status: 'active' | 'expired' | 'cancelled' | 'pending' | 'inactive';
-  // CRITICAL: Payment verification fields for UI accuracy
-  razorpaySubscriptionId?: string;
-  paymentId?: string;
 }
 
 export interface SubscriptionHistory {
@@ -204,10 +201,6 @@ class SubscriptionApiService {
         data?.razorpayKeyId ||
         response.data?.key ||
         response.data?.key_id;
-
-      // Clear transaction history cache to ensure the new PENDING transaction is visible
-      cacheService.clear(`transactions_unified_user_${userId}`);
-      console.log('[APP] 🧹 Cleared transaction cache on order creation');
 
       return {
         orderId,
@@ -384,7 +377,7 @@ class SubscriptionApiService {
                   planName: subscriptionData?.planName ?? null,
                   expiryDate: subscriptionData?.expiryDate ?? null,
                   autoRenew: Boolean(subscriptionData?.autoRenew),
-                  status: subscriptionData?.status?.toLowerCase() || (subscriptionData?.isActive ? "active" : "inactive")
+                  status: subscriptionData?.isActive ? "active" : "inactive"
                 },
                 message: 'Status fetched successfully'
               };
@@ -427,6 +420,84 @@ class SubscriptionApiService {
         },
         message: 'No active subscription'
       };
+    }
+  }
+
+  // Get subscription status for a specific business profile
+  async getBusinessProfileSubscriptionStatus(businessProfileId: string): Promise<SubscriptionResponse> {
+    try {
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id;
+      
+      if (!userId) {
+        throw new Error('User not authenticated');
+      }
+
+      const cacheKey = `subscription_status_profile_${businessProfileId}`;
+      const CACHE_TTL = 10 * 1000; // 10 seconds
+
+      return await cacheService.getOrFetch(
+        cacheKey,
+        async () => {
+          console.log('🔍 Fetching subscription status for business profile:', businessProfileId);
+          
+          try {
+            const response = await api.get(`/api/mobile/subscription/status`, {
+              params: { businessProfileId }
+            });
+            
+            if (response.data.success) {
+              const subscriptionData = response.data?.subscription ?? response.data?.data ?? null;
+              
+              if (!subscriptionData) {
+                return {
+                  success: true,
+                  data: {
+                    isActive: false,
+                    plan: null,
+                    expiryDate: null,
+                    autoRenew: false,
+                    status: "inactive"
+                  },
+                  message: 'No subscription data found'
+                };
+              }
+              
+              return {
+                success: true,
+                data: {
+                  isActive: Boolean(subscriptionData?.isActive),
+                  planId: subscriptionData?.planId ?? null,
+                  planName: subscriptionData?.planName ?? null,
+                  expiryDate: subscriptionData?.expiryDate ?? null,
+                  autoRenew: Boolean(subscriptionData?.autoRenew),
+                  status: subscriptionData?.status?.toLowerCase() || (subscriptionData?.isActive ? "active" : "inactive")
+                },
+                message: 'Status fetched successfully'
+              };
+            }
+          } catch (backendError: any) {
+            console.log('⚠️ Backend profile subscription status API error:', backendError.message);
+          }
+          
+          return {
+            success: true,
+            data: {
+              isActive: false,
+              plan: null,
+              expiryDate: null,
+              autoRenew: false,
+              status: 'inactive'
+            },
+            message: 'No active subscription'
+          };
+        },
+        CACHE_TTL,
+        true // Allow stale data
+      );
+    } catch (error: any) {
+      console.error('Get profile subscription status error:', error);
+      throw error;
     }
   }
 
@@ -567,14 +638,12 @@ class SubscriptionApiService {
     orderId: string;
     paymentId: string;
     signature: string;
-    subscriptionId?: string;
     amount?: number;
     amountPaise?: number;
     currency?: string;
     planId?: string;
     email?: string;
     contact?: string;
-    isAutopay?: boolean;
   }): Promise<{ success: boolean; message: string; data?: any }> {
     try {
       const currentUser = authService.getCurrentUser();
@@ -594,14 +663,6 @@ class SubscriptionApiService {
         paymentId: paymentData.paymentId,
         signature: paymentData.signature,
       };
-
-      if (paymentData.subscriptionId) {
-        payload.subscriptionId = paymentData.subscriptionId;
-      }
-
-      if (paymentData.isAutopay) {
-        payload.isAutopay = paymentData.isAutopay;
-      }
 
       if (typeof paymentData.amount === 'number') {
         payload.amount = paymentData.amount;
@@ -636,10 +697,6 @@ class SubscriptionApiService {
       // Clear subscription status cache after payment verification
       this.clearStatusCache(userId);
       
-      // Clear transaction history cache
-      cacheService.clear(`transactions_unified_user_${userId}`);
-      console.log('[APP] 🧹 Cleared transaction cache after payment');
-      
       return response.data;
     } catch (error: any) {
       console.error('❌ Payment verification error:', error);
@@ -647,6 +704,83 @@ class SubscriptionApiService {
       // Provide more detailed error message
       const errorMessage = error.response?.data?.message || error.message || 'Payment verification failed';
       throw new Error(errorMessage);
+    }
+  }
+
+  // Create autopay subscription for business profile
+  async createBusinessProfileAutopay(params: {
+    planId: string;
+    businessProfileId: string;
+    subscriptionCategory: 'BUSINESS_PROFILE';
+    customerEmail?: string;
+    customerPhone?: string;
+  }) {
+    try {
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id;
+
+      if (!userId) {
+        throw new Error('User not authenticated');
+      }
+
+      console.log('🔄 Creating Business Profile Autopay subscription:', params);
+
+      const payload = {
+        ...params,
+        userId
+      };
+
+      const response = await api.post(
+        '/api/mobile/subscription/create-autopay',
+        payload
+      );
+
+      console.log('📡 Autopay API response:', response.data);
+      
+      // Prioritize root-level fields from backend response
+      const root = response.data || {};
+      const nested = root.data || {};
+
+      console.log("🔍 Response structure:", {
+        'root.subscriptionId': root.subscriptionId,
+        'root.razorpaySubscriptionId': root.razorpaySubscriptionId,
+        'nested.razorpaySubscription.subscriptionId': nested?.razorpaySubscription?.subscriptionId,
+        'nested.subscription.razorpaySubscriptionId': nested?.subscription?.razorpaySubscriptionId,
+        'nested.subscription.subscriptionId': nested?.subscription?.subscriptionId
+      });
+
+      // Always prioritize flat fields from backend
+      const subscriptionId =
+        root.subscriptionId ||
+        root.razorpaySubscriptionId ||
+        nested?.razorpaySubscription?.subscriptionId ||
+        nested?.subscription?.razorpaySubscriptionId ||
+        nested?.subscription?.subscriptionId;
+
+      console.log("🎯 Final Razorpay Subscription ID:", subscriptionId);
+
+      if (!subscriptionId || !subscriptionId.startsWith("sub_")) {
+        console.error("❌ Invalid subscription ID:", subscriptionId);
+        throw new Error("Invalid Razorpay subscription ID received from backend.");
+      }
+
+      return {
+        ...root,
+        subscriptionId
+      };
+
+    } catch (error: any) {
+      console.error('❌ createBusinessProfileAutopay error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+
+      throw new Error(
+        error.response?.data?.message ||
+        error.message ||
+        'Failed to create subscription mandate'
+      );
     }
   }
 
@@ -668,11 +802,6 @@ class SubscriptionApiService {
       });
 
       console.log('✅ Autopay subscription created:', response.data);
-      
-      // Clear transaction history cache to ensure the new PENDING transaction is visible
-      cacheService.clear(`transactions_unified_user_${userId}`);
-      console.log('[APP] 🧹 Cleared transaction cache on autopay creation');
-
       return response.data;
     } catch (error: any) {
       console.error('❌ Create Autopay error:', error);

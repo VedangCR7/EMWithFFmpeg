@@ -67,12 +67,12 @@ const App: React.FC = () => {
       <QueryClientProvider client={queryClient}>
         <SafeAreaProvider>
           <ThemeProvider>
-            <BusinessProfileProvider>
-              <SubscriptionProvider>
+            <SubscriptionProvider>
+              <BusinessProfileProvider>
                 <AppNavigator />
                 <TokenExpirationHandler />
-              </SubscriptionProvider>
-            </BusinessProfileProvider>
+              </BusinessProfileProvider>
+            </SubscriptionProvider>
           </ThemeProvider>
         </SafeAreaProvider>
       </QueryClientProvider>

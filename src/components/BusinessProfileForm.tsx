@@ -474,7 +474,7 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
         
         // For new profiles, we need to create the profile first, then upload the image
         // So we'll submit the form without the logo, then upload it after getting the profile ID
-        const formDataWithoutLogo = { ...formData, companyLogo: '' };
+        const formDataWithoutLogo = { ...formData, companyLogo: '', logo: '' };
         
         console.log('✅ [BUSINESS FORM] Form validation passed, submitting to parent (without logo)');
         onSubmit(formDataWithoutLogo, formData.companyLogo); // Pass original logo URI separately
@@ -822,7 +822,6 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
               
               {/* Phone Number with Validation */}
               <View style={styles.inputContainer}>
-                <Text style={[styles.inputLabel, { color: isDarkMode ? '#ffffff' : '#1a1a1a' }]}>Phone Number *</Text>
                 <TextInput
                   ref={registerInputRef('phone')}
                   style={[
@@ -838,7 +837,7 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
                   onChangeText={(value) => handleInputChange('phone', value)}
                   onFocus={() => setFocusedField('phone')}
                   onBlur={() => setFocusedField(null)}
-                  placeholder="Enter 10 digit phone number"
+                  placeholder="Enter 10 digit phone number*"
                   placeholderTextColor={theme.colors.textSecondary}
                   keyboardType="phone-pad"
                   maxLength={10}

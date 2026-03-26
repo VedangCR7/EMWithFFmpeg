@@ -79,20 +79,25 @@ class BusinessProfileService {
           if (profiles && profiles.length > 0) {
             // Convert backend profiles to frontend format
             const businessProfiles: BusinessProfile[] = profiles.map((profile: any) => {
-              // Debug logging to identify logo field names
-              console.log('🔍 [BUSINESS PROFILE] Profile data:', {
+              // Enhanced logo field mapping with detailed logging
+              const logoMapping = {
+                logo: profile.logo,
+                companyLogo: profile.companyLogo,
+                profileLogo: profile.profileLogo,
+                businessLogo: profile.businessLogo,
+                image: profile.image,
+                photo: profile.photo,
+              };
+              
+              // Find the first non-empty logo field
+              const foundLogo = Object.values(logoMapping).find(url => url && url.trim() !== '') || '';
+              
+              console.log('🔍 [BUSINESS PROFILE] Profile logo mapping:', {
                 id: profile.id,
                 name: profile.name || profile.businessName,
-                logoFields: {
-                  logo: profile.logo,
-                  companyLogo: profile.companyLogo,
-                  profileLogo: profile.profileLogo,
-                  businessLogo: profile.businessLogo,
-                  image: profile.image,
-                  photo: profile.photo,
-                  banner: profile.banner,
-                  coverImage: profile.coverImage
-                }
+                logoFields: logoMapping,
+                selectedLogo: foundLogo,
+                hasLogo: !!foundLogo
               });
 
               return {
@@ -107,8 +112,9 @@ class BusinessProfileService {
                 alternatePhone: profile.alternatePhone || '',
                 email: profile.email || '',
                 website: profile.website || '',
-                logo: profile.logo || profile.companyLogo || profile.profileLogo || profile.businessLogo || profile.image || profile.photo || '',
-                companyLogo: profile.logo || profile.companyLogo || profile.profileLogo || profile.businessLogo || profile.image || profile.photo || '',
+                // Use the found logo for both fields
+                logo: foundLogo,
+                companyLogo: foundLogo,
                 banner: profile.banner || profile.coverImage || '',
                 services: [],
                 createdAt: profile.createdAt,
@@ -282,7 +288,9 @@ class BusinessProfileService {
         address,
         category,
         subCategory: data.subCategory || data.subcategory,
+        // Send both logo and companyLogo to ensure backend receives the logo
         logo: logoUrl,
+        companyLogo: logoUrl,
         description: data.description || '',
         website: data.website || ''
       };
@@ -315,8 +323,9 @@ class BusinessProfileService {
           alternatePhone: backendProfile.alternatePhone || '',
           email: backendProfile.email || '',
           website: backendProfile.website || '',
-          companyLogo: returnedLogo,
-          logo: returnedLogo,
+          // Enhanced logo field mapping for created profiles
+          companyLogo: returnedLogo || backendProfile.companyLogo || backendProfile.profileLogo || backendProfile.businessLogo || backendProfile.image || backendProfile.photo || '',
+          logo: returnedLogo || backendProfile.companyLogo || backendProfile.profileLogo || backendProfile.businessLogo || backendProfile.image || backendProfile.photo || '',
           banner: '',
           services: [],
           createdAt: backendProfile.createdAt,
@@ -351,6 +360,14 @@ class BusinessProfileService {
         throw new Error(
           'Cannot save local file path as logo. Please use uploadImage() to upload the image file first.'
         );
+      }
+      
+      // SAFETY GUARD: Prevent accidental logo updates from user profile sync
+      // Only allow logo updates if they come from explicit business profile operations
+      if (data.logo !== undefined || data.companyLogo !== undefined) {
+        console.warn('⚠️ [SAFETY] Logo update detected in business profile update');
+        console.warn('⚠️ [SAFETY] This should only happen from explicit business profile operations, not user profile sync');
+        // Allow the update but log warning for debugging - remove this block if you want to block completely
       }
       
       // Map frontend data to backend format - only include fields that are provided
@@ -691,6 +708,7 @@ class BusinessProfileService {
   }
 
   // Create payment order for business profile purchase
+  /** @deprecated Use subscriptionApi.createBusinessProfileAutopay instead */
   async createBusinessProfilePaymentOrder(params?: { amount?: number; currency?: string }) {
     try {
       const currentUser = authService.getCurrentUser();
@@ -722,6 +740,7 @@ class BusinessProfileService {
   }
 
   // Verify payment for business profile creation
+  /** @deprecated Subscription mandates are verified via webhooks; use subscriptionApi.getBusinessProfileSubscriptionStatus for status checks */
   async verifyBusinessProfilePayment(paymentData: {
     orderId: string;
     paymentId: string;
@@ -814,6 +833,7 @@ class BusinessProfileService {
   }
 
   // Check if user has paid for additional business profile creation
+  /** @deprecated Use subscriptionApi.getBusinessProfileSubscriptionStatus instead */
   async checkBusinessProfilePaymentStatus(): Promise<{ hasPaid: boolean; message?: string }> {
     try {
       const currentUser = authService.getCurrentUser();

@@ -1,0 +1,264 @@
+# Poster Preview Duplicate Analysis Report
+
+## 1. Root Cause Analysis
+
+The duplicate poster issue in PosterPlayerScreen is caused by **race conditions between multiple API calls and improper duplicate handling logic**. The root cause stems from the greeting category fetching mechanism where:
+
+1. **Multiple API calls are made simultaneously** for the same category (direct category fetch + multiple search variations)
+2. **Initial poster is manually added to the template list** when not found in fetched results
+3. **Background loading can duplicate the initial poster addition**
+4. **Thumbnail-based matching can fail** when the same poster has different thumbnail URLs
+
+## 2. Files Responsible
+
+### Primary Files:
+- `src/screens/PosterPlayerScreen.tsx` (lines 1136-2032) - Main duplicate logic
+- `src/screens/HomeScreen.tsx` (lines 5206-5220) - Navigation to PosterPlayer
+
+### Secondary Files:
+- `src/services/greetingTemplates.ts` - API service for fetching templates
+- `src/screens/GreetingTemplatesScreen.tsx` - Alternative navigation path
+
+## 3. Code Snippets Causing the Issue
+
+### 3.1 Multiple API Calls (Lines 1196-1204)
+```typescript
+const searchPromises = [
+  greetingTemplatesService.getTemplates({ category: greetingCategory, limit: initialLimit }),
+  greetingTemplatesService.searchTemplates(greetingCategory, undefined, initialLimit),
+  greetingTemplatesService.searchTemplates(normalizedCategory, undefined, initialLimit),
+  // Also search with individual words for better matching
+  ...searchVariations.slice(0, 3).map(variation =>
+    greetingTemplatesService.searchTemplates(variation, undefined, initialLimit)
+  ),
+];
+```
+
+### 3.2 Initial Poster Addition Logic (Lines 1833-1840)
+```typescript
+if (existingIndex === -1 && !matchingPoster && initialPosterWithLanguages.thumbnail) {
+  nextTemplates = [initialPosterWithLanguages, ...categoryFilteredTemplates];
+  console.log('⚠️ [GREETING FETCH] Adding initial poster to templates (not found in fetched):', {
+    initialPosterId: initialPosterWithLanguages.id,
+    finalTemplateCount: nextTemplates.length,
+    finalTemplateIds: nextTemplates.map(t => t.id)
+  });
+}
+```
+
+### 3.3 Background Loading Duplication (Lines 1637-1641)
+```typescript
+const existingIndex = categoryFilteredFinal.findIndex(t => t.id === initialPosterWithLanguages.id);
+let nextTemplates = categoryFilteredFinal;
+if (existingIndex === -1 && initialPosterWithLanguages.thumbnail) {
+  nextTemplates = [initialPosterWithLanguages, ...categoryFilteredFinal];
+}
+```
+
+### 3.4 Incomplete Thumbnail Matching (Lines 1790-1799)
+```typescript
+const matchingPosterByThumbnail = !matchingPosterById && (initialPosterThumbnail || initialPosterBackground)
+  ? categoryFilteredTemplates.find(t => {
+    const tThumbnail = t.thumbnail || (t as any).content?.background || '';
+    // Compare both thumbnail and background URLs
+    return (tThumbnail && initialPosterThumbnail && tThumbnail === initialPosterThumbnail) ||
+      (tThumbnail && initialPosterBackground && tThumbnail === initialPosterBackground) ||
+      (initialPosterBackground && tThumbnail && tThumbnail === initialPosterBackground);
+  })
+  : null;
+```
+
+## 4. When the Duplication Happens
+
+### 4.1 Initial Load Scenario
+1. User clicks "Motivational Quote" from Greetings page
+2. Navigation passes `selectedPoster` with specific template ID
+3. PosterPlayerScreen makes 5+ simultaneous API calls
+4. Initial poster is not found in first batch of results
+5. Initial poster is manually added to template list
+6. Background loading completes and adds initial poster again
+7. **Result: Duplicate poster appears in grid**
+
+### 4.2 Thumbnail URL Mismatch Scenario
+1. Initial poster has thumbnail URL A
+2. API returns same poster with thumbnail URL B (different resolution/format)
+3. ID matching fails (different IDs)
+4. Thumbnail matching fails (URLs don't match exactly)
+5. Initial poster is added as "new" poster
+6. **Result: Same poster appears twice with different thumbnails**
+
+### 4.3 Race Condition Scenario
+1. Multiple API calls return at different times
+2. First call doesn't contain the initial poster
+3. Initial poster is added to list
+4. Second call contains the same poster with different ID
+5. Deduplication fails because IDs are different
+6. **Result: Duplicate poster with different IDs**
+
+## 5. Why It Happens Intermittently
+
+### 5.1 API Response Timing
+- **Fast API responses**: All data returns before initial poster addition → No duplicate
+- **Slow API responses**: Initial poster added before API data → Potential duplicate
+- **Variable network conditions**: Different timing each time → Inconsistent behavior
+
+### 5.2 Caching Effects
+- **Cached responses**: API returns cached data quickly → Less likely to duplicate
+- **Fresh responses**: API takes longer to fetch → More likely to duplicate
+- **Partial cache hits**: Some calls cached, others not → Unpredictable results
+
+### 5.3 Search Result Variations
+- **Exact category match**: Initial poster found in API → No duplicate
+- **Search variation match**: Initial poster found in different search → Possible duplicate
+- **No match found**: Initial poster not in any API response → Guaranteed duplicate
+
+## 6. Recommended Fix
+
+### 6.1 Implement Robust Deduplication Strategy
+```typescript
+// Enhanced deduplication function
+const deduplicateTemplates = (templates: Template[], initialPoster?: Template): Template[] => {
+  const seen = new Map<string, Template>();
+  const thumbnailMap = new Map<string, Template>();
+  
+  // First, add the initial poster if provided
+  if (initialPoster && initialPoster.thumbnail) {
+    const key = initialPoster.id;
+    const thumbnail = initialPoster.thumbnail || (initialPoster as any).content?.background || '';
+    seen.set(key, initialPoster);
+    thumbnailMap.set(thumbnail, initialPoster);
+  }
+  
+  // Then process all templates
+  templates.forEach(template => {
+    const key = template.id;
+    const thumbnail = template.thumbnail || (template as any).content?.background || '';
+    
+    // Check by ID first
+    if (!seen.has(key)) {
+      // Check by thumbnail as fallback
+      if (!thumbnailMap.has(thumbnail)) {
+        seen.set(key, template);
+        thumbnailMap.set(thumbnail, template);
+      }
+    }
+  });
+  
+  return Array.from(seen.values());
+};
+```
+
+### 6.2 Fix Initial Poster Addition Logic
+```typescript
+// Replace the current addition logic with this
+const finalTemplates = deduplicateTemplates(categoryFilteredTemplates, initialPosterWithLanguages);
+```
+
+### 6.3 Prevent Background Loading Duplication
+```typescript
+// Add a flag to track if initial poster was already added
+const initialPosterAddedRef = useRef(false);
+
+// In background loading, check the flag before adding
+if (existingIndex === -1 && !initialPosterAddedRef.current && initialPosterWithLanguages.thumbnail) {
+  nextTemplates = [initialPosterWithLanguages, ...categoryFilteredFinal];
+  initialPosterAddedRef.current = true;
+}
+```
+
+## 7. Code Changes Required
+
+### 7.1 File: `src/screens/PosterPlayerScreen.tsx`
+
+#### Change 1: Add Enhanced Deduplication Function (after line 85)
+```typescript
+const deduplicateTemplates = (templates: Template[], initialPoster?: Template): Template[] => {
+  const seen = new Map<string, Template>();
+  const thumbnailMap = new Map<string, Template>();
+  
+  // First, add the initial poster if provided
+  if (initialPoster && initialPoster.thumbnail) {
+    const key = initialPoster.id;
+    const thumbnail = initialPoster.thumbnail || (initialPoster as any).content?.background || '';
+    seen.set(key, initialPoster);
+    thumbnailMap.set(thumbnail, initialPoster);
+  }
+  
+  // Then process all templates
+  templates.forEach(template => {
+    const key = template.id;
+    const thumbnail = template.thumbnail || (template as any).content?.background || '';
+    
+    // Check by ID first
+    if (!seen.has(key)) {
+      // Check by thumbnail as fallback
+      if (!thumbnailMap.has(thumbnail)) {
+        seen.set(key, template);
+        thumbnailMap.set(thumbnail, template);
+      }
+    }
+  });
+  
+  return Array.from(seen.values());
+};
+```
+
+#### Change 2: Add Ref to Track Initial Poster Addition (after line 415)
+```typescript
+const initialPosterAddedRef = useRef(false);
+```
+
+#### Change 3: Replace Initial Poster Addition Logic (lines 1833-1840)
+```typescript
+// Use enhanced deduplication instead of manual addition
+const finalTemplates = deduplicateTemplates(categoryFilteredTemplates, initialPosterWithLanguages);
+```
+
+#### Change 4: Replace Background Loading Logic (lines 1637-1641)
+```typescript
+const existingIndex = categoryFilteredFinal.findIndex(t => t.id === initialPosterWithLanguages.id);
+let nextTemplates = categoryFilteredFinal;
+if (existingIndex === -1 && !initialPosterAddedRef.current && initialPosterWithLanguages.thumbnail) {
+  nextTemplates = [initialPosterWithLanguages, ...categoryFilteredFinal];
+  initialPosterAddedRef.current = true;
+}
+```
+
+#### Change 5: Reset Ref on Category Change (in useEffect dependencies)
+```typescript
+// Reset the ref when category changes
+useEffect(() => {
+  initialPosterAddedRef.current = false;
+}, [greetingCategory]);
+```
+
+## 8. Preventive Measures (Deduplication Strategy)
+
+### 8.1 Multi-Level Deduplication
+1. **ID-based deduplication**: Primary method using unique template IDs
+2. **Thumbnail-based deduplication**: Fallback for same images with different IDs
+3. **Content-based deduplication**: Final fallback using content.background
+
+### 8.2 State Management Improvements
+1. **Single source of truth**: Use one array for all templates
+2. **Immutable updates**: Always replace entire array instead of merging
+3. **Reference tracking**: Use refs to track what has been added
+
+### 8.3 API Call Optimization
+1. **Sequential loading**: Load initial batch, then background load
+2. **Request deduplication**: Avoid multiple calls for same data
+3. **Cache management**: Proper cache invalidation and consistency
+
+### 8.4 Race Condition Prevention
+1. **Loading flags**: Track what's currently being loaded
+2. **Cancellation tokens**: Cancel outdated requests
+3. **Ordering guarantees**: Ensure responses are processed in correct order
+
+### 8.5 Monitoring and Debugging
+1. **Enhanced logging**: Track template additions and duplications
+2. **Performance metrics**: Monitor API response times
+3. **Error boundaries**: Catch and handle duplicate detection failures
+
+## Summary
+
+The duplicate poster issue is caused by race conditions in the greeting template fetching mechanism, where multiple API calls and background loading can cause the same poster to be added multiple times. The fix involves implementing robust deduplication logic that checks both IDs and thumbnail URLs, along with proper state management to prevent race conditions. The solution is backward-compatible and will not affect other parts of the application.

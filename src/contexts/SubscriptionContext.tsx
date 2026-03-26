@@ -37,6 +37,10 @@ interface SubscriptionContextType {
   enableAutopay: (planId: string) => Promise<void>;
   disableAutopay: () => Promise<void>;
   refreshAutopayStatus: () => Promise<void>;
+  // Business Profile Subscriptions
+  businessProfileSubscriptions: Record<string, SubscriptionStatus>;
+  getBusinessProfileSubscription: (profileId: string) => SubscriptionStatus | undefined;
+  refreshBusinessProfileSubscription: (profileId: string) => Promise<void>;
   // CRITICAL: Payment lock to prevent subscription updates during payment
   setPaymentInProgress: (inProgress: boolean) => void;
 }
@@ -113,6 +117,9 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
         nextBillingDate: null,
         autopayLoading: false,
       });
+
+      // Clear Business Profile Subscriptions
+      setBusinessProfileSubscriptions({});
       
       // Update current user ID
       setCurrentUserId(newUserId);
@@ -443,6 +450,9 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       nextBillingDate: null,
       autopayLoading: false,
     });
+
+    // Clear Business Profile Subscriptions
+    setBusinessProfileSubscriptions({});
     
     setCurrentUserId(null);
     console.log('✅ All subscription data cleared');
@@ -567,6 +577,30 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
     }
   }, []);
 
+  // Business Profile Subscription Methods
+  const [businessProfileSubscriptions, setBusinessProfileSubscriptions] = useState<Record<string, SubscriptionStatus>>({});
+
+  const getBusinessProfileSubscription = useCallback((profileId: string) => {
+    return businessProfileSubscriptions[profileId];
+  }, [businessProfileSubscriptions]);
+
+  const refreshBusinessProfileSubscription = useCallback(async (profileId: string) => {
+    try {
+      console.log('🔄 Refreshing subscription for business profile:', profileId);
+      const response = await subscriptionApi.getBusinessProfileSubscriptionStatus(profileId);
+      
+      if (response.success) {
+        setBusinessProfileSubscriptions(prev => ({
+          ...prev,
+          [profileId]: response.data
+        }));
+        console.log(`✅ Subscription for profile ${profileId} refreshed`);
+      }
+    } catch (error) {
+      console.error(`❌ Error refreshing subscription for profile ${profileId}:`, error);
+    }
+  }, []);
+
   return (
     <SubscriptionContext.Provider value={{ 
       isSubscribed, 
@@ -588,6 +622,10 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       enableAutopay,
       disableAutopay,
       refreshAutopayStatus,
+      // Business Profile Subscriptions
+      businessProfileSubscriptions,
+      getBusinessProfileSubscription,
+      refreshBusinessProfileSubscription,
       // CRITICAL: Payment lock to prevent subscription updates during payment
       setPaymentInProgress,
     }}>

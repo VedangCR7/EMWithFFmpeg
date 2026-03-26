@@ -28,6 +28,8 @@ import BottomSheet from '../components/BottomSheet';
 import RazorpayCheckout from 'react-native-razorpay';
 import { RAZORPAY_KEY_ID } from '@env';
 import { useSubscription } from '../contexts/SubscriptionContext';
+import { useBusinessProfile } from '../context/BusinessProfileContext';
+import subscriptionApi from '../services/subscriptionApi';
 import responsiveUtils, { 
   responsiveSpacing, 
   responsiveFontSize, 
@@ -50,11 +52,16 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 const BusinessProfilesScreen: React.FC = () => {
   const { isDarkMode, theme } = useTheme();
-  const { addTransaction } = useSubscription();
+  const { 
+    addTransaction, 
+    businessProfileSubscriptions, 
+    getBusinessProfileSubscription, 
+    refreshBusinessProfileSubscription 
+  } = useSubscription();
+  const { setSelectedBusinessProfile, selectedBusinessProfile } = useBusinessProfile();
   const insets = useSafeAreaInsets();
   const [profiles, setProfiles] = useState<any[]>([]);
   const [allProfiles, setAllProfiles] = useState<any[]>([]); // Cache all profiles for instant filtering
-  const [mainProfileId, setMainProfileId] = useState<string | null>(null); // Track the main/primary profile ID
   const [imageRefreshKey, setImageRefreshKey] = useState(Date.now()); // Key to force image refresh
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -134,133 +141,7 @@ const BusinessProfilesScreen: React.FC = () => {
       // Try to get user-specific profiles from API first
       const apiProfiles = await businessProfileService.getUserBusinessProfiles(userId);
       
-      // Auto-sync ALL user profile fields to the MAIN/FIRST business profile (user's profile from registration)
-      if (apiProfiles.length > 0) {
-        // Sort to ensure we get the oldest profile (created during registration)
-        const sortedByDate = [...apiProfiles].sort((a, b) => 
-          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-        );
-        
-        const mainProfile = sortedByDate[0]; // First profile = user's main profile
-        const otherProfiles = sortedByDate.slice(1); // All other profiles
-        
-        // Check if ANY user profile field needs to be synced
-        const userName = currentUser?._originalCompanyName || currentUser?.companyName || currentUser?.name;
-        const userPhone = currentUser?.phoneNumber || currentUser?.phone;
-        const userEmail = currentUser?.email;
-        const userAddress = currentUser?._originalAddress || currentUser?.address || '';
-        const userWebsite = currentUser?._originalWebsite || currentUser?.website || '';
-        const userCategory = currentUser?._originalCategory || currentUser?.category || '';
-        const userDescription = currentUser?._originalDescription || currentUser?.description || '';
-        const userAlternatePhone = currentUser?._originalAlternatePhone || currentUser?.alternatePhone || '';
-        const userLogo = currentUser?.logo || currentUser?.companyLogo || '';
-        
-        // CRITICAL: Sync ALL user fields to MAIN profile (registered profile)
-        // This is the user's primary profile created during registration
-        const needsSync = 
-          mainProfile.name !== userName ||
-          mainProfile.phone !== userPhone ||
-          mainProfile.email !== userEmail ||
-          mainProfile.address !== userAddress ||
-          mainProfile.website !== userWebsite ||
-          mainProfile.category !== userCategory ||
-          mainProfile.description !== userDescription ||
-          mainProfile.alternatePhone !== userAlternatePhone ||
-          (mainProfile.logo || mainProfile.companyLogo || '') !== userLogo;
-        
-        if (needsSync) {
-          console.log('🔄 Auto-syncing ALL user data to MAIN business profile (registered profile)...');
-          console.log('📍 Target profile:', mainProfile.name, '(created:', mainProfile.createdAt, ')');
-          console.log('📋 Syncing ALL user fields:');
-          console.log('   - Name:', userName);
-          console.log('   - Phone:', userPhone);
-          console.log('   - Email:', userEmail);
-          console.log('   - Address:', userAddress);
-          console.log('   - Website:', userWebsite);
-          console.log('   - Category:', userCategory);
-          console.log('   - Description:', userDescription);
-          console.log('   - Alternate Phone:', userAlternatePhone);
-          console.log('   - Logo:', userLogo ? 'Yes' : 'No');
-          console.log('🔒 ONLY syncing to MAIN profile - other profiles remain independent');
-          
-          try {
-            // Sync ALL user fields to MAIN business profile (this is the registered profile)
-            await businessProfileService.updateBusinessProfile(mainProfile.id, {
-              name: userName,
-              phone: userPhone,
-              email: userEmail,
-              address: userAddress,
-              website: userWebsite,
-              category: userCategory,
-              description: userDescription,
-              alternatePhone: userAlternatePhone,
-              companyLogo: userLogo,
-            });
-            
-            // Update the profile in the array (ALL synced fields)
-            mainProfile.name = userName;
-            mainProfile.phone = userPhone;
-            mainProfile.email = userEmail;
-            mainProfile.address = userAddress;
-            mainProfile.website = userWebsite;
-            mainProfile.category = userCategory;
-            mainProfile.description = userDescription;
-            mainProfile.alternatePhone = userAlternatePhone;
-            mainProfile.logo = userLogo;
-            mainProfile.companyLogo = userLogo;
-            
-            console.log(`✅ ALL user fields synced to MAIN profile: ${userName}`);
-            
-            // Clear cache after sync
-            businessProfileService.clearCache();
-            
-            // Clear business category posters cache to refresh My Business screen with new category posters
-            console.log('🔄 Clearing business category posters cache after profile sync');
-            try {
-              const businessCategoryPostersApi = require('../services/businessCategoryPostersApi').default;
-              businessCategoryPostersApi.clearCache();
-            } catch (error) {
-              console.error('Failed to clear business category posters cache:', error);
-            }
-          } catch (error) {
-            console.error(`❌ Failed to sync user data to main profile:`, error);
-          }
-        } else {
-          console.log('ℹ️ Main profile already has all current user data, skipping sync');
-        }
-        
-        // REMOVE user's logo FROM other business profiles (they should have their own logos)
-        if (userLogo) {
-          let removedCount = 0;
-          for (const profile of otherProfiles) {
-            const profileLogo = profile.logo || profile.companyLogo;
-            // If other profile has the user's logo, remove it
-            if (profileLogo === userLogo) {
-              console.log(`🗑️ Removing user logo from other profile: ${profile.name}`);
-              try {
-                await businessProfileService.updateBusinessProfile(profile.id, {
-                  companyLogo: '', // Clear the logo
-                });
-                
-                // Update in array
-                profile.logo = '';
-                profile.companyLogo = '';
-                
-                console.log(`✅ User logo removed from: ${profile.name}`);
-                removedCount++;
-              } catch (error) {
-                console.error(`❌ Failed to remove logo from ${profile.name}:`, error);
-              }
-            }
-          }
-          
-          if (removedCount > 0) {
-            console.log(`✅ Removed user logo from ${removedCount} other business profiles`);
-            businessProfileService.clearCache();
-          }
-        }
-      }
-      
+      // All profiles loaded successfully - no special auto-sync needed
       if (apiProfiles.length > 0) {
         // Sort profiles by creation date - OLDEST first (so first profile created stays at index 0)
         const sortedProfiles = apiProfiles.sort((a, b) => 
@@ -271,15 +152,8 @@ const BusinessProfilesScreen: React.FC = () => {
         setAllProfiles(sortedProfiles);
         setProfiles(sortedProfiles);
         
-        // Set the first profile (oldest) as the main/primary profile (from registration)
-        // This is set only once when profiles are initially loaded
-        if (!mainProfileId && sortedProfiles[0]?.id) {
-          setMainProfileId(sortedProfiles[0].id);
-          console.log('📍 Main profile ID set to:', sortedProfiles[0].id, '-', sortedProfiles[0].name);
-        }
-        
         console.log('✅ Loaded user-specific business profiles from API:', sortedProfiles.length);
-        console.log('🔍 First profile (Your Profile):', sortedProfiles[0]?.name, '- Created:', sortedProfiles[0]?.createdAt);
+        console.log('🔍 Total profiles loaded:', sortedProfiles.length);
         
         // Log logo URLs for debugging
         sortedProfiles.forEach((profile, index) => {
@@ -300,12 +174,21 @@ const BusinessProfilesScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [mainProfileId]);
+  }, []);
 
+  // Initial load of business profiles
   useEffect(() => {
     loadBusinessProfiles();
-    
-    // Load pending profile data from AsyncStorage on mount
+  }, [loadBusinessProfiles]);
+
+  // Handled by the consolidated useFocusEffect below
+  /*
+  useFocusEffect(
+    useCallback(() => {
+      // ...
+    }, [profiles.length, refreshBusinessProfileSubscription])
+  ); 
+  */    // Load pending profile data from AsyncStorage on mount
     const loadPendingData = async () => {
       try {
         const storedPendingData = await AsyncStorage.getItem('pending_business_profile_data');
@@ -319,8 +202,10 @@ const BusinessProfilesScreen: React.FC = () => {
       }
     };
     
-    loadPendingData();
-  }, [addTransaction, loadBusinessProfiles]);
+    // Load pending data on mount
+    useEffect(() => {
+      loadPendingData();
+    }, []); // Empty dependency array to run once on mount
 
   useEffect(() => {
     pendingProfileDataRef.current = pendingProfileData;
@@ -372,57 +257,204 @@ const BusinessProfilesScreen: React.FC = () => {
     }
   }, [pendingProfileData, loadBusinessProfiles]);
 
-  // Refresh profiles when screen comes into focus (e.g., returning from Profile edit or Payment)
+  // Consolidated useFocusEffect for refreshing profiles and subscriptions
   useFocusEffect(
     useCallback(() => {
-      console.log('🔄 BusinessProfilesScreen focused - refreshing profiles and images...');
-      setImageRefreshKey(Date.now()); // Force image refresh
+      console.log('🔄 BusinessProfilesScreen focused - refreshing profiles and subscriptions...');
+      setImageRefreshKey(Date.now());
       loadBusinessProfiles();
+      
+      // Refresh sub statuses when screen focuses
+      if (profiles && profiles.length > 0) {
+        profiles.forEach(p => {
+          if (p.id) {
+            console.log(`📡 Refreshing subscription status for: ${p.id}`);
+            refreshBusinessProfileSubscription(p.id);
+          }
+        });
+      } else {
+        // Even if no local profiles yet, try refreshing the list to fetch them
+        loadBusinessProfiles();
+      }
       
       // Check if payment was completed and create profile if needed
       checkPaymentAndCreateProfile();
-    }, [loadBusinessProfiles, checkPaymentAndCreateProfile])
+    }, [loadBusinessProfiles, profiles.length, refreshBusinessProfileSubscription, checkPaymentAndCreateProfile])
   );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    setImageRefreshKey(Date.now()); // Force image refresh on pull-to-refresh
+    setImageRefreshKey(Date.now());
     await loadBusinessProfiles();
     setRefreshing(false);
   }, [loadBusinessProfiles]);
 
-  // Instant search filter using cached profiles (no API call needed)
   const filterProfiles = useCallback((query: string) => {
     if (!query || query.trim() === '') {
-      // No search query - show all profiles
       setProfiles(allProfiles);
-      console.log('📋 Showing all profiles:', allProfiles.length);
       return;
     }
-
     const lowercaseQuery = query.toLowerCase().trim();
-    
-    // Filter cached profiles by company name, business subcategory, or mobile number
     const filtered = allProfiles.filter(profile => {
       const matchesName = profile.name?.toLowerCase().includes(lowercaseQuery);
       const matchesSubcategory = (profile.subcategory || profile.subCategory)?.toLowerCase().includes(lowercaseQuery);
       const matchesPhone = profile.phone?.toLowerCase().includes(lowercaseQuery);
-      
       return matchesName || matchesSubcategory || matchesPhone;
     });
-    
     setProfiles(filtered);
-    console.log('🔍 Instant search results:', filtered.length, 'profiles found for query:', query);
   }, [allProfiles]);
 
-  // Debounced search effect - automatically filter as user types
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       filterProfiles(searchQuery);
-    }, 300); // 300ms debounce
-
+    }, 300);
     return () => clearTimeout(timeoutId);
   }, [searchQuery, filterProfiles]);
+
+  const handlePayNow = useCallback(async () => {
+    if (!pendingProfileDataRef.current) {
+      setErrorMessage('No business profile data found.');
+      setShowErrorModal(true);
+      return;
+    }
+    const businessProfileId = pendingProfileDataRef.current.id;
+    try {
+      setIsProcessingPayment(true);
+      setShowPaymentModal(false);
+      const currentUser = authService.getCurrentUser();
+      const subscriptionData = await subscriptionApi.createBusinessProfileAutopay({
+        planId: 'plan_business_profile_standard',
+        businessProfileId,
+        subscriptionCategory: 'BUSINESS_PROFILE',
+        customerEmail: currentUser?.email,
+        customerPhone: currentUser?.phone || currentUser?.phoneNumber,
+      });
+
+      if (!subscriptionData?.subscriptionId) throw new Error('Failed to create subscription mandate.');
+
+      // Validate that we have a correct Razorpay subscription ID
+      if (!subscriptionData.subscriptionId.startsWith("sub_")) {
+        console.error("❌ Invalid subscription ID for Razorpay:", subscriptionData.subscriptionId);
+        throw new Error("Invalid Razorpay subscription ID.");
+      }
+
+      console.log("✅ Using Razorpay subscription ID:", subscriptionData.subscriptionId);
+
+      const options: any = {
+        description: 'Business Profile Subscription',
+        key: subscriptionData.razorpayKey || RAZORPAY_KEY_ID,
+        subscription_id: subscriptionData.subscriptionId,
+        name: 'Market Brand',
+        prefill: {
+          email: currentUser?.email || '',
+          contact: currentUser?.phone || currentUser?.phoneNumber || '',
+          name: currentUser?.name || currentUser?.companyName || 'User',
+        },
+        theme: { color: theme.colors.primary || '#667eea' },
+      };
+
+      try {
+        await RazorpayCheckout.open(options);
+        setSuccessMessage('Subscription mandate approved successfully! Your profile will be activated once the payment is verified.');
+        setShowSuccessModal(true);
+        refreshBusinessProfileSubscription(businessProfileId);
+        loadBusinessProfiles();
+      } catch (e: any) {
+        console.error('❌ Razorpay checkout error:', {
+          code: e?.code,
+          description: e?.description,
+          message: e?.message,
+          source: e?.source,
+          step: e?.step,
+          reason: e?.reason
+        });
+        
+        if (e?.code !== 2) {
+          // Handle payment cancellation and other errors with simple messages
+          let errorMessage = 'Payment Failed';
+          
+          // Check for payment cancellation in multiple ways
+          if (e?.code === 0 || 
+              e?.code === 'PAYMENT_CANCELLED' ||
+              e?.reason === 'payment_cancelled' ||
+              e?.step === 'payment_authentication' ||
+              (e?.description && e.description.includes('cancelled')) ||
+              (e?.description && e.description.includes('delay in response'))) {
+            errorMessage = 'Payment Failed';
+          } else if (e?.code === 'NETWORK_ERROR') {
+            errorMessage = 'Network error. Please check your connection and try again.';
+          } else if (e?.code === 'INVALID_OPTIONS') {
+            errorMessage = 'Invalid payment configuration. Please contact support.';
+          }
+          
+          setErrorMessage(errorMessage);
+          setShowErrorModal(true);
+        }
+      }
+    } catch (error: any) {
+      console.error('❌ Payment flow error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        code: error.code,
+        description: error.description,
+        stack: error.stack
+      });
+      
+      // Provide specific error messages
+      let errorMessage = error.message || 'Payment flow failed.';
+      
+      if (error.code === 'PAYMENT_CANCELLED') {
+        errorMessage = 'Payment was cancelled. Please try again.';
+      } else if (error.code === 'NETWORK_ERROR') {
+        errorMessage = 'Network error. Please check your connection and try again.';
+      } else if (error.code === 'INVALID_OPTIONS') {
+        errorMessage = 'Invalid payment configuration. Please contact support.';
+      }
+      
+      setErrorMessage(errorMessage);
+      setShowErrorModal(true);
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  }, [theme.colors.primary, refreshBusinessProfileSubscription, loadBusinessProfiles]);
+
+  const handleProfileSelect = useCallback(async (profile: any) => {
+    const subscription = getBusinessProfileSubscription(profile.id);
+    const status = subscription?.status?.toLowerCase();
+    
+    if (status !== 'active') {
+      const message = status === 'pending' 
+        ? "This business profile will unlock after your Razorpay subscription is activated (usually takes a few minutes)."
+        : status === 'expired'
+          ? "This business profile is locked because the subscription has expired. Please renew to continue."
+          : "This business profile is locked until the subscription is activated.";
+          
+      setErrorMessage(message);
+      
+      // Store this profile as the pending one so handlePayNow can use its ID
+      setPendingProfileData(profile);
+      pendingProfileDataRef.current = profile;
+      
+      setShowPaymentModal(true);
+      return;
+    }
+
+    try {
+      await setSelectedBusinessProfile(profile);
+      setSuccessMessage(`${profile.name} selected as active business profile`);
+      setShowSuccessModal(true);
+    } catch (error: any) {
+      setErrorMessage(error.message || 'Failed to select business profile');
+      setShowErrorModal(true);
+    }
+  }, [getBusinessProfileSubscription, setSelectedBusinessProfile]);
+
+  const initiatePaymentForProfile = useCallback((profile: any) => {
+    setPendingProfileData(profile);
+    pendingProfileDataRef.current = profile;
+    handlePayNow();
+  }, [handlePayNow]);
 
   const handleDeleteProfile = useCallback((profileId: string) => {
     setProfileToDelete(profileId);
@@ -431,20 +463,12 @@ const BusinessProfilesScreen: React.FC = () => {
 
   const confirmDeleteProfile = useCallback(async () => {
     if (!profileToDelete) return;
-    
     try {
       await businessProfileService.deleteBusinessProfile(profileToDelete);
-      // Update both displayed profiles and cached profiles
       setProfiles(prev => prev.filter(p => p.id !== profileToDelete));
       setAllProfiles(prev => prev.filter(p => p.id !== profileToDelete));
       setSuccessMessage('Business profile deleted successfully');
       setShowSuccessModal(true);
-      console.log('✅ Business profile deleted:', profileToDelete);
-      
-      // Refresh the profiles list to ensure consistency
-      setTimeout(() => {
-        loadBusinessProfiles();
-      }, 1000);
     } catch (error) {
       console.error('Error deleting profile:', error);
       setErrorMessage('Failed to delete profile. Please try again.');
@@ -461,7 +485,6 @@ const BusinessProfilesScreen: React.FC = () => {
   }, []);
 
   const handleAddProfile = useCallback(() => {
-    // Always allow opening the form - payment check will happen on save
     setEditingProfile(null);
     setShowBottomSheet(true);
   }, []);
@@ -471,511 +494,91 @@ const BusinessProfilesScreen: React.FC = () => {
     setIsProcessingPayment(false);
   }, []);
 
-  // Report payment failure to backend (non-blocking)
-  const reportPaymentFailure = async (orderId: string, status: string) => {
+  const reportPaymentFailure = useCallback(async (orderId: string, status: string) => {
     try {
-      console.log('🔴 Reporting payment failure to backend:', { orderId, status });
-      
-      // Verify auth token
       const token = await AsyncStorage.getItem('authToken');
-      console.log('🔑 Auth token for update-status:', token ? 'FOUND' : 'MISSING');
-      
-      // Log orderId being sent
-      console.log('📦 Sending orderId to backend:', orderId);
-      
-      // Await API call to ensure it completes before proceeding
-      const response = await fetch(`${api.defaults.baseURL}/api/mobile/transactions/update-status`, {
+      await fetch(`${api.defaults.baseURL}/api/mobile/transactions/update-status`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          orderId: orderId,
-          status: status
-        })
+        body: JSON.stringify({ orderId, status })
       });
-      
-      const data = await response.json().catch(() => null);
-      console.log('📡 update-status response:', {
-        status: response.status,
-        ok: response.ok,
-        data
-      });
-      
-      // Add small delay to ensure database update is visible to next query
-      if (response.ok) {
-        console.log('⏳ Waiting 400ms for database update to propagate...');
-        await new Promise(resolve => setTimeout(resolve, 400));
-        console.log('✅ Database update delay completed');
-      }
-      
     } catch (error) {
-      console.warn('⚠️ Error in reportPaymentFailure:', error);
-      // Silently handle - don't affect user experience
+      console.warn('⚠️ reportPaymentFailure error:', error);
     }
-  };
+  }, []);
 
-  const processBusinessProfilePaymentSuccess = useCallback(async (
-    paymentResponse: any,
-    orderMeta: { amount?: number; amountPaise?: number; currency?: string; orderId?: string }
-  ) => {
-    try {
-      console.log('🟢 [BUSINESS PAY] Handler invoked', { paymentResponse, orderMeta });
-      console.log('🟢 [BUSINESS PAY] Payment response:', JSON.stringify(paymentResponse, null, 2));
-      console.log('🟢 [BUSINESS PAY] Order meta:', JSON.stringify(orderMeta, null, 2));
-
-      // Validate payment response has required fields
-      if (!paymentResponse?.razorpay_payment_id || !paymentResponse?.razorpay_order_id || !paymentResponse?.razorpay_signature) {
-        console.error('❌ [BUSINESS PAY] Missing required payment fields:', {
-          hasPaymentId: !!paymentResponse?.razorpay_payment_id,
-          hasOrderId: !!paymentResponse?.razorpay_order_id,
-          hasSignature: !!paymentResponse?.razorpay_signature,
-        });
-        throw new Error('Payment response is incomplete. Please try the payment again.');
+  const SubscriptionStatusBadge = React.memo<{
+    status: any;
+    theme: any;
+  }>(({ status, theme }) => {
+    if (!status) return null;
+    const getStatusColor = () => {
+      const normalizedStatus = status.status?.toLowerCase();
+      switch (normalizedStatus) {
+        case 'active': return '#4CAF50';
+        case 'pending': return '#FF9800';
+        case 'expired': return '#F44336';
+        case 'cancelled': return '#9E9E9E';
+        default: return theme.colors.textSecondary;
       }
-
-      try {
-        await businessProfileService.verifyBusinessProfilePayment({
-          orderId: paymentResponse?.razorpay_order_id,
-          paymentId: paymentResponse?.razorpay_payment_id,
-          signature: paymentResponse?.razorpay_signature,
-          amount: orderMeta.amount,
-          amountPaise: orderMeta.amountPaise,
-          currency: orderMeta.currency,
-        });
-        console.log('✅ [BUSINESS PAY] verify-payment success');
-      } catch (verifyError: any) {
-        console.error('❌ [BUSINESS PAY] Payment verification failed:', verifyError);
-        console.error('❌ [BUSINESS PAY] Verification error details:', {
-          message: verifyError?.message,
-          responseStatus: verifyError?.response?.status,
-          responseData: verifyError?.response?.data,
-        });
-        
-        // If verification fails but payment was successful (paymentId exists), 
-        // we can still proceed with profile creation as a fallback
-        // The backend should handle payment verification separately
-        if (paymentResponse?.razorpay_payment_id) {
-          console.warn('⚠️ [BUSINESS PAY] Payment verification failed, but payment ID exists. Proceeding with profile creation...');
-          // Continue to create profile - backend can verify payment later
-        } else {
-          throw new Error(verifyError?.message || 'Payment verification failed. Please contact support.');
-        }
-      }
-
-      const profileData = pendingProfileDataRef.current;
-      if (!profileData) {
-        throw new Error('Missing business profile data after payment. Please try again.');
-      }
-
-      const resolvedAmount =
-        typeof orderMeta.amount === 'number'
-          ? orderMeta.amount
-          : orderMeta.amountPaise
-            ? orderMeta.amountPaise / 100
-            : 1;
-      console.log('ℹ️ [BUSINESS PAY] Resolved amount:', resolvedAmount);
-
-      try {
-        console.log('📡 [BUSINESS PAY] Logging transaction via addTransaction');
-        await addTransaction({
-          paymentId: paymentResponse?.razorpay_payment_id || `pay_${Date.now()}`,
-          orderId:
-            orderMeta.orderId ||
-            paymentResponse?.razorpay_order_id ||
-            `order_${Date.now()}`,
-          amount: resolvedAmount,
-          currency: orderMeta.currency || 'INR',
-          status: 'success',
-          plan: 'business_profile',
-          planName: 'Business Profile',
-          description: 'Business profile payment',
-          method: 'razorpay',
-          metadata: {
-            email: profileData.email,
-            contact: profileData.phone,
-            name: profileData.name,
-            category: profileData.category,
-            type: 'business_profile',
-          },
-          type: 'business_profile',
-        });
-        console.log('✅ [BUSINESS PAY] addTransaction finished');
-      } catch (transactionError) {
-        console.warn('⚠️ [BUSINESS PAY] Unable to record transaction:', transactionError);
-      }
-
-      console.log('📡 [BUSINESS PAY] Calling createBusinessProfile');
-      const newProfile = await businessProfileService.createBusinessProfile(profileData);
-      console.log('✅ [BUSINESS PAY] Business profile created:', newProfile?.id);
-
-      // Upload logo if there's a pending one
-      try {
-        const pendingLogoUri = await AsyncStorage.getItem('pending_business_logo_uri');
-        if (pendingLogoUri && newProfile?.id) {
-          console.log('📤 [BUSINESS PAY] Uploading pending logo for new profile:', newProfile.id);
-          const uploadResult = await businessProfileService.uploadImage(newProfile.id, 'logo', pendingLogoUri);
-          console.log('✅ [BUSINESS PAY] Logo uploaded successfully:', uploadResult.url);
-          
-          // Update the profile with the uploaded logo URL
-          await businessProfileService.updateBusinessProfile(newProfile.id, {
-            companyLogo: uploadResult.url
-          });
-          console.log('✅ [BUSINESS PAY] Profile updated with logo URL');
-        }
-        await AsyncStorage.removeItem('pending_business_logo_uri');
-      } catch (logoError) {
-        console.error('❌ [BUSINESS PAY] Failed to upload logo:', logoError);
-        // Don't fail the entire process if logo upload fails
-      }
-
-      await AsyncStorage.removeItem('pending_business_profile_data');
-      setPendingProfileData(null);
-      setShowPaymentModal(false);
-      setShowForm(false);
-      setShowBottomSheet(false);
-      setEditingProfile(null);
-      setSuccessMessage('Business profile created successfully.');
-      setShowSuccessModal(true);
-
-      // Refresh profiles to ensure UI consistency
-      setTimeout(() => {
-        loadBusinessProfiles();
-      }, 800);
-    } catch (error: any) {
-      console.error('❌ [BUSINESS PAY] Error finalizing payment:', error);
-      console.error('❌ [BUSINESS PAY] Error details:', {
-        message: error?.message,
-        responseStatus: error?.response?.status,
-        responseData: error?.response?.data,
-        stack: error?.stack,
-      });
-      
-      // Provide more user-friendly error messages
-      let userFriendlyMessage = 'Payment verification failed. Please contact support.';
-      
-      if (error?.message) {
-        if (error.message.includes('endpoint not found') || error.message.includes('404')) {
-          userFriendlyMessage = 'Payment verification service is temporarily unavailable. Your payment was successful. Please contact support to complete your business profile creation.';
-        } else if (error.message.includes('Invalid payment data')) {
-          userFriendlyMessage = 'Payment data is invalid. Please try the payment again.';
-        } else if (error.message.includes('Server error')) {
-          userFriendlyMessage = 'Server error during payment verification. Your payment was successful. Please contact support.';
-        } else {
-          userFriendlyMessage = error.message;
-        }
-      }
-      
-      setErrorMessage(userFriendlyMessage);
-      setShowErrorModal(true);
-    } finally {
-      setIsProcessingPayment(false);
-      console.log('🔚 [BUSINESS PAY] Handler flow complete');
-    }
-  }, [addTransaction, loadBusinessProfiles]);
-
-  const handlePayNow = useCallback(async () => {
-    if (!pendingProfileDataRef.current) {
-      setErrorMessage('No business profile data found. Please fill the form again.');
-      setShowErrorModal(true);
-      return;
-    }
-
-    let orderDetails: any;
-
-    try {
-      console.log('🟠 [BUSINESS PAY] Starting payment flow');
-      setShowPaymentModal(false);
-      setIsProcessingPayment(true);
-
-      // Ensure pending data is stored before initiating payment
-      await AsyncStorage.setItem('pending_business_profile_data', JSON.stringify(pendingProfileDataRef.current));
-      console.log('🗂️ [BUSINESS PAY] Pending form data saved to AsyncStorage');
-
-      // Create payment order for business profile
-      orderDetails = await businessProfileService.createBusinessProfilePaymentOrder({
-        amount: 599,
-        currency: 'INR',
-      });
-      console.log('📦 [BUSINESS PAY] create-payment-order response:', orderDetails);
-
-      if (!orderDetails?.orderId) {
-        throw new Error('Failed to create payment order. Please try again.');
-      }
-
-      const amountInPaise = typeof orderDetails.amountInPaise === 'number'
-        ? orderDetails.amountInPaise
-        : orderDetails.amount
-          ? Math.round(Number(orderDetails.amount) * 100)
-          : 59900;
-
-      if (!amountInPaise) {
-        throw new Error('Invalid payment amount. Please contact support.');
-      }
-      console.log('💰 [BUSINESS PAY] amountInPaise resolved:', amountInPaise);
-
-      const resolvedKey = orderDetails.razorpayKey || RAZORPAY_KEY_ID;
-      if (!resolvedKey) {
-        throw new Error('Missing Razorpay key configuration.');
-      }
-
-      const currentUser = authService.getCurrentUser();
-      const amountInRupees = amountInPaise / 100;
-      const resolvedAmount = typeof orderDetails.amount === 'number' ? orderDetails.amount : amountInRupees;
-
-      let handlerInvoked = false;
-      const handleRazorpaySuccess = async (response: any) => {
-        handlerInvoked = true;
-        console.log('🟢 [BUSINESS PAY] Razorpay handler triggered:', response);
-        await processBusinessProfilePaymentSuccess(response, {
-          amount: resolvedAmount,
-          amountPaise: amountInPaise,
-          currency: orderDetails.currency || 'INR',
-          orderId: orderDetails.orderId,
-        });
-      };
-
-      const options = {
-        description: 'Business Profile Addition',
-        currency: orderDetails.currency || 'INR',
-        key: resolvedKey,
-        amount: amountInPaise,
-        order_id: orderDetails.orderId,
-        name: 'Market Brand',
-        prefill: {
-          email: currentUser?.email || 'user@example.com',
-          contact: currentUser?.phoneNumber || '9999999999',
-          name: currentUser?.name || currentUser?.companyName || 'User',
-        },
-        theme: { color: '#667eea' },
-        method: {
-          upi: true,
-          card: true,
-          netbanking: false,
-          wallet: false,
-          emi: false,
-          paylater: false,
-        },
-        config: {
-          upi: {
-            flow: 'intent',
-            apps: ['google_pay', 'phonepe'],
-          },
-          display: {
-            hide: [
-              { method: 'netbanking' },
-              { method: 'wallet' },
-              { method: 'emi' },
-              { method: 'paylater' },
-              { method: 'upi', flows: ['collect'] },
-            ],
-            blocks: {
-              card: {
-                name: 'Pay using Card',
-                instruments: [
-                  {
-                    method: 'card',
-                  },
-                ],
-              },
-              upi: {
-                name: 'Pay using UPI (GPay / PhonePe)',
-                instruments: [
-                  {
-                    method: 'upi',
-                    apps: ['google_pay', 'phonepe'],
-                    flows: ['intent'],
-                  },
-                ],
-              },
-            },
-            sequence: ['block.card', 'block.upi'],
-            preferences: {
-              show_default_blocks: false,
-            },
-          },
-        },
-        handler: handleRazorpaySuccess,
-        modal: {
-          ondismiss: () => {
-            console.log('⚪ [BUSINESS PAY] Razorpay modal dismissed');
-            // Report failure to backend
-            if (orderDetails?.orderId) {
-              reportPaymentFailure(orderDetails.orderId, 'FAILED');
-            }
-            setIsProcessingPayment(false);
-          },
-        },
-      };
-
-      console.log('🚀 [BUSINESS PAY] Opening Razorpay with options:', options);
-      const razorpayResponse = await RazorpayCheckout.open(options);
-      console.log('✅ [BUSINESS PAY] Razorpay promise resolved:', razorpayResponse);
-
-      if (!handlerInvoked && razorpayResponse?.razorpay_payment_id) {
-        console.log('ℹ️ [BUSINESS PAY] Handler not invoked; processing Razorpay response manually');
-        await handleRazorpaySuccess(razorpayResponse);
-      }
-    } catch (error: any) {
-      console.error('❌ [BUSINESS PAY] Razorpay/open error:', error);
-      console.error('❌ [BUSINESS PAY] Error details:', {
-        message: error?.message,
-        description: error?.description,
-        code: error?.code,
-        metadata: error?.metadata,
-      });
-      // Report failure to backend
-      if (orderDetails?.orderId) {
-        reportPaymentFailure(orderDetails.orderId, 'FAILED');
-      }
-      setErrorMessage(error.message || 'Payment failed. Please try again.');
-      setShowErrorModal(true);
-      setIsProcessingPayment(false);
-    }
-  }, [processBusinessProfilePaymentSuccess]);
+    };
+    const statusLabel = status.status?.toUpperCase() || 'UNKNOWN';
+    const backgroundColor = `${getStatusColor()}20`;
+    const textColor = getStatusColor();
+    return (
+      <View style={[styles.statusBadge, { backgroundColor, borderColor: textColor, borderWidth: 1 }]}>
+        <Text style={[styles.statusBadgeText, { color: textColor }]}>{statusLabel}</Text>
+      </View>
+    );
+  });
 
   const handleFormSubmit = useCallback(async (formData: any, pendingLogoUri?: string) => {
-    // All new profiles require payment approval before creation
     if (!editingProfile) {
-      setPendingProfileData(formData);
-      if (pendingLogoUri) {
-        await AsyncStorage.setItem('pending_business_logo_uri', pendingLogoUri);
+      setFormLoading(true);
+      try {
+        const newProfile = await businessProfileService.createBusinessProfile(formData);
+        if (pendingLogoUri) {
+          await AsyncStorage.setItem(`pending_logo_${newProfile.id}`, pendingLogoUri);
+        }
+        const profileWithId = { ...formData, id: newProfile.id };
+        setPendingProfileData(profileWithId);
+        pendingProfileDataRef.current = profileWithId;
+        await AsyncStorage.setItem('pending_business_profile_data', JSON.stringify(profileWithId));
+        setShowPaymentModal(true);
+        setShowForm(false);
+        setShowBottomSheet(false);
+        loadBusinessProfiles();
+      } catch (error: any) {
+        setErrorMessage(error.message || 'Failed to create business profile.');
+        setShowErrorModal(true);
+      } finally {
+        setFormLoading(false);
       }
-      await AsyncStorage.setItem('pending_business_profile_data', JSON.stringify(formData));
-      setShowPaymentModal(true);
-      setShowForm(false);
-      setShowBottomSheet(false);
-      return; // IMPORTANT: Return early to prevent profile creation
+      return;
     }
 
     setFormLoading(true);
     try {
-      if (editingProfile) {
-        // CRITICAL: Snapshot user profile BEFORE updating business profile
-        // This protects against any accidental contamination from business profile updates
-        const authService = require('../services/auth').default;
-        const userBeforeUpdate = authService.getCurrentUser();
-        const userSnapshot = {
-          id: userBeforeUpdate?.id,
-          email: userBeforeUpdate?.email,
-          companyName: userBeforeUpdate?.companyName,
-          name: userBeforeUpdate?.name,
-          address: userBeforeUpdate?.address,
-          phone: userBeforeUpdate?.phone,
-          phoneNumber: userBeforeUpdate?.phoneNumber,
-          alternatePhone: userBeforeUpdate?.alternatePhone,
-          website: userBeforeUpdate?.website,
-          category: userBeforeUpdate?.category,
-          description: userBeforeUpdate?.description,
-          logo: userBeforeUpdate?.logo,
-          companyLogo: userBeforeUpdate?.companyLogo,
-          _originalCompanyName: userBeforeUpdate?._originalCompanyName,
-          _originalAddress: userBeforeUpdate?._originalAddress,
-          _originalWebsite: userBeforeUpdate?._originalWebsite,
-          _originalCategory: userBeforeUpdate?._originalCategory,
-          _originalDescription: userBeforeUpdate?._originalDescription,
-          _originalAlternatePhone: userBeforeUpdate?._originalAlternatePhone,
-        };
-        
-        console.log('🔒 USER PROFILE SNAPSHOT (before business profile update):');
-        console.log('   - address:', userSnapshot.address);
-        console.log('   - website:', userSnapshot.website);
-        console.log('   - category:', userSnapshot.category);
-        console.log('   - description:', userSnapshot.description);
-        
-        // Update existing profile
-        console.log('🔄 Updating profile with ID:', editingProfile.id);
-        console.log('📤 Form data being sent:', formData);
-        
-        const updatedProfile = await businessProfileService.updateBusinessProfile(editingProfile.id, formData);
-        console.log('✅ Updated profile received:', updatedProfile);
-        
-        // CRITICAL: Verify and restore user profile if it was contaminated
-        const userAfterUpdate = authService.getCurrentUser();
-        const addressChanged = userAfterUpdate?.address !== userSnapshot.address;
-        const websiteChanged = userAfterUpdate?.website !== userSnapshot.website;
-        const categoryChanged = userAfterUpdate?.category !== userSnapshot.category;
-        const descriptionChanged = userAfterUpdate?.description !== userSnapshot.description;
-        
-        if (addressChanged || websiteChanged || categoryChanged || descriptionChanged) {
-          console.warn('⚠️ USER PROFILE CONTAMINATION DETECTED! Restoring from snapshot...');
-          console.warn('   - address changed:', addressChanged, userAfterUpdate?.address, '→', userSnapshot.address);
-          console.warn('   - website changed:', websiteChanged, userAfterUpdate?.website, '→', userSnapshot.website);
-          console.warn('   - category changed:', categoryChanged, userAfterUpdate?.category, '→', userSnapshot.category);
-          console.warn('   - description changed:', descriptionChanged, userAfterUpdate?.description, '→', userSnapshot.description);
-          
-          // Restore user profile from snapshot
-          const restoredUser = {
-            ...userAfterUpdate,
-            address: userSnapshot.address,
-            website: userSnapshot.website,
-            category: userSnapshot.category,
-            description: userSnapshot.description,
-            alternatePhone: userSnapshot.alternatePhone,
-            _originalAddress: userSnapshot._originalAddress,
-            _originalWebsite: userSnapshot._originalWebsite,
-            _originalCategory: userSnapshot._originalCategory,
-            _originalDescription: userSnapshot._originalDescription,
-            _originalAlternatePhone: userSnapshot._originalAlternatePhone,
-          };
-          
-          authService.setCurrentUser(restoredUser);
-          console.log('✅ User profile restored from snapshot');
-        } else {
-          console.log('✅ User profile protected - no contamination detected');
-        }
-        
-        // Update both displayed profiles and cached profiles
-        const updateFn = (prev: any[]) => prev.map(p => p.id === editingProfile.id ? updatedProfile : p);
-        setProfiles(updateFn);
-        setAllProfiles(updateFn);
-        
-        setSuccessMessage('Business profile updated successfully');
-        setShowSuccessModal(true);
-        console.log('✅ Business profile updated:', editingProfile.id);
-        
-        // Clear business category posters cache to refresh My Business screen with new category posters
-        console.log('🔄 Clearing business category posters cache after profile update');
-        try {
-          const businessCategoryPostersApi = require('../services/businessCategoryPostersApi').default;
-          businessCategoryPostersApi.clearCache();
-        } catch (error) {
-          console.error('Failed to clear business category posters cache:', error);
-        }
-        
-        // Refresh the profiles list to ensure consistency
-        setTimeout(() => {
-          console.log('🔄 Refreshing profiles list after update...');
-          loadBusinessProfiles();
-        }, 1000);
-      } else {
-        // PAYMENT LOGIC COMMENTED FOR TESTING - Create profile directly
-        // This branch should be unreachable because new profiles require payment and return earlier.
-        // Keep as a fallback for admin/internal usage.
-        console.log('🆕 Creating new business profile directly (payment bypassed for testing)');
-        const newProfile = await businessProfileService.createBusinessProfile(formData);
-        setProfiles(prev => [...prev, newProfile]);
-        setAllProfiles(prev => [...prev, newProfile]);
-        setSuccessMessage('Business profile created successfully');
-        setShowSuccessModal(true);
-        console.log('✅ Business profile created (direct path):', newProfile.id);
-        setTimeout(() => {
-          loadBusinessProfiles();
-        }, 1000);
-      }
-      
+      const updatedProfile = await businessProfileService.updateBusinessProfile(editingProfile.id, formData);
+      const updateFn = (prev: any[]) => prev.map(p => p.id === editingProfile.id ? updatedProfile : p);
+      setProfiles(updateFn);
+      setAllProfiles(updateFn);
+      setSuccessMessage('Business profile updated successfully');
+      setShowSuccessModal(true);
       setShowForm(false);
       setShowBottomSheet(false);
       setEditingProfile(null);
+      setTimeout(() => loadBusinessProfiles(), 1000);
     } catch (error) {
-      console.error('Error saving profile:', error);
-      setErrorMessage('Failed to save profile. Please try again.');
+      setErrorMessage('Failed to update profile.');
       setShowErrorModal(true);
     } finally {
       setFormLoading(false);
     }
-  }, [editingProfile]);
+  }, [editingProfile, loadBusinessProfiles]);
 
   const handleFormClose = useCallback(() => {
     setShowForm(false);
@@ -983,22 +586,45 @@ const BusinessProfilesScreen: React.FC = () => {
     setEditingProfile(null);
   }, []);
 
-  // Memoized BusinessCard component for better performance
   const BusinessCard = React.memo<{
     item: any;
-    mainProfileId: string | null;
     imageRefreshKey: number;
     theme: any;
     onEdit: (item: any) => void;
     onDelete: (id: string) => void;
-  }>(({ item, mainProfileId, imageRefreshKey, theme, onEdit, onDelete }) => {
-    const isUserOwnProfile = mainProfileId !== null && item.id === mainProfileId;
-    
+    onSelect: (item: any) => void;
+    onPay: (item: any) => void;
+    subscription: any;
+  }>(({ item, imageRefreshKey, theme, onEdit, onDelete, onSelect, onPay, subscription }) => {
+    const isLocked = subscription?.status?.toLowerCase() !== 'active';
+    const isSelected = item.id === selectedBusinessProfile?.id;
+
     return (
-      <View style={[styles.businessCard, { backgroundColor: theme.colors.cardBackground }]}>
+      <TouchableOpacity 
+        style={[
+          styles.businessCard, 
+          { backgroundColor: theme.colors.cardBackground },
+          isSelected && { borderColor: theme.colors.primary, borderWidth: 2 }
+        ]}
+        onPress={() => onSelect(item)}
+        activeOpacity={isLocked ? 0.9 : 0.7}
+      >
+        {isLocked && (
+          <View style={styles.lockOverlay}>
+            <View style={[styles.lockBadge, { backgroundColor: theme.colors.surface }]}>
+              <Icon name="lock" size={24} color={theme.colors.error} />
+              <Text style={[styles.lockText, { color: theme.colors.text }]}>Subscription Required</Text>
+              <TouchableOpacity 
+                style={[styles.activateButton, { backgroundColor: theme.colors.primary }]}
+                onPress={() => onPay(item)}
+              >
+                <Text style={styles.activateButtonText}>Activate Now</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
         <View style={styles.cardHeader}>
           <View style={styles.businessInfoWithLogo}>
-            {/* Business Logo */}
             <View style={styles.logoContainer}>
               {(() => {
                 const logoUrl = item.companyLogo || item.logo;
@@ -1046,54 +672,31 @@ const BusinessProfilesScreen: React.FC = () => {
                 }
               })()}
             </View>
-            
             <View style={styles.businessInfo}>
-              <Text style={[styles.businessName, { color: theme.colors.text }]}>
-                {item.name || 'Business Name'}
-                {isUserOwnProfile && (
-                  <Text style={[styles.userBadge, { color: theme.colors.primary }]}> (Your Profile)</Text>
-                )}
-              </Text>
+              <View style={styles.nameAndStatus}>
+                <Text style={[styles.businessName, { color: theme.colors.text }]}>{item.name || 'Business Name'}</Text>
+                <SubscriptionStatusBadge status={getBusinessProfileSubscription(item.id)} theme={theme} />
+              </View>
               {(item.subcategory || item.subCategory) && (
-                <Text style={[styles.businessCategory, { color: theme.colors.primary }]}>
-                  {item.subcategory || item.subCategory}
-                </Text>
+                <Text style={[styles.businessCategory, { color: theme.colors.primary }]}>{item.subcategory || item.subCategory}</Text>
               )}
             </View>
           </View>
-          
-          {/* Only show edit/delete buttons for additional business profiles, not user's own profile */}
-          {!isUserOwnProfile && (
-            <View style={styles.cardActions}>
-              <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: `${theme.colors.primary}20` }]}
-                onPress={() => onEdit(item)}
-              >
-                <Icon name="edit" size={16} color={theme.colors.primary} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: `${theme.colors.error}20` }]}
-                onPress={() => onDelete(item.id)}
-              >
-                <Icon name="delete" size={16} color={theme.colors.error} />
-              </TouchableOpacity>
-            </View>
-          )}
+          <View style={styles.cardActions}>
+            <TouchableOpacity style={[styles.actionButton, { backgroundColor: `${theme.colors.primary}20` }]} onPress={() => onEdit(item)}>
+              <Icon name="edit" size={16} color={theme.colors.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.actionButton, { backgroundColor: `${theme.colors.error}20` }]} onPress={() => onDelete(item.id)}>
+              <Icon name="delete" size={16} color={theme.colors.error} />
+            </TouchableOpacity>
+          </View>
         </View>
-
-        {item.description && (
-          <Text style={[styles.description, { color: theme.colors.textSecondary }]}>
-            {item.description}
-          </Text>
-        )}
-
+        {item.description && <Text style={[styles.description, { color: theme.colors.textSecondary }]}>{item.description}</Text>}
         <View style={styles.contactInfo}>
           {item.phone && (
             <View style={styles.contactItem}>
               <Icon name="phone" size={14} color={theme.colors.textSecondary} />
-              <Text style={[styles.contactText, { color: theme.colors.textSecondary }]}>
-                {item.phone}
-              </Text>
+              <Text style={[styles.contactText, { color: theme.colors.textSecondary }]}>{item.phone}</Text>
             </View>
           )}
           {item.alternatePhone && (
@@ -1149,7 +752,7 @@ const BusinessProfilesScreen: React.FC = () => {
             </View>
           </View>
         )}
-      </View>
+      </TouchableOpacity>
     );
   }, (prevProps, nextProps) => {
     // Only re-render if item data, mainProfileId, imageRefreshKey, or theme changes
@@ -1165,7 +768,6 @@ const BusinessProfilesScreen: React.FC = () => {
       prevProps.item.address === nextProps.item.address &&
       prevProps.item.website === nextProps.item.website &&
       JSON.stringify(prevProps.item.services) === JSON.stringify(nextProps.item.services) &&
-      prevProps.mainProfileId === nextProps.mainProfileId &&
       prevProps.imageRefreshKey === nextProps.imageRefreshKey &&
       prevProps.theme.colors.primary === nextProps.theme.colors.primary &&
       prevProps.theme.colors.text === nextProps.theme.colors.text
@@ -1176,14 +778,16 @@ const BusinessProfilesScreen: React.FC = () => {
     return (
       <BusinessCard
         item={item}
-        mainProfileId={mainProfileId}
         imageRefreshKey={imageRefreshKey}
         theme={theme}
         onEdit={handleEditProfile}
         onDelete={handleDeleteProfile}
+        onSelect={handleProfileSelect}
+        onPay={initiatePaymentForProfile}
+        subscription={getBusinessProfileSubscription(item.id)}
       />
     );
-  }, [mainProfileId, imageRefreshKey, theme, handleEditProfile, handleDeleteProfile]);
+  }, [imageRefreshKey, theme, handleEditProfile, handleDeleteProfile, handleProfileSelect, initiatePaymentForProfile, getBusinessProfileSubscription]);
 
   const keyExtractor = useCallback((item: any) => item.id, []);
 
@@ -1622,6 +1226,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: Math.max(10, screenWidth * 0.025),
     paddingVertical: Math.max(6, screenHeight * 0.008),
     ...responsiveShadow.medium,
+  },
+  nameAndStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Math.max(3, screenHeight * 0.004),
+    flexWrap: 'wrap',
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  statusBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
   },
   searchInput: {
     flex: 1,
@@ -2112,6 +1733,46 @@ const styles = StyleSheet.create({
     fontSize: Math.min(screenWidth * 0.033, 13),
     fontWeight: '700',
     color: '#ffffff',
+  },
+  // Lock UI Styles
+  lockOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    zIndex: 10,
+    borderRadius: Math.max(10, responsiveSize.cardBorderRadius * 0.8),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  lockBadge: {
+    padding: 20,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 10,
+    width: '80%',
+  },
+  lockText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginTop: 10,
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  activateButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    minWidth: 120,
+    alignItems: 'center',
+  },
+  activateButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
 
