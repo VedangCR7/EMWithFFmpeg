@@ -1015,16 +1015,33 @@ const HomeScreen: React.FC = React.memo(() => {
 
   // Track if animations have been initialized
   const animationsInitializedRef = useRef(false);
+
+  // Safe fallback function for category matching to prevent undefined errors
+  const safeGetMatchingCategories = useCallback((searchLower: string, categories: any[]) => {
+    if (__DEV__) {
+      console.log('🔍 [SAFE FALLBACK] getMatchingCategories fallback being used');
+    }
+    if (!Array.isArray(categories) || !searchLower) return [];
+    
+    return categories.filter(category =>
+      category?.name?.toLowerCase().includes(searchLower) ||
+      (category?.parentCategoryName && category.parentCategoryName.toLowerCase().includes(searchLower))
+    );
+  }, []);
+
   const hierarchicalDisplayData = useMemo(() => {
     if (!isSearching || searchQuery.trim() === '') return { matchedNames: [], hierarchicalData: [] };
     
     const searchLower = searchQuery.toLowerCase().trim();
-    const matchingBusinessCategories = businessCategories.filter(category =>
-      category.name.toLowerCase().includes(searchLower) ||
-      (category.parentCategoryName && (
-        category.parentCategoryName.toLowerCase().includes(searchLower)
-      ))
-    );
+    
+    // Use safe category matching that includes parent categories
+    const matchingBusinessCategories = safeGetMatchingCategories(searchLower, businessCategories);
+    const matchingGeneralCategories = safeGetMatchingCategories(searchLower, filteredGreetingCategoriesList);
+
+    if (__DEV__) {
+      console.log('🔍 [HIERARCHICAL DISPLAY] Business categories matched:', matchingBusinessCategories.length);
+      console.log('🔍 [HIERARCHICAL DISPLAY] General categories matched:', matchingGeneralCategories.length);
+    }
 
     const matchedBusinessParentCategoryNames = [...new Set(
       matchingBusinessCategories
@@ -1037,13 +1054,6 @@ const HomeScreen: React.FC = React.memo(() => {
         .filter(cat => !cat.parentCategoryName)
         .map(cat => cat.name)
     )];
-
-    const matchingGeneralCategories = filteredGreetingCategoriesList.filter(category =>
-      category.name.toLowerCase().includes(searchLower) ||
-      (category.parentCategoryName && (
-        category.parentCategoryName.toLowerCase().includes(searchLower)
-      ))
-    );
 
     const matchedGeneralParentCategoryNames = [...new Set(
       matchingGeneralCategories
@@ -2724,6 +2734,43 @@ const HomeScreen: React.FC = React.memo(() => {
     businessQuotesTemplatesRaw,
   ]);
 
+  // Enhanced category matching to include parent, main, and child categories
+  const getMatchingCategories = useCallback((searchLower: string, categories: any[]) => {
+    // Direct matches (category name or parent category name)
+    const directMatches = categories.filter(category =>
+      category.name.toLowerCase().includes(searchLower) ||
+      (category.parentCategoryName && (
+        category.parentCategoryName.toLowerCase().includes(searchLower)
+      ))
+    );
+
+    // Find parent categories that match search
+    const matchingParentNames = [...new Set(
+      directMatches
+        .filter(cat => cat.parentCategoryName)
+        .map(cat => cat.parentCategoryName.toLowerCase())
+    )];
+
+    // Include child categories of matching parents
+    const childCategoriesOfMatchingParents = categories.filter(category =>
+      category.parentCategoryName && 
+      matchingParentNames.includes(category.parentCategoryName.toLowerCase())
+    );
+
+    // Combine all matches and remove duplicates
+    const allMatches = [...new Set([...directMatches, ...childCategoriesOfMatchingParents])];
+    
+    if (__DEV__) {
+      console.log('🔍 [CATEGORY MATCHING] Search:', searchLower);
+      console.log('🔍 [CATEGORY MATCHING] Direct matches:', directMatches.map(c => c.name));
+      console.log('🔍 [CATEGORY MATCHING] Parent matches:', matchingParentNames);
+      console.log('🔍 [CATEGORY MATCHING] Child categories of parents:', childCategoriesOfMatchingParents.map(c => c.name));
+      console.log('🔍 [CATEGORY MATCHING] Total matches:', allMatches.map(c => c.name));
+    }
+    
+    return allMatches;
+  }, []);
+
   // Lightweight hierarchy resolution for parent category search
   const getChildCategoriesForParent = useCallback((parentCategoryName: string, categories: any[]) => {
     return categories.filter(category => 
@@ -2962,6 +3009,30 @@ const HomeScreen: React.FC = React.memo(() => {
 
       // Set initial results immediately
       setTemplates(structuredResults);
+      
+      // Update hierarchicalResults for UI compatibility
+      if (allMatchingCategories.length > 0) {
+        // Create hierarchical structure from filtered results
+        const hierarchicalStructure = {
+          parentCategory: allMatchingCategories[0].name,
+          categories: allMatchingCategories.map(cat => ({
+            id: cat.id,
+            name: cat.name,
+            templates: uniqueFiltered.filter(template => 
+              template.category?.toLowerCase() === cat.name.toLowerCase()
+            ),
+            icon: cat.icon,
+            imageUrl: cat.imageUrl,
+            color: cat.color
+          }))
+        };
+        setHierarchicalResults(hierarchicalStructure);
+        setIsHierarchical(true);
+      } else {
+        // Clear hierarchical results when no categories match
+        setHierarchicalResults(null);
+        setIsHierarchical(false);
+      }
 
       // Then fetch General Category templates if search matches a category and update results
       if (allMatchingCategories.length > 0) {
@@ -3041,6 +3112,25 @@ const HomeScreen: React.FC = React.memo(() => {
 
             if (currentRequestId === requestId) {
               setTemplates(structuredResults);
+              
+              // Update hierarchicalResults with API data for UI compatibility
+              if (allMatchingCategories.length > 0) {
+                const apiHierarchicalStructure = {
+                  parentCategory: allMatchingCategories[0].name,
+                  categories: allMatchingCategories.map(cat => ({
+                    id: cat.id,
+                    name: cat.name,
+                    templates: finalUniqueResults.filter(template => 
+                      template.category?.toLowerCase() === cat.name.toLowerCase()
+                    ),
+                    icon: cat.icon,
+                    imageUrl: cat.imageUrl,
+                    color: cat.color
+                  }))
+                };
+                setHierarchicalResults(apiHierarchicalStructure);
+                setIsHierarchical(true);
+              }
             }
           } catch (error) {
             if (__DEV__) {
