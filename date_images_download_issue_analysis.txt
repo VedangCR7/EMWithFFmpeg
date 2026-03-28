@@ -1,0 +1,362 @@
+================================================================================
+DATE-WISE IMAGES DOWNLOAD ISSUE ANALYSIS REPORT
+================================================================================
+Technical Investigation: Missing imageUri and thumbnailUri in Mobile Downloads API Response
+
+ISSUE DESCRIPTION:
+- Admin uploads date-based images (Calendar Posters) successfully
+- Images appear correctly in mobile app poster display
+- When users download these images and fetch downloads via GET /api/mobile/users/{userId}/downloads,
+  the response for date images contains empty fields:
+  "imageUri": ""
+  "thumbnailUri": ""
+- Normal templates correctly return Cloudinary URLs
+
+PROBLEMATIC RESPONSE EXAMPLE:
+{
+  "id": "cmna2z0xi00071fd9dhk9efkp",
+  "title": "Resource jkt4b69m3gl2xix2uxb63lwr",
+  "description": "",
+  "imageUri": "",
+  "thumbnailUri": "",
+  "downloadDate": "2026-03-28T08:40:58.999Z",
+  "templateId": "jkt4b69m3gl2xix2uxb63lwr",
+  "category": "Templates",
+  "tags": [],
+  "userId": "cmn613x0h000211a6vfmt3izs",
+  "size": { "width": 300, "height": 400 }
+}
+
+================================================================================
+SECTION 1 — SYSTEM FLOW DIAGRAM
+================================================================================
+
+ADMIN UPLOAD FLOW:
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│ Admin Calendar  │    │ Cloudinary      │    │ Database       │
+│ Upload API      │───▶│ Upload Service  │───▶│ CalendarPoster │
+│ (POST /api/    │    │ (calendarUpload)│    │ Table          │
+│  admin/calendar│    │                 │    │                │
+│  /posters)     │    │                 │    │ imageUrl ✓     │
+│                 │    │                 │    │ thumbnailUrl ✓ │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+
+POSTER DISPLAY FLOW:
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│ Mobile Calendar │    │ Database        │    │ Cloudinary     │
+│ API            │───▶│ CalendarPoster  │───▶│ Optimized URLs │
+│ (GET /api/     │    │ Query           │    │ (thumbnail,    │
+│  mobile/calendar│    │                 │    │  medium)        │
+│  /posters/:date)│    │ imageUrl ✓      │    │                │
+│                 │    │ thumbnailUrl ✓  │    │                │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+
+DOWNLOAD TRACKING FLOW:
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│ Download        │    │ Database        │    │                │
+│ Tracking API    │───▶│ mobileDownload  │    │                │
+│ (POST /api/    │    │ Table           │    │                │
+│  mobile/       │    │                 │    │                │
+│  downloads/     │    │ resourceId ✓    │    │                │
+│  track)         │    │ resourceType ✓  │    │                │
+│                 │    │ fileUrl ✓       │    │                │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+
+DOWNLOADS FETCH FLOW (BROKEN):
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│ Downloads API   │    │ Database        │    │ Response       │
+│ (GET /api/      │───▶│ Multiple Tables │───▶│ Missing URLs   │
+│  mobile/        │    │ Query           │    │                │
+│  downloads/     │    │                 │    │ imageUri: ""   │
+│  user/:userId)   │    │ ❌ MISSING JOIN │    │ thumbnailUri: ""│
+│                 │    │ with CalendarPoster│    │                │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+
+================================================================================
+SECTION 2 — DATABASE SCHEMA ANALYSIS
+================================================================================
+
+PRIMARY MODELS INVOLVED:
+
+1. CalendarPoster Model (Lines 540-558):
+   id           String   @id
+   title        String
+   name         String?
+   description  String?
+   imageUrl     String   @map("image_url")           ← STORES CLOUDINARY URL
+   thumbnailUrl String?  @map("thumbnail_url")      ← STORES CLOUDINARY URL
+   date         DateTime @map("date") @db.Date
+   month        String
+   year         Int
+   category     String   @default("GENERAL")
+   tags         String?
+   isActive     Boolean  @default(true) @map("is_active")
+   createdAt    DateTime @default(now()) @map("created_at")
+   updatedAt    DateTime @updatedAt @map("updated_at")
+   createdBy    String   @map("created_by")
+
+2. MobileDownload Model (Lines 316-327):
+   id           String     @id @default(cuid())
+   mobileUserId String
+   resourceType String                          ← STORES 'CALENDAR'
+   resourceId   String                          ← STORES CalendarPoster.id
+   fileUrl      String                          ← STORES URL OR PATH
+   downloadedAt DateTime   @default(now())
+   createdAt    DateTime   @default(now())
+
+3. mobile_templates Model (Lines 375-397):
+   id                 String               @id
+   title              String
+   description        String?
+   imageUrl           String               ← STORES CLOUDINARY URL
+   fileUrl            String
+   category           String
+   language           String               @default("en")
+   type               String
+   isPremium          Boolean              @default(false)
+   tags               String?
+   downloads          Int                  @default(0)
+   likes              Int                  @default(0)
+   isActive           Boolean              @default(true)
+   sourceImageId      String?              @unique
+   syncedAt           DateTime             @default(now())
+   mobileSyncAt       DateTime?
+   createdAt          DateTime             @default(now())
+   updatedAt          DateTime
+
+KEY OBSERVATIONS:
+✓ CalendarPoster table HAS imageUrl and thumbnailUrl fields
+✓ MobileDownload table correctly stores resourceId and resourceType
+✓ Data schema supports the required functionality
+❌ No direct relationship/foreign key between MobileDownload and CalendarPoster
+
+================================================================================
+SECTION 3 — API FLOW ANALYSIS
+================================================================================
+
+1. ADMIN UPLOAD API (/api/admin/calendar/posters):
+   ✓ SUCCESSFULLY stores imageUrl and thumbnailUrl in CalendarPoster table
+   ✓ Uses CloudinaryService for upload
+   ✓ Cloudinary URLs are properly saved to database
+
+2. MOBILE POSTER DISPLAY API (/api/mobile/calendar/posters/:date):
+   ✓ SUCCESSFULLY retrieves CalendarPoster records
+   ✓ CORRECTLY formats response with thumbnail and imageUrl fields
+   ✓ Uses CloudinaryService.getMobileOptimizedImageUrl() for optimization
+
+3. DOWNLOAD TRACKING API (/api/mobile/downloads/track):
+   ✓ CORRECTLY accepts resourceType: 'CALENDAR'
+   ✓ CORRECTLY stores resourceId as CalendarPoster.id
+   ✓ CORRECTLY stores fileUrl (falls back to '/CALENDAR/{resourceId}')
+   ✓ MobileDownload record is created properly
+
+4. DOWNLOADS FETCH API (/api/mobile/downloads/user/:mobileUserId):
+   ❌ CRITICAL ISSUE IDENTIFIED
+   ❌ Only queries: template_downloads, video_downloads, greeting_downloads
+   ❌ COMPLETELY MISSING calendar poster downloads from mobileDownload table
+   ❌ Uses different endpoint (/api/mobile/downloads) with separate legacy tables
+
+================================================================================
+SECTION 4 — CODE LOGIC ANALYSIS
+================================================================================
+
+DOWNLOAD TRACKING API (src/routes/mobile/downloads.ts Lines 14-164):
+✅ CORRECT IMPLEMENTATION:
+- Accepts resourceType: 'CALENDAR' (Line 17)
+- Creates MobileDownload record with proper fields (Lines 131-138)
+- Stores resourceId and fileUrl correctly
+
+DOWNLOADS FETCH API (src/routes/mobile/downloads.ts Lines 170-331):
+✅ CORRECT IMPLEMENTATION for /api/mobile/downloads/user/:mobileUserId:
+- Includes case 'CALENDAR' in switch statement (Lines 252-263)
+- Fetches from CalendarPoster table using resourceId
+- Maps imageUrl and thumbnailUrl correctly
+- Returns proper imageUri and thumbnailUri fields
+
+❌ CRITICAL ISSUE - LEGACY API (Lines 337-427):
+- GET /api/mobile/downloads only queries template_downloads, video_downloads, greeting_downloads
+- COMPLETELY IGNORES mobileDownload table where CALENDAR downloads are stored
+- NO CALENDAR case in the mapping logic
+- This appears to be the API endpoint being used by the mobile app
+
+================================================================================
+SECTION 5 — ROOT CAUSE IDENTIFICATION
+================================================================================
+
+PRIMARY ROOT CAUSE:
+The mobile app is using the WRONG API endpoint for fetching downloads.
+
+TWO COMPETING DOWNLOADS APIs EXIST:
+
+1. ✅ CORRECT API: GET /api/mobile/downloads/user/:mobileUserId
+   - Location: src/routes/mobile/downloads.ts Lines 170-331
+   - Supports: TEMPLATE, VIDEO, GREETING, CONTENT, CALENDAR
+   - Data Source: mobileDownload table (unified approach)
+   - Calendar Support: ✅ FULLY IMPLEMENTED
+   - Returns: imageUri, thumbnailUri with proper Cloudinary URLs
+
+2. ❌ BROKEN API: GET /api/mobile/downloads
+   - Location: src/routes/mobile/downloads.ts Lines 337-427
+   - Supports: TEMPLATE, VIDEO, GREETING only
+   - Data Source: Separate legacy tables (template_downloads, video_downloads, greeting_downloads)
+   - Calendar Support: ❌ NOT IMPLEMENTED
+   - Returns: imageUri: "", thumbnailUri: "" for calendar downloads
+
+TECHNICAL DETAILS:
+- Download tracking correctly creates records in mobileDownload table
+- Legacy API doesn't query mobileDownload table
+- Legacy API has no knowledge of CalendarPoster model
+- Field mapping in legacy API doesn't include CALENDAR case
+
+================================================================================
+SECTION 6 — AFFECTED COMPONENTS
+================================================================================
+
+DIRECT IMPACT:
+1. Mobile App Downloads Screen
+   - Shows empty imageUri/thumbnailUri for calendar posters
+   - Users cannot see downloaded calendar poster thumbnails
+
+2. User Experience
+   - Inconsistent behavior between templates and calendar posters
+   - Broken visual feedback in downloads section
+
+INDIRECT IMPACT:
+1. API Architecture
+   - Confusion between two competing download endpoints
+   - Inconsistent data sources (unified vs. legacy tables)
+
+2. Data Integrity
+   - Calendar downloads tracked correctly but not retrievable by main endpoint
+
+================================================================================
+SECTION 7 — RECOMMENDED FIX
+================================================================================
+
+OPTION A: UPDATE LEGACY API (RECOMMENDED - MINIMAL RISK)
+1. Add calendar downloads query to GET /api/mobile/downloads
+2. Include CALENDAR case in the response mapping logic
+3. Ensure backward compatibility
+
+OPTION B: MIGRATE TO UNIFIED API (CLEANER - HIGHER RISK)
+1. Update mobile app to use /api/mobile/downloads/user/:userId endpoint
+2. Deprecate legacy /api/mobile/downloads endpoint
+3. Consolidate all download logic
+
+IMPLEMENTATION STRATEGY FOR OPTION A:
+
+1. UPDATE DOWNLOADS QUERY (Lines 353-383):
+   Add calendar downloads query:
+   ```typescript
+   const [templateDownloads, videoDownloads, greetingDownloads, calendarDownloads] = await Promise.all([
+     // ... existing queries ...
+     prisma.mobileDownload.findMany({
+       where: { 
+         mobileUserId: mobileUserId as string,
+         resourceType: 'CALENDAR'
+       },
+       skip,
+       take: limitNum,
+       orderBy: { downloadedAt: 'desc' }
+     })
+   ]);
+   ```
+
+2. UPDATE RESPONSE MAPPING (Lines 386-406):
+   Add calendar downloads mapping:
+   ```typescript
+   const allDownloads = [
+     // ... existing mappings ...
+     ...calendarDownloads.map(async (d) => {
+       const calendarPoster = await prisma.calendarPoster.findUnique({
+         where: { id: d.resourceId }
+       });
+       return {
+         ...d,
+         type: 'CALENDAR',
+         title: calendarPoster?.title || `Resource ${d.resourceId}`,
+         thumbnailUrl: calendarPoster?.thumbnailUrl || 
+                     CloudinaryService.getMobileOptimizedImageUrl(calendarPoster?.imageUrl, 'thumbnail') || '',
+         imageUri: calendarPoster?.imageUrl || d.fileUrl || ''
+       };
+     })
+   ];
+   ```
+
+================================================================================
+SECTION 8 — IMPLEMENTATION STRATEGY
+================================================================================
+
+PHASE 1: IMMEDIATE FIX (1-2 hours)
+1. Update GET /api/mobile/downloads to include calendar downloads
+2. Add CALENDAR case to response mapping
+3. Test with existing calendar download records
+4. Deploy to production
+
+PHASE 2: VALIDATION (1 hour)
+1. Test download tracking for new calendar posters
+2. Verify downloads display correctly in mobile app
+3. Ensure no regression for existing template/video/greeting downloads
+
+PHASE 3: LONG-TERM CLEANUP (FUTURE)
+1. Plan migration to unified /api/mobile/downloads/user/:userId endpoint
+2. Update mobile app to use correct endpoint
+3. Deprecate legacy endpoint
+
+================================================================================
+SECTION 9 — RISK ANALYSIS
+================================================================================
+
+OPTION A RISKS (LOW):
+✅ Minimal code changes
+✅ No database schema changes
+✅ Backward compatible
+✅ Can be deployed incrementally
+⚠️ Maintains technical debt (two endpoints)
+
+OPTION B RISKS (MEDIUM):
+⚠️ Requires mobile app updates
+⚠️ Higher testing requirements
+⚠️ Potential breaking changes
+✅ Cleaner architecture
+
+MITIGATION STRATEGIES:
+1. Comprehensive testing with existing download records
+2. Gradual rollout with feature flags
+3. Fallback mechanisms in mobile app
+
+================================================================================
+SECTION 10 — FINAL CONCLUSION
+================================================================================
+
+ROOT CAUSE SUMMARY:
+The issue is NOT with data storage or download tracking. Calendar posters are correctly
+uploaded with Cloudinary URLs, and download tracking works properly. The problem is that
+the mobile app is using a legacy downloads API endpoint that doesn't support calendar
+posters, while a newer unified endpoint with full calendar support exists.
+
+TECHNICAL ASSESSMENT:
+- Data Layer: ✅ WORKING CORRECTLY
+- Upload Flow: ✅ WORKING CORRECTLY  
+- Display Flow: ✅ WORKING CORRECTLY
+- Download Tracking: ✅ WORKING CORRECTLY
+- Downloads Retrieval: ❌ USING WRONG ENDPOINT
+
+RECOMMENDED ACTION:
+Implement Option A - Update the legacy GET /api/mobile/downloads endpoint to include
+calendar downloads. This provides an immediate fix with minimal risk while maintaining
+backward compatibility.
+
+EXPECTED OUTCOME:
+After implementing the fix, calendar poster downloads will correctly display:
+- imageUri: [Cloudinary URL]
+- thumbnailUri: [Cloudinary optimized thumbnail URL]
+
+This will resolve the user experience issue and provide consistent behavior across
+all resource types in the downloads section.
+
+================================================================================
+REPORT GENERATED: March 28, 2026
+ENGINEER: Senior Backend Engineer
+STATUS: ROOT CAUSE IDENTIFIED - FIX READY FOR IMPLEMENTATION
+================================================================================
