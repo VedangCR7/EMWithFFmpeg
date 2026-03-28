@@ -648,13 +648,7 @@ class SubscriptionApiService {
     contact?: string;
     subscriptionId?: string;
     isAutopay?: boolean;
-  }): Promise<{ 
-    success: boolean; 
-    message: string; 
-    paymentVerified: boolean;
-    subscriptionActivated: boolean;
-    data?: any 
-  }> {
+  }): Promise<{ success: boolean; message: string; data?: any }> {
     try {
       const currentUser = authService.getCurrentUser();
       const userId = currentUser?.id;
@@ -710,24 +704,12 @@ class SubscriptionApiService {
 
       const response = await api.post('/api/mobile/subscription/verify-payment', payload);
       
-      console.log('✅ Payment verification response:', response.data);
-      
-      // Ensure the response has the expected structure
-      const responseData = response.data || {};
-      const result = {
-        success: responseData.success || false,
-        message: responseData.message || 'Payment verification completed',
-        paymentVerified: responseData.paymentVerified !== undefined ? responseData.paymentVerified : responseData.success || false,
-        subscriptionActivated: responseData.subscriptionActivated !== undefined ? responseData.subscriptionActivated : false,
-        data: responseData.data || responseData
-      };
-      
-      console.log('📊 Processed verification result:', result);
+      console.log('✅ Payment verified successfully:', response.data);
       
       // Clear subscription status cache after payment verification
       this.clearStatusCache(userId);
       
-      return result;
+      return response.data;
     } catch (error: any) {
       console.error('❌ Payment verification error:', error);
       

@@ -566,10 +566,7 @@ const SubscriptionScreen: React.FC = () => {
 
             // Step 3: Start polling for subscription activation instead of immediate check
             if (verifyResult?.success) {
-              console.log('[APP] ✅ Payment verified, entering processing state');
-              
-              // Set transaction pending state - DO NOT activate subscription
-              setIsTransactionPending(true);
+              console.log('[APP] ✅ Payment verified, starting polling for activation (5m window)');
               
               // Use the new modular polling helper
               pollingCleanupRef.current = startSubscriptionPolling(
@@ -842,12 +839,9 @@ const SubscriptionScreen: React.FC = () => {
 
               // Step 3: Start polling for subscription activation instead of immediate check
               if (verifyResult?.success) {
-                console.log('[APP] ✅ Autopay payment verified, entering processing state');
+                console.log('[APP] ✅ Autopay payment verified, starting polling for activation');
                 
-                // Set transaction pending state - DO NOT activate subscription
-                setIsTransactionPending(true);
-                
-                // Use new modular polling helper
+                // Use the new modular polling helper
                 pollingCleanupRef.current = startSubscriptionPolling(
                   () => {
                     // onActive: Subscription is now active!
@@ -874,7 +868,7 @@ const SubscriptionScreen: React.FC = () => {
                     
                     Alert.alert(
                       'Processing Mandate',
-                      'Your mandate was approved! Subscription activation may take a few moments. Pro features will unlock once payment is processed.',
+                      'Your mandate was approved! Subscription activation may take a few moments. Pro features will unlock once the payment is processed.',
                       [{ text: 'OK', onPress: () => navigation.goBack() }]
                     );
                   }
@@ -1125,42 +1119,6 @@ const SubscriptionScreen: React.FC = () => {
           padding: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(8),
         }]}
       >
-
-        {/* Processing State Message */}
-        {isTransactionPending && (
-          <View style={[styles.processingCard, {
-            backgroundColor: theme.colors.cardBackground,
-            marginBottom: dynamicModerateScale(12),
-            padding: isTabletDevice ? dynamicModerateScale(16) : dynamicModerateScale(12),
-            borderRadius: dynamicModerateScale(12),
-            borderWidth: 1.5,
-            borderColor: '#2196f3',
-          }]}>
-            <View style={[styles.processingHeader, {
-              marginBottom: isTabletDevice ? dynamicModerateScale(8) : dynamicModerateScale(6),
-            }]}>
-              <ActivityIndicator size="small" color="#2196f3" />
-              <View style={[styles.processingInfo, {
-                marginLeft: dynamicModerateScale(10),
-              }]}>
-                <Text style={[styles.processingTitle, {
-                  color: theme.colors.text,
-                  fontSize: dynamicModerateScale(12),
-                  marginBottom: dynamicModerateScale(2),
-                }]}>
-                  Processing Payment
-                </Text>
-                <Text style={[styles.processingSubtitle, {
-                  color: theme.colors.textSecondary,
-                  fontSize: dynamicModerateScale(9),
-                  lineHeight: dynamicModerateScale(14),
-                }]}>
-                  Your mandate has been approved. Subscription activation may take a few moments.
-                </Text>
-              </View>
-            </View>
-          </View>
-        )}
 
         {/* Current Subscription Status (if subscribed) */}
         {isSubscribed && contextSubscriptionStatus && (
@@ -1473,7 +1431,7 @@ const SubscriptionScreen: React.FC = () => {
                 : isAuthenticating
                   ? 'Authenticating...'
                   : isTransactionPending
-                    ? 'Mandate approved. Activating your subscription...'
+                    ? `Transaction Pending...${pollingAttempts > 0 ? ` (${pollingAttempts}/5)` : ''}`
                     : isProcessing || paymentInProgress
                       ? 'Processing...'
                       : selectedPlan
@@ -1761,29 +1719,6 @@ const styles = StyleSheet.create({
   transactionHistoryButtonText: {
     fontWeight: '600',
     flex: 1,
-  },
-  // Processing state styles
-  processingCard: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  processingHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  processingInfo: {
-    flex: 1,
-  },
-  processingTitle: {
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  processingSubtitle: {
-    fontSize: 14,
-    opacity: 0.8,
   },
 });
 

@@ -219,13 +219,9 @@ const templateContainsLanguage = (template: Template, languageId: string): boole
     return false;
   }
 
-  // NEW UNIVERSAL LOGIC: Templates with ZERO language metadata are shown for ALL languages
-  if (templateLanguages.length === 0 && tags.length === 0) {
-    if (__DEV__) {
-      console.log(`🌐 [Language Filter] UNIVERSAL: ${template.id} (No tags/lang)`);
-    }
-    return true; 
-  }
+  // REMOVED: Universal logic that caused inconsistent filtering
+  // Templates with no language metadata should follow the same rules as others
+  // This prevents posters from appearing/disappearing unexpectedly
 
   // Fallback: Default to English if no other match found
   return normalizedLanguage === 'english';
@@ -1184,13 +1180,26 @@ const TodaysPickScreen: React.FC = () => {
       return templatesWithLanguages;
     }
 
-    // Filter by language - if no matches, return empty array
-    const languageFiltered = templatesWithLanguages.filter(template => {
-      const matches = templateContainsLanguage(template, selectedLanguage);
-      return matches;
-    });
+    // CRITICAL FIX: When a specific language is selected, show ALL posters
+    // Don't filter by language - this prevents grid from showing only 1 image
+    // Language auto-detection is for UI purposes only, not for filtering content
+    console.log(`🔄 [LANGUAGE FILTER] Language ${selectedLanguage} selected, showing all posters without filtering`);
+    return templatesWithLanguages;
+    
+    // REMOVED: Aggressive language filtering that caused single image display
+    // const languageFiltered = templatesWithLanguages.filter(template => {
+    //   const matches = templateContainsLanguage(template, selectedLanguage);
+    //   return matches;
+    // });
 
-    return languageFiltered;
+    // CRITICAL FIX: Never return empty array - fallback to all posters
+    // This prevents Preview Grid from disappearing during swipe
+    // if (languageFiltered.length === 0) {
+    //   console.log(`🔄 [LANGUAGE FILTER] No posters found for language: ${selectedLanguage}, showing all posters`);
+    //   return templatesWithLanguages;
+    // }
+
+    // return languageFiltered;
   }, [todayPosters, selectedLanguage]);
 
   // Preload images for better scrolling performance
@@ -2140,7 +2149,9 @@ const TodaysPickScreen: React.FC = () => {
       // If a language is detected and it's different from current selection, switch to it
       // Always auto-detect based on the current poster's language
       // Only skip if we've already detected for this poster to avoid duplicate detection
-      if (detectedLanguage && lastAutoDetectedPosterIdRef.current !== posterWithLanguages?.id) {
+      if (detectedLanguage && 
+          lastAutoDetectedPosterIdRef.current !== posterWithLanguages?.id &&
+          detectedLanguage !== selectedLanguage) { // ADD THIS CHECK
         setSelectedLanguage(detectedLanguage);
         lastAutoDetectedPosterIdRef.current = posterWithLanguages?.id || null;
       }

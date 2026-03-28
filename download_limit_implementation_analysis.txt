@@ -1,0 +1,200 @@
+DOWNLOAD LIMIT FUNCTIONALITY - IMPLEMENTATION ANALYSIS REPORT
+==========================================================
+
+Generated: March 30, 2026
+Project: EventMarketers Business Marketing Platform
+Stack: Node.js Backend + PostgreSQL + Prisma ORM + React Native Mobile App
+
+1. CURRENT DOWNLOAD FLOW
+------------------------
+
+Step-by-step explanation of how a download currently works in the system:
+
+1. User initiates download from mobile app (PosterPreviewScreen.tsx)
+2. Mobile app calls downloadPoster() function in PosterPreviewScreen.tsx (line 352)
+3. Download saves image to device gallery using CameraRoll.save()
+4. Mobile app calls trackPosterDownload() from downloadHelper.ts (line 418)
+5. downloadHelper.ts calls downloadTrackingService.trackDownload() (line 34)
+6. downloadTrackingService makes POST request to /api/mobile/downloads/track
+7. Backend downloads.ts route handles the request (line 14)
+8. Backend validates user exists and creates MobileDownload record (line 170)
+9. Backend returns success response with download details
+10. Mobile app shows success message to user
+
+Key Points:
+- Download tracking is separate from actual file download
+- Backend stores download records in MobileDownload table
+- No current limit checking exists
+- Duplicate prevention is implemented (lines 77-119 in downloads.ts)
+
+2. CODE LOCATIONS
+-----------------
+
+Backend files responsible for downloads:
+- src/routes/mobile/downloads.ts - Main download tracking API
+- src/middleware/subscription.ts - Subscription validation middleware
+- src/routes/mobile/subscriptions.ts - Subscription management
+- src/routes/admin/subscriptionPlans.ts - Plan management
+- src/controllers/autopayController.ts - Payment processing
+- src/services/razorpayAutopayService.ts - Payment service
+
+Mobile app files calling the API:
+- src/screens/PosterPreviewScreen.tsx - Main download interface
+- src/services/downloadTracking.ts - Download tracking service
+- src/utils/downloadHelper.ts - Download helper utilities
+- src/services/downloadedPosters.ts - Local poster management
+
+3. DATABASE ANALYSIS
+--------------------
+
+Relevant tables:
+- MobileDownload - Stores all download records
+  - id, mobileUserId, businessProfileId, resourceType, resourceId, fileUrl, downloadedAt, createdAt
+  - Already has mobileUserId for user association
+  - No download limit fields currently
+
+- MobileSubscription - User subscription records
+  - Links to mobile_subscription_plans via planId
+  - Has status, startDate, endDate for active period checking
+
+- mobile_subscription_plans - Subscription plan definitions
+  - id, name, price, period, features, isActive
+  - No download limit fields currently
+
+- MobileUser - User accounts
+  - Links to MobileDownload and MobileSubscription
+
+Required schema changes:
+1. Add download limit fields to mobile_subscription_plans:
+   - dailyDownloadLimit (Int, nullable)
+   - monthlyDownloadLimit (Int, nullable)
+
+2. Add download tracking fields to MobileUser (optional):
+   - dailyDownloadCount (Int, default 0)
+   - monthlyDownloadCount (Int, default 0)
+   - lastDownloadResetDate (DateTime)
+
+3. Add indexes for performance:
+   - Index on MobileDownload.mobileUserId + downloadedAt for counting
+   - Index on MobileSubscription.mobileUserId + status + endDate
+
+4. REQUIRED BACKEND CHANGES
+--------------------------
+
+Validation logic:
+- Create downloadLimitMiddleware.ts to check limits before download
+- Add limit checking to /api/mobile/downloads/track endpoint
+- Implement daily/monthly reset logic
+
+Limit checking logic:
+- Count user downloads in current period from MobileDownload table
+- Compare against subscription plan limits
+- Allow unlimited downloads if no limit set in plan
+
+API modifications:
+- Modify /api/mobile/downloads/track to include limit validation
+- Add /api/mobile/downloads/limits endpoint to check remaining downloads
+- Update subscription status endpoint to include download limit info
+
+New files needed:
+- src/middleware/downloadLimitMiddleware.ts
+- src/services/downloadLimitService.ts
+- src/utils/dateUtils.ts for period calculations
+
+Modified files:
+- src/routes/mobile/downloads.ts (add limit checking)
+- src/middleware/subscription.ts (add limit info to request)
+- src/routes/mobile/subscriptions.ts (include limits in status)
+
+5. REQUIRED MOBILE CHANGES
+--------------------------
+
+UI and error handling changes:
+- Update PosterPreviewScreen.tsx to show download limit reached message
+- Add remaining downloads display in subscription status
+- Update downloadHelper.ts to handle limit errors gracefully
+- Add download limit indicator in user profile
+
+Error handling:
+- Handle "DOWNLOAD_LIMIT_EXCEEDED" error from backend
+- Show user-friendly message with upgrade option
+- Display remaining downloads count
+
+New components needed:
+- DownloadLimitIndicator component
+- DownloadLimitReached modal
+
+Modified files:
+- src/screens/PosterPreviewScreen.tsx
+- src/services/downloadTracking.ts
+- src/utils/downloadHelper.ts
+- src/screens/SubscriptionScreen.tsx (add limit display)
+
+6. IMPLEMENTATION TIMELINE (1.5 days)
+--------------------------------------
+
+Day 1 (8 hours)
+- Backend analysis and planning (1 hour)
+- Database schema modifications (1 hour)
+- Implement download limit service (2 hours)
+- Add download limit middleware (2 hours)
+- Update downloads API endpoint (2 hours)
+
+Day 2 (Half Day - 4 hours)
+- Mobile app error handling (2 hours)
+- UI updates for limit display (1 hour)
+- Testing and debugging (1 hour)
+
+Total estimated: 12 hours
+
+7. RISKS / EDGE CASES
+-----------------------
+
+Concurrency issues:
+- Multiple simultaneous downloads could exceed limits
+- Solution: Use database transactions or atomic counters
+
+Multiple download attempts:
+- Rapid clicking could bypass limits
+- Solution: Add rate limiting and duplicate prevention (already exists)
+
+Caching problems:
+- Download count caching could show stale limits
+- Solution: Use real-time database queries for limit checking
+
+Timezone issues for daily limits:
+- Users in different timezones could have different reset times
+- Solution: Use UTC timezone for all date calculations
+
+Performance concerns:
+- Counting downloads for each request could be slow
+- Solution: Add cached counters and optimize database queries
+
+Edge cases:
+- What happens when subscription expires during download?
+- How to handle plan changes with different limits?
+- How to handle promotional periods with unlimited downloads?
+
+8. FINAL CONCLUSION
+-------------------
+
+Implementation within 1.5 days is FEASIBLE with the current architecture.
+
+Blockers discovered:
+- None major. The existing download tracking system provides a solid foundation.
+- MobileDownload table already exists with proper user association.
+- Subscription system is well-established for attaching limits.
+
+Advantages:
+- Clean separation of concerns between download tracking and limit enforcement
+- Existing duplicate prevention reduces complexity
+- Subscription middleware already in place for plan validation
+
+Recommendations:
+- Start with backend implementation first
+- Use database-level constraints for additional safety
+- Implement comprehensive logging for limit enforcement
+- Consider adding admin interface to monitor download limits
+- Plan for gradual rollout with A/B testing
+
+The feature can be implemented within the timeframe with proper planning and focused development effort.

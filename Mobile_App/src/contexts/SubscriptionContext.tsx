@@ -158,25 +158,21 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       const newUserId = user?.id || null;
       console.log('🔔 Auth state changed, updating subscription context. User:', newUserId, 'Status:', user?.subscriptionStatus);
       
-      // CRITICAL: Only update subscription state from backend API responses
-      // Do NOT set isSubscribed based solely on auth state changes
-      // The subscription state should be managed by refreshSubscription() only
-      
-      // Update subscriptionStatus if we have structured data from backend
-      if (user && user.subscriptionStatus && typeof user.subscriptionStatus === 'object') {
-        // This is a structured subscription object from backend API
-        setSubscriptionStatus(user.subscriptionStatus);
-        // Only set isSubscribed if backend explicitly confirms active status
-        const isActive = user.subscriptionStatus.isActive === true || 
-                       user.subscriptionStatus.status?.toLowerCase() === 'active';
-        setIsSubscribed(isActive);
-      } else if (user && typeof user.subscriptionStatus === 'string') {
-        // This is just a status string, don't activate without full backend confirmation
-        setSubscriptionStatus(prev => ({
-          ...(prev || {}),
-          status: user.subscriptionStatus.toLowerCase()
-        } as any));
-        // Do NOT set isSubscribed based on string alone - wait for full API response
+      // Update our isSubscribed and subscriptionStatus states from the profile API source
+      if (user) {
+        const isCurrentlyActive = authService.isSubscriptionActive();
+        setIsSubscribed(isCurrentlyActive);
+        
+        // Only update subscriptionStatus if we don't have one or if the source changed
+        if (user.subscriptionStatus) {
+          // If we have a fuller object from subscriptionApi, we might want to keep it,
+          // but at minimum check the status string.
+          setSubscriptionStatus(prev => ({
+            ...(prev || {}),
+            status: user.subscriptionStatus.toLowerCase(),
+            isActive: isCurrentlyActive
+          } as any));
+        }
       }
       
       // Trigger user change detection
@@ -279,15 +275,15 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
         });
         
         // Evaluate access based on backend isActive flag or explicit active status.
-        // CRITICAL: Only activate subscription if backend confirms it
+        // For Autopay and webhooks, paymentId may not always be populated side-by-side with isActive.
         const accessGranted = status?.isActive === true || normalizedStatus === 'active';
         
-        console.log('🔍 CRITICAL ACCESS CHECK - Backend Response:', {
+        console.log('🔍 CRITICAL ACCESS CHECK - Payment Verified:', {
           'status.status': status?.status,
-          'status.isActive': status?.isActive,
-          'normalizedStatus': normalizedStatus,
+          'razorpaySubscriptionId': status?.razorpaySubscriptionId,
+          'paymentId': status?.paymentId,
           'accessGranted': accessGranted,
-          'REASON': accessGranted ? 'BACKEND CONFIRMED ACTIVE' : 'BACKEND NOT ACTIVE'
+          'REASON': accessGranted ? 'PAYMENT VERIFIED' : 'PAYMENT NOT VERIFIED'
         });
         
         setIsSubscribed(Boolean(accessGranted));

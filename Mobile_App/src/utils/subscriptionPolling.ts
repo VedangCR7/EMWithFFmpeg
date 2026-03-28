@@ -1,6 +1,5 @@
 import authApi from '../services/authApi';
 import authService from '../services/auth';
-import subscriptionApi from '../services/subscriptionApi';
 import logger from './logger';
 
 /**
@@ -45,27 +44,21 @@ export const startSubscriptionPolling = (
     try {
       logger.log(`🔄 Polling subscription status... (${Math.round(elapsed / 1000)}s elapsed)`);
       
-      // Call the backend subscription status API as requested
-      const response = await subscriptionApi.getStatus();
+      // Call the profile API as requested
+      const response = await authApi.getProfile();
       
       if (response && response.success && response.data) {
-        const subscriptionData = response.data;
-        // Check for subscriptionStatus or isActive field as requested
-        const status = subscriptionData.status;
-        const isActive = subscriptionData.isActive;
+        const profileData = response.data as any;
+        // Check for subscriptionStatus directly as requested
+        const status = profileData.subscriptionStatus;
         
-        logger.log(`📊 Current subscription status: ${status}, isActive: ${isActive}`);
+        logger.log(`📊 Current subscriptionStatus: ${status}`);
 
-        // Check if subscription is ACTIVE via backend confirmation
-        if (status === 'active' || isActive === true) {
-          logger.log('✅ Subscription activated via backend! Stopping polling.');
+        if (status === 'Active' || status === 'ACTIVE') {
+          logger.log('✅ Subscription activated! Stopping polling.');
           
-          // Update authService with latest user data
-          const currentUser = authService.getCurrentUser();
-          if (currentUser) {
-            currentUser.subscriptionStatus = status;
-            authService.setCurrentUser(currentUser);
-          }
+          // Keep internal state updated via authService
+          authService.setCurrentUser(profileData);
           
           if (onActive) onActive();
           stopPolling();
