@@ -93,3 +93,6 @@ Backend/
 # AAB analysis directories (generated files)
 aab_*/
 **/aab_*/
+
+# Temporary git credentials file
+UsersADMINAppDataLocalTemprepo_evaluator_afd64fnjgit-credentials
