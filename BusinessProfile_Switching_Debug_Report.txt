@@ -1,0 +1,63 @@
+BUSINESS PROFILE SWITCHING - DEEP DEBUGGING REPORT
+
+1. ROOT CAUSE
+The "bounce-back" behavior occurs because of a race condition and stale closures inside redundant async effects in `HomeScreen.tsx`. 
+
+When the user manually selects Profile B:
+1. `handleBusinessProfileSelect(B)` is called and updates the context.
+2. `BusinessProfileContext` updates its state to B.
+3. `HomeScreen` re-renders with the new Profile B.
+4. Because `selectedBusinessProfile` is in the dependency array of two separate effects (`useEffect` and `useFocusEffect`), both effects re-trigger.
+5. In parallel, if an *older* instance of one of these effects was already "in-flight" (waiting for the API `getUserBusinessProfiles` to return), it might still be running.
+6. When the in-flight effect finishes its `await`, its closure still has the *old* value of `selectedBusinessProfile` (which was `null` or Profile A).
+7. The effect checks `if (!selectedBusinessProfile)` (which is TRUE in its stale closure) and then calls `setSelectedBusinessProfile(profiles[0])` (which is Profile A).
+8. This overrides the manual selection B and reverts the app to Profile A.
+
+2. EXACT FILE AND LINE NUMBERS
+The primary override occurs in:
+- File: `src/screens/HomeScreen.tsx`
+- Line 684: `setSelectedBusinessProfile(profiles[0]);` (inside `useEffect`)
+- Line 718: `setSelectedBusinessProfile(profiles[0]);` (inside `useFocusEffect`)
+
+3. REDUNDANT EFFECT BLOCKS
+There are two competing logic blocks doing the same "auto-selection":
+- `useEffect` (lines 659–702): Runs on mount and dependency change.
+- `useFocusEffect` (lines 705–733): Runs whenever the screen is focused or dependencies change.
+
+Both blocks fetch the full profile list and attempt to auto-select `profiles[0]` if `selectedBusinessProfile` is `null`.
+
+4. ASYNCSTORAGE CONFLICTS
+While `BusinessProfileContext` correctly updates AsyncStorage, the state revert happens *in memory* first (triggered by the effects), and then the revert is persisted back to AsyncStorage. The revert is triggered by the code execution, not by a storage restore failure.
+
+5. STEP-BY-STEP FAILURE FLOW
+1. User is on HomeScreen (Profile A).
+2. User taps the dropdown and selects Profile B.
+3. `setSelectedBusinessProfile(B)` is called.
+4. `HomeScreen` re-renders.
+5. `useFocusEffect` (or `useEffect`) re-triggers because `selectedBusinessProfile` changed.
+6. The effect starts an async API call: `await businessProfileService.getUserBusinessProfiles(userId)`.
+7. While the API call is in progress, the UI correctly shows Profile B.
+8. The async call finishes.
+9. Within the effect's stale closure, `selectedBusinessProfile` is still `null` or A (from when the effect started).
+10. The condition `if (!selectedBusinessProfile)` evaluates to TRUE.
+11. The code calls `setSelectedBusinessProfile(profiles[0])` (Profile A).
+12. The app state reverts to Profile A.
+
+6. RECOMMENDED FIX STRATEGY
+- CONSOLIDATE: Remove the redundant `useEffect` and rely solely on `useFocusEffect` for profile loading.
+- CANCELLATION: Add a "latest execution" guard or `isMounted` ref check inside the async function to ensure stale closures don't apply state updates.
+- REF CHECK: Use a Ref to check the *current* version of `selectedBusinessProfile` inside the async callback instead of relying on the closure value.
+- DE-DUPLICATE: Move the "auto-select first profile" logic entirely into `BusinessProfileContext.tsx`. Screens should only fetch and display, while the Context handles the "if nothing is selected, select the first one" rule.
+
+7. FILES TO MODIFY
+- `src/screens/HomeScreen.tsx`: Remove redundant auto-selection effects and add cancellation guards.
+- `src/context/BusinessProfileContext.tsx`: Consider moving auto-selection logic here for a true "Single Source of Truth".
+
+8. MULTIPLE INITIALIZATION LOGICS
+Yes, at least three separate initialization/auto-selection paths exist:
+1. `BusinessProfileContext`: Restores from AsyncStorage on auth change.
+2. `HomeScreen.tsx` (useEffect): Auto-selects on mount.
+3. `HomeScreen.tsx` (useFocusEffect): Auto-selects on focus.
+4. `PosterPlayerScreen.tsx` (useEffect): Force-selects based on route params.
+
+These multiple paths are competing and have different "opinions" on what the selected profile should be.

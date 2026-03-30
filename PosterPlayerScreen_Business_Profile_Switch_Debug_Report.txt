@@ -1,0 +1,341 @@
+POSTER PLAYER SCREEN - BUSINESS PROFILE SWITCH DEBUGGING REPORT
+==========================================================================
+
+ISSUE: Images/posters do not update when user switches business profile from HomeScreen dropdown
+
+EXPECTED BEHAVIOR:
+1. User switches business profile from HomeScreen dropdown
+2. BusinessProfileContext updates selectedBusinessProfile  
+3. User navigates to My Business tab
+4. PosterPlayerScreen should display posters belonging to the new business category
+
+ACTUAL BEHAVIOR:
+PosterPlayerScreen still displays old category posters even after switching profile.
+
+==========================================================================
+ROOT CAUSE ANALYSIS
+==========================================================================
+
+PRIMARY ROOT CAUSE: STALE CATEGORY DERIVATION DUE TO ROUTE PARAMETER OVERRIDE
+
+🔍 CRITICAL BUG #1 - Route Parameter Override (Lines 487-494)
+---------------------------------------------------------------
+Location: src/screens/PosterPlayerScreen.tsx:487-494
+
+```typescript
+const categoryToUse = useMemo(() => {
+  if (originScreen === "MainTabs") {
+    // When opened from bottom tab, use context-derived category
+    return businessCategoryFromProfile;
+  }
+  // When opened from other screens, use route params (preserve existing behavior)
+  return businessCategory || businessCategoryFromProfile;
+}, [originScreen, businessCategoryFromProfile, businessCategory]);
+```
+
+PROBLEM: 
+- When PosterPlayerScreen is opened from MainTabs (My Business tab), it correctly uses businessCategoryFromProfile
+- However, businessCategoryFromProfile is derived from globalSelectedProfile (line 477-484)
+- The businessCategoryFromProfile useMemo has dependency [globalSelectedProfile] only
+- When business profile changes, globalSelectedProfile updates, businessCategoryFromProfile updates
+- BUT the main poster loading useEffect (line 1170) depends on [categoryToUse, posterLimit, initialPoster, selectedLanguage, setAllTemplates]
+- categoryToUse SHOULD update when businessCategoryFromProfile updates
+
+🔍 CRITICAL BUG #2 - Missing Dependency in Category Derivation (Lines 477-484)
+------------------------------------------------------------------------
+Location: src/screens/PosterPlayerScreen.tsx:477-484
+
+```typescript
+const businessCategoryFromProfile = useMemo(() => {
+  if (!globalSelectedProfile) return null;
+  return (
+    globalSelectedProfile.subCategory ||
+    globalSelectedProfile.category ||
+    null
+  );
+}, [globalSelectedProfile]);
+```
+
+PROBLEM: This looks correct - dependency includes globalSelectedProfile
+
+🔍 CRITICAL BUG #3 - Race Condition in Category Loading (Lines 1023-1170)
+-----------------------------------------------------------------------
+Location: src/screens/PosterPlayerScreen.tsx:1023-1170
+
+```typescript
+// Fetch business category posters when categoryToUse is available
+useEffect(() => {
+  if (!categoryToUse) {
+    return;
+  }
+  // ... fetch logic
+}, [categoryToUse, posterLimit, initialPoster, selectedLanguage, setAllTemplates]);
+```
+
+PROBLEM: The useEffect correctly depends on categoryToUse, but there's a race condition:
+- Line 1058: businessCategoryPostersApi.clearCategoryCache(categoryName);
+- Line 1060: const response = await businessCategoryPostersApi.getPostersByCategory(categoryName, limit);
+
+🔍 CRITICAL BUG #4 - API Caching Interference (businessCategoryPostersApi.ts:40-53)
+----------------------------------------------------------------------------------
+Location: src/services/businessCategoryPostersApi.ts:40-53
+
+```typescript
+clearCategoryCache(category?: string): void {
+  if (category) {
+    const baseCacheKey = `category_${category}`;
+    if (this.postersCache.has(baseCacheKey)) {
+      this.postersCache.delete(baseCacheKey);
+      logger.log(`🗑️ [CACHE] Cleared cache for category: ${category}`);
+    }
+  }
+}
+```
+
+PROBLEM: Cache clearing happens correctly, but there might be timing issues.
+
+🔍 CRITICAL BUG #5 - Navigation Architecture Issue (AppNavigator.tsx:1121-1129)
+--------------------------------------------------------------------------------
+Location: src/navigation/AppNavigator.tsx:1121-1129
+
+```typescript
+<Tab.Screen
+  name="PosterPlayer"
+  component={PosterPlayerScreen}
+  initialParams={{ originScreen: "MainTabs" }}
+  options={{
+    title: 'My Business',
+    tabBarStyle: { display: 'none' },
+  }}
+/>
+```
+
+PROBLEM: PosterPlayerScreen is registered as a tab screen with initialParams. 
+- Tab screens in React Navigation remain mounted when switching between tabs
+- The component doesn't unmount/remount on tab switches
+- This means state persists and useEffect dependencies must trigger re-renders
+
+🔍 CRITICAL BUG #6 - useFocusEffect Timing Issue (Lines 441-466)
+------------------------------------------------------------------
+Location: src/screens/PosterPlayerScreen.tsx:441-466
+
+```typescript
+useFocusEffect(
+  React.useCallback(() => {
+    // ... reset language
+    if (originScreen === "MainTabs" && globalSelectedProfile) {
+      setAllTemplates([]);
+      setTimeout(() => {
+        const category = globalSelectedProfile.subCategory || globalSelectedProfile.category;
+        if (category) {
+          businessCategoryPostersApi.clearCategoryCache(category);
+        }
+      }, 50);
+    }
+  }, [globalSelectedProfile?.id, originScreen])
+);
+```
+
+PROBLEM: useFocusEffect runs when screen gains focus, but:
+1. It clears templates immediately
+2. Cache clearing happens in setTimeout(50ms)
+3. The main useEffect depends on categoryToUse, not on focus events
+4. There's a timing gap between focus effect and category update
+
+🔍 CRITICAL BUG #7 - Business Profile Change Detection (Lines 1172-1180)
+-----------------------------------------------------------------------
+Location: src/screens/PosterPlayerScreen.tsx:1172-1180
+
+```typescript
+// STEP 5: Reload posters when business profile changes in My Business tab
+useEffect(() => {
+  if (originScreen === "MainTabs" && globalSelectedProfile) {
+    // Clear templates to force reload with new profile
+    setAllTemplates([]);
+    // The business category loading useEffect will trigger automatically due to categoryToUse change
+    console.log('🔄 [PROFILE CHANGE] Business profile changed in My Business tab, reloading posters');
+  }
+}, [globalSelectedProfile?.id, originScreen]);
+```
+
+PROBLEM: This useEffect correctly detects profile changes and clears templates, but:
+- It depends on [globalSelectedProfile?.id, originScreen]
+- The categoryToUse should change when globalSelectedProfile changes
+- However, there might be a delay or the categoryToUse might not be updating properly
+
+==========================================================================
+DETAILED FLOW ANALYSIS
+================================================================----------
+
+STEP 1: User switches business profile from HomeScreen dropdown
+- HomeScreen calls setSelectedBusinessProfile() from BusinessProfileContext
+- BusinessProfileContext updates selectedBusinessProfile state
+- BusinessProfileContext saves to AsyncStorage
+
+STEP 2: BusinessProfileContext update propagation
+- BusinessProfileContext state changes trigger re-render in all consumers
+- PosterPlayerScreen receives new globalSelectedProfile via useBusinessProfile()
+- globalSelectedProfile updates to new profile
+
+STEP 3: Category derivation update
+- businessCategoryFromProfile useMemo should recalculate with new globalSelectedProfile
+- categoryToUse useMemo should recalculate with new businessCategoryFromProfile
+- Main poster loading useEffect should trigger due to categoryToUse change
+
+STEP 4: Poster loading
+- useEffect at line 1024 should run with new categoryToUse
+- Cache should be cleared for new category
+- API should be called with new category
+- New posters should be loaded and displayed
+
+🚨 WHERE THE CHAIN BREAKS:
+
+BREAK POINT #1 - Category Derivation Staleness
+- businessCategoryFromProfile might not be updating despite globalSelectedProfile change
+- This could happen if globalSelectedProfile reference doesn't change (object identity issue)
+
+BREAK POINT #2 - Category Resolution Logic
+- categoryToUse logic at line 487-494 might have issues
+- When originScreen === "MainTabs", it uses businessCategoryFromProfile
+- But businessCategoryFromProfile might be null or stale
+
+BREAK POINT #3 - useEffect Dependency Issues
+- Main useEffect at line 1170 depends on categoryToUse
+- If categoryToUse doesn't change, useEffect doesn't run
+- This could happen if categoryToUse reference remains the same
+
+BREAK POINT #4 - Race Condition Between Multiple useEffects
+- useFocusEffect (line 441) clears templates and cache
+- Profile change useEffect (line 1172) also clears templates  
+- Main loading useEffect (line 1024) loads new data
+- These might interfere with each other
+
+==========================================================================
+SPECIFIC BUG LOCATIONS
+==========================================================================
+
+FILE: src/screens/PosterPlayerScreen.tsx
+
+1. LINE 477-484: businessCategoryFromProfile derivation - POTENTIAL STALE CLOSURE
+2. LINE 487-494: categoryToUse resolution - ROUTE PARAMETER OVERRIDE LOGIC
+3. LINE 441-466: useFocusEffect timing - RACE CONDITION
+4. LINE 1172-1180: Profile change detection - DUPLICATE TEMPLATE CLEARING
+5. LINE 1024-1170: Main poster loading - DEPENDENCY CHAIN
+
+FILE: src/navigation/AppNavigator.tsx
+
+6. LINE 1121-1129: Tab screen configuration - COMPONENT LIFECYCLE
+
+FILE: src/services/businessCategoryPostersApi.ts
+
+7. LINE 40-53: Cache clearing - TIMING ISSUES
+8. LINE 58-179: getPostersByCategory - CACHING LOGIC
+
+==========================================================================
+RECOMMENDED FIX STRATEGIES
+==========================================================================
+
+STRATEGY #1: Fix Category Derivation Dependencies
+- Ensure businessCategoryFromProfile properly updates when globalSelectedProfile changes
+- Add logging to track category derivation steps
+- Verify categoryToUse updates correctly
+
+STRATEGY #2: Improve useEffect Dependency Chain
+- Review all useEffect dependencies related to business profile changes
+- Ensure proper trigger sequence when profile switches
+- Eliminate duplicate template clearing
+
+STRATEGY #3: Fix Race Conditions
+- Sequence focus effect, profile change effect, and loading effect properly
+- Use proper state management to avoid interference
+- Add proper loading states
+
+STRATEGY #4: Enhanced Debugging
+- Add comprehensive logging for category derivation
+- Track useEffect trigger sequence
+- Monitor cache clearing effectiveness
+
+STRATEGY #5: Alternative Approach - Force Remount
+- Consider using React Navigation's unmountOnBlur for PosterPlayerScreen
+- Or implement a key-based remount when profile changes
+- Ensure clean state on profile switches
+
+==========================================================================
+FILES THAT MUST BE MODIFIED
+==========================================================================
+
+1. src/screens/PosterPlayerScreen.tsx
+   - Fix category derivation logic
+   - Resolve useEffect dependency issues
+   - Eliminate race conditions
+   - Add comprehensive logging
+
+2. src/services/businessCategoryPostersApi.ts
+   - Improve cache clearing logic
+   - Add debugging for cache operations
+
+3. src/navigation/AppNavigator.tsx
+   - Consider tab screen lifecycle changes
+   - Add navigation state tracking
+
+==========================================================================
+TESTING SCENARIOS TO VERIFY FIX
+==========================================================================
+
+1. Profile Switch Test:
+   - Start with Profile A (Restaurant)
+   - Navigate to My Business tab
+   - Verify Restaurant posters load
+   - Go back to Home
+   - Switch to Profile B (Gym) from dropdown
+   - Navigate to My Business tab
+   - Verify Gym posters load (not Restaurant)
+
+2. Cache Clearing Test:
+   - Load posters for Category A
+   - Switch profile to Category B
+   - Verify cache is cleared for Category A
+   - Verify new API call for Category B
+
+3. useEffect Trigger Test:
+   - Add logging for all useEffect triggers
+   - Verify correct sequence on profile change
+   - Ensure no duplicate or missing triggers
+
+4. Navigation Test:
+   - Test tab switching behavior
+   - Verify component lifecycle
+   - Test focus/unfocus events
+
+==========================================================================
+PRIORITY FIX ORDER
+==========================================================================
+
+HIGH PRIORITY (Critical for functionality):
+1. Fix categoryToUse derivation and dependency chain (PosterPlayerScreen.tsx:477-494)
+2. Resolve useEffect race conditions (PosterPlayerScreen.tsx:441-1180)
+3. Add comprehensive debugging logging
+
+MEDIUM PRIORITY (Performance and reliability):
+4. Improve cache clearing logic (businessCategoryPostersApi.ts)
+5. Consider navigation lifecycle improvements (AppNavigator.tsx)
+
+LOW PRIORITY (Future enhancements):
+6. Optimize component remount strategy
+7. Add unit tests for profile switching
+
+==========================================================================
+CONCLUSION
+==========================================================================
+
+The root cause appears to be in the category derivation and useEffect dependency chain in PosterPlayerScreen. When a business profile is switched:
+
+1. BusinessProfileContext updates correctly
+2. PosterPlayerScreen receives the new globalSelectedProfile
+3. BUT the category derivation chain (businessCategoryFromProfile → categoryToUse) may not update properly
+4. This prevents the main poster loading useEffect from triggering
+5. Old posters remain displayed
+
+The fix requires ensuring proper dependency propagation from globalSelectedProfile through the category derivation chain to the main loading useEffect, while eliminating race conditions between multiple useEffects that clear templates and cache.
+
+==========================================================================

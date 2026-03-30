@@ -1,0 +1,327 @@
+POSTER PLAYER SCREEN - GRID vs PREVIEW MISMATCH DEBUGGING REPORT
+==========================================================================
+
+ISSUE: Poster grid shows correct images for selected business category, but main preview 
+continues showing previous category image and name.
+
+OBSERVED BEHAVIOR:
+✅ Poster grid correctly updates and shows posters for new category
+❌ Main preview (selected poster view) shows old category image/name/metadata
+
+This indicates grid state updates correctly, but selected poster state remains stale.
+
+==========================================================================
+ROOT CAUSE ANALYSIS
+==========================================================================
+
+PRIMARY ROOT CAUSE: USER SELECTION REFERENCE PREVENTS AUTOMATIC POSTER UPDATES
+
+🔍 CRITICAL BUG #1 - User Selection Override (Lines 915-917)
+---------------------------------------------------------------
+Location: src/screens/PosterPlayerScreen.tsx:915-917
+
+```typescript
+// CRITICAL: Don't reset if user has manually selected a poster (via swipe or click)
+// Check this FIRST before any other logic that might reset the poster
+if (userSelectedPosterRef.current !== null) {
+  return;
+}
+```
+
+PROBLEM: 
+- `userSelectedPosterRef.current` tracks when user manually selects a poster
+- When this ref is set, ALL automatic poster updates are blocked
+- The ref is set in `handlePosterSelect()` (line 2642) when user clicks/swipes
+- BUT the ref is NEVER cleared when business profile changes
+- This causes the main preview to freeze on the user-selected poster
+
+🔍 CRITICAL BUG #2 - Missing User Selection Reset on Profile Change (Lines 1172-1180)
+--------------------------------------------------------------------------------------
+Location: src/screens/PosterPlayerScreen.tsx:1172-1180
+
+```typescript
+// STEP 5: Reload posters when business profile changes in My Business tab
+useEffect(() => {
+  if (originScreen === "MainTabs" && globalSelectedProfile) {
+    // Clear templates to force reload with new profile
+    setAllTemplates([]);
+    // The business category loading useEffect will trigger automatically due to categoryToUse change
+    console.log('🔄 [PROFILE CHANGE] Business profile changed in My Business tab, reloading posters');
+  }
+}, [globalSelectedProfile?.id, originScreen]);
+```
+
+PROBLEM: This useEffect clears templates but DOES NOT clear `userSelectedPosterRef.current`
+- Grid updates because `allTemplates` is cleared and refetched
+- Preview remains stale because `userSelectedPosterRef` blocks automatic updates
+- The ref should be reset when business profile changes
+
+🔍 CRITICAL BUG #3 - User Selection Set Too Broadly (Lines 2641-2642)
+--------------------------------------------------------------------
+Location: src/screens/PosterPlayerScreen.tsx:2641-2642
+
+```typescript
+// Mark this as a user-selected poster (via swipe or click)
+userSelectedPosterRef.current = posterWithLanguages.id;
+```
+
+PROBLEM: The user selection ref is set for ANY poster interaction
+- Even casual browsing sets this ref
+- Once set, it blocks ALL automatic poster updates
+- This includes legitimate updates when business category changes
+- The ref should only block updates during active user interaction sessions
+
+🔍 CRITICAL BUG #4 - useEffect Priority Order Issue (Lines 908-1021)
+--------------------------------------------------------------------
+Location: src/screens/PosterPlayerScreen.tsx:908-1021
+
+```typescript
+// Watch for route param changes and update currentPoster when navigation occurs
+useEffect(() => {
+  // CRITICAL: Don't reset if user has manually selected a poster (via swipe or click)
+  // Check this FIRST before any other logic that might reset the poster
+  if (userSelectedPosterRef.current !== null) {
+    return; // <-- EARLY RETURN BLOCKS ALL UPDATES
+  }
+  // ... poster update logic
+}, [convertedInitialPoster, currentPoster.id, initialPoster]);
+```
+
+PROBLEM: The user selection check happens FIRST in the useEffect
+- This prevents legitimate poster updates when business profile changes
+- The check should be more context-aware
+- Business profile changes should override user selection ref
+
+🔍 CRITICAL BUG #5 - Language Filter Effect Also Blocked (Lines 2528-2560)
+--------------------------------------------------------------------------------
+Location: src/screens/PosterPlayerScreen.tsx:2528-2560
+
+```typescript
+// Skip if user manually selected a poster - don't override their choice
+if (userSelectedPosterRef.current) {
+  const userSelectedPoster = allTemplates.find(t => t.id === userSelectedPosterRef.current);
+  if (userSelectedPoster) {
+    // User's selection is always valid when "All" is selected
+    return; // <-- BLOCKS LANGUAGE-BASED UPDATES
+  }
+}
+```
+
+PROBLEM: Multiple useEffects are blocked by the same user selection ref
+- Language filtering updates are blocked
+- Category change updates are blocked
+- Template reload updates are blocked
+- The ref acts as a global block on all poster updates
+
+🔍 CRITICAL BUG #6 - Business Category Loading Effect Sets Poster (Lines 1114-1126)
+--------------------------------------------------------------------------------------
+Location: src/screens/PosterPlayerScreen.tsx:1114-1126
+
+```typescript
+// Try to find the initialPoster (the one that was clicked) in the loaded templates
+const ensuredInitialPoster = mergeTemplateLanguages(initialPoster);
+const matchingPoster = ensuredTemplates.find(t => t.id === ensuredInitialPoster.id && ensuredInitialPoster.thumbnail);
+const posterToSet = matchingPoster || ensuredTemplates[0];
+
+setCurrentPoster(posterToSet);
+```
+
+PROBLEM: This correctly sets the poster when new templates load
+- BUT it runs inside the business category loading useEffect
+- This useEffect may be blocked by earlier user selection checks
+- The poster update happens but may be overridden by other effects
+
+==========================================================================
+DETAILED FLOW ANALYSIS
+==========================================================================
+
+STEP 1: User switches business profile from HomeScreen dropdown
+- HomeScreen calls setSelectedBusinessProfile() 
+- BusinessProfileContext updates selectedBusinessProfile ✅
+
+STEP 2: PosterPlayerScreen receives profile update
+- globalSelectedProfile updates ✅
+- categoryToUse recalculates ✅
+- Business category loading useEffect triggers ✅
+
+STEP 3: Poster grid updates correctly
+- setAllTemplates([]) clears grid ✅ (Line 1176)
+- businessCategoryPostersApi.getPostersByCategory() fetches new category ✅
+- setAllTemplates(newTemplates) updates grid ✅ (Line 1110)
+
+STEP 4: Main preview should update but FAILS
+❌ Business category loading tries to setCurrentPoster(posterToSet) (Line 1126)
+❌ But route param useEffect (Line 915) sees userSelectedPosterRef.current !== null
+❌ Route param useEffect returns early, blocking the update
+❌ Language filter useEffect (Line 2536) also sees userSelectedPosterRef.current
+❌ Language filter useEffect returns early, blocking the update
+❌ Main preview remains stuck on old poster
+
+🚨 WHERE THE CHAIN BREAKS:
+
+BREAK POINT #1 - User Selection Ref Not Cleared
+- userSelectedPosterRef.current remains set from previous user interaction
+- Business profile change should clear this ref
+- Without clearing, all automatic updates are blocked
+
+BREAK POINT #2 - Multiple useEffects Blocked by Same Ref
+- Route param useEffect blocked (Line 915)
+- Language filter useEffect blocked (Line 2536)
+- Any other poster update useEffect would also be blocked
+- The ref acts as a global update blocker
+
+BREAK POINT #3 - useEffect Execution Order
+- Route param useEffect may run AFTER business category loading
+- Even if business category loading sets currentPoster, route param effect can override it
+- The blocking check in route param effect prevents proper updates
+
+==========================================================================
+SPECIFIC BUG LOCATIONS
+==========================================================================
+
+FILE: src/screens/PosterPlayerScreen.tsx
+
+1. LINE 915-917: User selection blocking check - GLOBAL UPDATE BLOCKER
+2. LINE 1172-1180: Profile change effect - MISSING REF RESET
+3. LINE 2641-2642: User selection ref setting - TOO BROAD
+4. LINE 2536-2543: Language filter blocking - DUPLICATE BLOCKING LOGIC
+5. LINE 1114-1126: Business category poster setting - CORRECTLY BLOCKED
+6. LINE 908-1021: Route param effect - PRIORITY ORDER ISSUE
+
+==========================================================================
+WHY GRID UPDATES BUT PREVIEW DOESN'T
+==========================================================================
+
+GRID UPDATES CORRECTLY BECAUSE:
+1. Business category loading useEffect (Line 1024) runs when categoryToUse changes
+2. This useEffect calls setAllTemplates([]) then setAllTemplates(newTemplates)
+3. No user selection checks block template updates
+4. Grid renders from allTemplates state directly
+
+PREVIEW REMAINS STALE BECAUSE:
+1. setCurrentPoster() calls are blocked by userSelectedPosterRef.current
+2. Multiple useEffects that should update currentPoster have early returns
+3. The ref was set during previous user interaction and never cleared
+4. Business profile change doesn't reset user interaction state
+
+==========================================================================
+ASYNC RACE CONDITIONS
+==========================================================================
+
+RACE CONDITION #1 - useEffect Execution Order
+- Business category loading: setCurrentPoster(posterToSet) 
+- Route param effect: if (userSelectedPosterRef.current) return;
+- If route param effect runs after business loading, it blocks the update
+
+RACE CONDITION #2 - Ref Timing
+- User sets ref by clicking poster
+- Business profile changes
+- Template reload happens
+- But ref check blocks poster update before template reload completes
+
+================================================================----------
+MEMOIZATION ISSUES
+==========================================================================
+
+No memoization issues found. The problem is not with memoization but with 
+explicit blocking logic in useEffects.
+
+==========================================================================
+RECOMMENDED FIX STRATEGIES
+==========================================================================
+
+STRATEGY #1: Clear User Selection Ref on Profile Change
+- Add userSelectedPosterRef.current = null in profile change useEffect
+- This will unblock automatic poster updates when business profile changes
+
+STRATEGY #2: Make User Selection Context-Aware
+- Don't block updates for legitimate category changes
+- Only block updates during active user interaction sessions
+- Reset ref when navigating away or changing business profiles
+
+STRATEGY #3: Fix useEffect Priority Order
+- Business profile changes should take precedence over user selection
+- Category changes should override user interaction refs
+- Reorder useEffect execution or add context checks
+
+STRATEGY #4: Separate User Interaction Tracking
+- Use different refs for different types of user interaction
+- Distinguish between temporary browsing and persistent selection
+- Allow automatic updates for category changes
+
+STRATEGY #5: Add Business Profile Change Detection
+- Explicitly detect when business profile changes
+- Reset all user interaction state on profile changes
+- Force poster refresh on category switches
+
+==========================================================================
+FILES THAT MUST BE MODIFIED
+==========================================================================
+
+1. src/screens/PosterPlayerScreen.tsx
+   - Clear userSelectedPosterRef on business profile changes
+   - Fix useEffect priority order for poster updates
+   - Make user selection blocking more context-aware
+   - Add proper business profile change detection
+
+==========================================================================
+TESTING SCENARIOS TO VERIFY FIX
+==========================================================================
+
+1. Profile Switch Test:
+   - User manually selects a poster in grid (sets userSelectedPosterRef)
+   - Switch business profile from HomeScreen dropdown
+   - Navigate to My Business tab
+   - Verify main preview updates to new category (not blocked by user ref)
+
+2. User Interaction Test:
+   - User browses through posters (swipe/click)
+   - Business profile changes
+   - Verify preview updates to new category
+   - Verify user can still select posters after category change
+
+3. useEffect Order Test:
+   - Add logging for all setCurrentPoster calls
+   - Verify business category loading sets poster correctly
+   - Verify route param effect doesn't block legitimate updates
+
+4. Ref Reset Test:
+   - Set userSelectedPosterRef.current manually
+   - Trigger business profile change
+   - Verify ref is cleared and poster updates
+
+==========================================================================
+PRIORITY FIX ORDER
+==========================================================================
+
+HIGH PRIORITY (Critical for functionality):
+1. Clear userSelectedPosterRef on business profile changes (Line 1172-1180)
+2. Fix useEffect blocking logic to allow category changes (Line 915-917)
+3. Add business profile change detection for poster updates
+
+MEDIUM PRIORITY (User experience):
+4. Make user selection more context-aware (Line 2641-2642)
+5. Fix useEffect execution order issues
+
+LOW PRIORITY (Future enhancements):
+6. Separate different types of user interaction tracking
+7. Add comprehensive logging for debugging
+
+==========================================================================
+CONCLUSION
+==========================================================================
+
+The root cause is that `userSelectedPosterRef.current` acts as a global blocker for 
+all automatic poster updates. When a user manually selects a poster, this ref is set 
+and never cleared. When the business profile changes:
+
+1. ✅ Poster grid updates because allTemplates state changes
+2. ❌ Main preview remains stale because setCurrentPoster calls are blocked
+3. ❌ Multiple useEffects have early returns due to the user selection ref
+4. ❌ Business profile change doesn't reset user interaction state
+
+The fix requires clearing the user selection ref when business profiles change 
+and making the blocking logic more context-aware to allow legitimate category 
+updates while preserving user choice during active interactions.
+
+==========================================================================

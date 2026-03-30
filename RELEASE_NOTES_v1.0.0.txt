@@ -1,0 +1,20 @@
+EventMarketers v1.0.0 – Release Notes
+====================================
+
+Highlights
+---------
+- Refreshed, professional splash experience with animated branding and enterprise messaging.
+- Portrait intro video support prepared with responsive handling across devices (classic splash retained for this build to prioritise clarity and performance).
+- Removed unused assets and services to reduce bundle size and simplify maintenance.
+
+Fixes & Improvements
+--------------------
+- Improved splash screen text contrast to ensure readability on gradient backgrounds.
+- Updated footer copy to “Powered by RSL Solution PVT LTD”.
+- Verified Android App Bundle generation (`android/app/build/outputs/bundle/release/app-release.aab`).
+
+Notes
+-----
+- Gradle reports upstream deprecation warnings; safe to ignore for now, but review before upgrading to Gradle 9.
+- No backend schema or API changes included in this release.
+

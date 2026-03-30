@@ -1,0 +1,319 @@
+====================================
+TODAY'S PICK SCREEN SWIPE BUG ANALYSIS
+====================================
+
+PROBLEM DESCRIPTION
+==================
+
+When a user swipes the main image to change the poster in the Today's Pick screen, 
+the images inside the Preview Grid automatically vanish/disappear. This should not happen - 
+the preview grid should retain all images unless explicitly removed by the user.
+
+====================================
+FEATURE ARCHITECTURE OVERVIEW
+==============================
+
+The Today's Pick screen consists of two main components:
+
+1. MAIN POSTER VIEWER (Top Section)
+   - Displays current selected poster in full size
+   - Supports swipe gestures (left/right) to navigate between posters
+   - Uses PanResponder for gesture handling
+   - Updates currentPoster state on swipe
+
+2. PREVIEW GRID (Bottom Section) 
+   - FlatList displaying all available posters in a grid layout
+   - Shows filtered posters based on selected language
+   - Uses filteredPosters array as data source
+   - Highlights currently selected poster
+
+====================================
+COMPONENT HIERARCHY
+====================
+
+TodaysPickScreen
+├── Main Poster Viewer (with swipeResponder.panHandlers)
+│   └── LazyFullImage (current poster)
+├── Language Filter Buttons
+└── Preview Grid Section
+    └── FlatList
+        ├── data={filteredPosters}
+        └── renderItem={renderRelatedPoster}
+
+====================================
+STATE FLOW DIAGRAM
+==================
+
+Initial State:
+├── todayPosters: Template[] (all today's posters)
+├── allTemplates: Template[] (synced with todayPosters)
+├── filteredPosters: Template[] (derived from todayPosters + language filter)
+├── currentPoster: Template (currently selected poster)
+└── selectedLanguage: string ('all', 'english', 'hindi')
+
+Swipe Action Flow:
+User Swipe → PanResponder.onPanResponderRelease → goToNextPoster()/goToPreviousPoster() 
+→ showPosterAtIndex() → handlePosterSelect() → setCurrentPoster() → 
+filteredPosters recalculated → FlatList re-renders
+
+====================================
+SWIPE EVENT EXECUTION FLOW
+============================
+
+1. GESTURE CAPTURE
+   - PanResponder configured on main poster container (line 2687)
+   - swipeThreshold = 50 pixels (line 2194)
+   - onPanResponderRelease handles gesture completion (lines 2211-2218)
+
+2. NAVIGATION FUNCTIONS
+   - goToNextPoster() (lines 2172-2181)
+   - goToPreviousPoster() (lines 2183-2192)
+   - Both call showPosterAtIndex() (lines 2160-2170)
+
+3. POSTER SELECTION
+   - showPosterAtIndex() calls handlePosterSelect() (lines 2102-2151)
+   - handlePosterSelect() updates currentPoster state
+   - Sets userSelectedPosterRef.current = poster.id (line 2107)
+
+4. STATE DERIVATION
+   - filteredPosters recalculated via useMemo (lines 1178-1194)
+   - Depends on: todayPosters and selectedLanguage
+
+5. GRID RE-RENDER
+   - FlatList receives new filteredPosters array
+   - Re-renders all grid items
+
+====================================
+PREVIEW GRID DATA SOURCE
+======================
+
+The Preview Grid (FlatList) uses:
+- Data: filteredPosters (line 2751)
+- Key Extractor: item.id (line 2753)
+- Render Function: renderRelatedPoster (lines 2492-2508)
+
+CRITICAL FINDING:
+filteredPosters is derived from todayPosters, NOT allTemplates:
+```typescript
+const filteredPosters = useMemo(() => {
+  const templatesWithLanguages = todayPosters.map(t => mergeTemplateLanguages(t));
+  
+  if (selectedLanguage === 'all') {
+    return templatesWithLanguages; // Returns todayPosters array
+  }
+  
+  return templatesWithLanguages.filter(template => {
+    const matches = templateContainsLanguage(template, selectedLanguage);
+    return matches;
+  });
+}, [todayPosters, selectedLanguage]);
+```
+
+====================================
+WHERE THE IMAGE ARRAY BECOMES EMPTY
+===================================
+
+ROOT CAUSE IDENTIFIED:
+
+The issue occurs because todayPosters array is being CLEARED during category/calendar 
+change operations, but the swipe action doesn't properly restore it.
+
+Evidence from code:
+
+1. MULTIPLE CLEAR OPERATIONS (Lines 1287, 1350, 1425, 1677, 1818):
+```typescript
+// Clear allTemplates immediately to prevent showing old posters in grid
+setAllTemplates([]);
+```
+
+2. MISSING todayPosters SYNC:
+   - When allTemplates is cleared, todayPosters is NOT properly restored
+   - filteredPosters becomes empty because todayPosters is empty
+   - FlatList receives empty array and shows no images
+
+3. STATE INCONSISTENCY:
+   - allTemplates and todayPosters should stay synchronized
+   - Clear operations only affect allTemplates
+   - todayPosters remains in inconsistent state
+
+====================================
+ROOT CAUSE OF THE ISSUE
+========================
+
+PRIMARY ROOT CAUSE:
+State synchronization failure between allTemplates and todayPosters arrays.
+
+DETAILED EXPLANATION:
+
+1. NORMAL OPERATION:
+   - todayPosters loaded from API/cache (line 1152: setTodayPosters(orderedPosters))
+   - allTemplates synced with todayPosters (line 1156: setAllTemplates(templatesWithLanguages))
+   - filteredPosters derived from todayPosters (line 1178-1194)
+   - Grid displays correctly
+
+2. CATEGORY/CALENDAR CHANGE:
+   - allTemplates cleared: setAllTemplates([]) (multiple locations)
+   - todayPosters NOT properly restored
+   - filteredPosters becomes empty (derived from empty todayPosters)
+   - Grid shows no images
+
+3. SWIPE ACTION TRIGGER:
+   - User swipes → handlePosterSelect() called
+   - filteredPosters recalculated from empty todayPosters
+   - FlatList receives empty array
+   - Images disappear from grid
+
+4. WHY IT HAPPENS ON SWIPE:
+   - Swipe triggers handlePosterSelect()
+   - This causes filteredPosters useMemo to recalculate
+   - Empty todayPosters results in empty filteredPosters
+   - Grid re-renders with empty data
+
+====================================
+FILES AND FUNCTIONS RESPONSIBLE
+==============================
+
+PRIMARY FILE: src/screens/TodaysPickScreen.tsx
+
+CRITICAL FUNCTIONS:
+
+1. STATE MANAGEMENT:
+   - useState todayPosters (line 472)
+   - useState allTemplates (line 478)
+   - useState filteredPosters (derived, line 1178)
+
+2. CLEAR OPERATIONS (PROBLEMATIC):
+   - Line 1287: setAllTemplates([]) - Category change
+   - Line 1350: setAllTemplates([]) - Business category
+   - Line 1425: setAllTemplates([]) - Greeting category  
+   - Line 1677: setAllTemplates([]) - Calendar date
+   - Line 1818: setAllTemplates([]) - Initial poster change
+
+3. SWIPE HANDLING:
+   - PanResponder creation (lines 2196-2225)
+   - goToNextPoster() (lines 2172-2181)
+   - goToPreviousPoster() (lines 2183-2192)
+   - handlePosterSelect() (lines 2102-2151)
+
+4. DATA DERIVATION:
+   - filteredPosters useMemo (lines 1178-1194)
+   - renderRelatedPoster() (lines 2492-2508)
+
+====================================
+EVIDENCE FROM CODE
+==================
+
+EVIDENCE 1 - STATE DERIVATION:
+```typescript
+// Line 1178-1194: filteredPosters depends on todayPosters
+const filteredPosters = useMemo(() => {
+  // Ensure all templates have languages merged before filtering
+  const templatesWithLanguages = todayPosters.map(t => mergeTemplateLanguages(t));
+
+  // If "All" is selected, return ALL templates without any language filtering
+  if (selectedLanguage === 'all') {
+    return templatesWithLanguages; // Returns todayPosters directly
+  }
+
+  // Filter by language - if no matches, return empty array
+  const languageFiltered = templatesWithLanguages.filter(template => {
+    const matches = templateContainsLanguage(template, selectedLanguage);
+    return matches;
+  });
+
+  return languageFiltered;
+}, [todayPosters, selectedLanguage]);
+```
+
+EVIDENCE 2 - ASYMMETRIC CLEAR OPERATIONS:
+```typescript
+// Lines 1287, 1350, 1425, 1677: Only allTemplates cleared
+setAllTemplates([]);
+// Missing: setTodayPosters([]) or proper restoration
+```
+
+EVIDENCE 3 - SWIPE TRIGGERING RECALCULATION:
+```typescript
+// Lines 2102-2151: handlePosterSelect updates currentPoster
+const handlePosterSelect = useCallback((poster: Template) => {
+  // ... poster selection logic
+  setCurrentPoster(posterWithLanguages); // Triggers filteredPosters recalculation
+}, [selectedLanguage]);
+```
+
+EVIDENCE 4 - GRID DATA SOURCE:
+```typescript
+// Line 2751: FlatList uses filteredPosters
+<FlatList
+  data={filteredPosters}  // Empty when todayPosters is empty
+  renderItem={renderRelatedPoster}
+  // ...
+/>
+```
+
+====================================
+RECOMMENDED FIX STRATEGY (HIGH LEVEL)
+====================================
+
+STRATEGY 1: SYNCHRONIZED STATE MANAGEMENT
+- Ensure todayPosters and allTemplates are always synchronized
+- When clearing allTemplates, also clear and properly restore todayPosters
+- Add proper state validation before swipe operations
+
+STRATEGY 2: ROBUST STATE RECOVERY
+- Implement state recovery mechanism when todayPosters becomes empty
+- Add fallback data loading when filteredPosters is empty
+- Prevent swipe operations when data is unavailable
+
+STRATEGY 3: IMPROVED ERROR HANDLING
+- Add state consistency checks
+- Implement proper error boundaries for state operations
+- Add logging for debugging state transitions
+
+STRATEGY 4: DEFENSIVE PROGRAMMING
+- Add null/empty checks before state updates
+- Implement state validation in useMemo dependencies
+- Add safeguards for FlatList data integrity
+
+====================================
+PRIORITY RECOMMENDATIONS
+========================
+
+IMMEDIATE (Critical):
+1. Fix state synchronization between todayPosters and allTemplates
+2. Add todayPosters restoration in all clear operations
+3. Add state validation before swipe operations
+
+SHORT TERM (High):
+1. Implement defensive programming for state updates
+2. Add proper error handling for empty states
+3. Improve state consistency checks
+
+LONG TERM (Medium):
+1. Refactor to single source of truth for poster data
+2. Implement comprehensive state management solution
+3. Add automated testing for state transitions
+
+====================================
+CONCLUSION
+===========
+
+The Today's Pick screen swipe bug is caused by a state synchronization issue where 
+todayPosters array becomes desynchronized from allTemplates during category/calendar 
+change operations. When users swipe, the filteredPosters derivation uses the empty 
+todayPosters array, causing the preview grid to show no images.
+
+The fix requires ensuring proper state synchronization and adding defensive programming 
+to prevent empty state scenarios during user interactions.
+
+====================================
+ANALYSIS COMPLETE
+==================
+
+Root Cause: State synchronization failure between todayPosters and allTemplates
+Impact: Preview grid images disappear on swipe
+Severity: Critical (breaks core user interaction)
+Files: src/screens/TodaysPickScreen.tsx
+Functions: Multiple clear operations, swipe handlers, state derivation
+
+====================================

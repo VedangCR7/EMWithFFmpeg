@@ -1,0 +1,128 @@
+================================================================================
+PROJECT TITLE
+================================================================================
+
+MarketBrand
+
+================================================================================
+PROJECT DESCRIPTION
+================================================================================
+
+MarketBrand is a comprehensive mobile application designed for event marketing,
+poster creation, greeting cards, and video editing. It serves as an enterprise
+marketing suite for ambitious creators, trusted by businesses worldwide.
+
+Key Features:
+- Event Marketing Tools: Create and manage marketing campaigns for events
+- Poster Maker: Design and customize professional posters with templates and frames
+- Greeting Cards Creator: Generate personalized greeting cards with templates
+- Video Editor: Edit and compose videos with overlays and effects
+- Business Profile Management: Create and manage multiple business profiles
+- Template Gallery: Access a wide variety of pre-designed templates
+- Festival Calendar: View and track upcoming festivals and events
+- Subscription Management: Premium features with subscription options
+- Payment Integration: Secure payment processing via Razorpay
+- Authentication: User registration, login, and password management
+- Download Tracking: Track and manage downloaded content
+- Offline Support: Cache services for offline content access
+
+Target Audience:
+Business owners, entrepreneurs, event planners, and marketers looking for
+professional marketing content creation tools on mobile devices.
+
+Platform: Cross-platform mobile application (Android & iOS)
+
+================================================================================
+TECH STACK USED
+================================================================================
+
+FRONTEND FRAMEWORK & CORE:
+- React Native 0.80.2
+- React 19.1.0
+- TypeScript 5.0.4
+
+NAVIGATION:
+- @react-navigation/native ^7.1.17
+- @react-navigation/stack ^7.4.5
+- @react-navigation/bottom-tabs ^7.4.5
+
+STATE MANAGEMENT & DATA FETCHING:
+- @tanstack/react-query ^5.90.11
+- @tanstack/react-query-persist-client ^5.90.13
+
+BACKEND & AUTHENTICATION:
+- Firebase App ^22.4.0
+- Firebase Authentication ^22.4.0
+- Firebase Cloud Messaging ^22.4.0
+- Google Sign-In ^15.0.0
+- Axios ^1.11.0
+
+MEDIA & IMAGE PROCESSING:
+- react-native-image-crop-picker ^0.51.0
+- react-native-image-picker ^8.2.1
+- react-native-camera-roll ^7.10.2
+- react-native-view-shot ^4.0.3
+- react-native-video ^6.16.1
+
+UI COMPONENTS & STYLING:
+- react-native-linear-gradient ^2.8.3
+- react-native-vector-icons ^10.3.0
+- react-native-animatable ^1.4.0
+- react-native-calendars ^1.1313.0
+- react-native-safe-area-context ^5.5.2
+
+NATIVE MODULES:
+- react-native-gesture-handler ^2.27.2
+- react-native-screens ^4.18.0
+- react-native-permissions ^5.4.2
+- react-native-fs ^2.20.0
+
+PAYMENT & SHARING:
+- react-native-razorpay ^2.3.0
+- react-native-share ^12.2.1
+
+STORAGE:
+- @react-native-async-storage/async-storage ^1.24.0
+
+UTILITIES:
+- react-native-otp-verify ^1.1.8
+- react-native-responsive-dimensions ^3.1.1
+- base-64 ^1.0.0
+
+NATIVE PLATFORMS:
+
+Android:
+- Kotlin (4 files - MainActivity, Media3VideoProcessorModule, etc.)
+- Java (2 files - VideoComposerModule, VideoComposerPackage)
+- Gradle Build System
+
+iOS:
+- Swift (AppDelegate.swift)
+- Objective-C (VideoComposerModule.m)
+
+DEVELOPMENT TOOLS:
+- ESLint ^8.19.0
+- Prettier 2.8.8
+- Jest ^29.6.3
+- Babel Core ^7.25.2
+- TypeScript Configuration
+- Metro Bundler (React Native's JavaScript bundler)
+
+BUILD TOOLS:
+- Gradle (Android)
+- CocoaPods (iOS)
+- Node.js >=18
+
+ANALYSIS & SCRIPTS:
+- Python (for AAB analysis and ELF analysis scripts)
+
+================================================================================
+PROJECT STATISTICS
+================================================================================
+
+Total Lines of Code: ~62,285 lines
+- TypeScript/TSX: 60,220 lines (96.7%)
+- Native Code (Kotlin/Java/Swift): 1,568 lines (2.5%)
+- Configuration & Scripts: 497 lines (0.8%)
+
+================================================================================

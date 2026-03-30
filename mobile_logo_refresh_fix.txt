@@ -1,0 +1,89 @@
+MOBILE LOGO REFRESH FIX REPORT
+=====================================
+
+BUG DESCRIPTION
+------------
+When a user uploads a profile photo from ProfileScreen:
+• The logo updates successfully in the backend.
+• The profile screen shows the correct updated image.
+• However, HomeScreen business dropdown still shows old cached logos or shows the same logo for multiple businesses.
+
+ROOT CAUSE
+-----------
+The mobile app updates only the selectedBusinessProfile state but does NOT refresh the full businessProfiles list used by the HomeScreen dropdown. The HomeScreen maintains its own `userBusinessProfiles` state which is separate from the global user profile data.
+
+FILES WHERE BUG EXISTED
+---------------------------
+1. ProfileScreen.tsx
+   - Line 1513: Logo upload success handler
+   - Line 1282: businessProfileService.clearCache() (called without userId)
+   - Missing: Business profiles refresh after logo upload
+
+2. HomeScreen.tsx  
+   - Line 633: const [userBusinessProfiles, setUserBusinessProfiles] = useState<BusinessProfile[]>([]);
+   - Line 666: businessProfileService.getUserBusinessProfiles(currentUserId);
+   - Missing: Listener for profile update events
+
+CODE ADDED OR MODIFIED
+--------------------------
+
+1. ProfileScreen.tsx (Lines 1297-1334)
+   - Added business profiles refresh after logo upload
+   - Added custom event emission using React Native DeviceEventEmitter
+   - Added navigation dispatch fallback
+   - Enhanced cache clearing with userId parameter
+
+2. HomeScreen.tsx (Lines 654-697)
+   - Added event listener for 'businessProfileUpdated' events
+   - Added navigation dispatch listener for fallback
+   - Automatic business profiles refresh when logo update is detected
+
+EXPLANATION OF WHY BUG HAPPENED
+------------------------------------
+The bug occurred because:
+
+1. **Separate State Management**: ProfileScreen updates global user profile data, but HomeScreen maintains its own `userBusinessProfiles` state that is not automatically refreshed when global profile changes.
+
+2. **Missing Event Communication**: No communication mechanism existed between ProfileScreen and HomeScreen to notify when business profiles need refreshing.
+
+3. **Incomplete Cache Clearing**: ProfileScreen was calling `businessProfileService.clearCache()` without userId parameter, which might not clear the correct cache entry.
+
+HOW FIX REFRESHES THE DROPDOWN
+---------------------------------
+The fix ensures immediate logo refresh through multiple mechanisms:
+
+1. **Custom Event Emission**: When logo upload succeeds, ProfileScreen emits 'businessProfileUpdated' event with:
+   - userId (for user-specific filtering)
+   - logoUrl (for debugging)
+   - timestamp (for deduplication)
+
+2. **Event Listener**: HomeScreen listens for 'businessProfileUpdated' events and automatically refreshes business profiles when:
+   - Event is for current user
+   - Event is recent (within 5 seconds to prevent stale events)
+
+3. **Navigation Dispatch Fallback**: Uses React Navigation's dispatch system as backup mechanism with 'SET_BUSINESS_PROFILES_REFRESH' action.
+
+4. **Enhanced Cache Clearing**: ProfileScreen now properly clears user-specific cache with `businessProfileService.clearCache(currentUser?.id)`.
+
+5. **Automatic Refresh**: HomeScreen calls `refreshBusinessProfiles()` which:
+   - Calls `businessProfileService.getUserBusinessProfiles()` with fresh data
+   - Updates `setUserBusinessProfiles()` state
+   - Triggers dropdown re-render with new logos
+
+RISK ASSESSMENT
+---------------
+• **LOW RISK**: Changes are minimal and additive
+• **NO BREAKING CHANGES**: Existing functionality preserved
+• **FALLBACK MECHANISMS**: Multiple refresh methods ensure reliability
+• **THREAD SAFETY**: Proper cleanup and error handling
+
+FINAL RESULT
+-------------
+When a logo is uploaded from ProfileScreen, the HomeScreen business dropdown immediately shows the correct logo for each business profile through:
+
+1. Event-driven refresh (primary)
+2. Navigation dispatch refresh (fallback)  
+3. Proper cache clearing
+4. Automatic state synchronization
+
+The fix ensures real-time logo updates across all screens without breaking existing business profile switching or loading logic.

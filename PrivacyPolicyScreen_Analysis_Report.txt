@@ -1,0 +1,193 @@
+PrivacyPolicyScreen Mobile Detection and Text Clipping Analysis Report
+==========================================================================
+
+FILE ANALYZED:
+PrivacyPolicyScreen.tsx
+
+----------------------------------------------------------
+
+1. MOBILE SIZE DETECTION LOGIC
+============================
+
+Static Detection (Lines 21-33):
+• screenWidth = Dimensions.get('window').width
+• isTablet = screenWidth >= 768
+• isSmallScreen = screenWidth < 375
+• isMediumScreen = screenWidth >= 375 && screenWidth < 414
+• isLargeScreen = screenWidth >= 414 && screenWidth < 768
+
+Dynamic Detection (Lines 74-123):
+• currentScreenWidth from useState with Dimensions.addEventListener
+• isTabletDevice = currentScreenWidth >= 768
+• isSmallScreenDevice = currentScreenWidth < 375
+
+Breakpoints Used:
+• Mobile: < 768px width
+• Tablet: >= 768px width
+• Small screen threshold: < 375px (static) and < 450px (dynamic for text scaling)
+
+----------------------------------------------------------
+
+2. SCALING UTILITIES USED
+=========================
+
+Static Scaling Functions:
+• scale(size) = (screenWidth / 375) * size
+• verticalScale(size) = (screenHeight / 667) * size
+• moderateScale(size, factor=0.5) = size + (scale(size) - size) * factor
+
+Dynamic Scaling Functions:
+• dynamicScale(size) = (currentScreenWidth / 375) * size
+• dynamicModerateScale(size, factor=0.5) = size + (dynamicScale(size) - size) * factor
+• getFontSize(baseSize) - Enhanced scaling for small screens (< 450px)
+
+Compact Spacing Multiplier:
+• COMPACT_MULTIPLIER = 0.5 (reduces all spacing by 50%)
+
+----------------------------------------------------------
+
+3. TITLE COMPONENT USED IN CARDS
+=================================
+
+Primary Title Style: sectionTitle (Lines 357-368)
+Usage: All card section titles throughout the screen
+
+Inline Style Overrides:
+Every sectionTitle usage includes inline styles that override the StyleSheet:
+• fontSize: isTabletDevice ? getFontSize(11) : getFontSize(10)
+• lineHeight: isTabletDevice ? dynamicModerateScale(11 * 1.4) : dynamicModerateScale(10 * 1.4)
+• includeFontPadding: false
+• paddingBottom: moderateScale(2)
+
+----------------------------------------------------------
+
+4. EXACT STYLE PROPERTIES AFFECTING TITLES
+==========================================
+
+StyleSheet sectionTitle (Lines 357-368):
+{
+  fontSize: moderateScale(isTablet ? 11 : 10),
+  fontWeight: '700',
+  color: '#667eea',
+  letterSpacing: 0.5,
+  flex: 1,
+  lineHeight: isTablet 
+    ? moderateScale(11 * 1.4)
+    : moderateScale(10) * 1.35,  // Recently modified
+  includeFontPadding: false,
+  paddingBottom: moderateScale(2),
+}
+
+Inline Overrides (Applied to ALL sectionTitle usages):
+{
+  fontSize: isTabletDevice ? getFontSize(11) : getFontSize(10),
+  lineHeight: isTabletDevice ? dynamicModerateScale(11 * 1.4) : dynamicModerateScale(10 * 1.4),
+  includeFontPadding: false,
+  paddingBottom: moderateScale(2),
+}
+
+----------------------------------------------------------
+
+5. MOBILE VS TABLET STYLE DIFFERENCES
+=====================================
+
+Mobile Devices (< 768px):
+• fontSize: getFontSize(10) with small screen boost
+• lineHeight: dynamicModerateScale(10 * 1.4)
+• Uses dynamic scaling functions
+• Small screens (< 450px) get 1.3x multiplier + 3px boost
+
+Tablet Devices (>= 768px):
+• fontSize: getFontSize(11) with normal scaling
+• lineHeight: dynamicModerateScale(11 * 1.4)
+• Uses dynamic scaling functions
+• No small screen boost applied
+
+Key Differences:
+• Mobile uses smaller base fontSize (10 vs 11)
+• Both use same 1.4 multiplier for lineHeight
+• Mobile gets additional text size boost on small screens
+
+----------------------------------------------------------
+
+6. PARENT CONTAINER ANALYSIS
+============================
+
+Card Container: HoverableCard component
+• No overflow: 'hidden' detected
+• No fixed height constraints
+• Uses dynamic padding and margins
+
+Section Container: styles.section
+• borderWidth: 1
+• shadow properties
+• No height constraints
+• Flexible padding system
+
+ScrollView: No clipping constraints detected
+• showsVerticalScrollIndicator: false
+• Dynamic padding applied
+
+----------------------------------------------------------
+
+7. ROOT CAUSE ANALYSIS
+======================
+
+PRIMARY ISSUE: Inconsistent lineHeight Scaling
+
+The StyleSheet sectionTitle uses:
+• Mobile: moderateScale(10) * 1.35
+• Tablet: moderateScale(11 * 1.4)
+
+But inline styles override with:
+• Mobile: dynamicModerateScale(10 * 1.4)
+• Tablet: dynamicModerateScale(11 * 1.4)
+
+PROBLEM IDENTIFIED:
+1. StyleSheet uses moderateScale() (static based on initial screen size)
+2. Inline styles use dynamicModerateScale() (responsive based on current screen size)
+3. Inline styles OVERRIDE StyleSheet values
+4. Mobile gets smaller lineHeight relative to fontSize compared to tablet
+
+SPECIFIC CALCULATION DIFFERENCES:
+
+Mobile (typical 375px width):
+• moderateScale(10) ≈ 10
+• moderateScale(10) * 1.35 ≈ 13.5 (StyleSheet, ignored)
+• dynamicModerateScale(10 * 1.4) ≈ dynamicModerateScale(14) (Applied)
+
+Tablet (typical 768px width):
+• moderateScale(11 * 1.4) ≈ moderateScale(15.4) (StyleSheet, ignored)
+• dynamicModerateScale(11 * 1.4) ≈ dynamicModerateScale(15.4) (Applied)
+
+The issue is that mobile devices get proportionally less lineHeight space compared to the fontSize, especially on smaller screens where the getFontSize() function boosts the font size but the lineHeight doesn't scale proportionally.
+
+----------------------------------------------------------
+
+8. RECOMMENDED FIX STRATEGY
+============================
+
+OPTION 1: Fix Inline Styles (Recommended)
+Update all sectionTitle inline styles to use mobile-specific lineHeight:
+• Mobile: dynamicModerateScale(10) * 1.45 (increase multiplier)
+• Tablet: dynamicModerateScale(11 * 1.4) (keep unchanged)
+
+OPTION 2: Remove StyleSheet lineHeight
+Remove lineHeight from StyleSheet sectionTitle since inline styles override it anyway.
+
+OPTION 3: Use Consistent Scaling
+Apply the same scaling approach (either all moderateScale or all dynamicModerateScale) for both StyleSheet and inline styles.
+
+PREFERRED APPROACH:
+Option 1 - Fix inline styles with mobile-specific lineHeight multiplier (1.45 instead of 1.4) to provide adequate descender space for mobile devices while preserving tablet layout.
+
+----------------------------------------------------------
+
+ANALYSIS COMPLETE
+================
+
+Root Cause: Mobile devices get insufficient lineHeight space relative to their fontSize due to inconsistent scaling between StyleSheet definitions and inline style overrides.
+
+Impact: Descender characters (p, q, y, g, j) are clipped on mobile but not tablet due to inadequate vertical space allocation.
+
+Priority: High - Affects readability and professional appearance on mobile devices.

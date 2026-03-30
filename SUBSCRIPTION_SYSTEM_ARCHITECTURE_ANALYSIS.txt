@@ -1,0 +1,488 @@
+# Complete Subscription System Architecture Analysis
+
+## 1. Subscription Architecture Overview
+
+The subscription system is a comprehensive payment and access management platform built around **Razorpay** as the primary payment gateway. The architecture follows a **mobile-first design** with separate concerns for user subscriptions vs business profile subscriptions.
+
+### Core Components:
+- **Mobile App** (React Native) - Frontend subscription management
+- **Backend API** (Node.js/Express/Prisma) - Payment processing & subscription management
+- **Razorpay** - Payment gateway and subscription management
+- **PostgreSQL** - Data persistence
+- **Webhook System** - Real-time payment event processing
+
+---
+
+## 2. End-to-End Subscription Flow
+
+### Standard One-Time Payment Flow:
+
+```
+Mobile App
+↓ (User selects plan)
+SubscriptionScreen.tsx
+↓ (Calls createPaymentOrder)
+/api/mobile/subscription/create-order
+↓ (Creates Razorpay order)
+Razorpay API
+↓ (Returns order ID)
+Mobile App (Razorpay Checkout)
+↓ (User completes payment)
+Payment Success Handler
+↓ (Calls verifyPayment)
+/api/mobile/subscription/verify-payment
+↓ (Atomic transaction)
+Database Update
+↓ (Activates subscription)
+Mobile App (Polling)
+↓ (Checks status)
+Subscription Activated
+```
+
+### Autopay (Recurring) Flow:
+
+```
+Mobile App
+↓ (User enables autopay)
+/api/mobile/subscription/create-autopay
+↓ (Creates Razorpay mandate)
+Razorpay Autopay
+↓ (User approves mandate)
+Webhook Event
+↓ (subscription.activated)
+/api/webhooks/razorpay
+↓ (Processes activation)
+Database Update
+↓ (Sets autopayEnabled=true)
+Mobile App (Status Check)
+↓ (Verifies activation)
+Autopay Active
+```
+
+---
+
+## 3. API Mapping Table
+
+| API Endpoint | Method | Purpose | Called From | DB Tables Used |
+|--------------|---------|---------|-------------|------------------|
+| `/api/mobile/subscription/plans` | GET | Fetch available subscription plans | Mobile App | `mobile_subscription_plans` |
+| `/api/mobile/subscription/create-order` | POST | Create Razorpay payment order | Mobile App | `mobileUser`, `mobile_subscription_plans`, `mobileTransaction` |
+| `/api/mobile/subscription/verify-payment` | POST | Verify payment & activate subscription | Mobile App | `mobileSubscription`, `mobileTransaction`, `mobileUser` |
+| `/api/mobile/subscription/status` | GET | Get current subscription status | Mobile App | `mobileSubscription`, `mobile_subscription_plans` |
+| `/api/mobile/subscription/create-autopay` | POST | Create recurring subscription mandate | Mobile App | `mobileSubscription`, `mobile_subscription_plans`, `mobileTransaction` |
+| `/api/mobile/subscription/cancel-autopay` | POST | Cancel recurring subscription | Mobile App | `mobileSubscription` |
+| `/api/mobile/subscription/autopay-status` | GET | Check autopay status | Mobile App | `mobileSubscription` |
+| `/api/mobile/subscription/cancel` | POST | Cancel active subscription | Mobile App | `mobileSubscription`, `mobileActivity` |
+| `/api/mobile/subscription/history` | GET | Get payment history | Mobile App | `mobileSubscription` |
+| `/api/webhooks/razorpay` | POST | Process Razorpay webhook events | Razorpay | `mobileSubscription`, `mobileTransaction`, `webhookEvent`, `businessProfile` |
+
+---
+
+## 4. Database Schema Analysis
+
+### Primary Subscription Tables:
+
+#### `mobileSubscription`
+**Purpose**: Core subscription tracking for mobile users
+**Important Fields**:
+- `id` - Primary key
+- `mobileUserId` - Links to `mobileUser`
+- `planId` - Links to `mobile_subscription_plans`
+- `status` - PENDING/ACTIVE/EXPIRED/CANCELLED
+- `startDate`/`endDate` - Subscription validity period
+- `razorpaySubscriptionId` - Razorpay subscription identifier
+- `autopayEnabled` - Boolean for recurring payments
+- `subscriptionCategory` - USER_SUBSCRIPTION vs BUSINESS_PROFILE
+- `businessProfileId` - Links to `businessProfile` for business subscriptions
+
+#### `mobile_subscription_plans`
+**Purpose**: Available subscription plans configuration
+**Important Fields**:
+- `id` - Plan identifier
+- `name` - Plan display name
+- `price` - Cost in INR
+- `period` - monthly/quarterly/yearly
+- `features` - JSON array of plan features
+- `razorpayPlanId` - Razorpay plan mapping
+
+#### `mobileTransaction`
+**Purpose**: Payment transaction history and tracking
+**Important Fields**:
+- `paymentId` - Razorpay payment identifier
+- `transactionId` - Internal transaction tracking
+- `status` - PENDING/SUCCESS/FAILED
+- `razorpaySubscriptionId` - Links to subscription
+- `isAutopayPayment` - Distinguishes recurring vs one-time
+
+#### `mobileUser`
+**Purpose**: User authentication and subscription state
+**Important Fields**:
+- `isActive` - Account status (updated on subscription activation)
+- Links to `mobileSubscription` via user ID
+
+#### `businessProfile`
+**Purpose**: Business-specific subscriptions (B2B feature)
+**Important Fields**:
+- `subscriptionStatus` - Mirrors subscription state
+- `isSubscriptionActive` - Boolean access flag
+- `subscriptionStartDate`/`subscriptionEndDate` - Validity period
+
+#### `webhookEvent`
+**Purpose**: Prevent duplicate webhook processing
+**Important Fields**:
+- `eventId` - Razorpay event identifier
+- `eventType` - subscription.activated, payment.captured, etc.
+- `status` - PROCESSED/FAILED
+
+---
+
+## 5. Razorpay Integration Flow
+
+### Payment Order Creation:
+1. **Mobile App** calls `/create-order` with plan ID
+2. **Backend** validates plan and user
+3. **Backend** creates Razorpay order with amount in paise
+4. **Razorpay** returns order ID and key
+5. **Mobile App** initializes Razorpay checkout
+
+### Payment Verification:
+1. **Mobile App** receives payment success callback
+2. **Mobile App** calls `/verify-payment` with payment details
+3. **Backend** verifies Razorpay signature (HMAC-SHA256)
+4. **Backend** executes atomic transaction:
+   - Updates `mobileSubscription` to ACTIVE
+   - Creates/updates `mobileTransaction` to SUCCESS
+   - Activates `mobileUser.isActive = true`
+   - For business profiles: updates `businessProfile`
+
+### Autopay Management:
+1. **Mobile App** calls `/create-autopay`
+2. **Backend** creates Razorpay subscription plan
+3. **Backend** creates Razorpay subscription with mandate
+4. **User** approves mandate (via Razorpay UI)
+5. **Webhook** `subscription.activated` finalizes activation
+6. **Recurring charges** handled via `subscription.charged` webhooks
+
+### Webhook Processing:
+- **Signature Verification**: HMAC-SHA256 with webhook secret
+- **Duplicate Prevention**: `webhookEvent` table tracking
+- **Event Types**:
+  - `subscription.activated` → Sets status to ACTIVE
+  - `subscription.charged` → Updates billing dates
+  - `payment.captured` → Records successful payment
+  - `payment.failed` → Handles retry logic
+  - `subscription.cancelled` → Updates status to CANCELLED
+
+---
+
+## 6. Mobile App Integration Flow
+
+### Subscription Screen (`SubscriptionScreen.tsx`):
+1. **Load Plans**: Calls `subscriptionApi.getPlans()`
+2. **Payment Initiation**: 
+   - Calls `createPaymentOrder()` 
+   - Initializes Razorpay checkout
+3. **Payment Handling**:
+   - Success: Calls `verifyPayment()`
+   - Starts polling for activation
+4. **Status Polling**: 
+   - Every 5 seconds for up to 5 attempts
+   - Checks `subscriptionApi.getStatus()`
+
+### Subscription Context (`SubscriptionContext.tsx`):
+1. **State Management**: Centralized subscription state
+2. **Caching**: 10-second TTL for status checks
+3. **Payment Lock**: Prevents duplicate payments during processing
+4. **Autopay Management**: Separate state for recurring subscriptions
+
+### Transaction History (`transactionHistory.ts`):
+1. **Unified API**: `/api/mobile/transactions/unified`
+2. **Caching**: 5-minute TTL
+3. **Type Differentiation**: User vs Business Profile transactions
+
+---
+
+## 7. Business Logic Rules
+
+### Access Control:
+```typescript
+// Active subscription determination
+const isActive = subscription.isActive === true || 
+                 subscription.status?.toLowerCase() === 'active';
+
+// Expiry check
+const isExpired = subscription.endDate && 
+                   new Date(subscription.endDate) <= new Date();
+
+// Final access decision
+const hasAccess = isActive && !isExpired;
+```
+
+### Subscription Status Priority:
+1. **Backend `isActive` flag** (primary)
+2. **Backend `status` field** (secondary)
+3. **Expiry date calculation** (fallback)
+
+### Autopay Rules:
+- **One per user**: Only one active USER_SUBSCRIPTION autopay
+- **One per business profile**: Separate BUSINESS_PROFILE autopay
+- **Retry Logic**: Exponential backoff (2^n days)
+- **Max Retries**: 3 attempts before cancellation
+
+### Payment Validation:
+- **Signature Verification**: HMAC-SHA256 for all webhooks
+- **Duplicate Prevention**: Webhook event ID tracking
+- **Atomic Transactions**: All-or-nothing database updates
+
+---
+
+## 8. Identified Architecture Issues
+
+### Critical Issues:
+
+#### 1. **Race Condition in Payment Processing**
+```javascript
+// MOBILE ISSUE: Payment verification and activation polling
+setIsTransactionPending(true);
+await verifyPayment(); // async
+// Polling starts immediately, might miss activation
+startPolling(); 
+```
+**Impact**: Users may see failed activation due to timing issues
+
+#### 2. **Inconsistent Status Fields**
+```typescript
+// BACKEND ISSUE: Multiple status fields
+subscription.isActive  // Boolean flag
+subscription.status    // String: 'ACTIVE'/'PENDING'
+subscription.endDate    // Date for expiry
+// Mobile app confused about which to trust
+```
+
+#### 3. **Webhook Dependency Risk**
+```javascript
+// BACKEND ISSUE: Subscription activation depends on webhook
+// If webhook fails, subscription stays PENDING forever
+await prisma.mobileSubscription.update({
+  status: 'ACTIVE' // Only done in webhook
+});
+```
+
+#### 4. **Business Profile Isolation**
+```typescript
+// MIXED LOGIC: Business profile updates affect customer
+if (subscriptionCategory === 'BUSINESS_PROFILE') {
+  await updateBusinessProfile(); // Correct
+} else {
+  await updateCustomer(); // May affect business profile
+}
+```
+
+### Medium Issues:
+
+#### 5. **Cache Invalidation**
+- **Problem**: 10-second cache may show stale subscription status
+- **Impact**: Users with recently activated subscriptions see expired state
+
+#### 6. **Error Handling Inconsistency**
+```javascript
+// MOBILE: Different error handling patterns
+catch (error) {
+  if (error.response?.status === 401) return []; // Silent
+  throw error; // Loud
+}
+```
+
+#### 7. **Transaction State Management**
+- **Problem**: PENDING transactions may not be cleaned up
+- **Impact**: Transaction history shows failed payments as pending
+
+---
+
+## 9. Suggested Improvements
+
+### High Priority:
+
+#### 1. **Implement Payment State Machine**
+```typescript
+enum PaymentState {
+  IDLE = 'idle',
+  INITIATING = 'initiating', 
+  PROCESSING = 'processing',
+  VERIFYING = 'verifying',
+  COMPLETED = 'completed',
+  FAILED = 'failed'
+}
+```
+
+#### 2. **Unify Subscription Status**
+```sql
+-- Single source of truth for subscription status
+ALTER TABLE mobileSubscription 
+ADD COLUMN computed_status GENERATED ALWAYS AS (
+  CASE 
+    WHEN status = 'ACTIVE' AND endDate > NOW() THEN 'ACTIVE'
+    WHEN status = 'PENDING' THEN 'PENDING'
+    ELSE 'INACTIVE'
+  END
+) STORED;
+```
+
+#### 3. **Add Webhook Retry Mechanism**
+```javascript
+const WEBHOOK_RETRY_ATTEMPTS = 3;
+const WEBHOOK_RETRY_DELAY = 5000; // 5 seconds
+
+async function processWebhookWithRetry(event, attempts = 0) {
+  try {
+    await processWebhookEvent(event);
+  } catch (error) {
+    if (attempts < WEBHOOK_RETRY_ATTEMPTS) {
+      setTimeout(() => 
+        processWebhookWithRetry(event, attempts + 1), 
+        WEBHOOK_RETRY_DELAY * Math.pow(2, attempts)
+      );
+    }
+  }
+}
+```
+
+### Medium Priority:
+
+#### 4. **Implement Subscription Cache Invalidation**
+```typescript
+// Immediate cache invalidation on payment success
+await verifyPayment(paymentData);
+cacheService.clear(`subscription_status_${userId}`);
+// Force refresh without TTL
+refreshSubscription(true); 
+```
+
+#### 5. **Add Subscription Health Monitoring**
+```sql
+-- Monitor subscriptions stuck in PENDING
+SELECT * FROM mobileSubscription 
+WHERE status = 'PENDING' 
+AND createdAt < NOW() - INTERVAL '1 hour';
+```
+
+#### 6. **Implement Graceful Degradation**
+```typescript
+// If backend is unavailable, use cached status
+const subscriptionStatus = await getSubscriptionStatus()
+  .catch(() => getCachedSubscriptionStatus())
+  .catch(() => ({ isActive: false, status: 'inactive' }));
+```
+
+---
+
+## 10. Security Considerations
+
+### Payment Security:
+- ✅ **Signature Verification**: All webhooks verified with HMAC-SHA256
+- ✅ **Duplicate Prevention**: Webhook event ID tracking
+- ✅ **Amount Validation**: Backend validates plan prices, not client-provided
+- ⚠️ **Key Exposure**: Razorpay keys in .env files (acceptable for backend)
+
+### Access Control:
+- ✅ **JWT Authentication**: All subscription endpoints require valid tokens
+- ✅ **User Isolation**: Mobile users can only access their own subscriptions
+- ✅ **Business Profile Separation**: B2B subscriptions isolated from B2C
+
+### Data Protection:
+- ✅ **Atomic Transactions**: Prevents partial subscription states
+- ✅ **Audit Logging**: All subscription changes logged
+- ⚠️ **PII in Logs**: Payment details in console logs (development only)
+
+---
+
+## 11. Performance Optimizations
+
+### Database Indexes:
+```sql
+-- Critical for subscription lookups
+CREATE INDEX idx_mobile_subscription_user_status 
+ON mobileSubscription(mobileUserId, status);
+
+CREATE INDEX idx_mobile_transaction_payment 
+ON mobileTransaction(paymentId);
+
+CREATE INDEX idx_webhook_event_id 
+ON webhookEvent(eventId);
+```
+
+### API Caching Strategy:
+```typescript
+// Tiered caching approach
+const CACHE_STRATEGY = {
+  subscriptionStatus: { ttl: 10000 }, // 10 seconds
+  plans: { ttl: 300000 }, // 5 minutes  
+  transactionHistory: { ttl: 300000 } // 5 minutes
+};
+```
+
+### Connection Pooling:
+```javascript
+// Prisma connection optimization
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL,
+      connectionLimit: 20,
+      poolTimeout: 10000
+    }
+  }
+});
+```
+
+---
+
+## 12. Key File Locations
+
+### Backend Core Files:
+- **Subscription Routes**: `/Backend/eventmarketersbackend-main/src/routes/mobileSubscription.ts`
+- **Autopay Controller**: `/Backend/eventmarketersbackend-main/src/controllers/autopayController.ts`
+- **Webhook Controller**: `/Backend/eventmarketersbackend-main/src/controllers/webhookController.ts`
+- **Razorpay Service**: `/Backend/eventmarketersbackend-main/src/services/razorpayAutopayService.ts`
+- **Database Schema**: `/Backend/eventmarketersbackend-main/prisma/schema.prisma`
+
+### Mobile App Core Files:
+- **Subscription Screen**: `/src/screens/SubscriptionScreen.tsx`
+- **Subscription Context**: `/src/contexts/SubscriptionContext.tsx`
+- **Subscription API**: `/src/services/subscriptionApi.ts`
+- **Transaction Service**: `/src/services/transactionHistory.ts`
+
+### Configuration Files:
+- **Backend Environment**: `/Backend/eventmarketersbackend-main/.env`
+- **Mobile Environment**: `/.env`
+- **Database Configuration**: Defined in Prisma schema
+
+---
+
+## 13. Production Deployment Notes
+
+### Required Environment Variables:
+```bash
+# Backend
+DATABASE_URL=postgresql://...
+RAZORPAY_KEY_ID=rzp_live_...
+RAZORPAY_KEY_SECRET=...
+JWT_SECRET=...
+RAZORPAY_WEBHOOK_SECRET=...
+
+# Mobile App
+RAZORPAY_KEY_ID=rzp_live_...
+API_BASE_URL=https://your-backend.com
+```
+
+### Webhook Configuration:
+- **Endpoint**: `https://your-backend.com/api/webhooks/razorpay`
+- **Events**: `subscription.activated`, `subscription.charged`, `payment.captured`, `payment.failed`, `subscription.cancelled`
+- **Secret**: Must match `RAZORPAY_WEBHOOK_SECRET`
+
+---
+
+This architecture analysis reveals a well-structured subscription system with clear separation of concerns, though some areas need attention for production robustness. The dual subscription model (user vs business profile) provides flexibility while maintaining isolation.
+
+**Generated**: $(date)
+**Analysis Scope**: Complete subscription system including mobile app, backend APIs, database schema, Razorpay integration, and webhook processing.

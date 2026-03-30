@@ -1,0 +1,241 @@
+# VerifyResetCodeScreen Deep Analysis Report
+
+## 1. File Location
+- **Primary Screen**: `src/screens/VerifyResetCodeScreen.tsx`
+- **UI Component**: `src/components/OtpVerificationComponent.tsx`
+- **Navigation**: `src/navigation/AppNavigator.tsx`
+- **API Services**: `src/services/loginAPIs.ts`
+
+## 2. Component Structure
+
+### VerifyResetCodeScreen.tsx
+- **Component Type**: Functional Component
+- **Architecture**: Simple wrapper component with minimal logic
+- **Imports**:
+  - React hooks: `useCallback`
+  - Navigation: `StackNavigationProp`, `RouteProp`
+  - Services: `loginAPIs`
+  - Components: `OtpVerificationComponent`
+  - Navigation types: `RootStackParamList`
+
+### OtpVerificationComponent.tsx
+- **Component Type**: Functional Component
+- **Architecture**: Reusable OTP verification component
+- **Imports**:
+  - React hooks: `useCallback`, `useEffect`, `useMemo`, `useState`
+  - React Native: `View`, `Text`, `StyleSheet`, `TextInput`, `TouchableOpacity`, `KeyboardAvoidingView`, `Platform`, `StatusBar`, `Alert`, `ActivityIndicator`
+  - External: `SafeAreaView`, `LinearGradient`
+  - Context: `useTheme`
+  - Utils: `getUserFriendlyError`
+
+## 3. State Variables
+
+### VerifyResetCodeScreen.tsx
+- **No local state variables**
+- **Navigation params**: `email` (from route.params)
+
+### OtpVerificationComponent.tsx
+- `code: string` - Current OTP input value
+- `isFocused: boolean` - Input focus state
+- `isSubmitting: boolean` - Loading state for API calls
+- `resendTimer: number` - Countdown timer for resend functionality (ALREADY IMPLEMENTED)
+- `isCodeValid: boolean` (memoized) - Validates 6-digit format using regex `/^\d{6}$/`
+
+## 4. UI Layout Breakdown
+
+### Screen Structure
+```
+SafeAreaView
+└── LinearGradient (theme gradient)
+    └── KeyboardAvoidingView
+        └── Card (rounded, shadowed)
+            ├── Title Text
+            ├── Subtitle Text + Email
+            ├── OTP Input Field (single 6-digit input)
+            ├── Verify Button
+            └── Resend Section
+                ├── "Didn't receive the code?" Text
+                └── Resend Button (with timer display)
+```
+
+### Key UI Elements
+- **OTP Input**: Single TextInput field with `maxLength={6}`, `textAlign="center"`, `autoFocus`
+- **Verify Button**: Disabled until valid 6-digit code, shows ActivityIndicator when submitting
+- **Resend Section**: Already includes countdown timer display (`resendTimer` state)
+- **Timer Display Location**: Line 169 - `{resendTimer > 0 ? \`Resend in ${formatResendTimer()}\` : 'Resend Code'}`
+
+## 5. API Flow
+
+### Verification Flow
+1. **User Input**: User enters 6-digit code
+2. **Validation**: Regex validation `/^\d{6}$/`
+3. **API Call**: `loginAPIs.verifyResetCode({ email, code })`
+4. **Success**: Navigate to `ResetPassword` screen with `{ email, code }`
+5. **Failure**: Show Alert with error message
+
+### Resend Flow
+1. **User Action**: Click "Resend Code" button
+2. **API Call**: `loginAPIs.requestPasswordReset({ email })`
+3. **Success**: Show success Alert, start 60-second cooldown
+4. **Failure**: Show error Alert
+
+### API Endpoints
+- **Verify**: `POST /api/mobile/auth/verify-reset-code`
+- **Resend**: `POST /api/mobile/auth/forgot-password`
+
+## 6. Navigation Flow
+
+### Entry Point
+- **From**: `ForgotPasswordScreen` (implied)
+- **Route**: `VerifyResetCode`
+- **Parameters**: `{ email: string }`
+
+### Exit Point
+- **To**: `ResetPassword` screen
+- **Parameters**: `{ email: string, code: string }`
+- **Trigger**: Successful OTP verification
+
+## 7. Lifecycle Behavior
+
+### useEffect Hooks
+1. **Timer Management** (Lines 46-54):
+   - Runs when `resendTimer` changes
+   - Sets up interval to decrement timer every second
+   - Cleans up interval on unmount or timer completion
+
+### No Mount Effects
+- No useEffect runs on component mount
+- Timer starts only when resend is triggered
+
+## 8. Timer Integration Points
+
+### Current Timer Implementation
+- **ALREADY IMPLEMENTED**: Resend cooldown timer exists
+- **Location**: `OtpVerificationComponent.tsx`
+- **Duration**: 60 seconds (configurable via `resendCooldown` prop)
+- **State**: `resendTimer`
+- **Display**: `Resend in ${formatResendTimer()}`
+
+### Potential New Timer Integration
+If implementing a separate countdown timer for code expiry:
+
+#### Timer Start Points
+1. **On Component Mount**: Start timer when screen loads
+2. **On Resend**: Restart timer when new code is sent
+
+#### Timer State Storage
+- **Location**: `OtpVerificationComponent.tsx`
+- **State Variable**: `codeExpiryTimer: number`
+- **Duration**: Configurable (e.g., 300 seconds = 5 minutes)
+
+#### Timer UI Placement
+- **Option 1**: Above subtitle, below title
+- **Option 2**: Below subtitle, above input field
+- **Option 3**: In resend section, alongside cooldown timer
+
+#### Timer Display Format
+```jsx
+<Text style={styles.timerText}>
+  Code expires in: ${formatTime(codeExpiryTimer)}
+</Text>
+```
+
+## 9. Potential Risks
+
+### State Management Risks
+- **Timer Conflicts**: Multiple timers could cause performance issues
+- **Memory Leaks**: Interval cleanup must be properly handled
+- **Re-render Issues**: Timer updates every second could affect performance
+
+### User Experience Risks
+- **Timer Confusion**: Two timers (expiry + cooldown) might confuse users
+- **Auto-logout**: If implementing auto-logout on expiry, need clear messaging
+- **Back Navigation**: Timer should continue or reset based on UX requirements
+
+### Technical Risks
+- **Background Behavior**: Timer behavior when app goes to background
+- **Screen Reload**: Timer reset on screen refresh
+- **Multiple Instances**: Multiple timers if component remounts
+
+## 10. Recommendations for Implementing Timer
+
+### Implementation Strategy
+1. **Reuse Existing Timer Infrastructure**: Leverage existing timer pattern from resend functionality
+2. **Clear User Communication**: Distinguish between expiry timer and resend cooldown
+3. **Graceful Degradation**: Handle timer expiration without breaking app flow
+
+### Code Implementation Points
+
+#### Add New State
+```tsx
+const [codeExpiryTimer, setCodeExpiryTimer] = useState(0);
+const [isCodeExpired, setIsCodeExpired] = useState(false);
+```
+
+#### Add useEffect for Expiry Timer
+```tsx
+useEffect(() => {
+  let interval: NodeJS.Timeout | undefined;
+  if (codeExpiryTimer > 0) {
+    interval = setInterval(() => {
+      setCodeExpiryTimer((prev) => {
+        if (prev <= 1) {
+          setIsCodeExpired(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }
+  return () => {
+    if (interval) clearInterval(interval);
+  };
+}, [codeExpiryTimer]);
+```
+
+#### Add Timer Display UI
+```jsx
+{codeExpiryTimer > 0 && (
+  <View style={styles.timerContainer}>
+    <Text style={[styles.timerText, { color: theme.colors.textSecondary }]}>
+      Code expires in: {formatTime(codeExpiryTimer)}
+    </Text>
+  </View>
+)}
+```
+
+#### Add Expiry Handling
+```tsx
+const handleVerify = useCallback(async () => {
+  if (isCodeExpired) {
+    Alert.alert('Code Expired', 'Your verification code has expired. Please request a new code.');
+    return;
+  }
+  // ... existing verification logic
+}, [isCodeExpired, ...]);
+```
+
+### Best Practices
+1. **Timer Duration**: Use reasonable duration (5-10 minutes)
+2. **Clear Messaging**: Explain timer purpose clearly
+3. **Backup Mechanisms**: Allow manual resend even if timer expires
+4. **Accessibility**: Add screen reader support for timer announcements
+5. **Testing**: Test timer behavior in various scenarios (background, multitasking)
+
+### Integration Considerations
+- **Prop Interface**: Add `codeExpiryTime?: number` to component props
+- **Timer Start**: Start timer on component mount or when code is resent
+- **Timer Reset**: Reset timer when new code is requested
+- **Error Handling**: Handle API errors without affecting timer
+
+---
+
+## Summary
+
+The `VerifyResetCodeScreen` is a well-structured component that already implements a countdown timer for the resend functionality. The existing timer infrastructure can be leveraged to implement a code expiry timer with minimal architectural changes. The component follows React best practices with proper state management, error handling, and user feedback mechanisms.
+
+**Key Finding**: A resend countdown timer is already implemented and functional. Any new timer implementation should complement rather than duplicate this existing functionality.
+
+**Risk Level**: Low - The component architecture supports additional timer functionality without major refactoring.
+
+**Implementation Complexity**: Medium - Requires careful UI/UX design to avoid timer confusion and proper state management for multiple timers.

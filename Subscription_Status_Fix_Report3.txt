@@ -1,0 +1,9 @@
+Issue 3: The UI was not auto-refreshing the buttons to "Subscribed" after a successful payment until the user manually restarted the app.
+
+Root Cause: 
+In `src/screens/SubscriptionScreen.tsx`, after parsing the Razorpay success handler, the app called `setIsSubscribed(true)` only for local state, and it explicitly skipped calling `await refreshSubscription(true)` for the global context because of an old comment (`❌ AVOID - Could override verified status`). This caused the screen to navigate back (`navigation.goBack()`) with the underlying screens still hooked to the stale, inactive context data.
+Furthermore, the Context wrapper explicitly blocked `refreshSubscription` if `paymentInProgress` was true, so if we tried to refresh it in the same lifecycle without releasing the lock first, it would instantly return.
+
+Fix Applied:
+1. Removed the old bypass constraint. Now that the `SubscriptionContext.tsx` is actually fully capable of treating webhooks as `isActive: true`, it is completely safe and required to refresh it.
+2. Carefully placed `await refreshSubscription(true);` AFTER calling `updatePaymentInProgress(false);`. This executes a background fetch that updates `isSubscribed` and `subscriptionStatus` everywhere in the app, causing all screens/buttons to instantly auto-refresh!

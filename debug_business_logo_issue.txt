@@ -1,0 +1,323 @@
+Business Logo Debug Report
+==========================
+
+ISSUE: Business Logo not updating on HomeScreen when switching profiles
+SYMPTOM: Business name updates correctly, but logo continues showing old/default logo
+
+1. Profile Switch Flow
+======================
+
+Profile switching is handled through the BusinessProfileContext global state:
+
+Key Files:
+- src/context/BusinessProfileContext.tsx
+- src/screens/HomeScreen.tsx (lines 3063-3073)
+- src/screens/BusinessProfilesScreen.tsx
+
+Flow:
+1. User taps profile in dropdown → handleBusinessProfileSelect() called
+2. Profile found in userBusinessProfiles array
+3. setSelectedBusinessProfile(profile) called in BusinessProfileContext
+4. Profile saved to AsyncStorage with key '@selected_business_profile'
+5. HomeScreen useBusinessProfile() hook receives new profile
+6. Both userName and userAvatarUri should update
+
+State Variables:
+- selectedBusinessProfile: BusinessProfile | null (global context)
+- userBusinessProfiles: BusinessProfile[] (local state)
+- userProfile: User (from authService)
+
+2. HomeScreen Rendering Logic
+=============================
+
+Key Files:
+- src/screens/HomeScreen.tsx (lines 758-799)
+
+Name Rendering (WORKS):
+```typescript
+const userName = useMemo(() => {
+  return (
+    selectedBusinessProfile?.name ||
+    userProfile?.displayName ||
+    userProfile?.name ||
+    userProfile?.companyName ||
+    userProfile?.username ||
+    'User'
+  );
+}, [userProfile, selectedBusinessProfile]);
+```
+
+Logo Rendering (BROKEN):
+```typescript
+const userAvatarUri = useMemo(() => {
+  const uri = (
+    selectedBusinessProfile?.logo ||
+    selectedBusinessProfile?.companyLogo ||
+    selectedBusinessProfile?.profileLogo ||
+    selectedBusinessProfile?.businessLogo ||
+    selectedBusinessProfile?.image ||
+    selectedBusinessProfile?.photo ||
+    selectedBusinessProfile?.banner ||
+    userProfile?.photo ||
+    userProfile?.photoURL ||
+    userProfile?.logo ||
+    userProfile?.companyLogo ||
+    userProfile?.avatar ||
+    null
+  );
+  console.log('🖼️ [HOMESCREEN] userAvatarUri updated:', {
+    selectedBusinessProfileId: selectedBusinessProfile?.id,
+    selectedBusinessProfileName: selectedBusinessProfile?.name,
+    uri: uri
+  });
+  return uri;
+}, [userProfile, selectedBusinessProfile]);
+```
+
+Image Component:
+```typescript
+{userAvatarUri ? (
+  <OptimizedImage
+    uri={userAvatarUri}
+    style={styles.userAvatarImage}
+    resizeMode="cover"
+    cacheKey={`user_avatar_${userProfile?.id || 'default'}_${selectedBusinessProfile?.id || 'personal'}`}
+    key={`avatar_${userProfile?.id || 'default'}_${selectedBusinessProfile?.id || 'personal'}`}
+  />
+) : (
+  <Text style={styles.userAvatarText}>{userInitials}</Text>
+)}
+```
+
+3. Logo Data Source Analysis
+============================
+
+BusinessProfile Interface (src/services/businessProfile.ts lines 6-29):
+```typescript
+export interface BusinessProfile {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  subCategory?: string;
+  subcategory?: string;
+  address: string;
+  phone: string;
+  alternatePhone?: string;
+  email: string;
+  website?: string;
+  logo?: string;              // Primary logo field
+  companyLogo?: string;       // Alternative logo field
+  profileLogo?: string;       // Additional logo field
+  businessLogo?: string;      // Additional logo field
+  image?: string;             // Additional logo field
+  photo?: string;             // Additional logo field
+  banner?: string;
+  coverImage?: string;
+  services: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+API Response Mapping (src/services/businessProfile.ts lines 98-116):
+```typescript
+return {
+  id: profile.id,
+  name: profile.name || profile.businessName,
+  description: profile.description || '',
+  category: profile.category,
+  subCategory: profile.subCategory || profile.subcategory,
+  subcategory: profile.subCategory || profile.subcategory,
+  address: profile.address || '',
+  phone: profile.phone || '',
+  alternatePhone: profile.alternatePhone || '',
+  email: profile.email || '',
+  website: profile.website || '',
+  logo: profile.logo || profile.companyLogo || profile.profileLogo || profile.businessLogo || profile.image || profile.photo || '',
+  companyLogo: profile.logo || profile.companyLogo || profile.profileLogo || profile.businessLogo || profile.image || profile.photo || '',
+  banner: profile.banner || profile.coverImage || '',
+  services: [],
+  createdAt: profile.createdAt,
+  updatedAt: profile.updatedAt,
+};
+```
+
+4. Cache Analysis
+==================
+
+Image Caching:
+- OptimizedImage component uses ThumbnailImage for thumbnails
+- ThumbnailImage caches in AsyncStorage with prefix '@thumbnail_cache_'
+- Cache key: `user_avatar_${userProfile?.id || 'default'}_${selectedBusinessProfile?.id || 'personal'}`
+- Cache expiry: 7 days
+- Cache is based on profile ID, which should change when switching profiles
+
+Profile Data Caching:
+- BusinessProfileContext caches selected profile in AsyncStorage
+- Key: '@selected_business_profile'
+- UID validation prevents cross-user cache contamination
+- Cache cleared on user logout
+
+Business Profiles Caching:
+- getUserBusinessProfiles() uses cacheService with 5-minute TTL
+- Cache key: `business_profiles_user_${userId}`
+- Stale data allowed while fetching fresh data
+
+5. State Update Propagation
+===========================
+
+useEffect Dependencies:
+- userName depends on [userProfile, selectedBusinessProfile]
+- userAvatarUri depends on [userProfile, selectedBusinessProfile]
+- Both should re-render when selectedBusinessProfile changes
+
+Profile Selection Handler (lines 3063-3073):
+```typescript
+const handleBusinessProfileSelect = useCallback(async (profileId: string) => {
+  const profile = userBusinessProfiles.find(p => p.id === profileId) || null;
+  console.log('🔄 [HOMESCREEN] handleBusinessProfileSelect called:', {
+    profileId,
+    profileName: profile?.name,
+    profileLogo: profile?.logo || profile?.companyLogo || profile?.profileLogo || profile?.businessLogo || profile?.image || profile?.photo || profile?.banner
+  });
+  await setSelectedBusinessProfile(profile);
+  closeBusinessProfileDropdown();
+  businessCategoryPostersApi.clearCache();
+}, [closeBusinessProfileDropdown, userBusinessProfiles, setSelectedBusinessProfile]);
+```
+
+6. API Response Analysis
+========================
+
+Debug Logging in getUserBusinessProfiles (lines 83-96):
+```typescript
+console.log('🔍 [BUSINESS PROFILE] Profile data:', {
+  id: profile.id,
+  name: profile.name || profile.businessName,
+  logoFields: {
+    logo: profile.logo,
+    companyLogo: profile.companyLogo,
+    profileLogo: profile.profileLogo,
+    businessLogo: profile.businessLogo,
+    image: profile.image,
+    photo: profile.photo,
+    banner: profile.banner,
+    coverImage: profile.coverImage
+  }
+});
+```
+
+This should show what logo fields are actually returned by the API.
+
+7. Image URL Format Check
+=========================
+
+The userAvatarUri logic checks multiple possible logo field names in order:
+1. selectedBusinessProfile?.logo
+2. selectedBusinessProfile?.companyLogo  
+3. selectedBusinessProfile?.profileLogo
+4. selectedBusinessProfile?.businessLogo
+5. selectedBusinessProfile?.image
+6. selectedBusinessProfile?.photo
+7. selectedBusinessProfile?.banner
+8. Falls back to user profile fields
+
+Potential Issues:
+- Backend might not be returning logo fields in expected format
+- Logo URLs might be null/undefined
+- Logo URLs might be relative instead of absolute
+- Logo URLs might be missing https:// prefix
+
+8. Complete Data Pipeline Trace
+===============================
+
+API Response → BusinessProfileService.getUserBusinessProfiles() → 
+Data Mapping (lines 98-116) → BusinessProfile[] → 
+HomeScreen.refreshBusinessProfiles() → initializeSelectedProfile() → 
+BusinessProfileContext.setSelectedBusinessProfile() → 
+HomeScreen useBusinessProfile() hook → 
+userAvatarUri useMemo → OptimizedImage component
+
+9. Root Cause Candidates
+========================
+
+A. Caching Issue:
+- ThumbnailImage component might be caching old logo based on cache key
+- Cache key includes selectedBusinessProfile?.id which should change
+- But if profile ID is same across switches, cache might not invalidate
+
+B. Data Mapping Issue:
+- Backend might return logo in different field than expected
+- Data mapping in getUserBusinessProfiles might not preserve logo correctly
+- Logo field might be overwritten in mapping process
+
+C. State Update Issue:
+- selectedBusinessProfile might not be updating correctly
+- useMemo dependencies might not be triggering re-render
+- Profile object reference might not be changing
+
+D. Image Component Issue:
+- OptimizedImage/ThumbnailImage might have internal caching
+- Component might not be re-rendering despite URI change
+- cacheKey might not be changing appropriately
+
+E. API Response Issue:
+- Backend might not be returning logo field at all
+- Logo field might be null/undefined in API response
+- Logo URL format might be invalid
+
+10. Recommended Fix Strategy
+============================
+
+Step 1: Add Debug Logging
+- Add console.log in userAvatarUri useMemo to track URI changes
+- Add console.log in getUserBusinessProfiles data mapping to verify logo fields
+- Add console.log in handleBusinessProfileSelect to verify selected profile data
+
+Step 2: Verify API Response
+- Check backend API response structure for logo fields
+- Confirm logo field names match frontend expectations
+- Verify logo URLs are valid and accessible
+
+Step 3: Check Cache Behavior
+- Temporarily disable image caching to test if caching is the issue
+- Verify cache key changes when switching profiles
+- Clear image cache manually between profile switches
+
+Step 4: Test State Updates
+- Add useEffect to log selectedBusinessProfile changes
+- Verify profile object reference changes on selection
+- Test with different profile data to isolate caching vs state issues
+
+Step 5: Fallback Testing
+- Temporarily hardcode different logo URLs to test image component
+- Test with simplified image component (plain <Image>) to isolate OptimizedImage
+- Test with different logo field priorities in userAvatarUri logic
+
+Most Likely Root Cause:
+The issue is likely in the data mapping layer in getUserBusinessProfiles() where logo fields from the backend API response are not being correctly mapped to the frontend BusinessProfile interface, or the ThumbnailImage component is not properly invalidating cache when the profile changes.
+
+Code Snippets Showing Problematic Logic:
+
+1. Data Mapping (potential issue):
+```typescript
+logo: profile.logo || profile.companyLogo || profile.profileLogo || profile.businessLogo || profile.image || profile.photo || '',
+companyLogo: profile.logo || profile.companyLogo || profile.profileLogo || profile.businessLogo || profile.image || profile.photo || '',
+```
+
+2. Cache Key (potential issue):
+```typescript
+cacheKey={`user_avatar_${userProfile?.id || 'default'}_${selectedBusinessProfile?.id || 'personal'}`}
+```
+
+3. Image Component (potential issue):
+```typescript
+<OptimizedImage
+  uri={userAvatarUri}
+  cacheKey={cacheKey}
+  key={`avatar_${userProfile?.id || 'default'}_${selectedBusinessProfile?.id || 'personal'}`}
+/>
+```
+
+The cache key and component key both depend on selectedBusinessProfile?.id, but if the ID is the same across profile switches (e.g., same user with different profiles), the cache might not invalidate properly.
