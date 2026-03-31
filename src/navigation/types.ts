@@ -20,6 +20,8 @@ export type MainStackParamList = {
     };
     selectedLanguage: string;
     selectedTemplateId: string;
+    selectedTemplate?: string;
+    posterCategory?: string;
   };
   PosterPlayer: {
     selectedPoster: any;
