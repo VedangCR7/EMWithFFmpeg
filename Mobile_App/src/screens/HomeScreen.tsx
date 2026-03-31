@@ -96,7 +96,6 @@ interface SearchResultTemplate {
   data: Template;
 }
 
-type SearchResultItem = SearchResultCategory | SearchResultTemplate;
 
 // Hierarchical search result interfaces for parent category support
 interface ChildCategory {
@@ -684,6 +683,7 @@ const HomeScreen: React.FC = React.memo(() => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchBarVisible, setIsSearchBarVisible] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<SearchCategoryResult[]>([]);
 
   // Business categories state
   const [businessCategories, setBusinessCategories] = useState<BusinessCategory[]>([]);
@@ -711,13 +711,10 @@ const HomeScreen: React.FC = React.memo(() => {
   const [generalHierarchicalData, setGeneralHierarchicalData] = useState<any[]>([]);
   const [isHierarchical, setIsHierarchical] = useState(false);
   const [banners, setBanners] = useState<Banner[]>([]);
-  const [templates, setTemplates] = useState<SearchResultItem[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [calendarRefreshKey, setCalendarRefreshKey] = useState(0);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [currentRequestId, setCurrentRequestId] = useState(0);
-  const [disableBackgroundUpdates, setDisableBackgroundUpdates] = useState(false);
 
   const normalizeCategoryData = useCallback((data: any, categoryType: 'business' | 'general'): HierarchicalSearchResult => {
     return {
@@ -1016,167 +1013,168 @@ const HomeScreen: React.FC = React.memo(() => {
   // Track if animations have been initialized
   const animationsInitializedRef = useRef(false);
 
-  // Safe fallback function for category matching to prevent undefined errors
-  const safeGetMatchingCategories = useCallback((searchLower: string, categories: any[]) => {
-    if (__DEV__) {
-      console.log('🔍 [SAFE FALLBACK] getMatchingCategories fallback being used');
-    }
-    if (!Array.isArray(categories) || !searchLower) return [];
+  // New category filtering function - matches both name and parentCategoryName
+  const filterCategories = useCallback((categories: any[], searchQuery: string) => {
+    if (!searchQuery || searchQuery.trim() === '') return [];
+    
+    const query = searchQuery.toLowerCase().trim();
     
     return categories.filter(category =>
-      category?.name?.toLowerCase().includes(searchLower) ||
-      (category?.parentCategoryName && category.parentCategoryName.toLowerCase().includes(searchLower))
+      category?.name?.toLowerCase().includes(query) ||
+      category?.parentCategoryName?.toLowerCase().includes(query)
     );
   }, []);
 
-  const hierarchicalDisplayData = useMemo(() => {
-    if (!isSearching || searchQuery.trim() === '') return { matchedNames: [], hierarchicalData: [] };
-    
-    const searchLower = searchQuery.toLowerCase().trim();
-    
-    // Use safe category matching that includes parent categories
-    const matchingBusinessCategories = safeGetMatchingCategories(searchLower, businessCategories);
-    const matchingGeneralCategories = safeGetMatchingCategories(searchLower, filteredGreetingCategoriesList);
+  // Unified search result interface
+  interface SearchCategoryResult {
+    id: string;
+    name: string;
+    type: 'general' | 'business';
+    posters: any[];
+    parentCategoryName?: string;
+  }
 
-    if (__DEV__) {
-      console.log('🔍 [HIERARCHICAL DISPLAY] Business categories matched:', matchingBusinessCategories.length);
-      console.log('🔍 [HIERARCHICAL DISPLAY] General categories matched:', matchingGeneralCategories.length);
+  // Helper function to group categories by parent category name
+  const groupCategoriesByParent = useCallback((categories: SearchCategoryResult[]) => {
+    const grouped: Record<string, SearchCategoryResult[]> = {};
+
+    categories.forEach(category => {
+      const parent = category.parentCategoryName || "Other";
+
+      if (!grouped[parent]) {
+        grouped[parent] = [];
+      }
+
+      grouped[parent].push(category);
+    });
+
+    return grouped;
+  }, []);
+
+  // Performance optimization: Memoize search results
+  const memoizedSearchResults = useMemo(() => searchResults, [searchResults]);
+
+  // Group categories by parent category name
+  const groupedResults = useMemo(() => {
+    return groupCategoriesByParent(memoizedSearchResults);
+  }, [memoizedSearchResults, groupCategoriesByParent]);
+
+  // Render search results with category headers and poster grids
+  const renderSearchResults = useCallback(() => {
+    if (!isSearching && searchQuery.trim() === '') return null;
+
+    if (isSearching) {
+      return (
+        <View style={{ padding: 20, alignItems: 'center' }}>
+          <Text style={{ color: theme.colors.textSecondary, fontSize: 14 }}>
+            Searching...
+          </Text>
+        </View>
+      );
     }
 
-    const matchedBusinessParentCategoryNames = [...new Set(
-      matchingBusinessCategories
-        .filter(cat => cat.parentCategoryName)
-        .map(cat => cat.parentCategoryName)
-    )];
-
-    const matchedBusinessDirectNames = [...new Set(
-      matchingBusinessCategories
-        .filter(cat => !cat.parentCategoryName)
-        .map(cat => cat.name)
-    )];
-
-    const matchedGeneralParentCategoryNames = [...new Set(
-      matchingGeneralCategories
-        .filter(cat => cat.parentCategoryName)
-        .map(cat => cat.parentCategoryName)
-    )];
-
-    const matchedGeneralDirectNames = [...new Set(
-      matchingGeneralCategories
-        .filter(cat => !cat.parentCategoryName)
-        .map(cat => cat.name)
-    )];
-
-    const allMatchedParentCategoryNames = [...new Set([
-      ...matchedBusinessParentCategoryNames,
-      ...matchedBusinessDirectNames,
-      ...matchedGeneralParentCategoryNames,
-      ...matchedGeneralDirectNames
-    ])];
-
-    // Use existing hierarchicalResults (already normalized) + generalHierarchicalData
-    const combinedHierarchicalData = [
-      ...hierarchicalResults ? [hierarchicalResults] : [],
-      ...generalHierarchicalData
-    ];
-
-    return {
-      matchedNames: allMatchedParentCategoryNames,
-      hierarchicalData: combinedHierarchicalData
-    };
-  }, [isSearching, searchQuery, businessCategories, filteredGreetingCategoriesList, hierarchicalResults, generalHierarchicalData]);
-
-  // Fetch templates for general categories when hierarchical data changes
-  useEffect(() => {
-    const fetchGeneralCategoryTemplates = async () => {
-      if (!isSearching || searchQuery.trim() === '') return;
-      
-      const searchLower = searchQuery.toLowerCase().trim();
-      const matchingGeneralCategories = filteredGreetingCategoriesList.filter(category =>
-        category.name.toLowerCase().includes(searchLower) ||
-        (category.parentCategoryName && (
-          category.parentCategoryName.toLowerCase().includes(searchLower)
-        ))
+    if (Object.keys(groupedResults).length === 0) {
+      return (
+        <View style={{ padding: 20, alignItems: 'center' }}>
+          <Text style={{ color: theme.colors.textSecondary, fontSize: 14 }}>
+            No results found for "{searchQuery}"
+          </Text>
+        </View>
       );
+    }
 
-      if (matchingGeneralCategories.length === 0) return;
+    return (
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+        {Object.entries(groupedResults).map(([parentName, categories]) => (
+          <View key={parentName} style={{ marginBottom: 24 }}>
+            {/* Parent Category Header */}
+            <Text style={{ 
+              fontSize: 20, 
+              fontWeight: 'bold', 
+              color: theme.colors.text,
+              marginTop: 20,
+              marginBottom: 16,
+              paddingHorizontal: 16,
+              textTransform: 'capitalize'
+            }}>
+              {parentName}
+            </Text>
 
-      // Create hierarchical structure for general categories
-      const parentCategories = new Set<string>();
-      const childCategoriesMap = new Map<string, any[]>();
+            {/* Child Categories */}
+            {categories.map(category => (
+              <View key={category.id} style={{ marginBottom: 20 }}>
+                {/* Child Category Header */}
+                <View style={{ 
+                  flexDirection: 'row', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between',
+                  paddingHorizontal: 16,
+                  marginBottom: 12
+                }}>
+                  <Text style={{ 
+                    fontSize: 16, 
+                    fontWeight: '600', 
+                    color: theme.colors.text,
+                    marginTop: 10,
+                    textTransform: 'capitalize'
+                  }}>
+                    {category.name}
+                  </Text>
+                  <Text style={{ 
+                    fontSize: 12, 
+                    color: theme.colors.textSecondary,
+                    textTransform: 'uppercase'
+                  }}>
+                    {category.type}
+                  </Text>
+                </View>
 
-      matchingGeneralCategories.forEach(category => {
-        if (category.parentCategoryName) {
-          parentCategories.add(category.parentCategoryName);
-          if (!childCategoriesMap.has(category.parentCategoryName)) {
-            childCategoriesMap.set(category.parentCategoryName, []);
-          }
-          childCategoriesMap.get(category.parentCategoryName)!.push({
-            id: category.id,
-            name: category.name,
-            icon: category.icon,
-            imageUrl: category.imageUrl,
-            color: category.color,
-            templates: []
-          });
-        } else {
-          // Direct match (no parent) - don't add to parentCategories to avoid duplicates
-          // Parent category names are already handled by search results display logic
-        }
-      });
+                {/* Poster Grid */}
+                {category.posters.length > 0 ? (
+                  <FlatList
+                    data={category.posters}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    keyExtractor={(poster, index) => `${category.id}-${poster.id || index}`}
+                    renderItem={({ item: poster }) => {
+                      // Use TemplateCard for both business and general posters
+                      return (
+                        <TemplateCard
+                          item={poster}
+                          cardWidth={120}
+                          theme={theme}
+                          onPress={() => {
+                            // Handle poster press
+                            navigation.navigate('PosterPlayer', {
+                              selectedPoster: poster,
+                              relatedPosters: [],
+                            });
+                          }}
+                        />
+                      );
+                    }}
+                    contentContainerStyle={{ paddingHorizontal: 16 }}
+                  />
+                ) : (
+                  <View style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
+                    <Text style={{ 
+                      color: theme.colors.textSecondary, 
+                      fontSize: 12,
+                      fontStyle: 'italic'
+                    }}>
+                      No posters available
+                    </Text>
+                  </View>
+                )}
+              </View>
+            ))}
+          </View>
+        ))}
+      </ScrollView>
+    );
+  }, [isSearching, searchQuery, groupedResults, theme, navigation]);
 
-      const generalHierarchicalData = Array.from(parentCategories).map(parentName => ({
-        parentCategory: parentName,
-        categories: childCategoriesMap.get(parentName) || []
-      }));
-
-      // Fetch templates for each child category
-      const enhancedGeneralHierarchicalData = await Promise.all(
-        generalHierarchicalData.map(async (parentData) => {
-          const enhancedCategories = await Promise.all(
-            parentData.categories.map(async (childCategory) => {
-              try {
-                const categoryTemplates = await greetingTemplatesService.searchTemplates(childCategory.name);
-                return {
-                  ...childCategory,
-                  templates: categoryTemplates || []
-                };
-              } catch (error) {
-                if (__DEV__) {
-                  devWarn(`Failed to fetch templates for general category ${childCategory.name}:`, error);
-                }
-                return {
-                  ...childCategory,
-                  templates: []
-                };
-              }
-            })
-          );
-          return {
-            ...parentData,
-            categories: enhancedCategories
-          };
-        })
-      );
-
-      // Normalize general category data using the same function as business categories
-      const normalizedGeneralData = enhancedGeneralHierarchicalData.map(data => 
-        normalizeCategoryData(data, 'general')
-      );
-
-      // Update generalHierarchicalData with normalized general category data
-      setGeneralHierarchicalData(prevData => {
-        // Combine business and general hierarchical data
-        const businessData = prevData.filter(data => 
-          !normalizedGeneralData.some(generalData => generalData.parentCategory === data.parentCategory)
-        );
-        return [...businessData, ...normalizedGeneralData];
-      });
-    };
-
-    fetchGeneralCategoryTemplates();
-  }, [isSearching, searchQuery, filteredGreetingCategoriesList, normalizeCategoryData]);
-
+  
 
 
   const generalCategoryModalColumns = modalColumns;
@@ -2734,43 +2732,7 @@ const HomeScreen: React.FC = React.memo(() => {
     businessQuotesTemplatesRaw,
   ]);
 
-  // Enhanced category matching to include parent, main, and child categories
-  const getMatchingCategories = useCallback((searchLower: string, categories: any[]) => {
-    // Direct matches (category name or parent category name)
-    const directMatches = categories.filter(category =>
-      category.name.toLowerCase().includes(searchLower) ||
-      (category.parentCategoryName && (
-        category.parentCategoryName.toLowerCase().includes(searchLower)
-      ))
-    );
-
-    // Find parent categories that match search
-    const matchingParentNames = [...new Set(
-      directMatches
-        .filter(cat => cat.parentCategoryName)
-        .map(cat => cat.parentCategoryName.toLowerCase())
-    )];
-
-    // Include child categories of matching parents
-    const childCategoriesOfMatchingParents = categories.filter(category =>
-      category.parentCategoryName && 
-      matchingParentNames.includes(category.parentCategoryName.toLowerCase())
-    );
-
-    // Combine all matches and remove duplicates
-    const allMatches = [...new Set([...directMatches, ...childCategoriesOfMatchingParents])];
-    
-    if (__DEV__) {
-      console.log('🔍 [CATEGORY MATCHING] Search:', searchLower);
-      console.log('🔍 [CATEGORY MATCHING] Direct matches:', directMatches.map(c => c.name));
-      console.log('🔍 [CATEGORY MATCHING] Parent matches:', matchingParentNames);
-      console.log('🔍 [CATEGORY MATCHING] Child categories of parents:', childCategoriesOfMatchingParents.map(c => c.name));
-      console.log('🔍 [CATEGORY MATCHING] Total matches:', allMatches.map(c => c.name));
-    }
-    
-    return allMatches;
-  }, []);
-
+  
   // Lightweight hierarchy resolution for parent category search
   const getChildCategoriesForParent = useCallback((parentCategoryName: string, categories: any[]) => {
     return categories.filter(category => 
@@ -2778,37 +2740,7 @@ const HomeScreen: React.FC = React.memo(() => {
     );
   }, []);
 
-  /**
-   * Helper function to group an array of templates into SearchResultItem categories.
-   * This ensures consistent horizontal layout with headers for all search results.
-   */
-  const groupTemplatesByCategory = useCallback((templates: Template[]): SearchResultItem[] => {
-    if (!templates.length) return [];
-    
-    // Deduplicate templates by ID
-    const uniqueTemplates = Array.from(new Map(templates.map(t => [t.id, t])).values());
-    
-    // Group by category name
-    const grouped: Record<string, Template[]> = {};
-    uniqueTemplates.forEach(template => {
-      const catName = template.category || 'General';
-      if (!grouped[catName]) {
-        grouped[catName] = [];
-      }
-      grouped[catName].push(template);
-    });
-    
-    // Convert to SearchResultCategory items
-    return Object.keys(grouped).map(catName => ({
-      type: 'category',
-      data: {
-        name: catName,
-        type: catName.toLowerCase().includes('business') ? 'business' : 'general',
-        templates: grouped[catName]
-      }
-    }));
-  }, []);
-
+  
   /**
    * Helper function to detect if API response contains hierarchical data
    */
@@ -2875,380 +2807,82 @@ const HomeScreen: React.FC = React.memo(() => {
     return hierarchicalData.categories.flatMap(category => category.images);
   }, []);
 
-  // Debounced search handler - triggers search after user stops typing
+  // Clean search implementation - single pipeline
   useEffect(() => {
-    // If search query is empty, reset immediately (no debounce delay)
+    // Reset immediately if search is empty
     if (searchQuery.trim() === '') {
-      setTemplates([]);
+      setSearchResults([]);
       setIsSearching(false);
-      setDisableBackgroundUpdates(false);
       return;
     }
 
-    // For non-empty queries, apply debounce delay
-    const timeoutId = setTimeout(() => {
-      // Double-check query is still not empty (user might have cleared it during debounce)
-      if (searchQuery.trim() === '') {
-        setTemplates([]);
-        setIsSearching(false);
-        setDisableBackgroundUpdates(false);
-        return;
-      }
+    // Debounce search execution
+    const timeoutId = setTimeout(async () => {
+      if (searchQuery.trim() === '') return;
 
-      // Trigger search after debounce delay
-      const requestId = currentRequestId + 1;
-      setCurrentRequestId(requestId);
       setIsSearching(true);
-      setDisableBackgroundUpdates(true);
 
-      // Use local search immediately for better performance
-      // Search in name, category, description, and tags
-      const searchLower = searchQuery.toLowerCase().trim();
+      try {
+        // Filter categories that match the search query
+        const matchingBusinessCategories = filterCategories(businessCategories, searchQuery);
+        const matchingGeneralCategories = filterCategories(filteredGreetingCategoriesList, searchQuery);
 
-      // Check if search query matches any General Category name or parent category name
-      const matchingCategories = filteredGreetingCategoriesList.filter(category =>
-        category.name.toLowerCase().includes(searchLower) ||
-        (category.parentCategoryName && (
-          category.parentCategoryName.toLowerCase().includes(searchLower)
-        ))
-      );
-      const matchingCategoryNames = matchingCategories.map(category => category.name.toLowerCase());
+        // Fetch posters for each matched category
+        const fetchPostersForCategories = async () => {
+          const results: SearchCategoryResult[] = [];
 
-    // Check if search query matches any Business Category name or parent category name
-    const matchingBusinessCategories = businessCategories.filter(category =>
-      category.name.toLowerCase().includes(searchLower) ||
-      (category.parentCategoryName && (
-        category.parentCategoryName.toLowerCase().includes(searchLower)
-      ))
-    );
-    const matchingBusinessCategoryNames = matchingBusinessCategories.map(category => category.name.toLowerCase());
-
-      // ENHANCEMENT: Include child categories when parent is searched
-      const parentCategories = [...matchingCategories, ...matchingBusinessCategories];
-      const additionalChildCategories: any[] = [];
-      
-      parentCategories.forEach(parent => {
-        const childCategories = getChildCategoriesForParent(parent.name, [...filteredGreetingCategoriesList, ...businessCategories]);
-        additionalChildCategories.push(...childCategories);
-      });
-      
-      // Combine matching categories with their child categories
-      const allMatchingCategories = [...parentCategories, ...additionalChildCategories];
-      const allMatchingCategoryNames = allMatchingCategories.map(category => category.name.toLowerCase());
-
-      // Combine greeting templates, calendar posters, and business category previews for unified search
-      const allBusinessCategoryTemplates = Object.values(businessCategoryPreviews).flat();
-      const allTemplates = [...allGreetingTemplates, ...calendarPosters, ...allBusinessCategoryTemplates];
-
-      // First, show immediate local results
-      const filtered = allTemplates.filter(template => {
-        // Search in name
-        if (template.name?.toLowerCase().includes(searchLower)) return true;
-
-        // Search in category
-        if (template.category?.toLowerCase().includes(searchLower)) return true;
-
-        // Search in description
-        if (template.description?.toLowerCase().includes(searchLower)) return true;
-
-        // Search in tags array (including calendar posters tags) - EXCLUDE language tags
-        if (template.tags && Array.isArray(template.tags)) {
-          const tagMatch = template.tags.some((tag: string) => {
-            const tagLower = tag?.toLowerCase();
-            // Skip language tags to prevent language buttons from appearing in search
-            if (tagLower === 'english' || tagLower === 'hindi' || tagLower === 'all') {
-              return false;
-            }
-            if (tagLower?.includes(searchLower)) return true;
-            // Check if tag matches any matching category name
-            if (matchingCategoryNames.some(catName => tagLower?.includes(catName))) return true;
-            return false;
-          });
-          if (tagMatch) return true;
-        }
-
-        // Search in festival name for calendar posters
-        if ((template as any).festivalName && (template as any).festivalName.toLowerCase().includes(searchLower)) {
-          return true;
-        }
-
-        // Check if template category matches any General Category name (including child categories)
-        if (template.category && allMatchingCategoryNames.some(catName =>
-          template.category?.toLowerCase().includes(catName)
-        )) {
-          return true;
-        }
-
-        // Check if template category matches any Business Category name (including child categories)
-        if (template.category && allMatchingCategoryNames.some(catName =>
-          template.category?.toLowerCase().includes(catName)
-        )) {
-          return true;
-        }
-
-        return false;
-      });
-
-      // Remove duplicates based on id
-      const uniqueFiltered = Array.from(
-        new Map(filtered.map(template => [template.id, template])).values()
-      );
-
-      // Group all templates by category for consistent horizontal display
-      let structuredResults = groupTemplatesByCategory(uniqueFiltered);
-
-      // Prioritize categories that match search query (including parent-child hierarchy)
-      structuredResults.sort((a, b) => {
-        if (a.type !== 'category' || b.type !== 'category') return 0;
-        const aMatches = allMatchingCategoryNames.includes(a.data.name.toLowerCase());
-        const bMatches = allMatchingCategoryNames.includes(b.data.name.toLowerCase());
-        if (aMatches && !bMatches) return -1;
-        if (!aMatches && bMatches) return 1;
-        return 0;
-      });
-
-      // Set initial results immediately
-      setTemplates(structuredResults);
-      
-      // Update hierarchicalResults for UI compatibility
-      if (allMatchingCategories.length > 0) {
-        // Create hierarchical structure from filtered results
-        const hierarchicalStructure = {
-          parentCategory: allMatchingCategories[0].name,
-          categories: allMatchingCategories.map(cat => ({
-            id: cat.id,
-            name: cat.name,
-            templates: uniqueFiltered.filter(template => 
-              template.category?.toLowerCase() === cat.name.toLowerCase()
-            ),
-            icon: cat.icon,
-            imageUrl: cat.imageUrl,
-            color: cat.color
-          }))
-        };
-        setHierarchicalResults(hierarchicalStructure);
-        setIsHierarchical(true);
-      } else {
-        // Clear hierarchical results when no categories match
-        setHierarchicalResults(null);
-        setIsHierarchical(false);
-      }
-
-      // Then fetch General Category templates if search matches a category and update results
-      if (allMatchingCategories.length > 0) {
-        (async () => {
-          try {
-            // Fetch General Category templates (including child categories)
-            const generalCategoryResultsPromises = allMatchingCategories.map(async (category) => {
-              try {
-                const categoryTemplates = await greetingTemplatesService.searchTemplates(category.name);
-                return categoryTemplates.map(t => ({ ...t, category: category.name }));
-              } catch (error) {
-                if (__DEV__) {
-                  devWarn(`Failed to search category ${category.name}:`, error);
-                }
-                return [];
-              }
-            });
-
-            // Fetch Business Category templates (including child categories)
-            const businessCategoryResultsPromises = allMatchingCategories.map(async (category) => {
-              try {
-                const categoryTemplates = await businessCategoryPostersApi.getPostersByCategory(category.name, 50);
-                return categoryTemplates.success && categoryTemplates.data?.posters ? categoryTemplates.data.posters : [];
-              } catch (error) {
-                if (__DEV__) {
-                  devWarn(`Failed to search business category ${category.name}:`, error);
-                }
-                return [];
-              }
-            });
-
-            const [generalCategoryResultsArrays, businessCategoryResultsArrays] = await Promise.all([
-              Promise.all(generalCategoryResultsPromises),
-              Promise.all(businessCategoryResultsPromises)
-            ]);
-
-            const generalCategoryResults = generalCategoryResultsArrays.flat();
-            const businessCategoryResults = businessCategoryResultsArrays.flat();
-
-            // Convert general category results to Template format
-            const convertedGeneralCategoryResults = generalCategoryResults.map(greetingTemplate => ({
-              id: greetingTemplate.id,
-              name: greetingTemplate.name || '',
-              thumbnail: greetingTemplate.thumbnail || '',
-              category: greetingTemplate.category || 'Greeting',
-              downloads: greetingTemplate.downloads || 0,
-              isDownloaded: greetingTemplate.isDownloaded || false,
-              description: greetingTemplate.content?.text || '',
-              tags: (greetingTemplate as any).tags || [],
-              isGreeting: true,
-              originalTemplate: greetingTemplate,
-            }));
-
-            // Convert business category results to Template format
-            const convertedBusinessCategoryResults = businessCategoryResults.map((poster: any) => ({
-              id: poster.id,
-              name: poster.title || poster.name || 'Business Poster',
-              thumbnail: poster.thumbnail || poster.image || '',
-              category: poster.category || 'Business',
-              downloads: poster.downloads || 0,
-              isDownloaded: false,
-              description: poster.description || '',
-              tags: Array.isArray(poster.tags) ? poster.tags : [],
-              isGreeting: false,
-              isBusiness: true,
-              originalTemplate: poster,
-            }));
-
-            // Combine with existing results and remove duplicates
-            const allResults = [...uniqueFiltered, ...convertedGeneralCategoryResults, ...convertedBusinessCategoryResults];
-            const finalUniqueResults = Array.from(
-              new Map(allResults.map(template => [template.id, template])).values()
-            );
-
-            // Group all templates by category for consistent horizontal display
-            const structuredResults = groupTemplatesByCategory(finalUniqueResults);
-
-            if (currentRequestId === requestId) {
-              setTemplates(structuredResults);
-              
-              // Update hierarchicalResults with API data for UI compatibility
-              if (allMatchingCategories.length > 0) {
-                const apiHierarchicalStructure = {
-                  parentCategory: allMatchingCategories[0].name,
-                  categories: allMatchingCategories.map(cat => ({
-                    id: cat.id,
-                    name: cat.name,
-                    templates: finalUniqueResults.filter(template => 
-                      template.category?.toLowerCase() === cat.name.toLowerCase()
-                    ),
-                    icon: cat.icon,
-                    imageUrl: cat.imageUrl,
-                    color: cat.color
-                  }))
-                };
-                setHierarchicalResults(apiHierarchicalStructure);
-                setIsHierarchical(true);
-              }
-            }
-          } catch (error) {
-            if (__DEV__) {
-              devWarn('Failed to fetch General Category templates:', error);
-            }
-          }
-        })();
-      }
-
-      // Try API search in background
-      setTimeout(async () => {
-        if (currentRequestId !== requestId) return;
-        try {
-          // Search greeting templates via API
-          const greetingResults = await greetingTemplatesService.searchTemplates(searchQuery);
-
-          // Check if search query matches any General Category name or parent category name
-          const searchLower = searchQuery.toLowerCase().trim();
-          const matchingCategories = filteredGreetingCategoriesList.filter(category =>
-            category.name.toLowerCase().includes(searchLower) ||
-            (category.parentCategoryName && (
-              category.parentCategoryName.toLowerCase().includes(searchLower)
-            ))
-          );
-
-          // Search for templates in matching General Categories
-          const generalCategoryResultsPromises = matchingCategories.map(async (category) => {
+          // Business categories
+          for (const category of matchingBusinessCategories) {
             try {
-              const categoryTemplates = await greetingTemplatesService.searchTemplates(category.name);
-              return categoryTemplates.map(t => ({ ...t, category: category.name }));
-            } catch (error) {
-              if (__DEV__) {
-                devWarn(`Failed to search category ${category.name}:`, error);
-              }
-              return [];
-            }
-          });
-
-          const generalCategoryResultsArrays = await Promise.all(generalCategoryResultsPromises);
-          const generalCategoryResults = generalCategoryResultsArrays.flat();
-
-          // Convert greeting results to Template format
-          const convertedGreetingResults = greetingResults.map(greetingTemplate => ({
-            id: greetingTemplate.id,
-            name: greetingTemplate.name || '',
-            thumbnail: greetingTemplate.thumbnail || '',
-            category: greetingTemplate.category || 'Greeting',
-            downloads: greetingTemplate.downloads || 0,
-            isDownloaded: greetingTemplate.isDownloaded || false,
-            description: greetingTemplate.content?.text || '',
-            tags: (greetingTemplate as any).tags || [],
-            isGreeting: true,
-            originalTemplate: greetingTemplate,
-          }));
-
-          // Convert general category results to Template format
-          const convertedGeneralCategoryResults = generalCategoryResults.map(greetingTemplate => ({
-            id: greetingTemplate.id,
-            name: greetingTemplate.name || '',
-            thumbnail: greetingTemplate.thumbnail || '',
-            category: greetingTemplate.category || 'Greeting',
-            downloads: greetingTemplate.downloads || 0,
-            isDownloaded: greetingTemplate.isDownloaded || false,
-            description: greetingTemplate.content?.text || '',
-            tags: (greetingTemplate as any).tags || [],
-            isGreeting: true,
-            originalTemplate: greetingTemplate,
-          }));
-
-          // Combine results and remove duplicates based on id
-          const allResults = [...convertedGreetingResults, ...convertedGeneralCategoryResults];
-          const uniqueApiResults = Array.from(
-            new Map(allResults.map(template => [template.id, template])).values()
-          );
-
-          if (currentRequestId === requestId) {
-            // Merge API results with existing local results, preserving local results
-            if (currentRequestId === requestId) {
-              setTemplates(prevTemplates => {
-                // Group new API results using the unified helper
-                const structuredApiResults = groupTemplatesByCategory(uniqueApiResults);
-                
-                const combinedResults = [...prevTemplates, ...structuredApiResults];
-                
-                // Deduplicate categories by merging their templates
-                const categoryMap = new Map<string, SearchResultCategory>();
-                
-                combinedResults.forEach(item => {
-                  if (item.type === 'category') {
-                    const existing = categoryMap.get(item.data.name);
-                    if (existing) {
-                      // Merge templates into existing category
-                      const merged = [...existing.data.templates, ...item.data.templates];
-                      existing.data.templates = Array.from(new Map(merged.map(t => [t.id, t])).values());
-                    } else {
-                      // Clone to avoid accidental mutations of existing items in prevTemplates
-                      categoryMap.set(item.data.name, JSON.parse(JSON.stringify(item)));
-                    }
-                  }
-                });
-                
-                return Array.from(categoryMap.values());
+              const response = await businessCategoryPostersApi.getPostersByCategory(category.name, 50);
+              const posters = response.success && response.data?.posters ? response.data.posters : [];
+              
+              results.push({
+                id: category.id,
+                name: category.name,
+                type: 'business',
+                posters,
+                parentCategoryName: category.parentCategoryName
               });
+            } catch (error) {
+              if (__DEV__) devWarn(`Failed to fetch business category ${category.name}:`, error);
             }
           }
-        } catch (error) {
-          if (__DEV__) {
-            if (__DEV__) {
-              devError('Search error:', error);
-            }
-          }
-        }
-      }, 100);
-    }, 300); // 300ms debounce delay
 
-    // Cleanup timeout on unmount or when searchQuery changes
+          // General categories  
+          for (const category of matchingGeneralCategories) {
+            try {
+              const templates = await greetingTemplatesService.searchTemplates(category.name);
+              
+              results.push({
+                id: category.id,
+                name: category.name,
+                type: 'general',
+                posters: templates || [],
+                parentCategoryName: category.parentCategoryName
+              });
+            } catch (error) {
+              if (__DEV__) devWarn(`Failed to fetch general category ${category.name}:`, error);
+            }
+          }
+
+          return results;
+        };
+
+        const results = await fetchPostersForCategories();
+        setSearchResults(results);
+
+      } catch (error) {
+        if (__DEV__) devError('Search error:', error);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+
+    }, 300); // 300ms debounce
+
     return () => clearTimeout(timeoutId);
-  }, [searchQuery, allGreetingTemplates, calendarPosters, currentRequestId, filteredGreetingCategoriesList, businessCategories, businessCategoryPreviews, getChildCategoriesForParent, groupTemplatesByCategory]);
+  }, [searchQuery, businessCategories, filteredGreetingCategoriesList, filterCategories]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -3288,210 +2922,32 @@ const HomeScreen: React.FC = React.memo(() => {
   }, []);
 
 
-  const handleDownloadTemplate = useCallback(async (templateId: string) => {
-    // Update local state immediately for better UX
-    setTemplates(prev => prev.map(item =>
-      item.type === 'template' && item.data.id === templateId
-        ? { 
-            ...item, 
-            data: { 
-              ...item.data, 
-              isDownloaded: true, 
-              downloads: item.data.downloads + 1 
-            } 
-          }
-        : item
-    ));
+  // const handleDownloadTemplate = useCallback(async (templateId: string) => {
+  //   // Update local state immediately for better UX
+  //   setTemplates(prev => prev.map(item =>
+  //     item.type === 'template' && item.data.id === templateId
+  //       ? { 
+  //           ...item, 
+  //           data: { 
+  //             ...item.data, 
+  //             isDownloaded: true, 
+  //             downloads: item.data.downloads + 1 
+  //           } 
+  //         }
+  //       : item
+  //   ));
 
-    // Try API call in background
-    setTimeout(async () => {
-      try {
-        await dashboardService.downloadTemplate(templateId);
-      } catch (error) {
-        if (__DEV__) {
-          devError('Error downloading template:', error);
-        }
-      }
-    }, 100);
-  }, []);
-
-  const handleSearch = useCallback(async () => {
-    const requestId = currentRequestId + 1;
-    setCurrentRequestId(requestId);
-
-    if (!searchQuery.trim()) {
-      setIsSearching(false);
-      setDisableBackgroundUpdates(false); // Re-enable background updates when clearing search
-      setTemplates([]);
-      return;
-    }
-
-    setIsSearching(true);
-    setDisableBackgroundUpdates(true); // Disable background updates when searching
-    // Use local search immediately for better performance with API data
-    const searchLower = searchQuery.toLowerCase().trim();
-
-    // Check if search query matches any General Category name or parent category name
-    const matchingCategoryNames = filteredGreetingCategoriesList
-      .filter(category =>
-        category.name.toLowerCase().includes(searchLower) ||
-        (category.parentCategoryName && (
-          category.parentCategoryName.toLowerCase().includes(searchLower)
-        ))
-      )
-      .map(category => category.name.toLowerCase());
-
-    // Check if search query matches any Business Category name or parent category name
-    const matchingBusinessCategories = businessCategories.filter(category =>
-      category.name.toLowerCase().includes(searchLower) ||
-      (category.parentCategoryName && (
-        category.parentCategoryName.toLowerCase().includes(searchLower)
-      ))
-    );
-    const matchingBusinessCategoryNames = matchingBusinessCategories.map(category => category.name.toLowerCase());
-
-    // Local search removed - only API search for greeting templates
-    setTemplates([]);
-
-    // Try API search in background
-    setTimeout(async () => {
-      // Check if this is still the current request
-      if (currentRequestId !== requestId) return;
-
-      try {
-        const results = await dashboardService.searchTemplates(searchQuery);
-
-        // Check if response contains hierarchical data
-        if (isHierarchicalResponse(results)) {
-          // Handle hierarchical response with unified normalization
-          if (currentRequestId === requestId && isSearching) {
-            const businessHierarchicalData = results as { data: { parentCategory: string; categories: any[] } };
-            const normalizedBusinessData = normalizeCategoryData(businessHierarchicalData.data, 'business');
-            setHierarchicalResults(normalizedBusinessData);
-            setIsHierarchical(true);
-            setTemplates([]); // Clear flat results
-          }
-          return;
-        }
-
-        // Handle flat array response (mock service returns Template[])
-        if (Array.isArray(results)) {
-          setIsHierarchical(false);
-          setHierarchicalResults(null);
-          
-          // Convert Template[] to SearchResultItem[] format
-          const searchResults: SearchResultItem[] = results.map(template => ({
-            type: 'template' as const,
-            data: template
-          }));
-          
-          if (currentRequestId === requestId && isSearching) {
-            setTemplates(searchResults);
-          }
-          return;
-        }
-
-        // Continue with existing flat response handling
-        setIsHierarchical(false);
-        setHierarchicalResults(null);
-
-        // Search for templates in matching General Categories
-        const generalCategoryResultsPromises = matchingCategoryNames.map(async (categoryName) => {
-          try {
-            const categoryTemplates = await greetingTemplatesService.searchTemplates(categoryName);
-            return categoryTemplates;
-          } catch (error) {
-            if (__DEV__) {
-              devWarn(`Failed to search category ${categoryName}:`, error);
-            }
-            return [];
-          }
-        });
-
-        // Search for templates in matching Business Categories
-        const businessCategoryResultsPromises = matchingBusinessCategoryNames.map(async (categoryName) => {
-          try {
-            const categoryTemplates = await businessCategoryPostersApi.getPostersByCategory(categoryName, 50);
-            return categoryTemplates.success && categoryTemplates.data?.posters ? categoryTemplates.data.posters : [];
-          } catch (error) {
-            if (__DEV__) {
-              devWarn(`Failed to search business category ${categoryName}:`, error);
-            }
-            return [];
-          }
-        });
-
-        const [generalCategoryResultsArrays, businessCategoryResultsArrays] = await Promise.all([
-          Promise.all(generalCategoryResultsPromises),
-          Promise.all(businessCategoryResultsPromises)
-        ]);
-
-        const generalCategoryResults = generalCategoryResultsArrays.flat();
-        const businessCategoryResults = businessCategoryResultsArrays.flat();
-
-        // Convert general category results to Template format
-        const convertedGeneralCategoryResults = generalCategoryResults.map(greetingTemplate => ({
-          id: greetingTemplate.id,
-          name: greetingTemplate.name || '',
-          thumbnail: greetingTemplate.thumbnail || '',
-          category: greetingTemplate.category || 'Greeting',
-          downloads: greetingTemplate.downloads || 0,
-          isDownloaded: greetingTemplate.isDownloaded || false,
-          description: greetingTemplate.content?.text || '',
-          tags: (greetingTemplate as any).tags || [],
-          isGreeting: true,
-          isBusiness: false,
-          originalTemplate: greetingTemplate,
-        }));
-
-        // Convert business category results to Template format
-        const convertedBusinessCategoryResults = businessCategoryResults.map((poster: any) => ({
-          id: poster.id,
-          name: poster.title || poster.name || 'Business Poster',
-          thumbnail: poster.thumbnail || poster.image || '',
-          category: poster.category || 'Business',
-          downloads: poster.downloads || 0,
-          isDownloaded: false,
-          description: poster.description || '',
-          tags: Array.isArray(poster.tags) ? poster.tags : [],
-          isGreeting: false,
-          isBusiness: true,
-          originalTemplate: poster,
-        }));
-
-        // Combine results and remove duplicates
-        const allResults = [
-          ...convertedGeneralCategoryResults,
-          ...convertedBusinessCategoryResults
-        ];
-        const uniqueResults = Array.from(
-          new Map(allResults.map(template => [template.id, template])).values()
-        );
-
-        // Group unique results by their actual category name for horizontal display
-        const searchResultItems = groupTemplatesByCategory(uniqueResults);
-
-        // Only update if this is still the current request and we're still searching
-        if (currentRequestId === requestId && isSearching) {
-          // Merge API results with existing local results, preserving local results
-          setTemplates(prevTemplates => {
-            const combinedResults = [...prevTemplates, ...searchResultItems];
-            
-            // Deduplicate by creating a Map with proper typing
-            const dedupMap = new Map<string, SearchResultItem>();
-            combinedResults.forEach(item => {
-              const key = item.type === 'template' ? item.data.id : item.data.name;
-              dedupMap.set(key, item);
-            });
-            
-            return Array.from(dedupMap.values());
-          });
-        }
-      } catch (error) {
-        devError('Search error:', error);
-      }
-    }, 100);
-  }, [searchQuery, activeTab, currentRequestId, isSearching, filteredGreetingCategoriesList, businessCategories]);
+  //   // Try API call in background
+  //   setTimeout(async () => {
+  //     try {
+  //       await dashboardService.downloadTemplate(templateId);
+  //     } catch (error) {
+  //       if (__DEV__) {
+  //         devError('Error downloading template:', error);
+  //       }
+  //     }
+  //   }, 100);
+  // }, []);
 
   // Memoized lookup maps for O(1) access instead of O(n) find operations
   const videoContentMap = useMemo(() => {
@@ -3666,8 +3122,7 @@ const HomeScreen: React.FC = React.memo(() => {
         // When closing search, clear search query and reset
         setSearchQuery('');
         setIsSearching(false);
-        setDisableBackgroundUpdates(false);
-        setTemplates([]);
+        setSearchResults([]);
         return false;
       }
     });
@@ -3901,53 +3356,7 @@ const HomeScreen: React.FC = React.memo(() => {
 
 
 
-  const renderTemplate = useCallback(({ item }: { item: SearchResultItem }) => {
-    if (item.type === 'category') {
-      // Render category header with templates
-      return (
-        <View style={styles.searchCategoryContainer}>
-          <Text style={[styles.searchCategoryTitle, { color: theme.colors.text }]}>
-            {item.data.name}
-          </Text>
-          <FlatList
-            data={item.data.templates}
-            renderItem={({ item: template }) => (
-              <TemplateCard
-                item={template}
-                cardWidth={cardWidth}
-                theme={theme}
-                onPress={handleTemplatePress}
-              />
-            )}
-            keyExtractor={(template) => template.id}
-            horizontal={true}
-            showsHorizontalScrollIndicator={false}
-            nestedScrollEnabled={true}
-            removeClippedSubviews={true}
-            maxToRenderPerBatch={3}
-            windowSize={2}
-            initialNumToRender={3}
-            updateCellsBatchingPeriod={150}
-            getItemLayout={getItemLayout}
-            contentContainerStyle={styles.horizontalList}
-          />
-        </View>
-      );
-    } else {
-      // Render individual template in vertical layout
-      return (
-        <View style={styles.verticalTemplateContainer}>
-          <TemplateCard
-            item={item.data}
-            cardWidth={cardWidth}
-            theme={theme}
-            onPress={handleTemplatePress}
-          />
-        </View>
-      );
-    }
-  }, [handleTemplatePress, theme, cardWidth]);
-
+  
   // Render function for hierarchical search results
   const renderHierarchicalItem = useCallback(({ item }: { item: HierarchicalSearchItem }) => {
     switch (item.type) {
@@ -5580,7 +4989,6 @@ const HomeScreen: React.FC = React.memo(() => {
                 onChangeText={setSearchQuery}
                 autoFocus={true}
                 returnKeyType="search"
-                onSubmitEditing={handleSearch}
                 blurOnSubmit={true}
               />
               {searchQuery.length > 0 && (
@@ -5588,8 +4996,7 @@ const HomeScreen: React.FC = React.memo(() => {
                   onPress={() => {
                     setSearchQuery('');
                     setIsSearching(false);
-                    setDisableBackgroundUpdates(false);
-                    setTemplates([]);
+                    setSearchResults([]);
                   }}
                   style={styles.clearIcon}
                 >
@@ -5844,127 +5251,10 @@ const HomeScreen: React.FC = React.memo(() => {
           </View> */}
 
 
-          {/* Search Results - Shown only when searching */}
-          {isSearching && searchQuery.trim() !== '' && (() => {
-            const searchLower = searchQuery.toLowerCase().trim();
-            const matchingCategories = filteredGreetingCategoriesList.filter(category =>
-              category.name.toLowerCase().includes(searchLower) ||
-              (category.parentCategoryName && (
-                category.parentCategoryName.toLowerCase().includes(searchLower)
-              ))
-            );
-
-            // Add business category matching using same pattern as general categories
-            const matchingBusinessCategories = businessCategories.filter(category =>
-              category.name.toLowerCase().includes(searchLower) ||
-              (category.parentCategoryName && (
-                category.parentCategoryName.toLowerCase().includes(searchLower)
-              ))
-            );
-
-            // Extract parent category names from both general and business categories
-            const matchedGeneralParentNames = [...new Set(
-              matchingCategories
-                .filter(cat => cat.parentCategoryName)
-                .map(cat => cat.parentCategoryName)
-            )];
-            const matchedBusinessParentNames = [...new Set(
-              matchingBusinessCategories
-                .filter(cat => cat.parentCategoryName)
-                .map(cat => cat.parentCategoryName)
-            )];
-
-            // Also include direct category names if they don't have parents (fallback)
-            const matchedGeneralDirectNames = [...new Set(
-              matchingCategories
-                .filter(cat => !cat.parentCategoryName)
-                .map(cat => cat.name)
-            )];
-            const matchedBusinessDirectNames = [...new Set(
-              matchingBusinessCategories
-                .filter(cat => !cat.parentCategoryName)
-                .map(cat => cat.name)
-            )];
-
-            // Combine all matched category names (prioritize parent names)
-            const allMatchedNames = [...new Set([
-              ...matchedGeneralParentNames,
-              ...matchedBusinessParentNames,
-              ...matchedGeneralDirectNames,
-              ...matchedBusinessDirectNames
-            ])];
-
-            return (
-              <>
-                  
-                  {/* Show matching category names */}
-                  {allMatchedNames.length > 0 && (
-                    <View style={styles.matchedCategoryNameContainer}>
-                      <Text style={[styles.matchedCategoryNameText, { color: theme.colors.text, fontWeight: 'bold' }]}>
-                        {allMatchedNames.join(', ')}
-                      </Text>
-                    </View>
-                  )}
-                                    
-                  {/* Render hierarchical results if available */}
-                  {hierarchicalDisplayData.hierarchicalData.length > 0 ? (
-                    <FlatList
-                      data={hierarchicalDisplayData.hierarchicalData.flatMap((data: any) => {
-              // Check if this is general category data by checking if it has the structure from normalizedGeneralData
-              const isGeneralCategory = data.categories && data.categories.length > 0 && 
-                data.categories[0] && data.categories[0].templates !== undefined;
-              
-              return convertHierarchicalToSearchResults(data, isGeneralCategory);
-            })}
-                      renderItem={renderHierarchicalItem}
-                      keyExtractor={(item, index) => 
-                        item.type === 'parentCategory' 
-                          ? `parent-${item.data.name}-${index}` 
-                          : item.type === 'childCategory'
-                          ? `child-${item.data.name}-${index}`
-                          : `template-${item.data.id}`
-                      }
-                      horizontal={false}
-                      showsVerticalScrollIndicator={false}
-                      nestedScrollEnabled={true}
-                      removeClippedSubviews={true}
-                      maxToRenderPerBatch={5}
-                      windowSize={5}
-                      initialNumToRender={3}
-                      updateCellsBatchingPeriod={150}
-                      contentContainerStyle={styles.verticalSearchList}
-                    />
-                  ) : templates.length > 0 ? (
-                    <FlatList
-                      key={`search-results-${templates.length}`}
-                      data={templates}
-                      renderItem={renderTemplate}
-                      keyExtractor={(item, index) => 
-                        item.type === 'category' 
-                          ? `category-${item.data.name}-${index}` 
-                          : `template-${item.data.id}`
-                      }
-                      horizontal={false}
-                      showsVerticalScrollIndicator={false}
-                      nestedScrollEnabled={true}
-                      removeClippedSubviews={true}
-                      maxToRenderPerBatch={5}
-                      windowSize={5}
-                      initialNumToRender={3}
-                      updateCellsBatchingPeriod={150}
-                      contentContainerStyle={styles.verticalSearchList}
-                    />
-                  ) : matchingCategories.length === 0 ? (
-                    <View style={{ padding: 20, alignItems: 'center' }}>
-                      <Text style={{ color: theme.colors.textSecondary, fontSize: 14 }}>
-                        No results found for "{searchQuery}"
-                      </Text>
-                    </View>
-                  ) : null}
-              </>
-            );
-          })()}
-
+          
+          {/* Unified Search Results - Shown only when searching */}
+          {renderSearchResults()}
+          
           {/* Video Section - Hidden when searching */}
           {!isSearching && searchQuery.trim() === '' && videoContent.length > 0 && (
             <View style={styles.videoSection}>
