@@ -382,7 +382,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
   const { selectedImage, selectedLanguage, selectedTemplateId, selectedBusinessProfile: selectedBusinessProfileParam } = route.params;
   const { isSubscribed, checkPremiumAccess, refreshSubscription, isSubscriptionActive } = useSubscription();
   const { isDarkMode, theme } = useTheme();
-  const { selectedBusinessProfile } = useBusinessProfile();
+  const { selectedBusinessProfile, selectedBusinessCategory, selectedBusinessId } = useBusinessProfile();
   
   // Check if the selected business profile has an active subscription
   const isActive = selectedBusinessProfile?.subscriptionStatus?.toUpperCase() === "ACTIVE" || isSubscriptionActive;

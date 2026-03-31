@@ -1,0 +1,336 @@
+POSTER NAVIGATION BUSINESS VALIDATION ANALYSIS
+================================================
+
+1. SYSTEM OVERVIEW
+----------------
+
+The mobile application implements a Business Category Poster Generator Flow with navigation:
+HomeScreen → PosterPlayerScreen → PosterEditorScreen → PosterPreviewScreen
+
+A business validation rule must be enforced before navigating from PosterEditorScreen to PosterPreviewScreen:
+- User can proceed only if: selectedBusinessProfile.category == clickedBusinessCategory AND selectedBusinessProfile.subscriptionStatus == "ACTIVE"
+- Otherwise, redirect to BusinessProfilesScreen
+
+2. NAVIGATION GRAPH
+-----------------
+
+HomeScreen
+├──→ PosterPlayerScreen (with businessCategory parameter)
+│   ├──→ PosterEditorScreen (with selectedBusinessProfile)
+│   │   ├──→ PosterPreviewScreen (if validation passes)
+│   │   └──→ BusinessProfilesScreen (if validation fails)
+│   └──→ [Back to HomeScreen]
+└──→ [Other navigation paths]
+
+Navigation Library: React Navigation with Stack Navigator
+Navigation Types: Defined in src/navigation/types.ts (MainStackParamList)
+
+3. HOMESCREEN ANALYSIS
+---------------------
+
+Business Category Rendering:
+- Categories displayed via BusinessCategoriesSection component
+- Categories fetched from businessCategoriesService
+- Category data structure: BusinessCategory { id, name, icon, imageUrl, color }
+
+Category Selection Handler:
+- Function: handleBusinessCategoryPress() (lines 4154-4217)
+- Navigation call: navigation.navigate('PosterPlayer', { ...params })
+
+Navigation Parameters Passed:
+```typescript
+{
+  selectedPoster: Template,
+  relatedPosters: Template[],
+  searchQuery: string,
+  templateSource: 'professional', // Indicates business category access
+  businessCategory: category.name, // KEY: clickedBusinessCategory
+  posterLimit: number
+}
+```
+
+Key Finding: businessCategory parameter contains the clicked business category name
+
+4. POSTER PLAYER SCREEN ANALYSIS
+-------------------------------
+
+Route Parameters Received:
+```typescript
+const {
+  selectedPoster,
+  relatedPosters,
+  businessCategory,           // From HomeScreen
+  greetingCategory,
+  originScreen,
+  posterLimit,
+  selectedBusinessProfile: initialBusinessProfile,
+} = route.params;
+```
+
+Business Profile Access:
+- Context: useBusinessProfile() hook provides globalSelectedProfile
+- Fallback: initialBusinessProfile from navigation params
+- Active Profile: globalSelectedProfile || initialBusinessProfile
+
+Next Button Handler:
+- Function: handleNextPress() → navigateToPosterEditor()
+- Navigation: navigation.navigate('PosterEditor', { ...params })
+
+Parameters Forwarded to PosterEditor:
+```typescript
+{
+  selectedImage: { uri, title, description },
+  selectedLanguage: string,
+  selectedTemplateId: string,
+  selectedBusinessProfile: activeBusinessProfile
+}
+```
+
+CRITICAL ISSUE: businessCategory from HomeScreen is NOT forwarded to PosterEditorScreen
+
+5. POSTER EDITOR SCREEN ANALYSIS
+---------------------------------
+
+Route Parameters Received:
+```typescript
+const { 
+  selectedImage, 
+  selectedLanguage, 
+  selectedTemplateId, 
+  selectedBusinessProfile: selectedBusinessProfileParam 
+} = route.params;
+```
+
+Business Profile State:
+- Context: useBusinessProfile() provides selectedBusinessProfile
+- Parameter: selectedBusinessProfileParam from navigation
+- Active Profile: Context takes priority over parameter
+
+Next Button Location:
+- Lines 2625-2782: TouchableOpacity with Next button
+- onPress handler: async () => { ...navigation logic }
+
+Current Navigation Logic:
+```typescript
+// Current subscription check only
+if (!isSubscribed || !isSubscriptionActive) {
+  setShowPremiumModal(true);
+  return;
+}
+
+// Navigate to PosterPreview
+(navigation as any).navigate('PosterPreview', {
+  capturedImageUri: uri,
+  selectedImage: selectedImage,
+  selectedLanguage: selectedLanguage,
+  selectedTemplateId: selectedTemplateId,
+  selectedBusinessProfile: activeBusinessProfile,
+  isSubscribed: isSubscribed,
+});
+```
+
+VALIDATION IMPLEMENTATION POINT:
+- File: src/screens/PosterEditorScreen.tsx
+- Function: Next button onPress handler (lines 2628-2772)
+- Optimal location: After subscription check, before navigation (around line 2635)
+
+6. BUSINESS PROFILE STATE SOURCE
+-------------------------------
+
+Primary Storage: React Context (BusinessProfileContext)
+- Context Provider: BusinessProfileProvider
+- Hook: useBusinessProfile()
+- AsyncStorage: '@selected_business_profile' key
+- API Service: businessProfileService.getUserBusinessProfiles()
+
+BusinessProfile Structure:
+```typescript
+interface BusinessProfile {
+  id: string;
+  name: string;
+  description: string;
+  category: string;              // KEY: Business category
+  subCategory?: string;
+  address: string;
+  phone: string;
+  email: string;
+  services: string[];
+  subscriptionStatus?: string;    // KEY: "ACTIVE", "NONE", "PENDING", "EXPIRED"
+  isSubscriptionActive?: boolean; // Quick boolean check
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+7. DATA FLOW TRACE
+-----------------
+
+clickedBusinessCategory Flow:
+HomeScreen (handleBusinessCategoryPress) 
+  ↓ businessCategory parameter
+PosterPlayerScreen (route.params.businessCategory)
+  ↓ [NOT FORWARDED] ❌ DATA LOSS
+PosterEditorScreen (UNAVAILABLE)
+
+selectedBusinessProfile Flow:
+PosterPlayerScreen (activeBusinessProfile)
+  ↓ selectedBusinessProfile parameter
+PosterEditorScreen (route.params.selectedBusinessProfile)
+  ↓ Available for validation ✅
+
+8. MISSING DATA ISSUES
+---------------------
+
+Issue 1: clickedBusinessCategory Not Available in PosterEditorScreen
+- Root Cause: PosterPlayerScreen does not forward businessCategory parameter
+- Impact: Cannot perform category matching validation
+- Fix Required: Forward businessCategory from PosterPlayerScreen to PosterEditorScreen
+
+Issue 2: Navigation Type Mismatch
+- Current: (navigation as any).navigate('PosterPreview')
+- Should Be: Properly typed navigation call
+
+9. RECOMMENDED VALIDATION IMPLEMENTATION
+---------------------------------------
+
+Location: PosterEditorScreen.tsx, Next button onPress handler (around line 2635)
+
+Required Code Structure:
+```typescript
+// After existing subscription check (line 2634)
+if (!isSubscribed || !isSubscriptionActive) {
+  setShowPremiumModal(true);
+  return;
+}
+
+// NEW VALIDATION LOGIC
+const clickedCategory = route.params.businessCategory; // Will be available after fix
+const profileCategory = activeBusinessProfile?.category;
+const subscriptionStatus = activeBusinessProfile?.subscriptionStatus;
+
+if (!clickedCategory || !profileCategory || !subscriptionStatus) {
+  console.error('Missing validation data:', { clickedCategory, profileCategory, subscriptionStatus });
+  navigation.navigate('BusinessProfiles');
+  return;
+}
+
+if (profileCategory === clickedCategory && subscriptionStatus === 'ACTIVE') {
+  // Proceed to PosterPreview (existing logic)
+} else {
+  // Redirect to BusinessProfilesScreen
+  navigation.navigate('BusinessProfiles');
+  return;
+}
+```
+
+10. EDGE CASES
+--------------
+
+Case 1: No Business Profile Selected
+- Detection: activeBusinessProfile is null/undefined
+- Handling: Navigate to BusinessProfilesScreen
+
+Case 2: Subscription Expired
+- Detection: subscriptionStatus !== "ACTIVE"
+- Handling: Navigate to BusinessProfilesScreen
+
+Case 3: Category Mismatch
+- Detection: profileCategory !== clickedCategory
+- Handling: Navigate to BusinessProfilesScreen
+
+Case 4: Multiple Profiles
+- Detection: Context provides selected profile
+- Handling: Use currently selected profile from context
+
+Case 5: Navigation Param Undefined
+- Detection: clickedCategory is undefined
+- Handling: Navigate to BusinessProfilesScreen
+
+11. STATE SYNCHRONIZATION RISKS
+------------------------------
+
+Risk 1: Stale Business Profile Data
+- Mitigation: Context refreshes from API periodically
+- Solution: Force refresh before validation if needed
+
+Risk 2: Async Loading Delays
+- Mitigation: Context loading state management
+- Solution: Wait for context to load before allowing validation
+
+Risk 3: Context Not Initialized
+- Detection: BusinessProfileContext isLoading state
+- Handling: Show loading indicator or disable Next button
+
+12. FINAL ARCHITECTURE FLOW
+--------------------------
+
+HomeScreen
+│ (handleBusinessCategoryPress)
+▼ [Passes businessCategory]
+PosterPlayerScreen
+│ (handleNextPress → navigateToPosterEditor)
+▼ [CURRENTLY MISSING: businessCategory forward]
+PosterEditorScreen
+│ (Next button validation)
+├── IF profile.category === businessCategory AND profile.subscriptionStatus === "ACTIVE"
+│         ▼
+│   PosterPreviewScreen
+│
+└── ELSE
+▼
+BusinessProfilesScreen
+
+13. EXACT CODE INSERTION LOCATION
+-------------------------------
+
+File: src/screens/PosterEditorScreen.tsx
+Function: Next button onPress handler
+Lines: 2635-2640 (after subscription check, before capture logic)
+
+Required Changes:
+1. Fix PosterPlayerScreen to forward businessCategory parameter
+2. Add validation logic in PosterEditorScreen Next button handler
+3. Update navigation types to include businessCategory in PosterEditor params
+
+14. IMPLEMENTATION CHECKLIST
+---------------------------
+
+□ Fix PosterPlayerScreen navigateToPosterEditor() to include businessCategory
+□ Update MainStackParamList.PosterEditor type to include businessCategory
+□ Add businessCategory parameter extraction in PosterEditorScreen
+□ Implement category and subscription validation logic
+□ Add navigation to BusinessProfilesScreen for validation failures
+□ Add proper error handling for missing data
+□ Test edge cases (no profile, expired subscription, category mismatch)
+□ Verify BusinessProfileContext data freshness
+□ Update navigation calls to use proper typing
+
+15. CRITICAL ARCHITECTURAL ISSUES
+---------------------------------
+
+Issue 1: Data Flow Break
+- businessCategory parameter is lost between PosterPlayerScreen and PosterEditorScreen
+- This prevents the core validation from working
+
+Issue 2: Navigation Type Safety
+- Current navigation uses type assertion (navigation as any)
+- Should use properly typed StackNavigationProp
+
+Issue 3: Validation Timing
+- Validation should occur before expensive capture operations
+- Current flow captures image then validates (inefficient)
+
+Issue 4: Business Profile Context Sync
+- Context may have stale data compared to API
+- No explicit refresh before validation
+
+RECOMMENDED FIX PRIORITY:
+1. Fix businessCategory parameter forwarding (CRITICAL)
+2. Implement validation logic (CRITICAL)
+3. Add proper error handling (HIGH)
+4. Improve type safety (MEDIUM)
+5. Optimize validation timing (LOW)
+
+================================================
+END OF ANALYSIS
+================================================

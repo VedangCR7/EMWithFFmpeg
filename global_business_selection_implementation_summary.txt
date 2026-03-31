@@ -1,0 +1,235 @@
+GLOBAL BUSINESS SELECTION STATE IMPLEMENTATION SUMMARY
+======================================================
+
+1. UPDATED BUSINESSPROFILECONTEXT.TSX
+-------------------------------------
+
+INTERFACE EXTENSIONS:
+```typescript
+interface BusinessProfileContextType {
+  // Existing
+  selectedBusinessProfile: BusinessProfile | null;
+  setSelectedBusinessProfile: (profile: BusinessProfile | null) => Promise<void>;
+  initializeSelectedProfile: (profiles: BusinessProfile[]) => Promise<void>;
+  isLoading: boolean;
+  
+  // New global business selection state
+  selectedBusinessCategory: string | null;
+  setSelectedBusinessCategory: (category: string | null) => void;
+  selectedBusinessId: string | null;  // Derived from selectedBusinessProfile?.id
+}
+```
+
+ASYNC STORAGE KEYS ADDED:
+- @selected_business_category
+
+NEW STATE VARIABLES:
+- selectedBusinessCategory: useState<string | null>(null)
+
+AUTO-SYNCHRONIZATION LOGIC:
+- When setSelectedBusinessProfile() is called, automatically updates selectedBusinessCategory from profile.category
+- Maintains consistency between profile and category selection
+
+PERSISTENCE:
+- Load category from AsyncStorage on context initialization
+- Save category to AsyncStorage whenever it changes
+- Clear category when profile cache is cleared
+
+PERFORMANCE OPTIMIZATIONS:
+- useMemo for context value to prevent unnecessary re-renders
+- useCallback for all update functions
+- Proper dependency arrays
+
+2. UPDATED HOMESCREEN CATEGORY SELECTION
+---------------------------------------
+
+UPDATED FUNCTION:
+```typescript
+const handleBusinessCategoryPress = useCallback(async (category: BusinessCategory) => {
+  // Update global business category state
+  await setSelectedBusinessCategory(category.name);
+  
+  // Existing navigation logic...
+}, [businessCategoryPreviews, navigation, setSelectedBusinessCategory]);
+```
+
+KEY CHANGES:
+- Added setSelectedBusinessCategory(category.name) call
+- Updated dependency array to include setSelectedBusinessCategory
+- Ensures global state is updated when user selects business category
+
+BUSINESS PROFILE SELECTION:
+- No changes needed - setSelectedBusinessProfile() automatically syncs category
+- Maintains existing behavior while adding global category sync
+
+3. UPDATED POSTEREDITORSCREEN CONTEXT USAGE
+------------------------------------------
+
+CONTEXT DESTRUCTURING:
+```typescript
+const { 
+  selectedBusinessProfile, 
+  selectedBusinessCategory, 
+  selectedBusinessId 
+} = useBusinessProfile();
+```
+
+VALIDATION CAPABILITY:
+- selectedBusinessProfile.category - Profile's business category
+- selectedBusinessCategory - Globally selected business category
+- selectedBusinessProfile.subscriptionStatus - Subscription status
+- selectedBusinessId - Profile ID for validation
+
+4. GLOBAL STATE ACCESS PATTERN
+------------------------------
+
+ANY SCREEN CAN NOW ACCESS:
+```typescript
+const {
+  selectedBusinessProfile,      // Full profile object
+  selectedBusinessCategory,     // Selected category string
+  selectedBusinessId,           // Profile ID (derived)
+  setSelectedBusinessCategory,  // Update category
+  setSelectedBusinessProfile,   // Update profile
+  isLoading                     // Loading state
+} = useBusinessProfile();
+```
+
+5. VALIDATION IMPLEMENTATION EXAMPLE
+-------------------------------------
+
+PosterEditorScreen validation logic:
+```typescript
+// Validation using global state
+const isCategoryMatch = selectedBusinessProfile?.category === selectedBusinessCategory;
+const isSubscriptionActive = selectedBusinessProfile?.subscriptionStatus === "ACTIVE";
+
+if (isCategoryMatch && isSubscriptionActive) {
+  // Proceed to PosterPreviewScreen
+  navigation.navigate('PosterPreview', { ...params });
+} else {
+  // Redirect to BusinessProfilesScreen
+  navigation.navigate('BusinessProfiles');
+}
+```
+
+6. EDGE CASE HANDLING
+---------------------
+
+NO BUSINESS PROFILE SELECTED:
+- selectedBusinessProfile === null
+- selectedBusinessId === null
+- Handle gracefully in validation logic
+
+CATEGORY NOT YET SELECTED:
+- selectedBusinessCategory === null
+- Can happen when user navigates directly without category selection
+- Validation should handle this case
+
+ASYNCSTORAGE NOT YET LOADED:
+- isLoading === true
+- Show loading indicators or disable actions
+- Context manages loading state automatically
+
+USER SWITCHES PROFILE AFTER SELECTING CATEGORY:
+- setSelectedBusinessProfile() auto-syncs category from new profile
+- Prevents mismatched state
+- Maintains data consistency
+
+7. POSTER FLOW INTEGRATION
+--------------------------
+
+PosterPlayerScreen can now:
+- Read selectedBusinessCategory from context instead of route params
+- Forward category to PosterEditorScreen if needed
+- Use global state for consistent behavior
+
+PosterEditorScreen can:
+- Access category directly from context
+- Perform validation without navigation parameter dependencies
+- Use selectedBusinessId for profile-specific operations
+
+8. BACKWARD COMPATIBILITY
+--------------------------
+
+EXISTING CODE UNCHANGED:
+- All existing useBusinessProfile() calls continue to work
+- setSelectedBusinessProfile() behavior preserved
+- AsyncStorage keys for profiles unchanged
+
+NEW FEATURES OPTIONAL:
+- Components can gradually adopt selectedBusinessCategory
+- No breaking changes to existing navigation flows
+- Legacy navigation parameters still supported
+
+9. PERFORMANCE CONSIDERATIONS
+-----------------------------
+
+CONTEXT OPTIMIZATIONS:
+- useMemo prevents unnecessary re-renders
+- useCallback functions maintain referential equality
+- Minimal dependency arrays
+
+ASYNC STORAGE OPERATIONS:
+- Parallel loading of profile and category data
+- Non-blocking writes to storage
+- Error handling for storage failures
+
+MEMORY USAGE:
+- Single additional state variable (selectedBusinessCategory)
+- Derived selectedBusinessId (no additional storage)
+- Efficient context value memoization
+
+10. TESTING CONSIDERATIONS
+--------------------------
+
+UNIT TEST SCENARIOS:
+- Context initialization with/without stored data
+- setSelectedBusinessCategory persistence
+- setSelectedBusinessProfile auto-sync behavior
+- Edge cases (null values, storage errors)
+
+INTEGRATION TEST SCENARIOS:
+- HomeScreen category selection flow
+- Profile selection and category sync
+- Validation logic in PosterEditorScreen
+- App reload with state restoration
+
+E2E TEST SCENARIOS:
+- Complete poster creation flow
+- Category change during poster editing
+- Profile switch during active session
+- App background/foreground with state persistence
+
+11. IMPLEMENTATION CHECKLIST
+-----------------------------
+
+✅ BusinessProfileContext interface extended
+✅ AsyncStorage keys added
+✅ State variables added
+✅ Auto-sync logic implemented
+✅ Persistence logic added
+✅ Performance optimizations added
+✅ HomeScreen category selection updated
+✅ PosterEditorScreen context usage updated
+✅ Backward compatibility maintained
+✅ Error handling implemented
+
+12. NEXT STEPS
+--------------
+
+OPTIONAL ENHANCEMENTS:
+- Update PosterPlayerScreen to use context for category
+- Add validation logic to PosterEditorScreen Next button
+- Update navigation types to reflect new context interface
+- Add loading states for category selection
+
+MONITORING:
+- Add analytics for category selection changes
+- Monitor context re-render frequency
+- Track AsyncStorage performance
+- Log state synchronization events
+
+======================================================
+IMPLEMENTATION COMPLETE
+======================================================

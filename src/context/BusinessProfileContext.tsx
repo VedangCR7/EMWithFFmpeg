@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef, useMemo } from 'react';
 import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BusinessProfile } from '../services/businessProfile';
@@ -10,12 +10,17 @@ interface BusinessProfileContextType {
   setSelectedBusinessProfile: (profile: BusinessProfile | null) => Promise<void>;
   initializeSelectedProfile: (profiles: BusinessProfile[]) => Promise<void>;
   isLoading: boolean;
+  // Global business selection state
+  selectedBusinessCategory: string | null;
+  setSelectedBusinessCategory: (category: string | null) => void;
+  selectedBusinessId: string | null;
 }
 
 const BusinessProfileContext = createContext<BusinessProfileContextType | undefined>(undefined);
 
 const SELECTED_PROFILE_KEY = '@selected_business_profile';
 const SELECTED_PROFILE_UID_KEY = '@selected_business_profile_uid';
+const SELECTED_BUSINESS_CATEGORY_KEY = '@selected_business_category';
 
 interface BusinessProfileProviderProps {
   children: ReactNode;
@@ -23,6 +28,7 @@ interface BusinessProfileProviderProps {
 
 export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = ({ children }) => {
   const [selectedBusinessProfile, setSelectedBusinessProfileState] = useState<BusinessProfile | null>(null);
+  const [selectedBusinessCategory, setSelectedBusinessCategoryState] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const isRefreshingRef = useRef<boolean>(false);
 
@@ -30,8 +36,10 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
   const clearProfileCache = useCallback(async () => {
     try {
       setSelectedBusinessProfileState(null);
+      setSelectedBusinessCategoryState(null);
       await AsyncStorage.removeItem(SELECTED_PROFILE_KEY);
       await AsyncStorage.removeItem(SELECTED_PROFILE_UID_KEY);
+      await AsyncStorage.removeItem(SELECTED_BUSINESS_CATEGORY_KEY);
       console.log('✅ [BUSINESS PROFILE CONTEXT] Cleared selected profile cache');
     } catch (e) {
       console.error('❌ [BUSINESS PROFILE CONTEXT] Error clearing cache:', e);
@@ -47,8 +55,11 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
     }
 
     try {
-      const storedProfile = await AsyncStorage.getItem(SELECTED_PROFILE_KEY);
-      const storedUid = await AsyncStorage.getItem(SELECTED_PROFILE_UID_KEY);
+      const [storedProfile, storedUid, storedCategory] = await Promise.all([
+        AsyncStorage.getItem(SELECTED_PROFILE_KEY),
+        AsyncStorage.getItem(SELECTED_PROFILE_UID_KEY),
+        AsyncStorage.getItem(SELECTED_BUSINESS_CATEGORY_KEY)
+      ]);
 
       if (storedProfile) {
         // Cross-user cache safety guard
@@ -62,6 +73,12 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
         }
       } else {
         await clearProfileCache();
+      }
+
+      // Load business category (no user-specific validation needed)
+      if (storedCategory) {
+        setSelectedBusinessCategoryState(storedCategory);
+        console.log('✅ [BUSINESS PROFILE CONTEXT] Loaded selected business category from storage:', storedCategory);
       }
     } catch (error) {
       console.error('❌ [BUSINESS PROFILE CONTEXT] Error loading selected profile:', error);
@@ -174,6 +191,13 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
     try {
       setSelectedBusinessProfileState(profile);
 
+      // Auto-sync business category when profile changes
+      if (profile?.category) {
+        setSelectedBusinessCategoryState(profile.category);
+        await AsyncStorage.setItem(SELECTED_BUSINESS_CATEGORY_KEY, profile.category);
+        console.log('✅ [BUSINESS PROFILE CONTEXT] Auto-synced business category from profile:', profile.category);
+      }
+
       if (profile) {
         const currentUser = authService.getCurrentUser();
         await AsyncStorage.setItem(SELECTED_PROFILE_KEY, JSON.stringify(profile));
@@ -189,6 +213,23 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
     }
   }, [clearProfileCache]);
 
+  // Set business category independently
+  const setSelectedBusinessCategory = useCallback(async (category: string | null) => {
+    try {
+      setSelectedBusinessCategoryState(category);
+      
+      if (category) {
+        await AsyncStorage.setItem(SELECTED_BUSINESS_CATEGORY_KEY, category);
+        console.log('✅ [BUSINESS PROFILE CONTEXT] Saved selected business category to storage:', category);
+      } else {
+        await AsyncStorage.removeItem(SELECTED_BUSINESS_CATEGORY_KEY);
+        console.log('✅ [BUSINESS PROFILE CONTEXT] Cleared selected business category from storage');
+      }
+    } catch (error) {
+      console.error('❌ [BUSINESS PROFILE CONTEXT] Error saving selected business category:', error);
+    }
+  }, []);
+
   // Centralized initialization logic: select first profile only if none selected
   const initializeSelectedProfile = useCallback(async (profiles: BusinessProfile[]) => {
     if (profiles.length > 0 && !selectedBusinessProfile && !isLoading) {
@@ -199,12 +240,22 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
     }
   }, [selectedBusinessProfile, isLoading, setSelectedBusinessProfile]);
 
-  const value: BusinessProfileContextType = {
+  const value: BusinessProfileContextType = useMemo(() => ({
     selectedBusinessProfile,
     setSelectedBusinessProfile,
     initializeSelectedProfile,
     isLoading,
-  };
+    selectedBusinessCategory,
+    setSelectedBusinessCategory,
+    selectedBusinessId: selectedBusinessProfile?.id || null,
+  }), [
+    selectedBusinessProfile,
+    setSelectedBusinessProfile,
+    initializeSelectedProfile,
+    isLoading,
+    selectedBusinessCategory,
+    setSelectedBusinessCategory,
+  ]);
 
   return (
     <BusinessProfileContext.Provider value={value}>

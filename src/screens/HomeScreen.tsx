@@ -671,7 +671,7 @@ const HomeScreen: React.FC = React.memo(() => {
   const [userProfile, setUserProfile] = useState(() => authService.getCurrentUser());
   const [userBusinessProfiles, setUserBusinessProfiles] = useState<BusinessProfile[]>([]);
   const [businessProfilesLoadingState, setBusinessProfilesLoadingState] = useState(false);
-  const { selectedBusinessProfile, setSelectedBusinessProfile, initializeSelectedProfile, isLoading: isContextLoading } = useBusinessProfile();
+  const { selectedBusinessProfile, setSelectedBusinessProfile, initializeSelectedProfile, isLoading: isContextLoading, setSelectedBusinessCategory } = useBusinessProfile();
   const isActive = isSubscriptionActive;
   const selectedBusinessProfileId = selectedBusinessProfile?.id || null;
   const [isBusinessProfileDropdownVisible, setIsBusinessProfileDropdownVisible] = useState(false);
@@ -4152,10 +4152,13 @@ const HomeScreen: React.FC = React.memo(() => {
 
   // Memoized renderItem functions for modal FlatLists
   const handleBusinessCategoryPress = useCallback(async (category: BusinessCategory) => {
-    console.log('=��� [BUSINESS CATEGORY PRESS]', {
+    console.log('=🏢 [BUSINESS CATEGORY PRESS]', {
       categoryName: category.name,
       settingTemplateSource: true
     });
+
+    // Update global business category state
+    await setSelectedBusinessCategory(category.name);
 
     const cachedTemplates = businessCategoryPreviews[category.id];
 
@@ -4214,7 +4217,7 @@ const HomeScreen: React.FC = React.memo(() => {
         }
       }
     });
-  }, [businessCategoryPreviews, navigation]);
+  }, [businessCategoryPreviews, navigation, setSelectedBusinessCategory]);
 
   const renderBusinessCategoryModalItem = useCallback(({ item, index, section }: { item: BusinessCategory[]; index: number; section: { title: string; data: BusinessCategory[][] } }) => {
     // item is now a row (array of categories)
