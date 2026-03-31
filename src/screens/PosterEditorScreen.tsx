@@ -373,6 +373,8 @@ interface PosterEditorScreenProps {
       };
       selectedLanguage: string;
       selectedTemplateId: string;
+      selectedTemplate?: string;
+      posterCategory?: string;
       selectedBusinessProfile?: any;
     };
   };
@@ -380,7 +382,7 @@ interface PosterEditorScreenProps {
 
 const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route, navigation }) => {
   const insets = useSafeAreaInsets();
-  const { selectedImage, selectedLanguage, selectedTemplateId } = route.params;
+  const { selectedImage, selectedLanguage, selectedTemplateId, selectedTemplate: initialTemplate, posterCategory } = route.params;
   const { isSubscribed, checkPremiumAccess, refreshSubscription, isSubscriptionActive } = useSubscription();
   const { isDarkMode, theme } = useTheme();
   const { selectedBusinessProfile, selectedBusinessCategory, selectedBusinessId, isLoading: isContextLoading } = useBusinessProfile();
@@ -1105,7 +1107,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route, navigati
   const dragTranslationRef = useRef<{ [key: string]: { x: number; y: number } }>({});
 
   // State for templates
-  const [selectedTemplate, setSelectedTemplate] = useState<string>('business');
+  const [selectedTemplate, setSelectedTemplate] = useState<string>(initialTemplate || 'business');
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
   const [initialTemplateApplied, setInitialTemplateApplied] = useState(false);
 
@@ -1362,43 +1364,44 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route, navigati
     console.log('🔄 [APPLY BUSINESS PROFILE] Cleared original layers for new profile:', profile.name);
 
     // Auto-set template based on business profile category
-    if (profile.category) {
-      const categoryToTemplate: { [key: string]: string } = {
-        'Restaurant': 'restaurant',
-        'Food & Beverage': 'restaurant',
-        'Cafe': 'restaurant',
-        'Bar': 'restaurant',
-        'Hotel': 'business',
-        'Event Planning': 'event',
-        'Wedding': 'wedding',
-        'Fashion': 'fashion',
-        'Real Estate': 'real-estate',
-        'Education': 'education',
-        'Healthcare': 'healthcare',
-        'Fitness': 'fitness',
-        'Technology': 'tech',
-        'Creative': 'creative',
-        'Corporate': 'corporate',
-        'Luxury': 'luxury',
-        'Modern': 'business',
-        'Vintage': 'vintage',
-        'Retro': 'retro',
-        'Elegant': 'elegant',
-        'Bold': 'creative',
-        'Nature': 'restaurant',
-        'Ocean': 'ocean',
-        'Sunset': 'sunset',
-        'Cosmic': 'tech',
-        'Artistic': 'artistic',
-        'Sport': 'fitness',
-        'Warm': 'sunset',
-        'Cool': 'education',
-      };
+    // DISABLED: Template should come from selected poster, not business profile
+    // if (profile.category) {
+    //   const categoryToTemplate: { [key: string]: string } = {
+    //     'Restaurant': 'restaurant',
+    //     'Food & Beverage': 'restaurant',
+    //     'Cafe': 'restaurant',
+    //     'Bar': 'restaurant',
+    //     'Hotel': 'business',
+    //     'Event Planning': 'event',
+    //     'Wedding': 'wedding',
+    //     'Fashion': 'fashion',
+    //     'Real Estate': 'real-estate',
+    //     'Education': 'education',
+    //     'Healthcare': 'healthcare',
+    //     'Fitness': 'fitness',
+    //     'Technology': 'tech',
+    //     'Creative': 'creative',
+    //     'Corporate': 'corporate',
+    //     'Luxury': 'luxury',
+    //     'Modern': 'business',
+    //     'Vintage': 'vintage',
+    //     'Retro': 'retro',
+    //     'Elegant': 'elegant',
+    //     'Bold': 'creative',
+    //     'Nature': 'restaurant',
+    //     'Ocean': 'ocean',
+    //     'Sunset': 'sunset',
+    //     'Cosmic': 'tech',
+    //     'Artistic': 'artistic',
+    //     'Sport': 'fitness',
+    //     'Warm': 'sunset',
+    //     'Cool': 'education',
+    //   };
 
-      const template = categoryToTemplate[profile.category] || 'business';
-      setSelectedTemplate(template);
-      console.log(`Auto-setting template to '${template}' based on business category '${profile.category}'`);
-    }
+    //   const template = categoryToTemplate[profile.category] || 'business';
+    //   setSelectedTemplate(template);
+    //   console.log(`Auto-setting template to '${template}' based on business category '${profile.category}'`);
+    // }
 
     // Generate content from business profile
     // Create default layers from business profile
@@ -2633,13 +2636,26 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route, navigati
           style={styles.nextButton}
           activeOpacity={0.85}
           onPress={async () => {
+            console.log('🎯 [POSTER EDITOR] Next button clicked');
+            console.log('📊 [POSTER EDITOR] Checking subscription status...');
+            console.log('📊 [POSTER EDITOR] Subscription checks:', {
+              isSubscribed,
+              isSubscriptionActive,
+              selectedBusinessProfile: selectedBusinessProfile?.name,
+              profileSubscriptionStatus: selectedBusinessProfile?.subscriptionStatus
+            });
+            
             // Check subscription status first
             if (!isSubscribed || !isSubscriptionActive) {
-              console.log('User is not subscribed - showing premium modal');
+              console.log('❌ [POSTER EDITOR] User is not subscribed - showing premium modal');
               setShowPremiumModal(true);
               return;
             }
+            
+            console.log('✅ [POSTER EDITOR] Subscription check passed');
 
+            console.log('🔍 [POSTER EDITOR] Starting category validation...');
+            
             // Category validation: Check if poster template category matches selected business category
             const getTemplateCategory = (template: string): string => {
               const templateToCategory: { [key: string]: string } = {
@@ -2678,24 +2694,37 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route, navigati
               return templateToCategory[template] || 'Business';
             };
 
-            const posterCategory = getTemplateCategory(selectedTemplate);
-            if (selectedBusinessCategory && posterCategory && selectedBusinessCategory.toLowerCase() !== posterCategory.toLowerCase()) {
-              console.log('Category mismatch detected:', {
-                posterCategory,
+            console.log('📋 [POSTER EDITOR] Category validation data:', {
+              selectedTemplate,
+              selectedBusinessCategory,
+              posterCategory: posterCategory
+            });
+            
+            // Use poster category from navigation instead of template mapping
+            const finalPosterCategory = posterCategory || getTemplateCategory(selectedTemplate);
+            console.log('📋 [POSTER EDITOR] Final poster category:', finalPosterCategory);
+            if (selectedBusinessCategory && finalPosterCategory && selectedBusinessCategory.toLowerCase() !== finalPosterCategory.toLowerCase()) {
+              console.log('❌ [POSTER EDITOR] Category mismatch detected:', {
+                posterCategory: finalPosterCategory,
                 selectedBusinessCategory,
                 selectedTemplate
               });
               
               // Redirect to BusinessProfilesScreen to update category
+              console.log('🔄 [POSTER EDITOR] Redirecting to BusinessProfiles to update category');
               navigation.navigate('BusinessProfiles');
               return;
             }
+            
+            console.log('✅ [POSTER EDITOR] Category validation passed');
 
+            console.log('🎨 [POSTER EDITOR] Preparing for capture - deselecting layers...');
             // Deselect any selected or dragged layers so borders don't appear in preview
             setSelectedLayer(null);
             setDraggedLayer(null);
             // Allow a brief tick for UI to update before capture
             await new Promise(resolve => setTimeout(resolve, 10));
+            console.log('✅ [POSTER EDITOR] Layers deselected');
 
             // Test capture first
             console.log('=== TESTING VIEWSHOT CAPTURE ===');
@@ -2718,12 +2747,14 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route, navigati
             }
             console.log('=== END TEST ===');
 
-            // Original capture logic
-            console.log('Next button pressed - starting capture process');
-            console.log('Poster ref available:', !!posterRef.current);
-            console.log('Poster ref capture method available:', !!posterRef.current?.capture);
-            console.log('Current layers state:', layers.length);
-            console.log('Visible fields:', visibleFields);
+            console.log('📸 [POSTER EDITOR] Starting poster capture process...');
+            console.log('📸 [POSTER EDITOR] Capture environment check:');
+            console.log('  - Canvas dimensions:', { width: screenWidth * 0.98, height: screenHeight * 0.65 });
+            console.log('  - Layers count:', layers.length);
+            console.log('  - Selected template:', selectedTemplate);
+            console.log('  - Poster ref available:', !!posterRef.current);
+            console.log('  - Capture method available:', !!posterRef.current?.capture);
+            console.log('  - Visible fields:', visibleFields);
             const hasVisibleCustomLayers = layers.some(layer => {
               if (layer.fieldType === 'footerBackground') return false;
               if (layer.fieldType && visibleFields[layer.fieldType] === false) return false;
