@@ -3134,6 +3134,8 @@ const PosterPlayerScreen: React.FC = () => {
       },
       selectedLanguage: selectedLanguage,
       selectedTemplateId: currentPoster.id,
+      selectedTemplate: JSON.stringify(currentPoster),
+      posterCategory: currentPoster.category
     });
   }, [navigation, currentPoster, selectedLanguage, getHighQualityImageUrl]);
 
@@ -3313,7 +3315,7 @@ const PosterPlayerScreen: React.FC = () => {
                     const date = new Date(calendarDate);
                     return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
                   })()
-                  : globalBusinessCategory || greetingCategory || currentPoster?.category || 'Templates'}
+                  : currentPoster?.category || greetingCategory || globalBusinessCategory || 'Templates'}
               </Text>
             </LinearGradient>
           </View>
