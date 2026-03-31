@@ -419,15 +419,20 @@ const PosterPlayerScreen: React.FC = () => {
   const {
     selectedPoster: initialPoster,
     relatedPosters: initialRelatedPosters,
-    businessCategory,
     greetingCategory,
     originScreen,
     posterLimit,
     calendarDate,
     templateSource,
-    selectedBusinessProfile: initialBusinessProfile,
-    selectedBusinessProfileId: initialBusinessProfileId,
   } = route.params;
+
+  // Use global state for business data instead of route parameters
+  const { 
+    selectedBusinessCategory: globalBusinessCategory,
+    selectedBusinessProfile: globalBusinessProfile,
+    selectedBusinessId: globalBusinessId,
+    isLoading: isContextLoading
+  } = useBusinessProfile();
 
   // Track previous initialPoster ID to detect when a different poster is selected
   const prevInitialPosterIdRef = useRef<string | null>(null);
@@ -515,14 +520,14 @@ const PosterPlayerScreen: React.FC = () => {
       newTemplateIds: Array.isArray(uniqueTemplates) ? uniqueTemplates.map(t => t.id).slice(0, 10) : 'unknown',
       previousCount: previousTemplates.length,
       previousIds: previousTemplates.map(t => t.id).slice(0, 10),
-      businessCategory,
+      globalBusinessCategory,
       greetingCategory,
       calendarDate,
       activeCategoryRef: activeCategoryRef.current,
       stackTrace: new Error().stack?.split('\n').slice(1, 6).join('\n')
     });
     setAllTemplatesState(uniqueTemplates);
-  }, [businessCategory, greetingCategory, calendarDate]);
+  }, [globalBusinessCategory, greetingCategory, calendarDate]);
 
   // Update ref when state changes
   useEffect(() => {
@@ -568,21 +573,15 @@ const PosterPlayerScreen: React.FC = () => {
 
   // Business profile state
   const [userBusinessProfiles, setUserBusinessProfiles] = useState<BusinessProfile[]>([]);
-  const { selectedBusinessProfile: globalSelectedProfile } = useBusinessProfile();
 
-  // Determine active business profile with fallback priority:
-  // 1️⃣ Context profile (global state)
-  // 2️⃣ Navigation param (read-only fallback for this session if context is empty)
-  // 3️⃣ AsyncStorage (loaded in useBusinessProfile)
-  const activeBusinessProfile = useMemo(() => {
-    return globalSelectedProfile || initialBusinessProfile;
-  }, [globalSelectedProfile, initialBusinessProfile]);
+  // Use global state for business profile
+  const activeBusinessProfile = globalBusinessProfile;
 
   // Determine if we should show subscription message instead of language buttons
-  // Only for business categories coming from HomeScreen (templateSource: 'professional' and businessCategory provided)
+  // Only for business categories coming from HomeScreen (templateSource: 'professional' and global business category available)
   const shouldShowSubscriptionMessage = useMemo(() => {
-    return templateSource === 'professional' && !!businessCategory;
-  }, [templateSource, businessCategory]);
+    return templateSource === 'professional' && !!globalBusinessCategory;
+  }, [templateSource, globalBusinessCategory]);
   const preloadedImagesRef = useRef<Set<string>>(new Set());
 
   // State for service filter specific templates
@@ -920,7 +919,7 @@ const PosterPlayerScreen: React.FC = () => {
 
     // Return service-filtered results (even if empty, don't fallback to all templates)
     return serviceFiltered;
-  }, [allTemplates, selectedLanguage, templateMatchesServiceFilter, calendarDate, greetingCategory, businessCategory, selectedServiceFilter, serviceFilterTemplates]);
+  }, [allTemplates, selectedLanguage, templateMatchesServiceFilter, calendarDate, greetingCategory, globalBusinessCategory, selectedServiceFilter, serviceFilterTemplates]);
 
   // Preload images for better scrolling performance
   const preloadImages = useCallback((posters: Template[], startIndex: number = 0, count: number = 20) => {
@@ -1107,13 +1106,13 @@ const PosterPlayerScreen: React.FC = () => {
     }
   }, [convertedInitialPoster, currentPoster.id, initialPoster]);
 
-  // Fetch business category posters when businessCategory is provided
+  // Fetch business category posters when global business category is provided
   useEffect(() => {
-    if (!businessCategory) {
+    if (!globalBusinessCategory) {
       return;
     }
 
-    // FIX #3: If calendarDate is also active, the calendar context takes priority.
+    // FIX #3: If calendarDate is also active, calendar context takes priority.
     // Do NOT fetch business category posters when the user is browsing a specific
     // calendar date — doing so would overwrite the date-scoped allTemplates state.
     if (calendarDate) {
@@ -1123,10 +1122,8 @@ const PosterPlayerScreen: React.FC = () => {
 
     // Track active category to prevent other useEffects from overwriting templates
     let categoryName: string;
-    if (typeof businessCategory === 'object' && businessCategory?.name) {
-      categoryName = businessCategory.name;
-    } else if (typeof businessCategory === 'string') {
-      categoryName = businessCategory;
+    if (typeof globalBusinessCategory === 'string') {
+      categoryName = globalBusinessCategory;
     } else {
       categoryName = 'Event Planner'; // fallback
     }
@@ -1170,7 +1167,7 @@ const PosterPlayerScreen: React.FC = () => {
               id: poster.id,
               name: poster.title || poster.name || 'Business Poster',
               thumbnail: poster.imageUrl || poster.thumbnail || '',
-              category: poster.category || businessCategory,
+              category: poster.category || globalBusinessCategory,
               downloads: poster.downloads || 0,
               isDownloaded: false,
               tags: normalizedTags,
@@ -1185,7 +1182,7 @@ const PosterPlayerScreen: React.FC = () => {
             const ensuredTemplates = convertedTemplates.map(t => mergeTemplateLanguages(t));
 
             console.log('🔍 [BUSINESS FETCH] Loaded templates:', {
-              category: businessCategory,
+              category: globalBusinessCategory,
               templateCount: ensuredTemplates.length,
               templateIds: ensuredTemplates.map(t => t.id),
               initialPosterId: initialPoster?.id,
@@ -1195,7 +1192,7 @@ const PosterPlayerScreen: React.FC = () => {
             // Ensure we're still on the same category (prevent race conditions)
             if (activeCategoryRef.current.type !== 'business' || activeCategoryRef.current.value !== categoryName) {
               console.warn('⚠️ [BUSINESS FETCH] Category changed, skipping setAllTemplates:', {
-                expectedCategory: businessCategory,
+                expectedCategory: globalBusinessCategory,
                 activeCategoryType: activeCategoryRef.current.type,
                 activeCategoryValue: activeCategoryRef.current.value
               });
@@ -1268,7 +1265,7 @@ const PosterPlayerScreen: React.FC = () => {
   // business-category API to re-fire every time the user pressed a language
   // button, overwriting the date-scoped allTemplates with business posters.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [businessCategory, posterLimit, initialPoster, setAllTemplates, calendarDate]);
+  }, [globalBusinessCategory, posterLimit, initialPoster, setAllTemplates, calendarDate]);
 
   // Fetch greeting category templates when greetingCategory is provided
   useEffect(() => {
@@ -2314,17 +2311,17 @@ const PosterPlayerScreen: React.FC = () => {
     fetchCalendarPosters();
   }, [calendarDate, initialPoster]);
 
-  // Sync state when route params change (only if businessCategory, greetingCategory, or calendarDate is not provided)
+  // Sync state when route params change (only if global business category, greetingCategory, or calendarDate is not provided)
   useEffect(() => {
     // Skip if business category, greeting category, or calendar date is provided (handled by separate useEffects above)
     // IMPORTANT: This check must be FIRST to prevent setting allTemplates when categories are active
     // Also check activeCategoryRef to handle race conditions
-    const hasActiveCategory = !!(businessCategory || greetingCategory || calendarDate);
+    const hasActiveCategory = !!(globalBusinessCategory || greetingCategory || calendarDate);
     const hasActiveCategoryRef = activeCategoryRef.current.type !== null;
 
     if (hasActiveCategory || hasActiveCategoryRef) {
       console.log('🔍 [INITIAL POSTER SYNC] Skipped - category/calendar provided:', {
-        businessCategory,
+        globalBusinessCategory,
         greetingCategory,
         calendarDate,
         hasActiveCategory,
@@ -2378,7 +2375,7 @@ const PosterPlayerScreen: React.FC = () => {
     console.warn('⚠️ [INITIAL POSTER SYNC] About to set allTemplates - THIS SHOULD NOT HAPPEN WHEN CATEGORY IS ACTIVE!', {
       updatedTemplatesCount: updatedTemplates.length,
       updatedTemplateIds: updatedTemplates.map(t => t.id),
-      businessCategory,
+      globalBusinessCategory,
       greetingCategory,
       calendarDate,
       activeCategoryRef: activeCategoryRef.current,
@@ -2412,7 +2409,7 @@ const PosterPlayerScreen: React.FC = () => {
       const foundPoster = updatedTemplates.find(t => t.id === prevPoster.id);
       return foundPoster || ensuredInitialPoster;
     });
-  }, [initialPoster, initialRelatedPosters, selectedLanguage, businessCategory, greetingCategory, calendarDate]);
+  }, [initialPoster, initialRelatedPosters, selectedLanguage, globalBusinessCategory, greetingCategory, calendarDate]);
 
   // Detect language from initial poster on mount
   useEffect(() => {
@@ -2429,7 +2426,7 @@ const PosterPlayerScreen: React.FC = () => {
       posterName: initialPosterWithLanguages.name,
       posterTags: initialPosterWithLanguages.tags,
       category: initialPosterWithLanguages.category,
-      businessCategory,
+      globalBusinessCategory,
       greetingCategory,
       calendarDate
     });
@@ -2512,7 +2509,7 @@ const PosterPlayerScreen: React.FC = () => {
     }
 
     // Only run for business category, greeting category, or calendar posters
-    if (!businessCategory && !greetingCategory && !calendarDate) {
+    if (!globalBusinessCategory && !greetingCategory && !calendarDate) {
       console.log('🔍 [CURRENT LANG DETECT] Skipped - not a category/calendar poster');
       return;
     }
@@ -2521,7 +2518,7 @@ const PosterPlayerScreen: React.FC = () => {
       posterId: currentPoster.id,
       posterName: currentPoster.name,
       category: currentPoster.category,
-      businessCategory,
+      globalBusinessCategory,
       greetingCategory,
       calendarDate
     });
@@ -2583,7 +2580,7 @@ const PosterPlayerScreen: React.FC = () => {
       console.log('ℹ️ [CURRENT LANG DETECT] User manually selected language, keeping:', selectedLanguage);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPoster?.id, businessCategory, greetingCategory, calendarDate]); // Run when current poster changes for category or calendar
+  }, [currentPoster?.id, globalBusinessCategory, greetingCategory, calendarDate]); // Run when current poster changes for category or calendar
 
   // Log whenever allTemplates changes to track duplicates
   useEffect(() => {
@@ -2610,7 +2607,7 @@ const PosterPlayerScreen: React.FC = () => {
         templateNames: allTemplates.map(t => t.name).slice(0, 5), // First 5 names
         duplicateIds,
         duplicateThumbnails,
-        businessCategory,
+        globalBusinessCategory,
         greetingCategory,
         calendarDate,
         stackTrace: new Error().stack?.split('\n').slice(1, 4).join('\n') // First 3 stack frames
@@ -2706,7 +2703,7 @@ const PosterPlayerScreen: React.FC = () => {
 
       return resolvedPrevious || templatesWithLanguages[0];
     });
-  }, [allTemplates, selectedLanguage, greetingCategory, businessCategory, calendarDate]);
+  }, [allTemplates, selectedLanguage, greetingCategory, globalBusinessCategory, calendarDate]);
 
   useEffect(() => {
     if (!isEventPlannerCategory && selectedServiceFilter) {
@@ -2727,7 +2724,7 @@ const PosterPlayerScreen: React.FC = () => {
       posterName: posterWithLanguages.name,
       posterTags: posterWithLanguages.tags,
       category: posterWithLanguages.category,
-      businessCategory,
+      globalBusinessCategory,
       greetingCategory,
       calendarDate
     });
@@ -2811,7 +2808,7 @@ const PosterPlayerScreen: React.FC = () => {
       console.log('❌ [HANDLE POSTER SELECT] No language detected - keeping current:', selectedLanguage);
       lastAutoDetectedPosterIdRef.current = posterWithLanguages?.id || null;
     }
-  }, [selectedLanguage, businessCategory, greetingCategory, calendarDate]);
+  }, [selectedLanguage, globalBusinessCategory, greetingCategory, calendarDate]);
 
   const currentPosterIndex = useMemo(() => {
     if (!currentPoster || !filteredPosters.length) {
@@ -3137,7 +3134,6 @@ const PosterPlayerScreen: React.FC = () => {
       },
       selectedLanguage: selectedLanguage,
       selectedTemplateId: currentPoster.id,
-      selectedBusinessProfile: activeBusinessProfile,
     });
   }, [navigation, currentPoster, selectedLanguage, getHighQualityImageUrl]);
 
@@ -3317,7 +3313,7 @@ const PosterPlayerScreen: React.FC = () => {
                     const date = new Date(calendarDate);
                     return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
                   })()
-                  : (typeof businessCategory === 'object' ? businessCategory?.name : businessCategory) || greetingCategory || currentPoster?.category || 'Templates'}
+                  : globalBusinessCategory || greetingCategory || currentPoster?.category || 'Templates'}
               </Text>
             </LinearGradient>
           </View>

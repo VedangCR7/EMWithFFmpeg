@@ -4169,7 +4169,6 @@ const HomeScreen: React.FC = React.memo(() => {
         relatedPosters: cachedTemplates.slice(1),
         searchQuery: '',
         templateSource: 'professional', // Show subscription message for direct business category access
-        businessCategory: category.name,
         posterLimit: 6, // Limit 6 for business categories from HomeScreen
       });
       return;
@@ -4191,7 +4190,6 @@ const HomeScreen: React.FC = React.memo(() => {
       relatedPosters: firstPoster ? [firstPoster] : [],
       searchQuery: '',
       templateSource: 'professional', // Show subscription message for direct business category access
-      businessCategory: category.name,
       posterLimit: 200, // Request all posters for business categories from HomeScreen
     });
 

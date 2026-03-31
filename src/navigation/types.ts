@@ -20,20 +20,16 @@ export type MainStackParamList = {
     };
     selectedLanguage: string;
     selectedTemplateId: string;
-    selectedBusinessProfile?: any;
   };
   PosterPlayer: {
     selectedPoster: any;
     relatedPosters: any[];
     searchQuery?: string;
     templateSource?: 'greeting' | 'professional' | 'featured';
-    businessCategory?: string | { name: string };
     greetingCategory?: string;
     originScreen?: string;
     posterLimit?: number;
     calendarDate?: string;
-    selectedBusinessProfile?: any;
-    selectedBusinessProfileId?: string;
   };
   MyBusinessPosterPlayer: undefined;
   AboutUs: undefined;
@@ -47,7 +43,6 @@ export type MainStackParamList = {
     };
     selectedLanguage: string;
     selectedTemplateId: string;
-    selectedBusinessProfile?: any;
   };
   VideoEditor: {
     selectedVideo: {

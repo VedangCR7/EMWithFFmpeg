@@ -1,0 +1,275 @@
+BUSINESS CATEGORY VALIDATION FLOW ANALYSIS REPORT
+==================================================
+
+Generated: March 31, 2026
+Project: React Native Mobile App
+Feature: Business Category Validation During Poster Creation
+
+---
+
+1. CURRENT POSTER CREATION FLOW
+===============================
+
+Step-by-Step Navigation Flow:
+-----------------------------
+
+1. HomeScreen.tsx
+   - User selects business category from BusinessCategoriesSection component
+   - Navigation call: navigation.navigate('PosterPlayer', {
+       selectedPoster: template,
+       relatedPosters: [],
+       businessCategory: category.name  // <-- Business category passed here
+     })
+
+2. PosterPlayerScreen.tsx
+   - Receives businessCategory from route.params
+   - User can swipe through posters and click "Next" button
+   - Navigation call: navigation.navigate('PosterEditor', {
+       selectedImage: { uri: highQualityImageUrl, title: poster.name },
+       selectedLanguage: selectedLanguage,
+       selectedTemplateId: poster.id
+     })
+
+3. PosterEditorScreen.tsx
+   - User edits poster with text, images, etc.
+   - User clicks "Next" button to finalize poster
+   - Currently proceeds to download/preview without validation
+
+4. MISSING VALIDATION POINT
+   - No category validation exists between PosterEditorScreen and final step
+   - User can complete poster creation without business category verification
+
+---
+
+2. CATEGORY DATA FLOW
+====================
+
+Current Data Sources:
+--------------------
+
+A. Selected Business Category (from HomeScreen):
+   - Stored in: route.params.businessCategory in PosterPlayerScreen
+   - Type: string | { name: string }
+   - Location: Passed via navigation from HomeScreen → PosterPlayerScreen
+   - Persistence: Not persisted beyond PosterPlayerScreen
+
+B. Poster Business Category:
+   - Source: poster.category property in Template object
+   - Available in: PosterPlayerScreen (currentPoster.category) and PosterEditorScreen
+   - Type: string
+   - Example values: 'Restaurant', 'Fashion', 'Education', etc.
+
+C. User Business Profile Category:
+   - Source: BusinessProfileContext.selectedBusinessProfile.category
+   - Stored in: AsyncStorage via BusinessProfileContext
+   - Available globally: useBusinessProfile() hook
+   - Key: '@selected_business_category'
+
+Data Flow Gap:
+--------------
+- HomeScreen businessCategory is NOT passed to PosterEditorScreen
+- PosterEditorScreen has access to poster.category but not selected business category
+- No validation compares these two categories
+
+---
+
+3. REQUIRED CODE CHANGES
+========================
+
+Files Requiring Modification:
+
+A. HomeScreen.tsx
+   - Line ~551: Add selectedBusinessCategory to navigation params
+   - Change: navigation.navigate('PosterPlayer', { ... })
+   - To: navigation.navigate('PosterPlayer', { ..., selectedBusinessCategory: category.name })
+
+B. PosterPlayerScreen.tsx
+   - Line ~3132: Pass selectedBusinessCategory to PosterEditorScreen
+   - Change: navigation.navigate('PosterEditor', { ... })
+   - To: navigation.navigate('PosterEditor', { ..., selectedBusinessCategory })
+
+C. PosterEditorScreen.tsx
+   - Line ~2629: Add validation logic in Next button onPress handler
+   - Add category comparison logic before capture process
+   - Add navigation redirect to BusinessProfilesScreen if mismatch
+
+D. navigation/types.ts
+   - Line ~15: Add selectedBusinessCategory to PosterEditor route params
+   - Line ~25: Add selectedBusinessCategory to PosterPlayer route params
+
+E. BusinessProfileContext.tsx (Optional Enhancement)
+   - Consider storing selectedBusinessCategory globally for persistence
+   - Already has infrastructure: setSelectedBusinessCategory()
+
+---
+
+4. PROPOSED IMPLEMENTATION APPROACH
+====================================
+
+Best Location for Validation Logic:
+----------------------------------
+
+**PosterEditorScreen.tsx - Next button onPress handler (line 2629)**
+
+Reasons:
+1. This is the final checkpoint before poster completion
+2. User has invested time in editing, making profile update more likely
+3. All necessary data is available:
+   - poster.category (from current poster)
+   - selectedBusinessCategory (from navigation params)
+   - BusinessProfileContext (for user's current profile category)
+
+Validation Logic Sequence:
+--------------------------
+
+1. Extract poster category: currentPoster?.category
+2. Extract selected business category: route.params.selectedBusinessCategory
+3. Extract user profile category: selectedBusinessProfile?.category
+4. Validation priority:
+   - Primary: selectedBusinessCategory vs poster.category
+   - Fallback: user profile category vs poster.category
+5. If mismatch: Navigate to BusinessProfilesScreen
+6. If match: Proceed with existing flow
+
+---
+
+5. NAVIGATION CHANGES
+=====================
+
+Redirection Implementation:
+---------------------------
+
+A. PosterEditorScreen.tsx - Add validation before existing logic:
+
+```typescript
+// Add at line 2630 (before subscription check)
+const posterCategory = currentPoster?.category?.toLowerCase();
+const selectedBusinessCategory = route.params.selectedBusinessCategory?.toLowerCase();
+const userProfileCategory = selectedBusinessProfile?.category?.toLowerCase();
+
+// Validation logic
+const categoryToValidate = selectedBusinessCategory || userProfileCategory;
+if (categoryToValidate && posterCategory && categoryToValidate !== posterCategory) {
+  console.log('Category mismatch detected:', {
+    posterCategory,
+    selectedBusinessCategory,
+    userProfileCategory
+  });
+  
+  // Navigate to BusinessProfilesScreen
+  navigation.navigate('BusinessProfiles');
+  return;
+}
+```
+
+B. Return Flow Enhancement:
+   - BusinessProfilesScreen already handles return navigation
+   - User can navigate back to complete poster creation
+   - Consider adding return param to BusinessProfilesScreen route
+
+---
+
+6. EDGE CASES
+=============
+
+Potential Issues and Solutions:
+
+A. Category Not Selected:
+   - Issue: User navigates directly without selecting category
+   - Solution: Allow flow to continue (no validation if selectedBusinessCategory is null)
+
+B. Poster Without Category:
+   - Issue: poster.category is undefined or null
+   - Solution: Skip validation if posterCategory is null
+
+C. Category Format Mismatch:
+   - Issue: "Restaurant" vs "restaurant" (case sensitivity)
+   - Solution: Use toLowerCase() for comparison
+
+D. Navigation Stack Issues:
+   - Issue: User gets stuck in navigation loop
+   - Solution: Add navigation params to indicate validation context
+
+E. User Returning from BusinessProfileScreen:
+   - Issue: Category still mismatched after profile update
+   - Solution: Re-validate on return, allow manual override option
+
+F. Multiple Business Profiles:
+   - Issue: User has multiple profiles with different categories
+   - Solution: Use globally selected profile from BusinessProfileContext
+
+G. Async Profile Loading:
+   - Issue: BusinessProfileContext still loading when validation runs
+   - Solution: Wait for isLoading to be false before validating
+
+---
+
+7. IMPLEMENTATION TIMELINE (1 – 1.5 Days)
+==========================================
+
+DAY 1 (Full Day - 8 hours)
+--------------------------
+
+Morning (4 hours):
+- Codebase navigation analysis ✓
+- Identify all navigation touchpoints ✓
+- Map data flow between screens ✓
+- Design validation logic architecture ✓
+
+Afternoon (4 hours):
+- Modify navigation types (types.ts) - 30 minutes
+- Update HomeScreen navigation params - 1 hour
+- Update PosterPlayerScreen navigation params - 1 hour
+- Implement validation logic in PosterEditorScreen - 1.5 hours
+- Test basic navigation flow - 30 minutes
+
+DAY 2 (Half Day - 4 hours)
+--------------------------
+
+Morning (4 hours):
+- Implement redirect to BusinessProfilesScreen - 1 hour
+- Handle edge cases and error scenarios - 1.5 hours
+- Add user feedback messages/toasts - 30 minutes
+- Comprehensive testing and debugging - 1 hour
+
+Total Estimated Effort: 12 hours (1.5 days)
+
+---
+
+8. FINAL CONCLUSION
+===================
+
+CAN THIS FEATURE BE REALISTICALLY IMPLEMENTED IN 1-1.5 DAYS?
+
+**YES - Implementation is highly feasible**
+
+Reasons:
+1. **Minimal Architecture Changes**: No new state management or Redux required
+2. **Existing Infrastructure**: BusinessProfileContext and navigation already in place
+3. **Clear Validation Point**: PosterEditorScreen Next button is ideal location
+4. **Simple Data Flow**: Category data flows through existing navigation params
+5. **Low Risk**: Changes are additive, won't break existing functionality
+
+ARCHITECTURAL BLOCKERS IDENTIFIED: None
+
+TECHNICAL CONSIDERATIONS:
+- All required data is available in PosterEditorScreen
+- BusinessProfileContext provides global state management
+- Navigation system supports additional params
+- BusinessProfilesScreen already exists and handles profile updates
+
+RECOMMENDATION:
+Proceed with implementation as outlined. The feature leverages existing architecture and requires minimal changes. The 1.5-day timeline is realistic and allows for proper testing and edge case handling.
+
+SUCCESS METRICS:
+- Validation triggers correctly when categories mismatch
+- Users can update profiles and return to complete poster creation
+- No impact on existing poster creation flows
+- Smooth user experience with clear feedback
+
+---
+
+IMPLEMENTATION PRIORITY: HIGH
+BUSINESS IMPACT: Improves data consistency and user experience
+TECHNICAL RISK: LOW
+USER EXPERIENCE IMPACT: POSITIVE (prevents category mismatches)

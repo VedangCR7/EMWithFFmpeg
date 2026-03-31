@@ -20,7 +20,7 @@ import calendarApi from '../services/calendarApi';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { MainStackParamList } from '../navigation/AppNavigator';
+import { MainStackParamList } from '../navigation/types';
 
 // Festival data structure
 interface FestivalData {
@@ -633,21 +633,13 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
 
   const handlePosterPress = useCallback(async (poster: Template, dateString: string) => {
     // Use global business profile for consistent branding
-    // NOTE: businessCategory is intentionally NOT passed here.
-    // When navigating from a calendar date, calendarDate context must take priority.
-    // Passing businessCategory would activate the business-poster API fetch in
-    // PosterPlayerScreen, which overwrites the date-scoped poster list whenever
-    // the user changes the language filter. Business profile data (branding/overlays)
-    // is still available via selectedBusinessProfile param.
     navigation.navigate('PosterPlayer', {
       selectedPoster: poster,
       relatedPosters: selectedDatePosters.filter(p => p.id !== poster.id),
       calendarDate: dateString,
       originScreen: 'Calendar',
-      selectedBusinessProfile: selectedBusinessProfile,
-      selectedBusinessProfileId: selectedBusinessProfile?.id,
     });
-  }, [navigation, selectedDatePosters, selectedBusinessProfile]);
+  }, [navigation, selectedDatePosters]);
 
   const renderPosterCard = useCallback(({ item }: { item: Template }) => {
     return (
