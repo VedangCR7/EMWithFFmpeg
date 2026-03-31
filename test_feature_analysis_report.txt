@@ -1,0 +1,369 @@
+TEST FEATURE ANALYSIS REPORT
+=====================================
+
+Objective: Analyze current implementation of HomeScreen and PosterPlayerScreen to prepare for adding temporary TEST functionality with floating button and category-based poster display.
+
+ANALYSIS DATE: March 4, 2026
+SCOPE: HomeScreen.tsx, PosterPlayerScreen.tsx, Navigation Structure, Category & Poster Data Sources
+
+=====================================
+1. HOMESCREEN STRUCTURE ANALYSIS
+=====================================
+
+Component Definition:
+- File: src/screens/HomeScreen.tsx
+- Component: const HomeScreen: React.FC = React.memo(() => { ... })
+- Navigation Hook: useNavigation<StackNavigationProp<MainStackParamList>>()
+
+Main Container Layout:
+- Root: SafeAreaView with style={[styles.container, { backgroundColor: theme.colors.gradient[0] || '#e8e8e8' }]}
+- SafeArea Edges: ['top', 'left', 'right']
+- Theme Integration: Uses useTheme() hook for dynamic styling
+
+UI Components Structure:
+- StatusBar (transparent, dark-content)
+- Main content container with gradient background
+- Multiple sections including:
+  * Header/Search area
+  * Business categories section
+  * Template galleries
+  * Featured content
+  * Banners
+  * Calendar integration
+
+Safe Location for Floating Test Button:
+- RECOMMENDED: Position absolute floating button in bottom-right corner
+- Safe Zone: Above existing tab bar navigation (avoid overlap)
+- Suggested Style: 
+  * position: 'absolute'
+  * bottom: safeAreaInsets.bottom + 80 (above tab bar)
+  * right: 16
+  * zIndex: 1000 (above content but below modals)
+
+Existing Floating Elements:
+- Custom Tab Bar with overlapping logo (AppNavigator.tsx lines 782-816)
+- Today's Pick FAB (AppNavigator.tsx lines 936-973) - positioned bottom-right
+- Business profile dropdown overlay
+
+Navigation Integration:
+- Already imports useNavigation hook
+- Stack navigation type: StackNavigationProp<MainStackParamList>
+- Can navigate to: 'PosterPlayer', 'TestScreen' (to be added)
+
+=====================================
+2. POSTERPLAYERSCREEN STRUCTURE ANALYSIS
+=====================================
+
+Component Definition:
+- File: src/screens/PosterPlayerScreen.tsx
+- Component: const PosterPlayerScreen: React.FC = () => { ... }
+- Navigation: useNavigation<PosterPlayerScreenNavigationProp>()
+- Route: useRoute<PosterPlayerScreenRouteProp>()
+
+Main Layout Structure:
+- Root: View with gradient background theme.colors.gradient
+- StatusBar (transparent, dark-content, translucent)
+- SafeArea top spacing: height: insets.top + moderateScale(12)
+
+Header Section:
+- Back arrow button (TouchableOpacity with LinearGradient)
+- Category title display (dynamic based on route params)
+- Next button (TouchableOpacity with LinearGradient)
+
+Poster Display Section:
+- Container: View with swipe gesture handling
+- Image Component: LazyFullImage for optimized loading
+- Image Properties: 
+  * thumbnailUri, fullImageUri
+  * resizeMode: 'contain'
+  * quality: 'high'
+  * maxWidth: 2400
+
+Data Flow - How Posters Are Passed:
+Route Parameters (MainStackParamList.PosterPlayer):
+{
+  selectedPoster: any;
+  relatedPosters: any[];
+  searchQuery?: string;
+  templateSource?: 'greeting' | 'professional' | 'featured';
+  businessCategory?: string | { name: string };
+  greetingCategory?: string;
+  originScreen?: string;
+  posterLimit?: number;
+  calendarDate?: string;
+}
+
+Expected Poster Data Format (Template interface):
+{
+  id: string;
+  name: string;
+  thumbnail: string;
+  thumbnailUrl?: string;
+  videoUrl?: string;
+  category: string;
+  downloads: number;
+  isDownloaded: boolean;
+  languages?: string[];
+  tags?: string[];
+  description?: string;
+}
+
+UI Components for Poster Rendering:
+- LazyFullImage: Main poster display with lazy loading
+- OptimizedImage: Thumbnail rendering
+- RelatedPosterItem: Related posters carousel
+- FlatList: For horizontal scrolling of related posters
+
+Reusable Logic for TestScreen:
+- Image optimization utilities (getHighQualityImageUrl function)
+- Template filtering logic (templateContainsLanguage, mergeTemplateLanguages)
+- Responsive scaling functions (scale, moderateScale)
+- Theme integration patterns
+- Navigation parameter handling
+
+=====================================
+3. NAVIGATION STRUCTURE ANALYSIS
+=====================================
+
+Navigation Hierarchy:
+- RootStack (RootStackParamList)
+  - MainApp (authenticated flow)
+    - MainStack (MainStackParamList)
+      - MainTabs (TabNavigator)
+      - PosterPlayer (Stack Screen)
+      - PosterEditor, VideoEditor, etc.
+
+PosterPlayerScreen Registration:
+- Location: src/navigation/AppNavigator.tsx
+- Stack: MainStack.Navigator
+- Registration: 
+  <MainStack.Screen 
+    name="PosterPlayer" 
+    component={PosterPlayerScreen}
+    options={{ headerShown: false }}
+  />
+
+Tab Navigator Integration:
+- Tab.Screen name="PosterPlayer" also exists in TabNavigator
+- Custom tab bar with overlapping logo design
+- Direct navigation shortcut from tab bar logo
+
+Adding TestScreen - RECOMMENDED APPROACH:
+1. Add to MainStackParamList:
+   TestScreen: {
+     selectedCategory: string;
+     posters: any[];
+   };
+
+2. Register in MainStack.Navigator:
+   <MainStack.Screen 
+     name="TestScreen" 
+     component={TestScreen}
+     options={{ headerShown: false }}
+   />
+
+Navigation Usage Pattern:
+- navigation.navigate('PosterPlayer', { selectedPoster, relatedPosters, ... })
+- Same pattern can be used for TestScreen
+
+=====================================
+4. CATEGORY DATA SOURCE ANALYSIS
+=====================================
+
+Business Categories Service:
+- File: src/services/businessCategoriesService.ts
+- Interface: BusinessCategory
+- Main Methods:
+  * getBusinessCategories(): Promise<BusinessCategoriesResponse>
+  * getHomeBusinessCategories(): Promise<BusinessCategoriesResponse>
+  * getCategories(): Promise<BusinessCategoriesResponse>
+
+BusinessCategory Interface:
+{
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  imageUrl?: string;
+  image?: string;
+  parentCategoryName?: string;
+  subCategories?: any[];
+  slug?: string;
+  color?: string;
+  posterCount?: number;
+  videoCount?: number;
+  totalContent?: number;
+  mainCategory?: string;
+  childCategoryNames?: any;
+  sortOrder?: number;
+  createdAt?: string;
+  isParent?: boolean;
+}
+
+API Endpoints:
+- Main: /api/mobile/business-categories/business
+- Home: /api/mobile/business-categories/home
+- Alias: /api/v1/categories
+
+HomeScreen Category Usage:
+- State: const [businessCategories, setBusinessCategories] = useState<BusinessCategory[]>([])
+- Loading: const [businessCategoriesLoading, setBusinessCategoriesLoading] = useState(false)
+- Fetch: businessCategoriesService.getHomeBusinessCategories()
+- Previews: const [businessCategoryPreviews, setBusinessCategoryPreviews] = useState<Record<string, Template[]>>({})
+
+Category Display Components:
+- BusinessCategoryCardItem: Individual category card
+- BusinessCategoriesSection: Section container
+- ModalBusinessCategoryItem: Modal display for categories
+
+=====================================
+5. POSTER DATA SOURCE ANALYSIS
+=====================================
+
+Business Category Posters API:
+- File: src/services/businessCategoryPostersApi.ts
+- Interface: BusinessCategoryPoster
+- Main Methods:
+  * getPostersByCategory(category: string, limit?: number): Promise<BusinessCategoryPostersResponse>
+  * getUserCategoryPosters(): Promise<BusinessCategoryPostersResponse>
+
+BusinessCategoryPoster Interface:
+{
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  thumbnail: string;
+  imageUrl: string;
+  downloadUrl: string;
+  downloads: number;
+  isPremium: boolean;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+API Endpoint:
+- /api/mobile/posters/category/{category}?limit={limit}&categoryId={categoryId}
+
+PosterPlayerScreen Poster Fetching:
+- Route parameters provide initial posters
+- Additional fetching via businessCategoryPostersApi.getPostersByCategory()
+- Template format conversion: BusinessCategoryPoster → Template
+- Caching: 5-minute cache duration with Map-based storage
+
+Data Transformation:
+```typescript
+const templates: Template[] = response.data.posters.map((poster: any) => ({
+  id: poster.id,
+  name: poster.title || poster.name,
+  thumbnail: poster.thumbnail,
+  category: poster.category,
+  downloads: poster.downloads || 0,
+  isDownloaded: poster.isDownloaded || false,
+  tags: poster.tags || [],
+  languages: [],
+  previewUrl: poster.imageUrl || poster.downloadUrl,
+}));
+```
+
+Poster Display Logic:
+- High-quality image URL generation
+- Cloudinary URL optimization
+- Progressive image loading
+- Language filtering
+- Tag-based filtering (for event planners)
+
+=====================================
+6. REUSABLE COMPONENTS FOR TESTSCREEN
+=====================================
+
+Image Components:
+- OptimizedImage: Thumbnail and poster preview rendering
+- LazyFullImage: Full-quality poster display with lazy loading
+- Image optimization utilities (getHighQualityImageUrl)
+
+UI Components:
+- TemplateCard: Reusable poster template card
+- BusinessCategoryCardItem: Category display card
+- RelatedPosterItem: Horizontal poster item
+
+Data Utilities:
+- Template filtering functions (templateContainsLanguage)
+- Responsive scaling (scale, moderateScale)
+- Theme integration (useTheme hook)
+- Navigation patterns
+
+API Services:
+- businessCategoriesService: Category fetching
+- businessCategoryPostersApi: Poster fetching by category
+- Template transformation utilities
+
+State Management Patterns:
+- useState for local state
+- useCallback for memoized functions
+- useMemo for computed values
+- useEffect for side effects
+
+=====================================
+7. IMPLEMENTATION RECOMMENDATIONS
+=====================================
+
+TestScreen Structure:
+1. Create TestScreen.tsx following PosterPlayerScreen pattern
+2. Use similar layout: Header + Poster Gallery
+3. Reuse LazyFullImage for poster display
+4. Implement FlatList with poster items
+
+Floating Button Implementation:
+1. Add to HomeScreen main return (before closing SafeAreaView)
+2. Use TouchableOpacity with absolute positioning
+3. Style to match existing FAB (Today's Pick button)
+4. Handle press to open category selection modal
+
+Category Selection:
+1. Reuse existing businessCategories state
+2. Create modal similar to existing category modals
+3. Use BusinessCategoryCardItem components
+4. Navigate to TestScreen with selected category
+
+Navigation Flow:
+HomeScreen → (Floating Button) → Category Modal → TestScreen → PosterPlayer
+
+Data Flow:
+1. Category selected → businessCategoryPostersApi.getPostersByCategory()
+2. Posters fetched → Navigate to TestScreen with posters
+3. TestScreen displays posters → On poster tap → Navigate to PosterPlayer
+
+=====================================
+8. SAFE INTEGRATION POINTS
+=====================================
+
+HomeScreen Integration:
+- Add floating button before SafeAreaView closing tag
+- Use existing businessCategories state
+- Leverage existing navigation hooks
+- Follow existing theme and styling patterns
+
+Navigation Integration:
+- Add TestScreen to MainStackParamList
+- Register TestScreen in MainStack.Navigator
+- Use existing navigation patterns
+
+Data Integration:
+- Reuse businessCategoriesService for category data
+- Reuse businessCategoryPostersApi for poster data
+- Follow existing data transformation patterns
+- Use existing caching mechanisms
+
+UI Integration:
+- Follow existing component patterns
+- Use established theme system
+- Maintain responsive design principles
+- Preserve existing user experience
+
+=====================================
+END OF ANALYSIS REPORT
+=====================================
+
+This analysis provides a comprehensive foundation for implementing the TEST functionality while maintaining code consistency and reusing existing patterns. All identified integration points are safe and follow established architectural patterns in the codebase.

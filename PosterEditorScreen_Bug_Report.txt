@@ -1,0 +1,48 @@
+# Debugging Report: PosterEditorScreen Stale Profile Issue
+
+1. Root cause of why PosterEditorScreen shows stale profile data
+The root cause lies in disconnected state management and missing authentication listener in `BusinessProfileContext`. When a user logs out, the globally cached `@selected_business_profile` in `AsyncStorage` and in the `BusinessProfileContext` memory state is never cleared. `HomeScreen` updates its own local state on user change but fails to sync this update with the global `BusinessProfileContext`. Since `PosterEditorScreen` prioritizes the context's state (`globalSelectedProfile`), it continues to consume and render the previous user's profile data.
+
+2. Differences between HomeScreen implementation and PosterEditorScreen
+- **HomeScreen**: Manages the business profile independently using local component state (`userBusinessProfiles`, `selectedBusinessProfileId`) and explicit `AsyncStorage` calls (using the key `'selectedBusinessProfileId'`). Crucially, it subscribes to `authService.onAuthStateChanged`. When a new user logs in, it fetches the new profiles and updates its local state perfectly. It does NOT use or update the global `BusinessProfileContext`.
+- **PosterEditorScreen**: Does not manage or fetch profiles. It consumes `useBusinessProfile()` to get the `globalSelectedProfile`. It sets `globalSelectedProfile` as its primary source of truth, falling back to a navigation param only if the context is null.
+
+3. Files responsible for the bug
+- `src/context/BusinessProfileContext.tsx`: Missing auth state listener to clear cache on logout.
+- `src/screens/HomeScreen.tsx`: Fails to synchronize its local profile selection with the global `BusinessProfileContext`.
+- `src/screens/PosterEditorScreen.tsx`: (Victim) Incorrectly assumes the global context is always fresh and correctly synced with the authenticated user.
+
+4. Code locations where stale profile data is used
+In `src/screens/PosterEditorScreen.tsx`:
+```javascript
+  const { selectedBusinessProfile: globalSelectedProfile } = useBusinessProfile();
+  
+  // 1️⃣ Context profile (global state) - PRIMARY SOURCE OF TRUTH
+  const activeBusinessProfile = useMemo(() => {
+    return globalSelectedProfile ?? selectedBusinessProfileParam ?? null;
+  }, [globalSelectedProfile, selectedBusinessProfileParam]);
+```
+
+5. Missing state subscriptions or dependencies
+- `BusinessProfileContext.tsx` is missing an `useEffect` that subscribes to `authService.onAuthStateChanged` to call `setSelectedBusinessProfile(null)` and remove `@selected_business_profile` from `AsyncStorage` upon logout.
+- `HomeScreen.tsx` is missing a call to `setSelectedBusinessProfile` from `useBusinessProfile()` whenever it automatically switches the profile for the new user.
+
+6. Whether navigation params or cached state is causing the issue
+It is the cached context state causing the issue. Although `PosterEditorScreen` can receive `selectedBusinessProfileParam` via navigation params, the code explicitly prioritizes the cached context (`globalSelectedProfile`) over the navigation param. Since the context outlives the user session and isn't cleared, the stale cache overrides the potentially correct navigation param.
+
+7. Step-by-step explanation of the failure flow
+1. User A logs in. `HomeScreen` loads their profiles. Down the line (e.g., in `PosterPlayerScreen`), User A's profile gets saved to `BusinessProfileContext` and cached to `@selected_business_profile`.
+2. User A logs out. `HomeScreen` clears its local state, but `BusinessProfileContext` keeps User A's profile in its React state and in `AsyncStorage`.
+3. User B logs in. `HomeScreen` successfully detects the new user, fetches User B's profiles, and displays User B's profile. However, it does NOT update `BusinessProfileContext`.
+4. User B navigates to `PosterEditorScreen`.
+5. `PosterEditorScreen` calls `useBusinessProfile()`. The context returns User A's profile (the stale cache).
+6. `PosterEditorScreen` sets `activeBusinessProfile = globalSelectedProfile`, rendering User A's business name and logo on User B's screen.
+
+8. Recommended fix strategy
+- **Fix Context Lifecycle**: In `BusinessProfileContext.tsx`, add an effect that listens to `authService.onAuthStateChanged`. If the user becomes null or changes, immediately call `setSelectedBusinessProfile(null)`.
+- **Unify State Management**: `HomeScreen` should consume `useBusinessProfile()` and call `setSelectedBusinessProfile` whenever it switches the active business profile, ensuring `HomeScreen` and `PosterEditorScreen` read from the exact same source of truth.
+- **Normalize AsyncStorage Keys**: `HomeScreen` uses `'selectedBusinessProfileId'` while the Context uses `'@selected_business_profile'`. This should be unified so only the global context handles persistence.
+
+9. Specific files that need modification
+- `src/context/BusinessProfileContext.tsx` (Add auth listener)
+- `src/screens/HomeScreen.tsx` (Integrate with BusinessProfileContext instead of recreating profile local state)

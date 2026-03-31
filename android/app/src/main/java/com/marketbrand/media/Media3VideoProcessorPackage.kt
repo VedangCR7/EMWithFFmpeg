@@ -1,0 +1,17 @@
+package com.marketbrand.media
+
+import com.facebook.react.ReactPackage
+import com.facebook.react.bridge.NativeModule
+import com.facebook.react.bridge.ReactApplicationContext
+import com.facebook.react.uimanager.ViewManager
+
+class Media3VideoProcessorPackage : ReactPackage {
+  override fun createNativeModules(reactContext: ReactApplicationContext): MutableList<NativeModule> {
+    return mutableListOf(Media3VideoProcessorModule(reactContext))
+  }
+
+  override fun createViewManagers(reactContext: ReactApplicationContext): MutableList<ViewManager<*, *>> {
+    return mutableListOf()
+  }
+}
+

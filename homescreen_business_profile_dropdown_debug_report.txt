@@ -1,0 +1,534 @@
+HOMESCREEN BUSINESS PROFILE DROPDOWN DEBUG REPORT
+================================================
+
+DATE: 2026-03-08
+ISSUE: Business profile dropdown not updating name, photo, and selected business profile
+SYMPTOM: Changing dropdown selection does not update UI elements
+
+============================================================
+STEP 1 — DROPDOWN IMPLEMENTATION ANALYSIS
+============================================================
+
+✅ File: src/screens/HomeScreen.tsx
+
+DROPDOWN COMPONENT:
+- Location: Lines 4787-4800+ (ScrollView with businessProfileDropdownList)
+- Data Source: userBusinessProfiles.map(profile => ...)
+- Selection Handler: onPress={() => handleBusinessProfileSelect(profile.id)}
+- Active State: const isActive = profile.id === selectedBusinessProfileId
+
+SELECTION HANDLER:
+```typescript
+const handleBusinessProfileSelect = useCallback((profileId: string) => {
+  const profile = userBusinessProfiles.find(p => p.id === profileId);
+  if (profile) {
+    setSelectedBusinessProfile(profile);  // ✅ Calls context setter
+  }
+  setSelectedBusinessProfileId(profileId);  // ✅ Updates local state
+  closeBusinessProfileDropdown();
+  businessCategoryPostersApi.clearCache();
+}, [userBusinessProfiles, setSelectedBusinessProfile, closeBusinessProfileDropdown]);
+```
+
+VERIFICATION: PASSED
+- Dropdown correctly triggers handleBusinessProfileSelect
+- Handler calls setSelectedBusinessProfile (context) and setSelectedBusinessProfileId (local)
+- Profile is found from userBusinessProfiles array
+
+============================================================
+STEP 2 — BUSINESS PROFILE STATE ANALYSIS
+============================================================
+
+✅ STATE DECLARATIONS:
+
+CONTEXT STATE:
+```typescript
+const { selectedBusinessProfile, setSelectedBusinessProfile } = useBusinessProfile();
+```
+
+LOCAL STATE:
+```typescript
+const [selectedBusinessProfileId, setSelectedBusinessProfileId] = useState<string | null>(null);
+const [userBusinessProfiles, setUserBusinessProfiles] = useState<BusinessProfile[]>([]);
+```
+
+USER PROFILE STATE:
+```typescript
+const [userProfile, setUserProfile] = useState(() => authService.getCurrentUser());
+```
+
+VERIFICATION: MIXED STATE USAGE
+- Context: selectedBusinessProfile (from BusinessProfileContext)
+- Local: selectedBusinessProfileId (for dropdown selection)
+- User: userProfile (for general user info)
+
+ISSUE IDENTIFIED: Multiple state sources for profile data
+
+============================================================
+STEP 3 — PROFILE SELECTION FUNCTION VERIFICATION
+============================================================
+
+✅ FUNCTION: handleBusinessProfileSelect(profileId)
+
+EXPECTED BEHAVIOR:
+✅ Update selectedBusinessProfileId (local state)
+✅ Update selectedBusinessProfile (global context)
+✅ Close dropdown
+✅ Clear cache
+
+IMPLEMENTATION:
+```typescript
+const handleBusinessProfileSelect = useCallback((profileId: string) => {
+  const profile = userBusinessProfiles.find(p => p.id === profileId);
+  if (profile) {
+    setSelectedBusinessProfile(profile);  // ✅ CONTEXT UPDATE
+  }
+  setSelectedBusinessProfileId(profileId);  // ✅ LOCAL UPDATE
+  closeBusinessProfileDropdown();
+  businessCategoryPostersApi.clearCache();
+}, [userBusinessProfiles, setSelectedBusinessProfile, closeBusinessProfileDropdown]);
+```
+
+VERIFICATION: PASSED
+- Function correctly updates both context and local state
+- Profile is found from userBusinessProfiles
+- Both setSelectedBusinessProfile (context) and setSelectedBusinessProfileId (local) are called
+
+============================================================
+STEP 4 — CONTEXT USAGE VERIFICATION
+============================================================
+
+✅ IMPORT:
+```typescript
+import { useBusinessProfile } from '../context/BusinessProfileContext';
+```
+
+✅ HOOK USAGE:
+```typescript
+const { selectedBusinessProfile, setSelectedBusinessProfile } = useBusinessProfile();
+```
+
+✅ CONTEXT UPDATE:
+```typescript
+setSelectedBusinessProfile(profile);  // Called in handleBusinessProfileSelect
+```
+
+VERIFICATION: PASSED
+- HomeScreen correctly imports and uses BusinessProfileContext
+- Context is updated when dropdown selection changes
+- setSelectedBusinessProfile is called with the selected profile
+
+============================================================
+STEP 5 — UI DATA SOURCE ANALYSIS
+============================================================
+
+🔍 CRITICAL ISSUE FOUND
+
+PROFILE PHOTO (userAvatarUri):
+```typescript
+const userAvatarUri = useMemo(() => {
+  return (
+    userProfile?.photo ||          // ❌ WRONG SOURCE
+    userProfile?.photoURL ||       // ❌ WRONG SOURCE
+    userProfile?.logo ||           // ❌ WRONG SOURCE
+    userProfile?.companyLogo ||    // ❌ WRONG SOURCE
+    userProfile?.avatar ||         // ❌ WRONG SOURCE
+    null
+  );
+}, [userProfile]);  // ❌ DEPENDS ON userProfile, NOT selectedBusinessProfile
+```
+
+BUSINESS NAME (userName):
+```typescript
+const userName = useMemo(() => {
+  return (
+    userProfile?.displayName ||    // ❌ WRONG SOURCE
+    userProfile?.name ||          // ❌ WRONG SOURCE
+    userProfile?.companyName ||    // ❌ WRONG SOURCE
+    userProfile?.username ||       // ❌ WRONG SOURCE
+    'User'
+  );
+}, [userProfile]);  // ❌ DEPENDS ON userProfile, NOT selectedBusinessProfile
+```
+
+USER INITIALS:
+```typescript
+const userInitials = useMemo(() => 
+  userName
+    .split(' ')
+    .map((n: string) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2),
+  [userName]  // ❌ INDIRECTLY DEPENDS ON userProfile
+);
+```
+
+VERIFICATION: FAILED
+- UI elements read from userProfile instead of selectedBusinessProfile
+- This is the root cause of the issue
+
+============================================================
+STEP 6 — USEMEMO/USEEFFECT DEPENDENCIES ANALYSIS
+============================================================
+
+❌ DEPENDENCY ISSUES:
+
+userAvatarUri:
+- Dependencies: [userProfile] ❌ Should include selectedBusinessProfile
+- Missing: selectedBusinessProfile dependency
+
+userName:
+- Dependencies: [userProfile] ❌ Should include selectedBusinessProfile  
+- Missing: selectedBusinessProfile dependency
+
+userInitials:
+- Dependencies: [userName] ❌ Should include selectedBusinessProfile
+- Missing: selectedBusinessProfile dependency
+
+CORRECT DEPENDENCIES SHOULD BE:
+```typescript
+const userAvatarUri = useMemo(() => {
+  return (
+    selectedBusinessProfile?.logo ||
+    selectedBusinessProfile?.companyLogo ||
+    userProfile?.photo ||
+    userProfile?.photoURL ||
+    null
+  );
+}, [selectedBusinessProfile, userProfile]);
+
+const userName = useMemo(() => {
+  return (
+    selectedBusinessProfile?.name ||
+    userProfile?.displayName ||
+    userProfile?.name ||
+    'User'
+  );
+}, [selectedBusinessProfile, userProfile]);
+```
+
+VERIFICATION: FAILED
+- Dependencies do not include selectedBusinessProfile
+- UI will not update when selectedBusinessProfile changes
+
+============================================================
+STEP 7 — BUSINESS PROFILE LOADING VERIFICATION
+============================================================
+
+✅ LOADING FUNCTION: loadBusinessProfiles()
+
+API CALL:
+```typescript
+const profiles = await businessProfileService.getUserBusinessProfiles(currentUserId);
+```
+
+STORAGE LOGIC:
+```typescript
+// Get stored profile ID, but verify it belongs to current user
+const storedProfileId = await AsyncStorage.getItem('selectedBusinessProfileId');
+const storedUserId = await AsyncStorage.getItem('selectedBusinessProfileUserId');
+
+let resolvedProfileId: string | null = null;
+
+// Only use stored profile ID if it belongs to the current user
+if (storedProfileId && storedUserId === currentUserId && profiles.some(profile => profile.id === storedProfileId)) {
+  resolvedProfileId = storedProfileId;
+  console.log('G [HOMESCREEN] Using stored business profile:', resolvedProfileId);
+  // Use first profile if no valid stored profile
+  resolvedProfileId = profiles[0].id;
+  console.log('G [HOMESCREEN] Using first business profile:', resolvedProfileId);
+  // Store the user ID with the profile ID
+  await AsyncStorage.setItem('selectedBusinessProfileUserId', currentUserId).catch(() => {});
+} else {
+  // Clear stored profile if user has no profiles
+  await AsyncStorage.removeItem('selectedBusinessProfileId').catch(() => {});
+  await AsyncStorage.removeItem('selectedBusinessProfileUserId').catch(() => {});
+}
+
+if (resolvedProfileId) {
+  setSelectedBusinessProfileId(resolvedProfileId);
+} else {
+  setSelectedBusinessProfileId(null);
+}
+```
+
+ISSUE IDENTIFIED: 
+- Function sets selectedBusinessProfileId (local state)
+- But does NOT update selectedBusinessProfile (context)
+- Context is not synchronized with stored profile
+
+VERIFICATION: PARTIAL ISSUE
+- Profile loading works correctly
+- But context is not updated with stored/selected profile
+
+============================================================
+STEP 8 — DROPDOWN DATA SOURCE VERIFICATION
+============================================================
+
+✅ DROPDOWN DATA:
+```typescript
+{userBusinessProfiles.map(profile => {
+  const isActive = profile.id === selectedBusinessProfileId;  // ✅ Uses local state
+  const profileLogo = profile.logo || profile.companyLogo || profile.banner;
+  const initials = profile.name ? profile.name.split(' ').map(part => part[0]).join('').slice(0, 2).toUpperCase() : 'MB';
+  // ... render dropdown item
+})}
+```
+
+SELECTION SYNC:
+- Dropdown uses selectedBusinessProfileId for active state ✅
+- Dropdown data comes from userBusinessProfiles ✅
+- Selection updates both local and context state ✅
+
+VERIFICATION: PASSED
+- Dropdown is correctly synchronized with state
+- Data source is appropriate
+- Selection tracking works correctly
+
+============================================================
+STEP 9 — PROFILE PHOTO LOGIC VERIFICATION
+============================================================
+
+❌ CURRENT PRIORITY (WRONG):
+1. userProfile.photo
+2. userProfile.photoURL  
+3. userProfile.logo
+4. userProfile.companyLogo
+5. userProfile.avatar
+
+✅ CORRECT PRIORITY SHOULD BE:
+1. selectedBusinessProfile.logo
+2. selectedBusinessProfile.companyLogo
+3. userProfile.photo
+4. userProfile.photoURL
+5. userProfile.avatar
+
+CURRENT IMPLEMENTATION:
+```typescript
+const userAvatarUri = useMemo(() => {
+  return (
+    userProfile?.photo ||
+    userProfile?.photoURL ||
+    userProfile?.logo ||
+    userProfile?.companyLogo ||
+    userProfile?.avatar ||
+    null
+  );
+}, [userProfile]);  // ❌ WRONG DEPENDENCIES
+```
+
+VERIFICATION: FAILED
+- Profile photo logic completely ignores selectedBusinessProfile
+- Dependencies don't include selectedBusinessProfile
+
+============================================================
+STEP 10 — BUSINESS NAME LOGIC VERIFICATION
+============================================================
+
+❌ CURRENT PRIORITY (WRONG):
+1. userProfile.displayName
+2. userProfile.name
+3. userProfile.companyName
+4. userProfile.username
+5. 'User'
+
+✅ CORRECT PRIORITY SHOULD BE:
+1. selectedBusinessProfile.name
+2. userProfile.displayName
+3. userProfile.name
+4. 'User'
+
+CURRENT IMPLEMENTATION:
+```typescript
+const userName = useMemo(() => {
+  return (
+    userProfile?.displayName ||
+    userProfile?.name ||
+    userProfile?.companyName ||
+    userProfile?.username ||
+    'User'
+  );
+}, [userProfile]);  // ❌ WRONG DEPENDENCIES
+```
+
+VERIFICATION: FAILED
+- Business name logic completely ignores selectedBusinessProfile
+- Dependencies don't include selectedBusinessProfile
+
+============================================================
+STEP 11 — STATE UPDATE FLOW VERIFICATION
+============================================================
+
+✅ EXPECTED FLOW:
+Dropdown selection
+↓
+handleBusinessProfileSelect()
+↓
+setSelectedBusinessProfile(profile) → Context update
+↓
+setSelectedBusinessProfileId(profileId) → Local state update
+↓
+UI re-render with new profile data
+
+❌ ACTUAL FLOW:
+Dropdown selection
+↓
+handleBusinessProfileSelect()
+↓
+setSelectedBusinessProfile(profile) → Context update ✅
+↓
+setSelectedBusinessProfileId(profileId) → Local state update ✅
+↓
+UI re-render but still uses userProfile data ❌
+↓
+No visible change in UI ❌
+
+ROOT CAUSE: UI elements depend on userProfile, not selectedBusinessProfile
+
+VERIFICATION: FAILED
+- State updates work correctly
+- UI does not reflect state changes due to wrong data source
+
+============================================================
+STEP 12 — REGRESSION DETECTION
+============================================================
+
+🔍 REGRESSION CONFIRMED
+
+EVIDENCE OF REGRESSION:
+1. UI uses userProfile instead of selectedBusinessProfile
+2. Dependencies don't include selectedBusinessProfile
+3. Context is updated but UI ignores it
+4. Previously this worked (mentioned in task description)
+
+LIKELY REGRESSION CAUSE:
+- During context implementation, UI dependency updates were missed
+- useMemo dependencies were not updated to include selectedBusinessProfile
+- UI continued to use old userProfile-based logic
+
+VERIFICATION: REGRESSION CONFIRMED
+- This is definitely a regression from a previous working state
+- The BusinessProfileContext was implemented but UI dependencies were not updated
+
+============================================================
+STEP 13 — ROOT CAUSE ANALYSIS
+============================================================
+
+PRIMARY ROOT CAUSE:
+UI elements (userName, userAvatarUri, userInitials) depend on userProfile instead of selectedBusinessProfile
+
+SECONDARY ISSUES:
+1. Missing selectedBusinessProfile in useMemo dependencies
+2. Profile loading does not update context with stored profile
+3. Mixed state usage creates confusion
+
+DETAILED BREAKDOWN:
+
+1. UI DATA SOURCE ISSUE:
+   - userName uses userProfile.name instead of selectedBusinessProfile.name
+   - userAvatarUri uses userProfile.photo instead of selectedBusinessProfile.logo
+   - Dependencies only include userProfile, not selectedBusinessProfile
+
+2. DEPENDENCY ARRAY ISSUE:
+   - userAvatarUri: [userProfile] should be [selectedBusinessProfile, userProfile]
+   - userName: [userProfile] should be [selectedBusinessProfile, userProfile]
+   - userInitials: [userName] should be [selectedBusinessProfile, userProfile]
+
+3. LOADING SYNC ISSUE:
+   - loadBusinessProfiles sets selectedBusinessProfileId but not selectedBusinessProfile
+   - Context is not updated when stored profile is loaded
+
+4. PRIORITY LOGIC ISSUE:
+   - Profile photo should prioritize business profile over user profile
+   - Business name should prioritize business profile over user profile
+
+============================================================
+RECOMMENDED FIXES
+============================================================
+
+IMMEDIATE FIXES:
+
+1. Update userAvatarUri:
+```typescript
+const userAvatarUri = useMemo(() => {
+  return (
+    selectedBusinessProfile?.logo ||
+    selectedBusinessProfile?.companyLogo ||
+    userProfile?.photo ||
+    userProfile?.photoURL ||
+    userProfile?.avatar ||
+    null
+  );
+}, [selectedBusinessProfile, userProfile]);
+```
+
+2. Update userName:
+```typescript
+const userName = useMemo(() => {
+  return (
+    selectedBusinessProfile?.name ||
+    userProfile?.displayName ||
+    userProfile?.name ||
+    userProfile?.companyName ||
+    'User'
+  );
+}, [selectedBusinessProfile, userProfile]);
+```
+
+3. Update profile loading to sync context:
+```typescript
+if (resolvedProfileId) {
+  setSelectedBusinessProfileId(resolvedProfileId);
+  const resolvedProfile = profiles.find(p => p.id === resolvedProfileId);
+  if (resolvedProfile) {
+    setSelectedBusinessProfile(resolvedProfile);  // Add this
+  }
+}
+```
+
+4. Update userInitials dependencies:
+```typescript
+const userInitials = useMemo(() => 
+  userName
+    .split(' ')
+    .map((n: string) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2),
+  [userName, selectedBusinessProfile]  // Add selectedBusinessProfile
+);
+```
+
+============================================================
+VALIDATION RESULTS
+============================================================
+
+✅ DROPDOWN IMPLEMENTATION: WORKING
+✅ CONTEXT USAGE: WORKING
+✅ STATE UPDATES: WORKING
+❌ UI DATA SOURCES: FAILED
+❌ DEPENDENCIES: FAILED
+❌ PROFILE LOADING SYNC: PARTIAL
+❌ PRIORITY LOGIC: FAILED
+
+OVERALL STATUS: FAILED
+Root cause identified: UI elements use wrong data source
+
+============================================================
+CONCLUSION
+============================================================
+
+ISSUE: HomeScreen business profile dropdown not updating UI
+ROOT CAUSE: UI elements depend on userProfile instead of selectedBusinessProfile
+TYPE: Regression from previous working state
+SEVERITY: High (core functionality broken)
+
+The dropdown selection works correctly and updates the context, but the UI ignores the context updates because it's still using the old userProfile-based data sources and dependencies.
+
+FIX COMPLEXITY: Low (simple dependency and priority updates)
+TESTING REQUIRED: Verify profile selection updates name, photo, and category display
+
+File created: homescreen_business_profile_dropdown_debug_report.txt
+Total investigation time: Complete
+Root cause: UI data source regression
