@@ -35,7 +35,8 @@ import PosterCanvas from '../components/PosterCanvas';
 
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, NavigationProp } from '@react-navigation/native';
+import { MainStackParamList } from '../navigation/types';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { PanGestureHandler, State, PinchGestureHandler } from 'react-native-gesture-handler';
@@ -360,6 +361,7 @@ interface Layer {
 }
 
 interface PosterEditorScreenProps {
+  navigation: NavigationProp<MainStackParamList, 'PosterEditor'>;
   route: {
     params: {
       selectedImage: {
@@ -376,13 +378,17 @@ interface PosterEditorScreenProps {
   };
 }
 
-const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
-  const navigation = useNavigation();
+const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route, navigation }) => {
   const insets = useSafeAreaInsets();
-  const { selectedImage, selectedLanguage, selectedTemplateId, selectedBusinessProfile: selectedBusinessProfileParam } = route.params;
+  const { selectedImage, selectedLanguage, selectedTemplateId } = route.params;
   const { isSubscribed, checkPremiumAccess, refreshSubscription, isSubscriptionActive } = useSubscription();
   const { isDarkMode, theme } = useTheme();
-  const { selectedBusinessProfile, selectedBusinessCategory, selectedBusinessId } = useBusinessProfile();
+  const { selectedBusinessProfile, selectedBusinessCategory, selectedBusinessId, isLoading: isContextLoading } = useBusinessProfile();
+  
+  // Prevent rendering if context is still loading
+  if (isContextLoading) {
+    return null;
+  }
   
   // Check if the selected business profile has an active subscription
   const isActive = selectedBusinessProfile?.subscriptionStatus?.toUpperCase() === "ACTIVE" || isSubscriptionActive;
@@ -2631,6 +2637,57 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
             if (!isSubscribed || !isSubscriptionActive) {
               console.log('User is not subscribed - showing premium modal');
               setShowPremiumModal(true);
+              return;
+            }
+
+            // Category validation: Check if poster template category matches selected business category
+            const getTemplateCategory = (template: string): string => {
+              const templateToCategory: { [key: string]: string } = {
+                'business': 'Business',
+                'event': 'Event',
+                'restaurant': 'Restaurant',
+                'fashion': 'Fashion & Beauty',
+                'real-estate': 'Real Estate',
+                'education': 'Education',
+                'healthcare': 'Healthcare',
+                'fitness': 'Fitness',
+                'wedding': 'Event',
+                'birthday': 'Event',
+                'corporate': 'Business',
+                'creative': 'Creative',
+                'minimal': 'Business',
+                'luxury': 'Fashion & Beauty',
+                'vintage': 'Creative',
+                'retro': 'Creative',
+                'elegant': 'Fashion & Beauty',
+                'tech': 'Technology',
+                'ocean': 'Creative',
+                'sunset': 'Creative',
+                'artistic': 'Creative',
+                'ombre-sunset': 'Creative',
+                'ombre-ocean': 'Creative',
+                'ombre-purple': 'Fashion & Beauty',
+                'ombre-forest': 'Education',
+                'ombre-fire': 'Fitness',
+                'ombre-night': 'Business',
+                'ombre-tropical': 'Restaurant',
+                'ombre-autumn': 'Fashion & Beauty',
+                'ombre-rose': 'Fashion & Beauty',
+                'ombre-galaxy': 'Technology',
+              };
+              return templateToCategory[template] || 'Business';
+            };
+
+            const posterCategory = getTemplateCategory(selectedTemplate);
+            if (selectedBusinessCategory && posterCategory && selectedBusinessCategory.toLowerCase() !== posterCategory.toLowerCase()) {
+              console.log('Category mismatch detected:', {
+                posterCategory,
+                selectedBusinessCategory,
+                selectedTemplate
+              });
+              
+              // Redirect to BusinessProfilesScreen to update category
+              navigation.navigate('BusinessProfiles');
               return;
             }
 
