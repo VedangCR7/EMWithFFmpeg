@@ -2654,78 +2654,32 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route, navigati
               profileSubscriptionStatus: selectedBusinessProfile?.subscriptionStatus
             });
             
-            // Check subscription status first
-            if (!isSubscribed || !isSubscriptionActive) {
-              console.log('❌ [POSTER EDITOR] User is not subscribed - showing premium modal');
-              setShowPremiumModal(true);
-              return;
-            }
-            
-            console.log('✅ [POSTER EDITOR] Subscription check passed');
-
-            console.log('🔍 [POSTER EDITOR] Starting category validation...');
-            
-            // Category validation: Check if poster template category matches selected business category
-            const getTemplateCategory = (template: string): string => {
-              const templateToCategory: { [key: string]: string } = {
-                'business': 'Business',
-                'event': 'Event',
-                'restaurant': 'Restaurant',
-                'fashion': 'Fashion & Beauty',
-                'real-estate': 'Real Estate',
-                'education': 'Education',
-                'healthcare': 'Healthcare',
-                'fitness': 'Fitness',
-                'wedding': 'Event',
-                'birthday': 'Event',
-                'corporate': 'Business',
-                'creative': 'Creative',
-                'minimal': 'Business',
-                'luxury': 'Fashion & Beauty',
-                'vintage': 'Creative',
-                'retro': 'Creative',
-                'elegant': 'Fashion & Beauty',
-                'tech': 'Technology',
-                'ocean': 'Creative',
-                'sunset': 'Creative',
-                'artistic': 'Creative',
-                'ombre-sunset': 'Creative',
-                'ombre-ocean': 'Creative',
-                'ombre-purple': 'Fashion & Beauty',
-                'ombre-forest': 'Education',
-                'ombre-fire': 'Fitness',
-                'ombre-night': 'Business',
-                'ombre-tropical': 'Restaurant',
-                'ombre-autumn': 'Fashion & Beauty',
-                'ombre-rose': 'Fashion & Beauty',
-                'ombre-galaxy': 'Technology',
-              };
-              return templateToCategory[template] || 'Business';
-            };
-
-            console.log('📋 [POSTER EDITOR] Category validation data:', {
-              selectedTemplate,
-              selectedBusinessCategory,
-              posterCategory: posterCategory
-            });
-            
-            // Use poster category from navigation instead of template mapping
-            const finalPosterCategory = posterCategory || getTemplateCategory(selectedTemplate);
-            console.log('📋 [POSTER EDITOR] Final poster category:', finalPosterCategory);
-            if (selectedBusinessCategory && finalPosterCategory && selectedBusinessCategory.toLowerCase() !== finalPosterCategory.toLowerCase()) {
-              console.log('❌ [POSTER EDITOR] Category mismatch detected:', {
-                posterCategory: finalPosterCategory,
-                selectedBusinessCategory,
-                selectedTemplate
+            // Validation based on type parameter
+            if (type === "business") {
+              console.log("🔍 [POSTER EDITOR] Business category validation", {
+                categoryName,
+                selectedBusinessCategory
               });
               
-              // Redirect to BusinessProfilesScreen to update category
-              console.log('🔄 [POSTER EDITOR] Redirecting to BusinessProfiles to update category');
-              navigation.navigate('BusinessProfiles');
-              return;
+              // Business category validation
+              if (!categoryName || !selectedBusinessCategory || categoryName.toLowerCase() !== selectedBusinessCategory.toLowerCase()) {
+                console.log("❌ [POSTER EDITOR] Business category mismatch", {
+                  categoryName,
+                  selectedBusinessCategory
+                });
+                return;
+              }
+            } else {
+              console.log("🔍 [POSTER EDITOR] Non-business poster → checking subscription");
+              
+              // Non-business poster: check subscription status
+              if (!selectedBusinessProfile?.subscriptionStatus || selectedBusinessProfile.subscriptionStatus.toUpperCase() !== "ACTIVE") {
+                console.log("❌ [POSTER EDITOR] Subscription inactive");
+                return;
+              }
             }
             
-            console.log('✅ [POSTER EDITOR] Category validation passed');
+            console.log("✅ [POSTER EDITOR] Validation passed → continuing");
 
             console.log('🎨 [POSTER EDITOR] Preparing for capture - deselecting layers...');
             // Deselect any selected or dragged layers so borders don't appear in preview
