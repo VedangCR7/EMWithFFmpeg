@@ -1,0 +1,164 @@
+MOBILE AUTH SCREENS ERROR MESSAGE ANALYSIS REPORT
+=================================================
+
+1. LoginScreen
+--------------
+API Calls:
+- loginAPIs.loginUser (login user with email/password)
+
+Issues Found:
+1. Raw backend message displayed
+Location: LoginScreen.tsx:157
+Code Snippet:
+const errorMsg = error.response?.data?.message || error.message || 'Sign in failed. Please try again.';
+setErrorMessage(errorMsg);
+
+Problem:
+Directly displays raw backend error message (error.response?.data?.message) when login fails.
+
+Current User Output:
+Raw backend messages like "Invalid credentials", "User not found", or technical error messages.
+
+Recommended UX Message:
+"Please check your email and password and try again."
+
+---------------------------------------
+
+2. RegistrationScreen
+---------------------
+API Calls:
+- businessCategoriesService.getBusinessCategories (fetch business categories)
+- loginAPIs.registerUser (register new user account)
+
+Issues Found:
+1. Raw backend message displayed (Registration)
+Location: RegistrationScreen.tsx:609
+Code Snippet:
+const errorMessage = error.response?.data?.message || error.message || '';
+// ... logic to check for email already registered ...
+} else {
+  setErrorMessage(errorMessage || 'Registration failed. Please try again.');
+}
+
+Problem:
+When registration fails (not due to email already registered), directly displays raw backend error message.
+
+Current User Output:
+Raw backend messages like "Validation failed: password too weak", "Phone number invalid", or other technical errors.
+
+Recommended UX Message:
+"We're having trouble creating your account right now. Please check your information and try again."
+
+---------------------------------------
+
+3. VerifyOtpScreen
+------------------
+API Calls:
+- Uses OtpVerificationComponent (no direct API calls in this screen)
+
+Issues Found:
+No direct issues in this screen - OTP verification handled by OtpVerificationComponent.
+
+---------------------------------------
+
+4. ForgotPasswordScreen
+-----------------------
+API Calls:
+- loginAPIs.requestPasswordReset (request password reset code)
+
+Issues Found:
+1. Raw backend message displayed
+Location: ForgotPasswordScreen.tsx:54
+Code Snippet:
+const message = error?.response?.data?.message || error.message || 'Unable to send code. Please try again.';
+Alert.alert('Request Failed', message);
+
+Problem:
+Directly displays raw backend error message when password reset request fails.
+
+Current User Output:
+Raw backend messages like "Email not found", "Rate limit exceeded", or technical errors.
+
+Recommended UX Message:
+"We couldn't send the code right now. Please check your email address and try again."
+
+---------------------------------------
+
+5. EmailVerificationScreen
+--------------------------
+API Calls:
+- loginAPIs.verifyEmailCode (verify email verification code)
+- loginAPIs.resendEmailVerification (resend verification code)
+
+Issues Found:
+No direct issues in this screen - error handling delegated to OtpVerificationComponent.
+
+---------------------------------------
+
+6. VerifyResetCodeScreen
+------------------------
+API Calls:
+- loginAPIs.verifyResetCode (verify password reset code)
+- loginAPIs.requestPasswordReset (resend reset code)
+
+Issues Found:
+No direct issues in this screen - error handling delegated to OtpVerificationComponent.
+
+---------------------------------------
+
+7. OtpVerificationComponent (Shared by EmailVerificationScreen & VerifyResetCodeScreen)
+-----------------------------------------------------------------------------------------
+API Calls:
+- Handles verification and resend operations via callback props
+
+Issues Found:
+1. Raw backend message displayed (Verification)
+Location: OtpVerificationComponent.tsx:65-66
+Code Snippet:
+const message = error?.response?.data?.message || error.message || 'Verification failed. Please try again.';
+Alert.alert('Verification Failed', message);
+
+Problem:
+Directly displays raw backend error message when OTP verification fails.
+
+Current User Output:
+Raw backend messages like "Invalid code", "Code expired", "Too many attempts", or technical errors.
+
+Recommended UX Message:
+"The code you entered is incorrect. Please check and try again."
+
+2. Raw backend message displayed (Resend)
+Location: OtpVerificationComponent.tsx:79-80
+Code Snippet:
+const message = error?.response?.data?.message || error.message || 'Unable to resend code right now.';
+Alert.alert('Resend Failed', message);
+
+Problem:
+Directly displays raw backend error message when code resend fails.
+
+Current User Output:
+Raw backend messages like "Rate limit exceeded", "Email service unavailable", or technical errors.
+
+Recommended UX Message:
+"We couldn't send a new code right now. Please wait a moment and try again."
+
+---------------------------------------
+
+GLOBAL OBSERVATIONS
+-------------------
+1. Total screens affected: 4 (LoginScreen, RegistrationScreen, ForgotPasswordScreen, OtpVerificationComponent)
+2. Total locations where raw errors are displayed: 4
+3. Whether centralized error handling exists: NO - No centralized error handling utilities found
+4. Recommended improvement approach: Create a centralized error message utility that maps backend error codes/messages to user-friendly messages, and implement consistent error handling patterns across all screens.
+
+---------------------------------------
+
+SUMMARY
+-------
+Total Screens Analyzed: 6
+Total Issues Found: 4
+Priority Fix Areas:
+1. LoginScreen (high priority - first user interaction)
+2. OtpVerificationComponent (high priority - affects both email verification and password reset)
+3. RegistrationScreen (medium priority - complex form with multiple validation points)
+4. ForgotPasswordScreen (low priority - less frequent user flow)

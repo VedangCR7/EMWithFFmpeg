@@ -1,0 +1,403 @@
+# PosterPlayerScreen Business Profile Switching Debug Report
+
+## 1. Root Cause Analysis
+
+### PRIMARY ISSUE: Navigation Parameter Priority Over Context
+**Root Cause**: PosterPlayerScreen prioritizes navigation route parameters over BusinessProfileContext for determining the business category.
+
+**File**: `src/screens/PosterPlayerScreen.tsx` (Lines 988-1134)
+
+### Critical Code Analysis:
+
+#### Navigation Parameter Extraction (Lines 308-319):
+```tsx
+const {
+  selectedPoster: initialPoster,
+  relatedPosters: initialRelatedPosters,
+  businessCategory,           // ❌ FROM ROUTE PARAMS
+  greetingCategory,
+  originScreen,
+  posterLimit,
+  calendarDate,
+  templateSource,
+  selectedBusinessProfile: initialBusinessProfile,  // ❌ FROM ROUTE PARAMS
+  selectedBusinessProfileId: initialBusinessProfileId, // ❌ FROM ROUTE PARAMS
+} = route.params;
+```
+
+#### Context Subscription (Lines 448-458):
+```tsx
+const { selectedBusinessProfile: globalSelectedProfile } = useBusinessProfile();
+
+// Determine active business profile with fallback priority:
+// 1️⃣ Context profile (global state)
+// 2️⃣ Navigation param (read-only fallback for this session if context is empty)
+// 3️⃣ AsyncStorage (loaded in useBusinessProfile)
+const activeBusinessProfile = useMemo(() => {
+  return globalSelectedProfile || initialBusinessProfile;  // ❌ FALLBACK TO ROUTE PARAMS
+}, [globalSelectedProfile, initialBusinessProfile]);
+```
+
+#### Business Category Loading Logic (Lines 988-1134):
+```tsx
+// Fetch business category posters when businessCategory is provided
+useEffect(() => {
+  if (!businessCategory) {  // ❌ USES ROUTE PARAM businessCategory
+    return;
+  }
+
+  // ... category determination logic
+  let categoryName: string;
+  if (typeof businessCategory === 'object' && businessCategory?.name) {
+    categoryName = businessCategory.name;  // ❌ STALE ROUTE PARAM
+  } else if (typeof businessCategory === 'string') {
+    categoryName = businessCategory;       // ❌ STALE ROUTE PARAM
+  } else {
+    categoryName = 'Event Planner'; // fallback
+  }
+
+  // ... fetch logic using categoryName
+}, [businessCategory, posterLimit, initialPoster, selectedLanguage, setAllTemplates]); // ❌ DEPENDS ON businessCategory ROUTE PARAM
+```
+
+## 2. Screen Context Usage Analysis
+
+### BusinessProfileContext Usage:
+- ✅ **Correctly Subscribed**: `const { selectedBusinessProfile: globalSelectedProfile } = useBusinessProfile();` (Line 450)
+- ❌ **Not Used for Category Determination**: Context is available but ignored for business category loading
+- ❌ **Fallback Priority**: Context only used if route params are empty
+
+### Active Profile Logic (Lines 456-458):
+```tsx
+const activeBusinessProfile = useMemo(() => {
+  return globalSelectedProfile || initialBusinessProfile;  // ❌ PRIORITIZES ROUTE PARAMS
+}, [globalSelectedProfile, initialBusinessProfile]);
+```
+
+**Problem**: When PosterPlayerScreen is opened from bottom tab, `initialBusinessProfile` from route params takes precedence over the updated `globalSelectedProfile`.
+
+## 3. Category Derivation Logic Analysis
+
+### Current Implementation (Lines 988-1001):
+```tsx
+useEffect(() => {
+  if (!businessCategory) {  // ❌ businessCategory comes from route.params
+    return;
+  }
+
+  let categoryName: string;
+  if (typeof businessCategory === 'object' && businessCategory?.name) {
+    categoryName = businessCategory.name;  // ❌ Uses stale route param
+  } else if (typeof businessCategory === 'string') {
+    categoryName = businessCategory;       // ❌ Uses stale route param
+  } else {
+    categoryName = 'Event Planner'; // fallback
+  }
+```
+
+### Expected Implementation (MISSING):
+```tsx
+// Should derive category from selectedBusinessProfile context
+const businessCategoryFromProfile = useMemo(() => {
+  if (globalSelectedProfile) {
+    return globalSelectedProfile.subCategory || globalSelectedProfile.category;
+  }
+  return null;
+}, [globalSelectedProfile]);
+```
+
+## 4. Data Loading useEffect Analysis
+
+### Current useEffect Dependencies (Line 1134):
+```tsx
+}, [businessCategory, posterLimit, initialPoster, selectedLanguage, setAllTemplates]);
+```
+
+**Problem**: 
+- ❌ `businessCategory` is a route parameter that never updates when context changes
+- ❌ Missing `selectedBusinessProfile` or `globalSelectedProfile` in dependencies
+- ❌ Missing `activeBusinessProfile` in dependencies
+
+### Correct Dependencies Should Be:
+```tsx
+}, [globalSelectedProfile, posterLimit, initialPoster, selectedLanguage, setAllTemplates]);
+```
+
+## 5. useFocusEffect Behavior Analysis
+
+### Language Reset on Focus (Lines 438-446):
+```tsx
+useFocusEffect(
+  React.useCallback(() => {
+    console.log('PosterPlayerScreen focused → resetting language to ALL');
+    userManuallySelectedLanguageRef.current = false;
+    setSelectedLanguage('all');
+  }, [])
+);
+```
+
+**Analysis**:
+- ✅ useFocusEffect is implemented
+- ❌ **No poster reloading on focus**: Only resets language, doesn't reload business category posters
+- ❌ **Stale closure**: useEffect doesn't trigger when business profile changes
+
+## 6. Poster Fetch Function Analysis
+
+### fetchBusinessCategoryPosters Function (Lines 1012-1031):
+```tsx
+const fetchBusinessCategoryPosters = async () => {
+  try {
+    const limit = posterLimit || 1000;
+    const apiUrl = `/api/mobile/posters/category/${encodeURIComponent(categoryName)}?limit=${limit}`;
+    console.log(`🔍 [MY BUSINESS API] Fetching: ${apiUrl} (limit: ${limit})`);
+
+    businessCategoryPostersApi.clearCategoryCache(categoryName);
+    const response = await businessCategoryPostersApi.getPostersByCategory(categoryName, limit);
+```
+
+**Analysis**:
+- ✅ Correctly uses `categoryName` parameter
+- ✅ Clears cache before fetching
+- ❌ **categoryName is stale**: Derived from route params, not context
+
+## 7. API Layer Analysis
+
+### businessCategoryPostersApi.ts:
+- ✅ **Correct Implementation**: API receives profileId directly from screen
+- ✅ **No AsyncStorage Reading**: API doesn't read stale data from storage
+- ❌ **Problem**: API receives wrong category name due to upstream issue
+
+## 8. Local State Shadowing Analysis
+
+### businessCategory Route Parameter (Line 311):
+```tsx
+businessCategory,  // From route.params - STALE when opened from bottom tab
+```
+
+### activeCategoryRef (Line 323):
+```tsx
+const activeCategoryRef = useRef<{ type: 'business' | 'greeting' | 'calendar' | null; value: string | null }>({ type: null, value: null });
+```
+
+**Analysis**:
+- ❌ **Route Parameter Shadowing**: `businessCategory` from route.params shadows context updates
+- ❌ **No State Update**: When context changes, route params remain stale
+- ❌ **Category Ref**: Tracks active category but doesn't trigger reloads
+
+## 9. Navigation Param Priority Analysis
+
+### Critical Issue: Route Params Override Context
+
+**When PosterPlayerScreen is opened from bottom tab:**
+1. **Navigation**: `MainTabs` → `PosterPlayer` (with `originScreen: "MainTabs"`)
+2. **Route Params**: `businessCategory` may be set from previous navigation
+3. **Context**: `selectedBusinessProfile` updates with new profile
+4. **Problem**: `businessCategory` route param remains stale, overrides context
+
+### Priority Logic (Lines 452-458):
+```tsx
+// 1️⃣ Context profile (global state)
+// 2️⃣ Navigation param (read-only fallback for this session if context is empty)
+// 3️⃣ AsyncStorage (loaded in useBusinessProfile)
+const activeBusinessProfile = useMemo(() => {
+  return globalSelectedProfile || initialBusinessProfile;  // ❌ ROUTE PARAM TAKES PRECEDENCE
+}, [globalSelectedProfile, initialBusinessProfile]);
+```
+
+**Issue**: Even though context is available, business category loading uses route params instead of context.
+
+## 10. Full Data Flow Analysis
+
+### Expected Flow (What SHOULD happen):
+1. User switches profile on HomeScreen
+2. setSelectedBusinessProfile(profileB) called
+3. BusinessProfileContext updates
+4. User taps "My Business" tab
+5. PosterPlayerScreen opens/gains focus
+6. PosterPlayerScreen uses selectedBusinessProfile from context
+7. Business category derived from new profile
+8. useEffect triggers with new category
+9. API fetches posters for new category
+10. UI shows new posters
+
+### Actual Flow (What ACTUALLY happens):
+1. User switches profile on HomeScreen ✅
+2. setSelectedBusinessProfile(profileB) called ✅
+3. BusinessProfileContext updates ✅
+4. User taps "My Business" tab ✅
+5. PosterPlayerScreen opens with stale route params ❌
+6. businessCategory from route.params is old value ❌
+7. useEffect depends on businessCategory route param ❌
+8. API called with stale category name ❌
+9. UI shows old posters ❌
+
+## 11. Step-by-Step Failure Flow
+
+### Detailed Failure Analysis:
+
+#### Step 1: Navigation Architecture
+```
+User taps "My Business" tab
+↓
+Navigation: MainTabs → PosterPlayer (originScreen: "MainTabs")
+↓
+PosterPlayerScreen receives route.params (possibly stale)
+```
+
+#### Step 2: Parameter Extraction
+```tsx
+// Line 311: Extracted from route.params (STALE)
+businessCategory,  
+
+// Line 317-318: Extracted from route.params (STALE)
+selectedBusinessProfile: initialBusinessProfile,
+selectedBusinessProfileId: initialBusinessProfileId,
+```
+
+#### Step 3: Context vs Route Priority
+```tsx
+// Line 450: Context subscription
+const { selectedBusinessProfile: globalSelectedProfile } = useBusinessProfile();
+
+// Line 456-458: Route params take precedence
+const activeBusinessProfile = useMemo(() => {
+  return globalSelectedProfile || initialBusinessProfile;  // ❌ initialBusinessProfile wins
+}, [globalSelectedProfile, initialBusinessProfile]);
+```
+
+#### Step 4: Category Determination
+```tsx
+// Line 988: useEffect depends on businessCategory (STALE)
+useEffect(() => {
+  if (!businessCategory) {  // ❌ Uses route param, not context
+    return;
+  }
+```
+
+#### Step 5: API Call with Stale Data
+```tsx
+// Line 1018: API called with stale category
+const apiUrl = `/api/mobile/posters/category/${encodeURIComponent(categoryName)}?limit=${limit}`;
+```
+
+## 12. Root Cause Summary
+
+**PosterPlayerScreen shows posters from the previous business profile because:**
+
+1. **PRIMARY**: Navigation route parameters (`businessCategory`, `initialBusinessProfile`) override BusinessProfileContext
+2. **SECONDARY**: useEffect dependencies include stale route params instead of context
+3. **TERTIARY**: No mechanism to reload posters when context changes
+
+### Exact Bug Locations:
+- **Line 311**: `businessCategory` extracted from route.params (stale)
+- **Line 988**: useEffect depends on `businessCategory` route param
+- **Line 1134**: Missing `selectedBusinessProfile` in dependencies
+- **Line 456-458**: Route params take precedence over context
+
+## 13. Recommended Fix Strategy
+
+### IMMEDIATE FIX: Update Category Derivation Logic
+
+**File**: `src/screens/PosterPlayerScreen.tsx`
+
+#### 1. Replace Route Param Dependency with Context:
+```tsx
+// CURRENT (Line 988):
+useEffect(() => {
+  if (!businessCategory) {  // ❌ Route param
+    return;
+  }
+
+// CORRECT:
+const businessCategoryFromProfile = useMemo(() => {
+  if (globalSelectedProfile) {
+    return globalSelectedProfile.subCategory || globalSelectedProfile.category;
+  }
+  return businessCategory; // Fallback to route param
+}, [globalSelectedProfile, businessCategory]);
+
+useEffect(() => {
+  const categoryToUse = businessCategoryFromProfile;
+  if (!categoryToUse) {
+    return;
+  }
+```
+
+#### 2. Update useEffect Dependencies:
+```tsx
+// CURRENT (Line 1134):
+}, [businessCategory, posterLimit, initialPoster, selectedLanguage, setAllTemplates]);
+
+// CORRECT:
+}, [businessCategoryFromProfile, posterLimit, initialPoster, selectedLanguage, setAllTemplates]);
+```
+
+#### 3. Add Context Change Detection:
+```tsx
+// Add new useEffect to reload when profile changes
+useEffect(() => {
+  if (globalSelectedProfile && originScreen === "MainTabs") {
+    // Reload posters when business profile changes in My Business tab
+    setAllTemplates([]);
+    // Trigger business category reload
+  }
+}, [globalSelectedProfile?.id, originScreen]);
+```
+
+### Alternative Fix: Navigation Param Updates
+
+**Update navigation when business profile changes:**
+- When user switches profile on HomeScreen, update bottom tab navigation params
+- Ensure PosterPlayerScreen receives updated route params
+
+## 14. Files Requiring Modification
+
+### Primary Files:
+1. **`src/screens/PosterPlayerScreen.tsx`**
+   - Replace businessCategory route param dependency with context
+   - Update useEffect dependencies
+   - Add profile change detection
+
+### Secondary Files (if needed):
+2. **`src/screens/HomeScreen.tsx`**
+   - Update navigation params when business profile changes
+   - Ensure bottom tab navigation receives updated params
+
+## 15. Verification Steps
+
+After implementing the fix:
+1. **Build and test profile switching**
+2. **Switch from Profile A → Profile B on HomeScreen**
+3. **Tap "My Business" tab**
+4. **Verify PosterPlayerScreen shows Profile B's category posters**
+5. **Check console logs for correct category and API calls**
+6. **Test multiple profile switches**
+
+## 16. Expected Correct Behavior
+
+After fix implementation:
+1. User switches business profile ✅
+2. BusinessProfileContext updates ✅
+3. PosterPlayerScreen detects context change ✅
+4. Business category derived from new profile ✅
+5. useEffect triggers with new category ✅
+6. API fetches posters for new category ✅
+7. UI shows correct posters for new profile ✅
+
+## 17. Critical Code Sections Requiring Changes
+
+### Section 1: Category Derivation (Lines 988-1001)
+**Replace route param dependency with context-based derivation**
+
+### Section 2: useEffect Dependencies (Line 1134)
+**Add selectedBusinessProfile to dependency array**
+
+### Section 3: Profile Change Detection
+**Add new useEffect to detect and react to profile changes**
+
+### Section 4: Navigation Param Handling
+**Update logic to prioritize context over route params for My Business tab**
+
+---
+
+**CONCLUSION**: The root cause is that PosterPlayerScreen uses stale navigation route parameters instead of the updated BusinessProfileContext for determining which business category posters to load. The fix requires updating the category derivation logic to prioritize context over route parameters.

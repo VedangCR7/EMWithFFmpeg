@@ -1,0 +1,425 @@
+# PosterPlayerScreen Tab Navigation Debugging Report
+
+## 1. Root Cause Analysis
+
+### PRIMARY ISSUE: Bottom Tab Navigation Keeps Screen Mounted
+**Root Cause**: PosterPlayerScreen is registered in bottom tab navigator, which means it remains mounted and doesn't re-execute useEffect when business profile context changes.
+
+**File**: `src/navigation/AppNavigator.tsx` (Lines 1121-1129)
+
+### Critical Navigation Architecture:
+
+#### Tab Navigator Configuration:
+```tsx
+<Tab.Screen
+  name="PosterPlayer"
+  component={PosterPlayerScreen}
+  initialParams={{ originScreen: "MainTabs" }}
+  options={{
+    title: 'My Business',
+    tabBarStyle: { display: 'none' },
+  }}
+/>
+```
+
+**Key Finding**: 
+- ❌ **No lazy loading**: PosterPlayerScreen is not wrapped in `lazy()` 
+- ❌ **No unmountOnBlur**: Screen stays mounted when switching tabs
+- ❌ **No tab listeners**: No mechanism to detect tab switches
+
+## 2. Bottom Tab Navigation Behavior Analysis
+
+### React Navigation Tab Behavior:
+1. **Screen Mounting**: All tab screens are mounted at app startup
+2. **Persistent Mounting**: Screens remain mounted when switching between tabs
+3. **useEffect Execution**: Only runs on initial mount, not on tab switches
+4. **Context Updates**: BusinessProfileContext updates are received but don't trigger re-renders
+
+### Expected vs Actual Behavior:
+
+#### Expected (What SHOULD happen):
+1. User switches profile on HomeScreen
+2. BusinessProfileContext updates ✅
+3. User taps "My Business" tab
+4. PosterPlayerScreen should re-run useEffect with new context ✅
+5. Posters reload with new category ✅
+
+#### Actual (What ACTUALLY happens):
+1. User switches profile on HomeScreen ✅
+2. BusinessProfileContext updates ✅
+3. User taps "My Business" tab ✅
+4. PosterPlayerScreen is already mounted ❌
+5. useEffect doesn't re-run (screen already mounted) ❌
+6. Posters continue showing old category ❌
+
+## 3. Screen Context Usage Analysis
+
+### Current Implementation Status:
+```tsx
+// ✅ CORRECTLY SUBSCRIBED
+const { selectedBusinessProfile: globalSelectedProfile } = useBusinessProfile();
+
+// ✅ CORRECTLY DERIVED (from previous fix)
+const businessCategoryFromProfile = useMemo(() => {
+  if (!globalSelectedProfile) return null;
+  return (
+    globalSelectedProfile.subCategory ||
+    globalSelectedProfile.category ||
+    null
+  );
+}, [globalSelectedProfile]);
+
+// ✅ CORRECTLY RESOLVED (from previous fix)
+const categoryToUse = useMemo(() => {
+  if (originScreen === "MainTabs") {
+    // When opened from bottom tab, use context-derived category
+    return businessCategoryFromProfile;
+  }
+  // When opened from other screens, use route params (preserve existing behavior)
+  return businessCategory || businessCategoryFromProfile;
+}, [originScreen, businessCategoryFromProfile, businessCategory]);
+```
+
+**Analysis**: 
+- ✅ Context subscription is correct
+- ✅ Category derivation logic is correct
+- ✅ Previous fix is implemented and working
+
+## 4. useEffect Dependencies Analysis
+
+### Business Category Loading useEffect (Lines 1007-1154):
+```tsx
+// Fetch business category posters when categoryToUse is available
+useEffect(() => {
+  // ... fetch logic using categoryToUse
+}, [categoryToUse, posterLimit, initialPoster, selectedLanguage, setAllTemplates]);
+```
+
+**Dependency Analysis**:
+- ✅ `categoryToUse` is included (depends on businessCategoryFromProfile)
+- ✅ `categoryToUse` will update when `businessCategoryFromProfile` changes
+- ✅ `businessCategoryFromProfile` depends on `globalSelectedProfile`
+
+### Profile Change Detection useEffect (Lines 1156-1164):
+```tsx
+// STEP 5: Reload posters when business profile changes in My Business tab
+useEffect(() => {
+  if (originScreen === "MainTabs" && globalSelectedProfile) {
+    // Clear templates to force reload with new profile
+    setAllTemplates([]);
+    console.log('🔄 [PROFILE CHANGE] Business profile changed in My Business tab, reloading posters');
+  }
+}, [globalSelectedProfile?.id, originScreen]);
+```
+
+**Analysis**:
+- ✅ Profile change detection is implemented
+- ✅ Should trigger when `globalSelectedProfile?.id` changes
+- ❌ **BUT**: Only clears templates, doesn't trigger actual reload
+
+## 5. useFocusEffect Behavior Analysis
+
+### Current Implementation (Lines 438-446):
+```tsx
+// Reset language to "All" whenever PosterPlayerScreen becomes active
+useFocusEffect(
+  React.useCallback(() => {
+    console.log('PosterPlayerScreen focused → resetting language to ALL');
+    userManuallySelectedLanguageRef.current = false;
+    setSelectedLanguage('all');
+  }, [])
+);
+```
+
+**Analysis**:
+- ✅ useFocusEffect is implemented
+- ❌ **Only resets language**: Doesn't reload posters
+- ❌ **Missing dependency**: Should depend on `selectedBusinessProfile`
+
+## 6. Caching Mechanisms Analysis
+
+### Cache Clearing (Lines 1041-1042):
+```tsx
+// Clear cache for "My Business" to ensure fresh data with new limit
+businessCategoryPostersApi.clearCategoryCache(categoryName);
+```
+
+**Analysis**:
+- ✅ Cache clearing is implemented
+- ✅ Should prevent stale data
+- ❌ **But**: Only called when useEffect runs, not on profile change
+
+## 7. State Reset Logic Analysis
+
+### Template Reset (Lines 1159-1160):
+```tsx
+if (originScreen === "MainTabs" && globalSelectedProfile) {
+  // Clear templates to force reload with new profile
+  setAllTemplates([]);
+  // The business category loading useEffect will trigger automatically due to categoryToUse change
+  console.log('🔄 [PROFILE CHANGE] Business profile changed in My Business tab, reloading posters');
+}
+```
+
+**Problem**: 
+- ✅ Clears templates
+- ❌ **Doesn't trigger reload**: useEffect depends on `categoryToUse`, but `categoryToUse` doesn't change when only `globalSelectedProfile` changes
+
+## 8. Full Data Flow Analysis
+
+### When Business Profile Changes:
+
+#### Step 1: Profile Switch on HomeScreen
+```
+User switches Profile A → Profile B
+↓
+setSelectedBusinessProfile(ProfileB) called
+↓
+BusinessProfileContext updates ✅
+```
+
+#### Step 2: Tab Navigation to My Business
+```
+User taps "My Business" tab
+↓
+Navigation: MainTabs → PosterPlayer (already mounted)
+↓
+PosterPlayerScreen gains focus (useFocusEffect runs)
+↓
+useFocusEffect only resets language ❌
+```
+
+#### Step 3: Context Update Detection
+```
+PosterPlayerScreen receives updated globalSelectedProfile ✅
+↓
+businessCategoryFromProfile updates to Profile B category ✅
+↓
+categoryToUse updates to Profile B category ✅
+↓
+useEffect should re-run with new category ❌
+```
+
+#### Step 4: The Break Point
+```
+useEffect dependency: [categoryToUse, posterLimit, initialPoster, selectedLanguage, setAllTemplates]
+↓
+categoryToUse changes ✅
+↓
+BUT: useEffect may not re-run if screen is already mounted and dependencies are tracked as unchanged
+↓
+Posters continue showing Profile A data ❌
+```
+
+## 9. Root Cause Summary
+
+**PosterPlayerScreen shows posters from previous business profile because:**
+
+1. **PRIMARY**: Bottom tab navigation keeps screen mounted, preventing useEffect re-execution
+2. **SECONDARY**: Profile change detection only clears templates but doesn't trigger reload
+3. **TERTIARY**: useFocusEffect only resets language, doesn't reload posters
+4. **QUATERNARY**: useEffect dependencies may not trigger re-execution in mounted screens
+
+### The Core Issue:
+In React Navigation's bottom tab navigator, when a screen is already mounted, changing context values doesn't automatically re-trigger useEffect hooks unless the dependencies are perceived as changed.
+
+## 10. Exact Bug Locations
+
+### File: `src/screens/PosterPlayerScreen.tsx`
+
+#### Critical Issue Locations:
+1. **Line 1154**: useEffect dependencies don't force re-execution on profile change
+   ```tsx
+   }, [categoryToUse, posterLimit, initialPoster, selectedLanguage, setAllTemplates]);
+   ```
+
+2. **Line 1156-1164**: Profile change detection only clears templates
+   ```tsx
+   if (originScreen === "MainTabs" && globalSelectedProfile) {
+     setAllTemplates([]); // ❌ Only clears, doesn't reload
+   }
+   ```
+
+3. **Line 438-446**: useFocusEffect missing profile reload
+   ```tsx
+   useFocusEffect(
+     React.useCallback(() => {
+       // ❌ Only resets language, no poster reload
+     }, [])
+   );
+   ```
+
+### Navigation Configuration Issue:
+**File**: `src/navigation/AppNavigator.tsx` (Lines 1121-1129)
+- No lazy loading configured
+- No unmount/mount mechanisms
+- Screen stays mounted permanently
+
+## 11. Step-by-Step Failure Flow
+
+### Detailed Failure Sequence:
+
+1. **User switches business profile** on HomeScreen
+   - BusinessProfileContext updates ✅
+   - globalSelectedProfile changes ✅
+
+2. **User taps "My Business" tab**
+   - Tab navigation switches to already-mounted PosterPlayerScreen ✅
+   - useFocusEffect runs (resets language) ✅
+   - Screen does not remount ❌
+
+3. **Context updates in mounted screen**
+   - businessCategoryFromProfile updates to new profile ✅
+   - categoryToUse updates to new category ✅
+   - useEffect should re-run ❌
+
+4. **The React Hook Problem**
+   - useEffect dependencies: `[categoryToUse, posterLimit, initialPoster, selectedLanguage, setAllTemplates]`
+   - categoryToUse changes from Profile A category → Profile B category ✅
+   - React should re-run useEffect ❌
+   - But useEffect may not execute if React doesn't detect dependency change ❌
+
+5. **Result**: Stale posters continue showing
+
+## 12. Recommended Fix Strategy
+
+### OPTION 1: Force useEffect Re-execution (RECOMMENDED)
+
+#### File: `src/screens/PosterPlayerScreen.tsx`
+
+**Update Profile Change Detection (Lines 1156-1164)**:
+```tsx
+// CURRENT:
+useEffect(() => {
+  if (originScreen === "MainTabs" && globalSelectedProfile) {
+    setAllTemplates([]);
+    console.log('🔄 [PROFILE CHANGE] Business profile changed in My Business tab, reloading posters');
+  }
+}, [globalSelectedProfile?.id, originScreen]);
+
+// CORRECTED:
+useEffect(() => {
+  if (originScreen === "MainTabs" && globalSelectedProfile) {
+    // Force immediate reload
+    setAllTemplates([]);
+    
+    // Force useEffect re-execution by updating categoryToUse trigger
+    setTimeout(() => {
+      console.log('🔄 [PROFILE CHANGE] Forcing poster reload for new profile');
+      setAllTemplates([]); // This will trigger the main useEffect
+    }, 0);
+  }
+}, [globalSelectedProfile?.id, originScreen]);
+```
+
+**OR Alternative - Add explicit reload trigger**:
+```tsx
+// Add a reload trigger state
+const [profileReloadTrigger, setProfileReloadTrigger] = useState(0);
+
+useEffect(() => {
+  if (originScreen === "MainTabs" && globalSelectedProfile) {
+    setProfileReloadTrigger(prev => prev + 1);
+  }
+}, [globalSelectedProfile?.id, originScreen]);
+
+// Add to main useEffect dependencies:
+}, [categoryToUse, posterLimit, initialPoster, selectedLanguage, setAllTemplates, profileReloadTrigger]);
+```
+
+### OPTION 2: Update useFocusEffect (ALTERNATIVE)
+
+#### Update Focus Effect (Lines 438-446):
+```tsx
+// CURRENT:
+useFocusEffect(
+  React.useCallback(() => {
+    console.log('PosterPlayerScreen focused → resetting language to ALL');
+    userManuallySelectedLanguageRef.current = false;
+    setSelectedLanguage('all');
+  }, [])
+);
+
+// CORRECTED:
+useFocusEffect(
+  React.useCallback(() => {
+    console.log('PosterPlayerScreen focused → resetting language to ALL');
+    userManuallySelectedLanguageRef.current = false;
+    setSelectedLanguage('all');
+    
+    // Reload posters when screen gains focus and profile is selected
+    if (globalSelectedProfile && originScreen === "MainTabs") {
+      console.log('🔄 [FOCUS] Reloading posters due to focus');
+      setAllTemplates([]); // Trigger main useEffect
+    }
+  }, [globalSelectedProfile, originScreen])
+);
+```
+
+### OPTION 3: Navigation Configuration (COMPREHENSIVE)
+
+#### File: `src/navigation/AppNavigator.tsx`
+
+**Update Tab Screen Configuration**:
+```tsx
+// CURRENT:
+<Tab.Screen
+  name="PosterPlayer"
+  component={PosterPlayerScreen}
+  initialParams={{ originScreen: "MainTabs" }}
+  options={{
+    title: 'My Business',
+    tabBarStyle: { display: 'none' },
+  }}
+/>
+
+// CORRECTED:
+<Tab.Screen
+  name="PosterPlayer"
+  component={lazy(() => PosterPlayerScreen)} // Add lazy loading
+  initialParams={{ originScreen: "MainTabs" }}
+  options={{
+    title: 'My Business',
+    tabBarStyle: { display: 'none' },
+    unmountOnBlur: true, // Add unmount on blur
+  }}
+/>
+```
+
+## 13. Files Requiring Modification
+
+### Primary Files:
+1. **`src/screens/PosterPlayerScreen.tsx`**
+   - Update profile change detection to force useEffect re-execution
+   - OR update useFocusEffect to reload posters on focus
+   - Add reload trigger mechanism
+
+### Secondary Files (if needed):
+2. **`src/navigation/AppNavigator.tsx`**
+   - Add lazy loading to PosterPlayerScreen
+   - Add unmountOnBlur to ensure fresh screen state
+
+## 14. Verification Steps
+
+After implementing fix:
+1. **Test profile switching on HomeScreen**
+2. **Navigate to My Business tab**
+3. **Verify console logs show profile change detection**
+4. **Verify posters reload with new category**
+5. **Test multiple rapid profile switches**
+6. **Test tab switching away and back to My Business**
+
+## 15. Expected Correct Behavior
+
+After fix implementation:
+1. User switches business profile ✅
+2. BusinessProfileContext updates ✅
+3. User taps "My Business" tab ✅
+4. PosterPlayerScreen detects profile change ✅
+5. useEffect re-executes with new category ✅
+6. API fetches posters for new profile ✅
+7. UI shows correct posters for new profile ✅
+
+---
+
+**CONCLUSION**: The root cause is that bottom tab navigation keeps PosterPlayerScreen mounted, preventing useEffect re-execution when business profile context changes. The fix requires forcing useEffect re-execution or implementing proper tab navigation lifecycle management.

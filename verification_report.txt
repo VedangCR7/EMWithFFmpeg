@@ -1,0 +1,71 @@
+Business Profile Autopay Verification Report
+=============================================
+Date: 2026-03-25
+Status: PASS
+
+1. Razorpay Checkout Verification
+---------------------------------
+Requirement: Use subscription_id for mandate initiation. Do not use order_id or amount.
+Findings:
+- File: src/screens/BusinessProfilesScreen.tsx
+- The `handlePayNow` function correctly configures `RazorpayCheckout.open()`.
+- Options used: { subscription_id: subscriptionData.subscriptionId, description, key, name, prefill, theme }.
+- Missing (as required): order_id, plan_id, amount.
+Result: PASS
+
+2. Autopay API Payload Verification
+-----------------------------------
+Requirement: Call POST /api/mobile/subscription/create-autopay with businessProfileId and subscriptionCategory: "BUSINESS_PROFILE".
+Findings:
+- File: src/services/subscriptionApi.ts
+- Method `createBusinessProfileAutopay` correctly constructs the payload.
+- Payload: { planId, businessProfileId, subscriptionCategory: "BUSINESS_PROFILE", customerEmail, customerPhone, userId }.
+Result: PASS
+
+3. Business Profile Creation Flow Verification
+----------------------------------------------
+Requirement: Profile creation must precede autopay initiation to obtain businessProfileId.
+Findings:
+- File: src/screens/BusinessProfilesScreen.tsx
+- The `handleFormSubmit` function creates the profile via `businessProfileService.createBusinessProfile`.
+- The returned `newProfile.id` is stored and then passed to `subscriptionApi.createBusinessProfileAutopay` in the subsequent payment step.
+Result: PASS
+
+4. Service Layer Implementation Check
+-------------------------------------
+Requirement: Service method must exist with correct parameters.
+Findings:
+- File: src/services/subscriptionApi.ts
+- `createBusinessProfileAutopay` is implemented with proper parameter typing and endpoint mapping.
+Result: PASS
+
+5. Subscription Context Verification
+------------------------------------
+Requirement: Context must track multiple profile subscriptions.
+Findings:
+- File: src/contexts/SubscriptionContext.tsx
+- `businessProfileSubscriptions` state is implemented as a `Record<string, SubscriptionStatus>`.
+- Properly handles status refresh per `profileId`.
+Result: PASS
+
+6. Razorpay Mandate Flow Verification
+-------------------------------------
+Requirement: Mandate initiation via subscription_id.
+Findings:
+- Confirmed that `subscriptionData.subscriptionId` (returned from backend) is used directly for mandate approval.
+Result: PASS
+
+7. Legacy Payment Logic Detection
+---------------------------------
+Requirement: Detect and isolate legacy one-time payment logic.
+Findings:
+- Legacy methods `createBusinessProfilePaymentOrder` and `verifyBusinessProfilePayment` in `src/services/businessProfile.ts` have been marked as @deprecated.
+- Grep analysis confirms these methods are NO LONGER called in the `BusinessProfilesScreen.tsx` creation flow.
+Result: PASS
+
+Final Result: PASS
+------------------
+All backend requirements for Business Profile Autopay have been successfully verified in the React Native mobile application.
+- Uses subscription_id for Razorpay Checkout: YES
+- Sends businessProfileId in autopay API: YES
+- Sets subscriptionCategory to BUSINESS_PROFILE: YES

@@ -1,0 +1,301 @@
+  # Business Categories API Response Structure
+# Endpoint: GET /api/mobile/business-categories/business
+# This response structure matches the RegistrationScreen.tsx requirements
+
+{
+  "success": true,
+  "data": {
+    "categories": [
+      {
+        "id": "event_planners",
+        "name": "Event Planners",
+        "description": "Professional event planning and coordination services",
+        "icon": "event-planning",
+        "imageUrl": "https://example.com/images/event-planners.jpg",
+        "color": "#FF6B6B",
+        "subCategories": [
+          {
+            "id": "wedding_planners",
+            "name": "Wedding Planners",
+            "description": "Specialized wedding planning and coordination",
+            "icon": "wedding",
+            "color": "#FF69B4",
+            "slug": "wedding-planners"
+          },
+          {
+            "id": "corporate_event_planners",
+            "name": "Corporate Event Planners",
+            "description": "Corporate meetings, conferences and business events",
+            "icon": "business",
+            "color": "#4169E1",
+            "slug": "corporate-event-planners"
+          },
+          {
+            "id": "birthday_party_planners",
+            "name": "Birthday Party Planners",
+            "description": "Birthday celebration planning and coordination",
+            "icon": "cake",
+            "color": "#FFA500",
+            "slug": "birthday-party-planners"
+          },
+          {
+            "id": "concert_event_planners",
+            "name": "Concert Event Planners",
+            "description": "Music concerts and live event planning",
+            "icon": "music",
+            "color": "#9370DB",
+            "slug": "concert-event-planners"
+          }
+        ],
+        "slug": "event-planners",
+        "isParent": true,
+        "sortOrder": 1
+      },
+      {
+        "id": "decorators",
+        "name": "Decorators",
+        "description": "Event decoration and venue styling services",
+        "icon": "decorators",
+        "imageUrl": "https://example.com/images/decorators.jpg",
+        "color": "#32CD32",
+        "subCategories": [
+          {
+            "id": "flower_decorators",
+            "name": "Flower Decorators",
+            "description": "Floral arrangements and flower decoration services",
+            "icon": "flower",
+            "color": "#FF69B4",
+            "slug": "flower-decorators"
+          },
+          {
+            "id": "light_decorators",
+            "name": "Light Decorators",
+            "description": "Lighting design and decorative lighting services",
+            "icon": "light",
+            "color": "#FFD700",
+            "slug": "light-decorators"
+          },
+          {
+            "id": "theme_decorators",
+            "name": "Theme Decorators",
+            "description": "Theme-based event decoration and styling",
+            "icon": "theme",
+            "color": "#FF6347",
+            "slug": "theme-decorators"
+          },
+          {
+            "id": "balloon_decorators",
+            "name": "Balloon Decorators",
+            "description": "Balloon decoration and balloon art services",
+            "icon": "balloon",
+            "color": "#87CEEB",
+            "slug": "balloon-decorators"
+          }
+        ],
+        "slug": "decorators",
+        "isParent": true,
+        "sortOrder": 2
+      },
+      {
+        "id": "sound_suppliers",
+        "name": "Sound Suppliers",
+        "description": "Audio equipment and sound system services",
+        "icon": "sound",
+        "imageUrl": "https://example.com/images/sound-suppliers.jpg",
+        "color": "#FF4500",
+        "subCategories": [
+          {
+            "id": "dj_services",
+            "name": "DJ Services",
+            "description": "Professional DJ services for events and parties",
+            "icon": "dj",
+            "color": "#FF1493",
+            "slug": "dj-services"
+          },
+          {
+            "id": "live_band_services",
+            "name": "Live Band Services",
+            "description": "Live music bands and musical performances",
+            "icon": "music-band",
+            "color": "#8B4513",
+            "slug": "live-band-services"
+          },
+          {
+            "id": "speaker_rental",
+            "name": "Speaker Rental",
+            "description": "Speaker and audio equipment rental services",
+            "icon": "speaker",
+            "color": "#696969",
+            "slug": "speaker-rental"
+          },
+          {
+            "id": "sound_engineering",
+            "name": "Sound Engineering",
+            "description": "Professional sound engineering and mixing services",
+            "icon": "sound-engineer",
+            "color": "#2F4F4F",
+            "slug": "sound-engineering"
+          }
+        ],
+        "slug": "sound-suppliers",
+        "isParent": true,
+        "sortOrder": 3
+      },
+      {
+        "id": "light_suppliers",
+        "name": "Light Suppliers",
+        "description": "Lighting equipment and illumination services",
+        "icon": "lights",
+        "imageUrl": "https://example.com/images/light-suppliers.jpg",
+        "color": "#FFD700",
+        "subCategories": [
+          {
+            "id": "stage_lighting",
+            "name": "Stage Lighting",
+            "description": "Professional stage lighting and effects",
+            "icon": "stage-light",
+            "color": "#FFA500",
+            "slug": "stage-lighting"
+          },
+          {
+            "id": "led_lighting",
+            "name": "LED Lighting",
+            "description": "LED lighting solutions and decorative lights",
+            "icon": "led",
+            "color": "#00FF00",
+            "slug": "led-lighting"
+          },
+          {
+            "id": "laser_shows",
+            "name": "Laser Shows",
+            "description": "Laser light shows and visual effects",
+            "icon": "laser",
+            "color": "#FF00FF",
+            "slug": "laser-shows"
+          },
+          {
+            "id": "decorative_lighting",
+            "name": "Decorative Lighting",
+            "description": "Decorative and ambient lighting services",
+            "icon": "decorative-light",
+            "color": "#FFE4B5",
+            "slug": "decorative-lighting"
+          }
+        ],
+        "slug": "light-suppliers",
+        "isParent": true,
+        "sortOrder": 4
+      },
+      {
+        "id": "video_services",
+        "name": "Video Services",
+        "description": "Video production and photography services",
+        "icon": "video",
+        "imageUrl": "https://example.com/images/video-services.jpg",
+        "color": "#4169E1",
+        "subCategories": [
+          {
+            "id": "event_photography",
+            "name": "Event Photography",
+            "description": "Professional event photography services",
+            "icon": "camera",
+            "color": "#4682B4",
+            "slug": "event-photography"
+          },
+          {
+            "id": "videography",
+            "name": "Videography",
+            "description": "Professional video recording and production",
+            "icon": "video-camera",
+            "color": "#191970",
+            "slug": "videography"
+          },
+          {
+            "id": "drone_photography",
+            "name": "Drone Photography",
+            "description": "Aerial photography and drone videography",
+            "icon": "drone",
+            "color": "#87CEEB",
+            "slug": "drone-photography"
+          },
+          {
+            "id": "live_streaming",
+            "name": "Live Streaming",
+            "description": "Live event streaming and broadcast services",
+            "icon": "streaming",
+            "color": "#DC143C",
+            "slug": "live-streaming"
+          }
+        ],
+        "slug": "video-services",
+        "isParent": true,
+        "sortOrder": 5
+      },
+      {
+        "id": "catering_services",
+        "name": "Catering Services",
+        "description": "Food catering and beverage services",
+        "icon": "catering",
+        "imageUrl": "https://example.com/images/catering-services.jpg",
+        "color": "#8B4513",
+        "subCategories": [
+          {
+            "id": "wedding_catering",
+            "name": "Wedding Catering",
+            "description": "Specialized wedding catering services",
+            "icon": "wedding-food",
+            "color": "#FF69B4",
+            "slug": "wedding-catering"
+          },
+          {
+            "id": "corporate_catering",
+            "name": "Corporate Catering",
+            "description": "Corporate event and meeting catering",
+            "icon": "business-food",
+            "color": "#708090",
+            "slug": "corporate-catering"
+          },
+          {
+            "id": "vegetarian_catering",
+            "name": "Vegetarian Catering",
+            "description": "Pure vegetarian catering services",
+            "icon": "veg-food",
+            "color": "#32CD32",
+            "slug": "vegetarian-catering"
+          },
+          {
+            "id": "dessert_catering",
+            "name": "Dessert Catering",
+            "description": "Dessert and sweet catering services",
+            "icon": "dessert",
+            "color": "#FFB6C1",
+            "slug": "dessert-catering"
+          }
+        ],
+        "slug": "catering-services",
+        "isParent": true,
+        "sortOrder": 6
+      }
+    ]
+  },
+  "message": "Business categories fetched successfully"
+}
+
+# Field Descriptions:
+# - id: Unique identifier for the category/subcategory
+# - name: Display name shown in the registration dropdown
+# - description: Brief description of the category/subcategory
+# - icon: Icon name for UI display
+# - imageUrl: Optional image URL for category display
+# - color: Theme color for the category
+# - subCategories: Array of subcategory objects (crucial for registration flow)
+# - slug: URL-friendly name for the category
+# - isParent: Indicates if this is a parent category with subcategories
+# - sortOrder: Display order in the category list
+
+# Important Notes for Backend Implementation:
+# 1. Each main category MUST have a "subCategories" array
+# 2. Each subcategory should have: id, name, description, icon, color, slug
+# 3. The RegistrationScreen.tsx expects this exact structure
+# 4. Subcategories are used for poster fetching in MyBusinessScreen
+# 5. Both main category and subcategory are stored during registration
