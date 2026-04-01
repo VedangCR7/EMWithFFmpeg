@@ -1,0 +1,289 @@
+BUSINESS PROFILE CONTEXT - CATEGORY ANALYSIS REPORT
+======================================================
+
+Generated on: 2025-04-01
+Analysis Scope: Business category flow from API to Context to UI
+
+==============================================================================
+1. FILE LOCATIONS
+==============================================================================
+
+Primary Context File:
+- src/context/BusinessProfileContext.tsx
+
+Service Files:
+- src/services/businessProfile.ts
+- src/services/businessCategoryPostersApi.ts
+
+UI Components Using Category:
+- src/screens/HomeScreen.tsx
+- src/screens/MyBusinessScreen.tsx
+- src/screens/PosterEditorScreen.tsx
+- src/screens/MyBusinessPosterPlayerScreen.tsx
+- src/components/BusinessProfileForm.tsx
+
+==============================================================================
+2. BUSINESS PROFILE CONTEXT STATE VARIABLES
+==============================================================================
+
+Core State Variables in BusinessProfileContext:
+- selectedBusinessProfile: BusinessProfile | null
+- selectedBusinessCategory: string | null
+- isLoading: boolean
+- selectedBusinessId: string (derived from profile)
+
+BusinessProfile Interface Fields:
+- id: string
+- name: string
+- category: string                    ← MAIN CATEGORY FIELD
+- subCategory?: string                 ← SUBCATEGORY FIELD (user selected)
+- subcategory?: string                 ← ALTERNATE SUBCATEGORY FIELD
+- address: string
+- phone: string
+- email: string
+- logo?: string
+- subscriptionStatus?: string
+- isSubscriptionActive?: boolean
+
+==============================================================================
+3. API ENDPOINTS USED
+==============================================================================
+
+Primary Business Profile API:
+- GET /api/mobile/business-profile/{userId}
+  - Fetches user-specific business profiles
+  - Used by: businessProfileService.getUserBusinessProfiles()
+
+Secondary Endpoints:
+- GET /api/mobile/business-profile
+  - Fetches all business profiles
+  - Used by: businessProfileService.getBusinessProfiles()
+
+- GET /api/mobile/business-profile/{id}
+  - Fetches single business profile
+  - Used by: businessProfileService.getBusinessProfile()
+
+==============================================================================
+4. API RESPONSE STRUCTURE
+==============================================================================
+
+Backend Response Format (from getUserBusinessProfiles):
+```json
+{
+  "success": true,
+  "data": {
+    "profiles": [
+      {
+        "id": "string",
+        "businessName": "string",        ← Maps to frontend 'name'
+        "category": "string",            ← MAIN CATEGORY
+        "subCategory": "string",          ← USER SELECTED SUBCATEGORY
+        "subcategory": "string",         ← ALTERNATE FIELD NAME
+        "description": "string",
+        "address": "string",
+        "phone": "string",
+        "email": "string",
+        "logo": "string",
+        "companyLogo": "string",
+        "subscriptionStatus": "string",
+        "isSubscriptionActive": boolean,
+        "createdAt": "string",
+        "updatedAt": "string"
+      }
+    ]
+  }
+}
+```
+
+==============================================================================
+5. DATA MAPPING LOGIC
+==============================================================================
+
+Frontend Mapping (businessProfile.ts lines 84-129):
+```typescript
+const businessProfiles: BusinessProfile[] = profiles.map((profile: any) => {
+  return {
+    id: profile.id,
+    name: profile.name || profile.businessName,
+    description: profile.description || '',
+    category: profile.category,                                    ← DIRECT MAPPING
+    subCategory: profile.subCategory || profile.subcategory,       ← PRIORITY MAPPING
+    subcategory: profile.subCategory || profile.subcategory,       ← SAME AS ABOVE
+    // ... other fields
+  };
+});
+```
+
+Key Mapping Rules:
+1. category: Direct 1:1 mapping from backend profile.category
+2. subCategory: Uses backend subCategory first, falls back to subcategory
+3. subcategory: Same mapping as subCategory (redundant field)
+
+==============================================================================
+6. CATEGORY ASSIGNMENT FLOW
+==============================================================================
+
+Step-by-Step Flow:
+
+A. API → Service Layer:
+   1. API returns profile with category and subCategory fields
+   2. Service maps category directly (no transformation)
+   3. Service maps subCategory with fallback logic
+
+B. Service → Context:
+   1. Context receives BusinessProfile[] from getUserBusinessProfiles()
+   2. setSelectedBusinessProfile() is called with profile object
+   3. Auto-sync triggers: setSelectedBusinessCategoryState(profile.category)
+
+C. Context Category Auto-Sync (lines 194-199):
+```typescript
+// Auto-sync business category when profile changes
+if (profile?.category) {
+  setSelectedBusinessCategoryState(profile.category);
+  await AsyncStorage.setItem(SELECTED_BUSINESS_CATEGORY_KEY, profile.category);
+  console.log('✅ [BUSINESS PROFILE CONTEXT] Auto-synced business category from profile:', profile.category);
+}
+```
+
+D. Context Storage:
+   - selectedBusinessProfile: Full profile object
+   - selectedBusinessCategory: String from profile.category
+   - AsyncStorage: Both profile and category stored separately
+
+==============================================================================
+7. UI COMPONENTS USING THE CATEGORY
+==============================================================================
+
+A. HomeScreen.tsx:
+   - Uses: selectedBusinessProfile?.subCategory || selectedBusinessProfile?.subcategory || selectedBusinessProfile?.category
+   - Priority: Subcategory first, then main category
+   - Purpose: Business category filtering and display
+
+B. MyBusinessScreen.tsx:
+   - Uses: selectedBusinessProfile.subcategory || selectedBusinessProfile.category
+   - Display: Shows category in business profile details
+
+C. PosterEditorScreen.tsx:
+   - Uses: selectedBusinessCategory (from context)
+   - Purpose: Category-based template filtering
+
+D. MyBusinessPosterPlayerScreen.tsx:
+   - Uses: selectedBusinessProfile.subCategory || selectedBusinessProfile.subcategory || selectedBusinessProfile.category
+   - Priority: Same as HomeScreen
+
+E. BusinessProfileForm.tsx:
+   - Uses: profile.category for form initialization
+   - Maps: category field to form input
+
+==============================================================================
+8. EXISTING LOGGING
+==============================================================================
+
+Context Logs:
+- "✅ [BUSINESS PROFILE CONTEXT] Auto-synced business category from profile: {category}"
+- "✅ [BUSINESS PROFILE CONTEXT] Loaded selected business category from storage: {category}"
+
+Service Logs:
+- "🏷️ category: {category}" (line 429 in businessProfile.ts)
+- Profile mapping logs show category field values
+
+UI Component Logs:
+- HomeScreen: "[BUSINESS CATEGORY FILTER]" shows userSubCategory and selectedProfileSubCategory
+- businessCategoryPostersApi: Detailed category selection logging
+
+==============================================================================
+9. IDENTIFIED ROOT CAUSE
+==============================================================================
+
+POTENTIAL ISSUE: Category Field Priority Mismatch
+
+A. Context Auto-Sync Issue:
+   - Context ALWAYS uses profile.category for selectedBusinessCategory
+   - UI components often prioritize subCategory over category
+   - This creates a mismatch between what's stored and what's displayed
+
+B. UI Priority Logic:
+   ```typescript
+   // Most UI components use this priority:
+   selectedBusinessProfile.subCategory || selectedBusinessProfile.subcategory || selectedBusinessProfile.category
+   ```
+   - But context only stores: profile.category
+
+C. Potential Scenarios:
+   1. User has both category and subCategory
+   2. Context stores category (main category)
+   3. UI displays subCategory (user's actual selection)
+   4. Mismatch between stored and displayed category
+
+D. businessCategoryPostersApi Logic:
+   - Uses: subCategory || category (line 252)
+   - This matches UI priority but differs from context storage
+
+==============================================================================
+10. RECOMMENDED FIX
+==============================================================================
+
+FIX OPTION 1: Align Context Storage with UI Priority
+```typescript
+// In BusinessProfileContext.tsx, setSelectedBusinessProfile function:
+// Replace lines 194-199:
+if (profile?.category) {
+  // Use same priority as UI components
+  const displayCategory = profile.subCategory || profile.subcategory || profile.category;
+  setSelectedBusinessCategoryState(displayCategory);
+  await AsyncStorage.setItem(SELECTED_BUSINESS_CATEGORY_KEY, displayCategory);
+  console.log('✅ [BUSINESS PROFILE CONTEXT] Auto-synced business category (with priority):', displayCategory);
+}
+```
+
+FIX OPTION 2: Standardize UI to Use Context Category
+```typescript
+// In UI components, replace priority logic with:
+const displayCategory = selectedBusinessCategory || selectedBusinessProfile?.category;
+```
+
+FIX OPTION 3: Add Both Categories to Context
+```typescript
+// Add to BusinessProfileContextType interface:
+selectedMainBusinessCategory: string | null;
+selectedSubBusinessCategory: string | null;
+
+// Store both fields separately for different use cases
+```
+
+RECOMMENDED: Fix Option 1
+- Aligns context storage with existing UI priority logic
+- Minimal code change
+- Maintains backward compatibility
+- Fixes the core mismatch issue
+
+==============================================================================
+11. VERIFICATION STEPS
+==============================================================================
+
+1. Add logging to show both category and subCategory values in API response
+2. Verify context stores the expected category value
+3. Check UI displays match stored category
+4. Test businessCategoryPostersApi uses correct category
+5. Verify category persistence across app restarts
+
+==============================================================================
+12. FLOW DIAGRAM
+==============================================================================
+
+API Response (category + subCategory)
+    ↓
+Service Mapping (direct + fallback)
+    ↓
+Context Storage (currently: category only)
+    ↓
+UI Display (priority: subCategory → category)
+    ↓
+API Calls (businessCategoryPostersApi: subCategory → category)
+
+ISSUE: Context stores category, but UI and API calls prefer subCategory
+SOLUTION: Make context store same priority as UI/API calls
+
+==============================================================================
+END OF REPORT
+======================================================
