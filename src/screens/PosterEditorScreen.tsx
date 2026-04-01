@@ -393,7 +393,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route, navigati
   }
   
   // Check if the selected business profile has an active subscription
-  const isActive = selectedBusinessProfile?.subscriptionStatus?.toUpperCase() === "ACTIVE" || isSubscriptionActive;
+  const isActive = selectedBusinessProfile?.subscriptionStatus?.toUpperCase() === "ACTIVE";
 
   const activeBusinessProfile = selectedBusinessProfile;
 
@@ -2646,8 +2646,8 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route, navigati
             });
             
             // Check subscription status first
-            if (!isSubscribed || !isSubscriptionActive) {
-              console.log('❌ [POSTER EDITOR] User is not subscribed - showing premium modal');
+            if (!isActive) {
+              console.log('❌ [POSTER EDITOR] Business profile is not active - showing premium modal');
               setShowPremiumModal(true);
               return;
             }
@@ -3802,8 +3802,8 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route, navigati
         onClose={() => setShowPremiumModal(false)}
         onUpgrade={async () => {
           setShowPremiumModal(false);
-          await refreshSubscription();
-          (navigation as any).navigate('Subscription');
+          // BUSINESS PROFILE: Navigate to BusinessProfiles for activation
+          (navigation as any).navigate('BusinessProfiles');
         }}
         selectedTemplate={null}
       />

@@ -126,7 +126,7 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
   const { isSubscriptionActive } = useSubscription();
   
   // Check if the selected business profile has an active subscription
-  const isActive = selectedBusinessProfile?.subscriptionStatus?.toUpperCase() === "ACTIVE" || isSubscriptionActive;
+  const isActive = selectedBusinessProfile?.subscriptionStatus?.toUpperCase() === "ACTIVE";
 
   // Responsive design helpers
   const isTabletDevice = screenWidth >= 768;

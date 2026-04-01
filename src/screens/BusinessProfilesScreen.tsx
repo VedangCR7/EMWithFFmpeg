@@ -12,6 +12,7 @@ import {
   Image,
   Modal,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -326,156 +327,15 @@ const BusinessProfilesScreen: React.FC = () => {
       return;
     }
     const businessProfileId = pendingProfileDataRef.current.id;
-
-    // Stop existing polling before starting a new payment flow
-    if (pollingCleanupRef.current) {
-      pollingCleanupRef.current();
-      pollingCleanupRef.current = null;
-    }
-
-    try {
-      setIsProcessingPayment(true);
-      setShowPaymentModal(false);
-      const currentUser = authService.getCurrentUser();
-      const subscriptionData = await subscriptionApi.createBusinessProfileAutopay({
-        planId: 'plan_business_profile_standard',
-        businessProfileId,
-        subscriptionCategory: 'BUSINESS_PROFILE',
-        customerEmail: currentUser?.email,
-        customerPhone: currentUser?.phone || currentUser?.phoneNumber,
-      });
-
-      if (!subscriptionData?.subscriptionId) throw new Error('Failed to create subscription mandate.');
-
-      // Validate that we have a correct Razorpay subscription ID
-      if (!subscriptionData.subscriptionId.startsWith("sub_")) {
-        console.error("❌ Invalid subscription ID for Razorpay:", subscriptionData.subscriptionId);
-        throw new Error("Invalid Razorpay subscription ID.");
-      }
-
-      console.log("✅ Using Razorpay subscription ID:", subscriptionData.subscriptionId);
-
-      // CRITICAL: Ensure Razorpay key is valid to prevent native crash
-      const razorpayKey = subscriptionData.razorpayKey || getProductionRazorpayKey();
-      
-      // Log configuration status for debugging
-      console.log('💳 Razorpay Config:', {
-        environment: RAZORPAY_CONFIG.environment,
-        isValid: RAZORPAY_CONFIG.isValid,
-        isTestMode: RAZORPAY_CONFIG.isTestMode
-      });
-      
-      console.log('💳 Opening Razorpay checkout for profile:', businessProfileId);
-      console.log('🆔 Subscription ID:', subscriptionData.subscriptionId);
-      console.log('🔑 Using Razorpay Key:', razorpayKey ? 'FOUND' : 'MISSING');
-
-      const options: any = {
-        description: 'Business Profile Subscription',
-        key: razorpayKey,
-        subscription_id: subscriptionData.subscriptionId,
-        name: 'Market Brand',
-        prefill: {
-          email: currentUser?.email || '',
-          contact: currentUser?.phone || currentUser?.phoneNumber || '',
-          name: currentUser?.name || currentUser?.companyName || 'User',
-        },
-        theme: { color: theme.colors.primary || '#667eea' },
-        method: {
-          upi: true,
-          card: true,
-          netbanking: false,
-          wallet: false,
-          emi: false,
-          paylater: false,
-        },
-      };
-
-      try {
-        console.log('🚀 Triggering Razorpay native checkout...');
-        const razorpayResult = await RazorpayCheckout.open(options);
-        console.log('✅ Razorpay checkout result:', razorpayResult);
-        
-        // Start polling for activation status
-        console.log('✅ Payment successful, starting polling (5m window)');
-        pollingCleanupRef.current = startSubscriptionPolling(
-          () => {
-            // onActive: Subscription is now active!
-            console.log('✅ Subscription activated! Refreshing profiles.');
-            setSuccessMessage('Subscription activated! Your profile is now ready.');
-            setShowSuccessModal(true);
-            
-            // Refresh profiles to show updated status
-            loadBusinessProfiles();
-            refreshBusinessProfileSubscription(businessProfileId);
-          },
-          () => {
-            // onTimeout: 5 minutes passed
-            console.warn('⚠️ Polling timed out - activation may take longer');
-            setSuccessMessage('Subscription mandate approved successfully! Your profile will be activated once the payment is verified.');
-            setShowSuccessModal(true);
-          }
-        );
-
-        // Immediate single refresh as fallback
-        refreshBusinessProfileSubscription(businessProfileId);
-        loadBusinessProfiles();
-      } catch (e: any) {
-        console.error('❌ Razorpay checkout error:', {
-          code: e?.code,
-          description: e?.description,
-          message: e?.message,
-          source: e?.source,
-          step: e?.step,
-          reason: e?.reason
-        });
-        
-        if (e?.code !== 2) {
-          // Handle payment cancellation and other errors with simple messages
-          let errorMessage = 'Payment Failed';
-          
-          // Check for payment cancellation in multiple ways
-          if (e?.code === 0 || 
-              e?.code === 'PAYMENT_CANCELLED' ||
-              e?.reason === 'payment_cancelled' ||
-              e?.step === 'payment_authentication' ||
-              (e?.description && e.description.includes('cancelled')) ||
-              (e?.description && e.description.includes('delay in response'))) {
-            errorMessage = 'Payment Failed';
-          } else if (e?.code === 'NETWORK_ERROR') {
-            errorMessage = 'Network error. Please check your connection and try again.';
-          } else if (e?.code === 'INVALID_OPTIONS') {
-            errorMessage = 'Invalid payment configuration. Please contact support.';
-          }
-          
-          setErrorMessage(errorMessage);
-          setShowErrorModal(true);
-        }
-      }
-    } catch (error: any) {
-      console.error('❌ Payment flow error:', error);
-      
-      // Provide specific error messages
-      let errorMessage = 'Payment flow failed.';
-      if (typeof error === 'string') {
-        errorMessage = error;
-      } else if (error && error.message) {
-        errorMessage = error.message;
-      }
-      
-      if (error && error.code === 'PAYMENT_CANCELLED') {
-        errorMessage = 'Payment was cancelled. Please try again.';
-      } else if (error && error.code === 'NETWORK_ERROR') {
-        errorMessage = 'Network error. Please check your connection and try again.';
-      } else if (error && error.code === 'INVALID_OPTIONS') {
-        errorMessage = 'Invalid payment configuration. Please contact support.';
-      }
-      
-      setErrorMessage(errorMessage);
-      setShowErrorModal(true);
-    } finally {
-      setIsProcessingPayment(false);
-    }
-  }, [theme.colors.primary, refreshBusinessProfileSubscription, loadBusinessProfiles]);
+    
+    // NAVIGATE TO SUBSCRIPTION SCREEN INSTEAD OF DIRECT RAZORPAY
+    console.log('🔍 BUSINESS PROFILES - Navigating to Subscription screen for profile:', businessProfileId);
+    
+    navigation.navigate('Subscription' as any, {
+      source: 'BUSINESS_PROFILE_REQUIRED',
+      businessProfileId: businessProfileId
+    });
+  }, []);
 
   const handleProfileSelect = useCallback(async (profile: any) => {
     // Debug logging to identify the issue

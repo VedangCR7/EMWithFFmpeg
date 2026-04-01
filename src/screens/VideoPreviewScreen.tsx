@@ -143,7 +143,10 @@ const VideoPreviewScreen: React.FC<VideoPreviewScreenProps> = ({ route }) => {
 
   const { videoWidth, videoHeight, availableWidth, availableHeight } = getResponsiveDimensions(insets);
   const { selectedVideo, selectedLanguage, selectedTemplateId, layers, selectedProfile, processedVideoPath: initialProcessedVideoPath, canvasData } = route.params;
-  const { isSubscribed } = useSubscription();
+  const { selectedBusinessProfile } = useBusinessProfile();
+  
+  // BUSINESS PROFILE SUBSCRIPTION LOGIC: Check if business profile has active subscription
+  const isBusinessActive = selectedBusinessProfile?.subscriptionStatus?.toUpperCase() === 'ACTIVE';
 
   // Video state
   const [isVideoPlaying, setIsVideoPlaying] = useState(true);

@@ -3516,7 +3516,9 @@ const HomeScreen: React.FC = React.memo(() => {
           { text: "Cancel", style: "cancel" },
           { 
             text: "Activate Now", 
-            onPress: () => navigation.navigate('BusinessProfiles' as any) 
+            onPress: () => navigation.navigate('Subscription' as any, { 
+              source: 'BUSINESS_PROFILE_REQUIRED' 
+            }) 
           }
         ]
       );

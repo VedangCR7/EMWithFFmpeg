@@ -2972,7 +2972,12 @@ const HomeScreen: React.FC = React.memo(() => {
           { text: "Cancel", style: "cancel" },
           { 
             text: "Activate Now", 
-            onPress: () => navigation.navigate('BusinessProfiles' as any) 
+            onPress: () => {
+              console.log('🔍 HOME SCREEN - Navigating to Subscription with context');
+              navigation.navigate('Subscription' as any, { 
+                source: 'BUSINESS_PROFILE_REQUIRED' 
+              });
+            }
           }
         ]
       );
@@ -3282,7 +3287,12 @@ const HomeScreen: React.FC = React.memo(() => {
             { text: "Cancel", style: "cancel" },
             { 
               text: "Activate Now", 
-              onPress: () => navigation.navigate('BusinessProfiles' as any) 
+              onPress: () => {
+                console.log('🔍 HOME SCREEN - Navigating to Subscription with context (banner)');
+                navigation.navigate('Subscription' as any, { 
+                  source: 'BUSINESS_PROFILE_REQUIRED' 
+                });
+              }
             }
           ]
         );
