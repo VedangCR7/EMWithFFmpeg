@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import RazorpayCheckout from 'react-native-razorpay';
@@ -21,6 +21,7 @@ import { RAZORPAY_KEY_ID } from '@env';
 import { getProductionRazorpayKey, RAZORPAY_CONFIG } from '../config/razorpayConfig';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSubscription } from '../contexts/SubscriptionContext';
+import { useBusinessProfile } from '../context/BusinessProfileContext';
 import PaymentErrorModal from '../components/PaymentErrorModal';
 import PlanCard from '../components/PlanCard';
 import { useTheme } from '../context/ThemeContext';
@@ -66,9 +67,29 @@ const responsiveFontSize = {
 
 const SubscriptionScreen: React.FC = () => {
   const navigation = useNavigation();
+  const route = useRoute();
   const insets = useSafeAreaInsets();
-  const { isSubscribed, subscriptionStatus: contextSubscriptionStatus, plans: contextPlans, refreshSubscription, refreshPlans, addTransaction, setIsSubscribed, transactionStats, isLoading, autopayState, enableAutopay, disableAutopay, refreshAutopayStatus, setPaymentInProgress } = useSubscription();
+  
+  // DYNAMIC TITLE: Check if navigation is from business profile lock screen
+  const source = (route.params as any)?.source;
+  const businessProfileId = (route.params as any)?.businessProfileId;
+  console.log('🔍 SUBSCRIPTION SCREEN - Route params:', route.params);
+  console.log('🔍 SUBSCRIPTION SCREEN - Source:', source);
+  console.log('🔍 SUBSCRIPTION SCREEN - Business Profile ID:', businessProfileId);
+  const screenTitle = source === 'BUSINESS_PROFILE_REQUIRED' ? 'Activate Business Plan' : 'Upgrade to Pro';
+  console.log('🔍 SUBSCRIPTION SCREEN - Screen title:', screenTitle);
+  const { isSubscribed, subscriptionStatus: contextSubscriptionStatus, plans: contextPlans, refreshPlans, addTransaction, setIsSubscribed, transactionStats, isLoading, autopayState, enableAutopay, disableAutopay, refreshAutopayStatus, setPaymentInProgress, refreshBusinessProfileSubscription } = useSubscription();
+  const { selectedBusinessProfile } = useBusinessProfile();
+  
+  // Use passed business profile ID or fall back to selected one
+  const effectiveBusinessProfile = useMemo(() => businessProfileId 
+    ? { ...selectedBusinessProfile, id: businessProfileId }
+    : selectedBusinessProfile, [businessProfileId, selectedBusinessProfile]);
   const { theme } = useTheme();
+
+  // BUSINESS PROFILE SUBSCRIPTION LOGIC: Replace user subscription with business profile logic
+  const isBusinessActive = effectiveBusinessProfile?.subscriptionStatus?.toUpperCase() === 'ACTIVE';
+  console.log('🏢 BUSINESS SUBSCRIPTION LOGIC: isBusinessActive =', isBusinessActive, 'for profile:', effectiveBusinessProfile?.name);
 
   // Dynamic dimensions for responsive layout (matching HomeScreen)
   const [dimensions, setDimensions] = useState(() => {
@@ -128,6 +149,32 @@ const SubscriptionScreen: React.FC = () => {
   const [isTransactionPending, setIsTransactionPending] = useState(false); // Post-payment, pre-activation
   const [pollingAttempts, setPollingAttempts] = useState(0);
 
+  // BUSINESS API VALIDATION: Verify integration is working
+  useEffect(() => {
+    console.log('🏢 BUSINESS API VALIDATION - SubscriptionScreen useEffect');
+    console.log('📊 Context plans length:', contextPlans.length);
+    console.log('📊 Purchasable plans length:', purchasablePlans.length);
+    console.log('📊 Selected plan ID:', selectedPlanId);
+    
+    // Validate that business API data is flowing correctly
+    if (contextPlans.length > 0) {
+      console.log('✅ BUSINESS API INTEGRATION: Plans loaded successfully');
+      contextPlans.forEach((plan, index) => {
+        console.log(`📋 Plan ${index + 1}:`, {
+          id: plan.id,
+          name: plan.name,
+          price: plan.price,
+          duration: plan.duration,
+          hasFeatures: Array.isArray(plan.features) && plan.features.length > 0
+        });
+      });
+    } else {
+      console.log('⚠️ BUSINESS API INTEGRATION: No plans loaded');
+    }
+  }, [contextPlans, purchasablePlans, selectedPlanId]);
+
+  const pollingCleanupRef = useRef<(() => void) | null>(null);
+
   // Cleanup polling on unmount
   useEffect(() => {
     return () => {
@@ -136,8 +183,6 @@ const SubscriptionScreen: React.FC = () => {
       }
     };
   }, []);
-
-  const pollingCleanupRef = useRef<(() => void) | null>(null);
 
   // Wrapper to update both local and context payment states
   const updatePaymentInProgress = (inProgress: boolean) => {
@@ -155,6 +200,25 @@ const SubscriptionScreen: React.FC = () => {
 
   // Filter out promo plans from purchasable plans
   const purchasablePlans = contextPlans.filter(plan => plan.name !== "PROMO");
+  
+  // BUSINESS API VALIDATION: Log plan data for testing
+  console.log('🏢 BUSINESS API VERIFICATION - SubscriptionScreen:');
+  console.log('📊 Total plans from context:', contextPlans.length);
+  console.log('📊 Purchasable plans (filtered):', purchasablePlans.length);
+  console.log('📋 Purchasable plan details:', purchasablePlans.map(plan => ({
+    id: plan.id,
+    name: plan.name,
+    price: plan.price,
+    duration: plan.duration,
+    featuresCount: plan.features?.length || 0
+  })));
+  
+  // BUSINESS API: Log selected business profile
+  console.log('🏢 BUSINESS API: Selected business profile:', effectiveBusinessProfile ? {
+    id: effectiveBusinessProfile.id,
+    name: effectiveBusinessProfile.name,
+    subscriptionStatus: effectiveBusinessProfile.subscriptionStatus
+  } : 'NONE');
 
   // Detect number of plans for layout adjustments
   const planCount = purchasablePlans.length;
@@ -212,17 +276,23 @@ const SubscriptionScreen: React.FC = () => {
         return;
       }
 
-      // CRITICAL: Only refresh if not in payment flow to prevent false activation
       console.log('🔄 SUBSCRIPTION_STATUS_FETCH - SubscriptionScreen focused, refreshing subscription');
-      refreshSubscription();
-      refreshPlans();
-      refreshAutopayStatus();
+      
+      // TEMPORARILY DISABLED: User subscription logic for testing
+      // refreshSubscription(); // Disabled - only refresh business plans
+      
+      console.log('🏢 BUSINESS API INTEGRATION: Only refreshing business plans');
+      refreshPlans(); // This now uses business API
+      
+      // TEMPORARILY DISABLED: Autopay status for testing
+      // refreshAutopayStatus(); // Disabled for business-only testing
 
       // Set default selected plan when plans load
       if (!selectedPlanId && purchasablePlans.length > 0) {
         setSelectedPlanId(purchasablePlans[0].id);
+        console.log('🏢 BUSINESS API: Set default selected plan:', purchasablePlans[0].id);
       }
-    }, [refreshSubscription, refreshPlans, refreshAutopayStatus, selectedPlanId, purchasablePlans.length, paymentInProgress])
+    }, [refreshPlans, selectedPlanId, purchasablePlans.length, paymentInProgress])
   );
 
   // Helper function to show error modal
@@ -290,49 +360,41 @@ const SubscriptionScreen: React.FC = () => {
         console.log(`🔄 Polling attempt ${attempt}/${maxAttempts}`);
         setPollingAttempts(attempt);
         
-        // Force refresh subscription status
-        await refreshSubscription(true);
-        
-        // Check if subscription is now active
-        const currentUser = authService.getCurrentUser();
-        if (currentUser?.id) {
-          const statusResponse = await subscriptionApi.getStatus();
-          const subscriptionData = (statusResponse.data as any)?.subscription || (statusResponse.data as any)?.data || statusResponse.data;
-          const isActive = isStatusActive(subscriptionData);
+        // BUSINESS PROFILE: Check if business profile subscription is now active
+        if (effectiveBusinessProfile) {
+          const businessSubscription = await subscriptionApi.getBusinessProfileSubscriptionStatus(effectiveBusinessProfile.id);
+          const isActive = businessSubscription.success && businessSubscription.data?.status?.toUpperCase() === 'ACTIVE';
           
-          console.log(`📊 Polling result - Attempt ${attempt}: isActive=${isActive}`);
+          console.log(`📊 Business Profile Polling result - Attempt ${attempt}: isActive=${isActive}, profile=${effectiveBusinessProfile.name}`);
           
           if (isActive) {
-            console.log('✅ Subscription activated! Stopping polling.');
-            setIsSubscribed(true);
+            console.log('✅ Business Profile Subscription activated! Stopping polling.');
             setIsTransactionPending(false);
             updatePaymentInProgress(false);
             
-            // Show success message
-            if (Platform.OS === 'android') {
-              ToastAndroid.show('🎉 Payment successful! Welcome to Pro!', ToastAndroid.LONG);
-            } else {
-              Alert.alert('🎉 Success', 'Payment successful! Welcome to Pro!');
-            }
-            
-            return true; // Success
+            return true; // Success - polling should stop
           }
         }
         
-        // Wait before next attempt (except for last attempt)
+        // Wait before next attempt
         if (attempt < maxAttempts) {
-          console.log(`⏳ Waiting ${interval}ms before next attempt...`);
+          console.log(`⏱️ Waiting ${interval}ms before next attempt...`);
           await new Promise(resolve => setTimeout(resolve, interval));
         }
         
       } catch (error) {
         console.error(`❌ Polling attempt ${attempt} failed:`, error);
+        
+        // Wait before retry even on error
+        if (attempt < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, interval));
+        }
       }
     }
     
-    console.log(`⏱️ Polling completed after ${maxAttempts} attempts - subscription not activated`);
+    console.log(`⏱️ Polling completed after ${maxAttempts} attempts - business profile not activated`);
     return false; // Failed to activate
-  }, [refreshSubscription, setIsSubscribed, updatePaymentInProgress]);
+  }, [effectiveBusinessProfile, updatePaymentInProgress]);
 
   // Handle payment with Razorpay
   const handlePayment = async () => {
@@ -341,10 +403,19 @@ const SubscriptionScreen: React.FC = () => {
       return;
     }
 
-    if (isSubscribed) {
-      showErrorModal('Already Subscribed', 'You are already a Pro subscriber!');
+    if (isBusinessActive) {
+      showErrorModal('Already Subscribed', 'This business profile already has an active subscription!');
       return;
     }
+
+    // BUSINESS API VALIDATION: Check if business profile is selected
+    if (!effectiveBusinessProfile) {
+      console.log('🏢 BUSINESS API: No business profile selected');
+      showErrorModal('Business Profile Required', 'Please select a business profile before subscribing.');
+      return;
+    }
+
+    console.log('🏢 BUSINESS API: Starting payment for profile:', effectiveBusinessProfile.name, 'ID:', effectiveBusinessProfile.id);
 
     // Stop existing polling before starting a new payment flow
     if (pollingCleanupRef.current) {
@@ -391,22 +462,25 @@ const SubscriptionScreen: React.FC = () => {
       // Use actual plan price from API
       const normalizedPlanAmountRupees = planPriceFromApi;
 
-      // Create payment order with backend to obtain order ID and amount
-      orderDetails = await subscriptionApi.createPaymentOrder({
+      // Create BUSINESS payment order with backend to obtain order ID and amount
+      console.log('🏢 BUSINESS API: Creating payment order for business profile');
+      orderDetails = await subscriptionApi.createBusinessPaymentOrder({
         planId: selectedPlan.id,
+        businessProfileId: effectiveBusinessProfile.id,
         currency: 'INR',
       });
 
       if (!orderDetails?.orderId) {
-        throw new Error('Failed to create payment order. Please try again.');
+        throw new Error('Failed to create business payment order. Please try again.');
       }
 
-      console.log('📦 Order details from backend:', {
+      console.log('📦 BUSINESS API: Order details from backend:', {
         orderId: orderDetails.orderId,
         amount: orderDetails.amount,
         amountInPaise: orderDetails.amountInPaise,
         currency: orderDetails.currency,
         razorpayKey: orderDetails.razorpayKey,
+        businessProfileId: effectiveBusinessProfile.id,
         fallbackKey: RAZORPAY_KEY_ID,
       });
 
@@ -540,21 +614,22 @@ const SubscriptionScreen: React.FC = () => {
             // Verify payment with backend and activate subscription
             console.log('🔄 Activating subscription...');
 
-            const currency = 'INR';
+            // Step 1: Verify BUSINESS payment with backend and activate subscription
+            console.log('🔄 Activating BUSINESS subscription for profile:', effectiveBusinessProfile.id);
 
-            // Step 1: Verify payment first
-            const verifyResult = await subscriptionApi.verifyPayment({
+            const verifyResult = await subscriptionApi.verifyBusinessPayment({
+              businessProfileId: effectiveBusinessProfile.id,
               orderId: response.razorpay_order_id,
               paymentId: response.razorpay_payment_id,
               signature: response.razorpay_signature,
               amount: amountInRupees,
               amountPaise: amountInPaise,
-              currency,
+              currency: 'INR',
               planId: selectedPlan.id,
               email: currentUserForTransaction?.email,
               contact: currentUserForTransaction?.phoneNumber,
             });
-            console.log('✅ PAYMENT_SUCCESS - Payment verified:', verifyResult);
+            console.log('✅ BUSINESS PAYMENT_SUCCESS - Payment verified:', verifyResult);
 
             // Step 2: Clear subscription cache immediately
             const currentUserForCache = authService.getCurrentUser();
@@ -571,18 +646,17 @@ const SubscriptionScreen: React.FC = () => {
               // Use the new modular polling helper
               pollingCleanupRef.current = startSubscriptionPolling(
                 () => {
-                  // onActive: Subscription is now active!
-                  console.log('✅ Subscription activated via polling!');
-                  setIsSubscribed(true);
+                  // onActive: Business Profile Subscription is now active!
+                  console.log('✅ Business Profile Subscription activated via polling!');
                   setIsTransactionPending(false);
                   updatePaymentInProgress(false);
                   
                   if (Platform.OS === 'android') {
-                    ToastAndroid.show('🎉 Subscription activated! Welcome to Pro!', ToastAndroid.LONG);
+                    ToastAndroid.show('🎉 Business Profile activated! Welcome to Pro!', ToastAndroid.LONG);
                   }
                   
-                  // Final refresh of context to ensure everything is updated
-                  refreshSubscription(true);
+                  // BUSINESS PROFILE: Refresh business profile subscription status
+                  refreshBusinessProfileSubscription(effectiveBusinessProfile.id);
                   
                   // Close screen once active
                   navigation.goBack();
@@ -631,7 +705,7 @@ const SubscriptionScreen: React.FC = () => {
 
       // If payment succeeds but handler wasn't called (uncommon scenario)
       // Only activate if we have a valid payment_id AND it's a successful payment
-      if (data && data.razorpay_payment_id && data.razorpay_order_id && !isSubscribed) {
+      if (data && data.razorpay_payment_id && data.razorpay_order_id && !isBusinessActive) {
         console.log('⚠️ Payment succeeded but handler not called, activating manually...');
         try {
           await options.handler?.(data);
@@ -695,8 +769,8 @@ const SubscriptionScreen: React.FC = () => {
       return;
     }
 
-    if (isSubscribed) {
-      showErrorModal('Already Subscribed', 'You are already a Pro subscriber!');
+    if (isBusinessActive) {
+      showErrorModal('Already Subscribed', 'This business profile already has an active subscription!');
       return;
     }
 
@@ -844,18 +918,19 @@ const SubscriptionScreen: React.FC = () => {
                 // Use the new modular polling helper
                 pollingCleanupRef.current = startSubscriptionPolling(
                   () => {
-                    // onActive: Subscription is now active!
-                    console.log('✅ Autopay subscription activated!');
-                    setIsSubscribed(true);
+                    // onActive: Business Profile Subscription is now active!
+                    console.log('✅ Business Profile Autopay activated!');
                     setIsTransactionPending(false);
                     updatePaymentInProgress(false);
                     
                     if (Platform.OS === 'android') {
-                      ToastAndroid.show('🎉 Mandate approved! Welcome to Pro!', ToastAndroid.LONG);
+                      ToastAndroid.show('🎉 Business Profile activated! Welcome to Pro!', ToastAndroid.LONG);
                     }
                     
-                    // Final refresh of context
-                    refreshSubscription(true);
+                    // BUSINESS PROFILE: Refresh business profile subscription status
+                    if (selectedBusinessProfile) {
+                      refreshBusinessProfileSubscription(selectedBusinessProfile.id);
+                    }
                     
                     // Close screen
                     navigation.goBack();
@@ -928,9 +1003,9 @@ const SubscriptionScreen: React.FC = () => {
       // DANGEROUS: Do NOT refresh subscription on failure - backend might return active due to webhook
       // await refreshSubscription(true); // ❌ REMOVED - Prevents false activation
 
-      // CRITICAL: Explicitly set subscription to false on payment failure
-      setIsSubscribed(false);
-      console.log('🚫 Payment failed - subscription explicitly set to false');
+      // CRITICAL: Do NOT set subscription state on business payment failure
+      // Business profile status will be refreshed independently
+      console.log('🚫 Business payment failed - profile status unchanged');
 
       // PREVENT APP CRASH - Show user-friendly error
       if (error.message === "Razorpay module not loaded") {
@@ -1026,16 +1101,12 @@ const SubscriptionScreen: React.FC = () => {
 
       console.log('✅ Subscription activated via API:', subscriptionResponse.data);
 
-      // Refresh subscription status from backend
-      const statusResponse = await subscriptionApi.getStatus();
-      const latestStatus = statusResponse.data;
-      const active = isStatusActive(latestStatus);
-      setIsSubscribed(active);
+      // BUSINESS PROFILE: Refresh business profile subscription status instead of user subscription
+      if (effectiveBusinessProfile) {
+        await refreshBusinessProfileSubscription(effectiveBusinessProfile.id);
+      }
 
-      // Ensure shared context is refreshed without cache
-      await refreshSubscription(true);
-
-      return latestStatus;
+      return subscriptionResponse.data;
 
     } catch (error) {
       console.error('❌ Payment verification and subscription activation failed:', error);
@@ -1083,7 +1154,9 @@ const SubscriptionScreen: React.FC = () => {
           <Text style={[styles.headerTitle, {
             fontSize: dynamicModerateScale(14),
             color: theme.colors.text,
-          }]}>Upgrade to Pro</Text>
+          }]}>
+            {screenTitle}
+          </Text>
           <Text style={[styles.headerSubtitle, {
             fontSize: dynamicModerateScale(9),
             marginTop: dynamicModerateScale(1),
@@ -1120,8 +1193,8 @@ const SubscriptionScreen: React.FC = () => {
         }]}
       >
 
-        {/* Current Subscription Status (if subscribed) */}
-        {isSubscribed && contextSubscriptionStatus && (
+        {/* Current Business Profile Subscription Status (if active) */}
+        {isBusinessActive && selectedBusinessProfile && (
           <View style={[styles.currentSubscriptionCard, {
             backgroundColor: theme.colors.cardBackground,
             marginBottom: dynamicModerateScale(12),
@@ -1141,26 +1214,14 @@ const SubscriptionScreen: React.FC = () => {
                   fontSize: dynamicModerateScale(12),
                   marginBottom: dynamicModerateScale(2),
                 }]}>
-                  {contextSubscriptionStatus.planName || 'Pro Subscription'}
+                  {effectiveBusinessProfile.name} - Business Profile
                 </Text>
                 <Text style={[styles.currentSubscriptionSubtitle, {
                   color: theme.colors.textSecondary,
                   fontSize: dynamicModerateScale(9),
                   lineHeight: dynamicModerateScale(14),
                 }]}>
-                  {(() => {
-                    const expiryDate = contextSubscriptionStatus.expiryDate || contextSubscriptionStatus.endDate;
-                    if (expiryDate) {
-                      const daysRemaining = Math.ceil((new Date(expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-                      const expiryDateFormatted = new Date(expiryDate).toLocaleDateString('en-IN', {
-                        day: 'numeric',
-                        month: 'short',
-                        year: 'numeric'
-                      });
-                      return `${daysRemaining} days remaining • Expires ${expiryDateFormatted}`;
-                    }
-                    return 'Active subscription';
-                  })()}
+                  Status: {effectiveBusinessProfile.subscriptionStatus || 'Unknown'}
                 </Text>
               </View>
             </View>
@@ -1405,10 +1466,10 @@ const SubscriptionScreen: React.FC = () => {
             marginBottom: isTabletDevice ? dynamicModerateScale(8) : dynamicModerateScale(6),
           }]}
           onPress={handleAutopayPayment}
-          disabled={isProcessing || isSubscribed || paymentInProgress || isAuthenticating || isTransactionPending}
+          disabled={isProcessing || isBusinessActive || paymentInProgress || isAuthenticating || isTransactionPending}
         >
           <LinearGradient
-            colors={isSubscribed
+            colors={isBusinessActive
               ? ['#28a745', '#20c997']
               : isAuthenticating
                 ? ['#ff9800', '#f57c00'] // Orange for authenticating
@@ -1426,8 +1487,8 @@ const SubscriptionScreen: React.FC = () => {
             <Text style={[styles.upgradeButtonText, {
               fontSize: dynamicModerateScale(11),
             }]}>
-              {isSubscribed
-                ? 'Already Pro'
+              {isBusinessActive
+                ? 'Already Active'
                 : isAuthenticating
                   ? 'Authenticating...'
                   : isTransactionPending
@@ -1442,7 +1503,7 @@ const SubscriptionScreen: React.FC = () => {
           </LinearGradient>
         </TouchableOpacity>
 
-        {!isSubscribed && (
+        {!isBusinessActive && (
           <Text style={[styles.termsText, {
             color: theme.colors.textSecondary,
             fontSize: dynamicModerateScale(7.5),

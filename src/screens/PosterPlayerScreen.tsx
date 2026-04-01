@@ -434,7 +434,6 @@ const PosterPlayerScreen: React.FC = () => {
     categoryName,
     templateSource
   });
-
   // Use global state for business data instead of route parameters
   const { 
     selectedBusinessCategory: globalBusinessCategory,
@@ -3142,6 +3141,8 @@ const PosterPlayerScreen: React.FC = () => {
         uri: getHighQualityImageUrl(currentPoster),
         title: currentPoster.name,
         description: currentPoster.category,
+        id: currentPoster.id,
+        templateId: currentPoster.id,
       },
       selectedLanguage: selectedLanguage,
       selectedTemplateId: currentPoster.id,

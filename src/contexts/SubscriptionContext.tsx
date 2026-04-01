@@ -366,17 +366,50 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
   const refreshPlans = useCallback(async () => {
     try {
       console.log('🔄 Refreshing subscription plans...');
+      console.log('🏢 BUSINESS API INTEGRATION: Using /api/mobile/subscription/plans endpoint');
+      
+      // Use existing business plans API (already calling /api/mobile/subscription/plans)
       const response = await subscriptionApi.getPlans();
       
+      console.log('📡 BUSINESS API RESPONSE:', response);
+      
       if (response.success) {
-        setPlans(response.data || []);
-        console.log('✅ Plans refreshed successfully:', response.data?.length || 0, 'plans');
+        // Response adapter - map business API response to existing UI format
+        const mappedPlans = (response.data || []).map((plan: any) => {
+          console.log('🔄 MAPPING BUSINESS PLAN:', plan);
+          return {
+            id: plan.id || '',
+            name: plan.name || '',
+            description: plan.description || '',
+            price: typeof plan.price === 'number' ? plan.price : 0,
+            currency: plan.currency || 'INR',
+            duration: plan.period || plan.duration || 'monthly',
+            features: Array.isArray(plan.features) ? plan.features : 
+                      typeof plan.features === "string" ? plan.features.split(',').map((f: string) => f.trim()).filter((f: string) => f) : [],
+            isPopular: plan.originalPrice && plan.originalPrice > plan.price
+          };
+        });
+        
+        console.log('✅ BUSINESS PLANS MAPPED TO UI FORMAT:', mappedPlans);
+        setPlans(mappedPlans);
+        console.log('✅ Business plans refreshed successfully:', mappedPlans.length || 0, 'plans');
       } else {
-        console.log('⚠️ Failed to fetch plans, using empty array');
+        console.log('⚠️ Failed to fetch business plans, using empty array');
         setPlans([]);
       }
+      
+      // TEMPORARILY DISABLED: User subscription logic for testing
+      // Original user subscription API calls commented out for safety
+      /*
+      const userResponse = await subscriptionApi.getPlans();
+      if (userResponse.success) {
+        setPlans(userResponse.data || []);
+      }
+      */
+      
     } catch (error) {
-      console.error('❌ Error refreshing plans:', error);
+      console.error('❌ Error refreshing business plans:', error);
+      console.log('🔄 FALLBACK: Setting empty plans array due to business API error');
       setPlans([]);
     }
   }, []);

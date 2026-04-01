@@ -84,6 +84,7 @@ class SubscriptionApiService {
   // Get subscription plans
   async getPlans(): Promise<PlansResponse> {
     try {
+      console.log('🏢 BUSINESS API INTEGRATION: Calling /api/mobile/subscription/plans endpoint');
       const response = await api.get('/api/mobile/subscription/plans');
       
       // Check if response has the expected structure
@@ -98,7 +99,8 @@ class SubscriptionApiService {
         };
       }
       
-      console.log("Subscription plans API response:", response.data);
+      console.log("📡 BUSINESS API RESPONSE:", response.data);
+      console.log("📊 BUSINESS PLANS COUNT:", plans.length);
       
       // Transform the response to match expected format
       const transformedData = plans.map((plan: any) => {
@@ -121,16 +123,195 @@ class SubscriptionApiService {
         };
       });
       
-      console.log("Parsed subscription plans:", transformedData);
+      console.log("✅ BUSINESS PLANS TRANSFORMED:", transformedData);
 
       return {
         success: true,
         data: transformedData,
-        message: 'Plans fetched successfully'
+        message: 'Business plans fetched successfully'
       };
     } catch (error) {
-      console.error('Get plans error:', error);
+      console.error('❌ Business plans API error:', error);
       throw error;
+    }
+  }
+
+  // Create BUSINESS Razorpay order before initiating payment
+  async createBusinessPaymentOrder(params: {
+    planId: string;
+    businessProfileId: string;
+    currency?: string;
+  }): Promise<PaymentOrderDetails> {
+    try {
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id;
+
+      if (!userId) {
+        throw new Error('User not authenticated');
+      }
+
+      const payload: Record<string, any> = {
+        planId: params.planId,
+        businessProfileId: params.businessProfileId,
+        userId,
+      };
+
+      if (params.currency) {
+        payload.currency = params.currency;
+      }
+
+      console.log('🏢 BUSINESS API: Creating Razorpay order with payload:', payload);
+
+      const response = await api.post('/api/mobile/subscription/create-business-order', payload);
+      const responseData = response.data?.data ?? response.data;
+      const data =
+        responseData?.order ??
+        responseData?.orderDetails ??
+        responseData?.razorpayOrder ??
+        responseData;
+      console.log('✅ BUSINESS API: Create payment order response:', data);
+
+      const orderId = data?.orderId || data?.order_id || data?.id;
+      if (!orderId) {
+        throw new Error('Business Order ID missing from create-order response');
+      }
+
+      const amount =
+        typeof data?.amount === 'number'
+          ? data.amount
+          : typeof data?.amount === 'string'
+            ? Number(data.amount)
+            : 0;
+
+      const rawAmountInPaise =
+        typeof data?.amountInPaise === 'number'
+          ? data.amountInPaise
+          : typeof data?.amountInPaise === 'string'
+            ? Number(data.amountInPaise)
+            : typeof data?.amount_paise === 'number'
+              ? data.amount_paise
+              : typeof data?.amount_paise === 'string'
+                ? Number(data.amount_paise)
+                : undefined;
+
+      const amountInPaise =
+        typeof rawAmountInPaise === 'number' && !Number.isNaN(rawAmountInPaise)
+          ? rawAmountInPaise
+          : typeof amount === 'number' && amount > 0
+            ? Math.round(amount * 100)
+            : undefined;
+
+      const currency = data?.currency || params.currency || 'INR';
+
+      const razorpayKey =
+        data?.key ||
+        data?.key_id ||
+        data?.razorpayKey ||
+        data?.razorpayKeyId ||
+        response.data?.key ||
+        response.data?.key_id;
+
+      return {
+        orderId,
+        amount,
+        amountInPaise,
+        currency,
+        receipt: data?.receipt,
+        razorpayKey,
+        raw: data,
+      };
+    } catch (error: any) {
+      console.error('❌ BUSINESS API: Create payment order error:', error);
+      const message = error.response?.data?.message || error.message || 'Failed to create business payment order';
+      throw new Error(message);
+    }
+  }
+
+  // Verify BUSINESS payment with backend
+  async verifyBusinessPayment(paymentData: {
+    businessProfileId: string;
+    orderId: string;
+    paymentId: string;
+    signature: string;
+    amount?: number;
+    amountPaise?: number;
+    currency?: string;
+    planId?: string;
+    email?: string;
+    contact?: string;
+    subscriptionId?: string;
+    isAutopay?: boolean;
+  }): Promise<{ success: boolean; message: string; data?: any }> {
+    try {
+      const currentUser = authService.getCurrentUser();
+      const userId = currentUser?.id;
+      
+      if (!userId) {
+        throw new Error('User not authenticated');
+      }
+
+      console.log('🏢 BUSINESS API: Verifying payment with backend:', {
+        businessProfileId: paymentData.businessProfileId,
+        orderId: paymentData.orderId,
+        paymentId: paymentData.paymentId,
+      });
+      
+      const payload: Record<string, any> = {
+        businessProfileId: paymentData.businessProfileId,
+        orderId: paymentData.orderId,
+        paymentId: paymentData.paymentId,
+        signature: paymentData.signature,
+      };
+
+      if (paymentData.subscriptionId) {
+        payload.subscriptionId = paymentData.subscriptionId;
+      }
+
+      if (paymentData.isAutopay !== undefined) {
+        payload.isAutopay = paymentData.isAutopay;
+      }
+
+      if (typeof paymentData.amount === 'number') {
+        payload.amount = paymentData.amount;
+      }
+
+      if (typeof paymentData.amountPaise === 'number') {
+        payload.amountPaise = paymentData.amountPaise;
+      }
+
+      if (paymentData.currency) {
+        payload.currency = paymentData.currency;
+      }
+
+      if (paymentData.planId) {
+        payload.planId = paymentData.planId;
+      }
+
+      if (paymentData.email) {
+        payload.email = paymentData.email;
+      }
+
+      if (paymentData.contact) {
+        payload.contact = paymentData.contact;
+      }
+
+      console.log('📨 BUSINESS API: Sending verify-payment payload:', payload);
+
+      const response = await api.post('/api/mobile/subscription/verify-business-payment', payload);
+      
+      console.log('✅ BUSINESS API: Payment verified successfully:', response.data);
+      
+      // Clear business profile subscription status cache after payment verification
+      const cacheKey = `subscription_status_profile_${paymentData.businessProfileId}`;
+      cacheService.clear(cacheKey);
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ BUSINESS API: Payment verification error:', error);
+      
+      // Provide more detailed error message
+      const errorMessage = error.response?.data?.message || error.message || 'Business payment verification failed';
+      throw new Error(errorMessage);
     }
   }
 

@@ -192,21 +192,10 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
       setSelectedBusinessProfileState(profile);
 
       // Auto-sync business category when profile changes
-      if (profile?.category || profile?.subCategory || profile?.subcategory) {
-        const displayCategory =
-            profile.subCategory ||
-            profile.subcategory ||
-            profile.category;
-
-        // Add detailed logging for category selection
-        console.log("🏷️ [BUSINESS PROFILE CONTEXT] category:", profile.category);
-        console.log("🏷️ [BUSINESS PROFILE CONTEXT] subCategory:", profile.subCategory);
-        console.log("🏷️ [BUSINESS PROFILE CONTEXT] subcategory:", profile.subcategory);
-        console.log("✅ [BUSINESS PROFILE CONTEXT] Final category used:", displayCategory);
-
-        setSelectedBusinessCategoryState(displayCategory);
-        await AsyncStorage.setItem(SELECTED_BUSINESS_CATEGORY_KEY, displayCategory);
-        console.log('✅ [BUSINESS PROFILE CONTEXT] Auto-synced business category from profile:', displayCategory);
+      if (profile?.category) {
+        setSelectedBusinessCategoryState(profile.category);
+        await AsyncStorage.setItem(SELECTED_BUSINESS_CATEGORY_KEY, profile.category);
+        console.log('✅ [BUSINESS PROFILE CONTEXT] Auto-synced business category from profile:', profile.category);
       }
 
       if (profile) {

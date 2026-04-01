@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -2008,8 +2008,7 @@ const ProfileScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
 
-
-          {/* Subscription Section */}
+          {/* Transaction History Section */}
           <View style={[styles.section, {
             marginBottom: dynamicModerateScale(12),
           }]}>
@@ -2018,72 +2017,7 @@ const ProfileScreen: React.FC = () => {
               marginBottom: dynamicModerateScale(5),
               paddingHorizontal: dynamicModerateScale(8),
               color: theme.colors.text,
-            }]}>Subscription</Text>
-            <TouchableOpacity 
-              style={[styles.subscriptionCard, { 
-                backgroundColor: theme.colors.cardBackground,
-                marginHorizontal: dynamicModerateScale(8),
-                marginBottom: dynamicModerateScale(6),
-                paddingVertical: dynamicModerateScale(10),
-                paddingHorizontal: dynamicModerateScale(12),
-                borderRadius: dynamicModerateScale(12),
-              }]}
-              onPress={handleSubscription}
-            >
-              <View style={styles.subscriptionContent}>
-                <View style={styles.subscriptionLeft}>
-                  <View style={[styles.subscriptionIcon, { 
-                    backgroundColor: isSubscribed ? '#28a745' : '#667eea',
-                    width: dynamicModerateScale(32),
-                    height: dynamicModerateScale(32),
-                    borderRadius: dynamicModerateScale(16),
-                    marginRight: dynamicModerateScale(10),
-                  }]}>
-                    <Icon 
-                      name={isSubscribed ? 'check-circle' : 'star'} 
-                      size={getIconSize(16)} 
-                      color="#ffffff" 
-                    />
-                  </View>
-                  <View style={styles.subscriptionInfo}>
-                    <Text style={[styles.subscriptionTitle, { 
-                      color: theme.colors.text,
-                      fontSize: getFontSize(10),
-                    }]}>
-                      {isSubscribed 
-                        ? (() => {
-                            const sanitizedData = sanitizeSubscriptionData(subscriptionStatus);
-                            return sanitizedData?.planName || 'Pro Subscription';
-                          })()
-                        : 'Upgrade to Pro'}
-                    </Text>
-                    <Text style={[styles.subscriptionSubtitle, { 
-                      color: theme.colors.textSecondary,
-                      fontSize: getFontSize(8),
-                      marginTop: dynamicModerateScale(0.5),
-                    }]}>
-                      {isSubscribed 
-                        ? (() => {
-                            const sanitizedData = sanitizeSubscriptionData(subscriptionStatus);
-                            if (!sanitizedData) {
-                              return 'Subscription activating...';
-                            }
-                            const expiryDate = sanitizedData?.expiryDate || sanitizedData?.endDate;
-                            if (expiryDate) {
-                              const daysRemaining = Math.ceil((new Date(expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-                              return `Active • ${daysRemaining} days remaining`;
-                            }
-                            return 'Active • Unlimited features';
-                          })()
-                        : 'Unlock unlimited possibilities'}
-                    </Text>
-                  </View>
-                </View>
-                <Icon name="chevron-right" size={getIconSize(20)} color={theme.colors.textSecondary} />
-              </View>
-            </TouchableOpacity>
-            
-            {/* Transaction History Button */}
+            }]}>Transaction History</Text>
             <TouchableOpacity 
               style={[styles.transactionHistoryCard, { 
                 backgroundColor: theme.colors.cardBackground,

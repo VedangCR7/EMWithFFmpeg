@@ -2972,7 +2972,12 @@ const HomeScreen: React.FC = React.memo(() => {
           { text: "Cancel", style: "cancel" },
           { 
             text: "Activate Now", 
-            onPress: () => navigation.navigate('BusinessProfiles' as any) 
+            onPress: () => {
+              console.log('🔍 HOME SCREEN - Navigating to Subscription with context');
+              navigation.navigate('Subscription' as any, { 
+                source: 'BUSINESS_PROFILE_REQUIRED' 
+              });
+            }
           }
         ]
       );
@@ -3282,7 +3287,12 @@ const HomeScreen: React.FC = React.memo(() => {
             { text: "Cancel", style: "cancel" },
             { 
               text: "Activate Now", 
-              onPress: () => navigation.navigate('BusinessProfiles' as any) 
+              onPress: () => {
+                console.log('🔍 HOME SCREEN - Navigating to Subscription with context (banner)');
+                navigation.navigate('Subscription' as any, { 
+                  source: 'BUSINESS_PROFILE_REQUIRED' 
+                });
+              }
             }
           ]
         );
@@ -4152,7 +4162,10 @@ const HomeScreen: React.FC = React.memo(() => {
 
   // Memoized renderItem functions for modal FlatLists
   const handleBusinessCategoryPress = useCallback(async (category: BusinessCategory) => {
-    console.log('🏢 BUSINESS CATEGORY CLICKED:', category.name);
+    console.log('=🏢 [BUSINESS CATEGORY PRESS]', {
+      categoryName: category.name,
+      settingTemplateSource: true
+    });
 
     // Update global business category state
     await setSelectedBusinessCategory(category.name);
@@ -4161,27 +4174,13 @@ const HomeScreen: React.FC = React.memo(() => {
 
     // Navigate immediately if we have cached templates
     if (cachedTemplates && cachedTemplates.length > 0) {
-      console.log('🚀 Navigating to PosterPlayer with BUSINESS type');
-      console.log('📋 Cached templates found:', cachedTemplates.length);
-      const navigationParams: {
-        selectedPoster: any;
-        relatedPosters: any[];
-        searchQuery: string;
-        templateSource: 'greeting' | 'professional' | 'featured';
-        posterLimit: number;
-        type: 'business' | 'greeting' | 'calendar' | 'featured';
-        categoryName: string;
-      } = {
+      navigation.navigate('PosterPlayer', {
         selectedPoster: cachedTemplates[0],
         relatedPosters: cachedTemplates.slice(1),
         searchQuery: '',
         templateSource: 'professional', // Show subscription message for direct business category access
         posterLimit: 6, // Limit 6 for business categories from HomeScreen
-        type: 'business', // ADD THIS
-        categoryName: category.name // ADD THIS
-      };
-      console.log('📤 Navigation params being sent:', JSON.stringify(navigationParams, null, 2));
-      navigation.navigate('PosterPlayer', navigationParams);
+      });
       return;
     }
 
@@ -4189,7 +4188,6 @@ const HomeScreen: React.FC = React.memo(() => {
     // Use loading placeholder since we'll fetch actual data in background
     const firstPoster = null;
 
-    console.log('📋 No cached templates found, using loading state');
     navigation.navigate('PosterPlayer', {
       selectedPoster: firstPoster || {
         id: 'loading',
@@ -4201,15 +4199,8 @@ const HomeScreen: React.FC = React.memo(() => {
       },
       relatedPosters: firstPoster ? [firstPoster] : [],
       searchQuery: '',
-      templateSource: 'professional' as const, // Show subscription message for direct business category access
+      templateSource: 'professional', // Show subscription message for direct business category access
       posterLimit: 200, // Request all posters for business categories from HomeScreen
-      type: 'business', // ADD THIS
-      categoryName: category.name // ADD THIS
-    });
-    console.log('📤 Navigation params (loading state) being sent:', {
-      type: 'business',
-      categoryName: category.name,
-      templateSource: 'professional'
     });
 
     // Load data in background after navigation

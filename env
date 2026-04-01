@@ -1,0 +1,9 @@
+# Razorpay Configuration - Production
+RAZORPAY_KEY_ID=rzp_live_SSISrKJIaF1CMy
+RAZORPAY_KEY_SECRET=PAoDzCc1lhVYESh49XmmXkhx
+
+
+# Note: Replace with your actual live keys from Razorpay dashboard
+# For testing, you can use:
+# RAZORPAY_KEY_ID=rzp_test_RQ5lTAzm7AyNN9
+# RAZORPAY_KEY_SECRET=your_test_secret_key_hereM9Ky5KqsTwu2kS

@@ -280,7 +280,11 @@ const VideoEditorScreen: React.FC<VideoEditorScreenProps> = ({ route }) => {
   const { selectedLanguage: initialLanguage, selectedTemplateId, selectedVideo } = route.params;
   
   const { isSubscribed, checkPremiumAccess, refreshSubscription } = useSubscription();
+  const { selectedBusinessProfile } = useBusinessProfile();
   const { isDarkMode, theme } = useTheme();
+
+  // BUSINESS PROFILE SUBSCRIPTION LOGIC: Check if business profile has active subscription
+  const isBusinessActive = selectedBusinessProfile?.subscriptionStatus?.toUpperCase() === 'ACTIVE';
 
   // Video refs
   const videoRef = useRef<any>(null);
@@ -2103,7 +2107,7 @@ const [videoDimensions, setVideoDimensions] = useState<{ width: number; height: 
   };
 
   const handleNext = useCallback(async () => {
-    if (!isSubscribed) {
+    if (!isBusinessActive) {
       setShowPremiumModal(true);
       return;
     }
@@ -3377,8 +3381,8 @@ const renderLayer = (
         onClose={() => setShowPremiumModal(false)}
         onUpgrade={async () => {
           setShowPremiumModal(false);
-          await refreshSubscription();
-          (navigation as any).navigate('Subscription');
+          // BUSINESS PROFILE: Navigate to BusinessProfiles for activation
+          (navigation as any).navigate('BusinessProfiles');
         }}
         selectedTemplate={null}
       />

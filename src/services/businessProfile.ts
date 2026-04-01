@@ -103,13 +103,13 @@ class BusinessProfileService {
                 hasLogo: !!foundLogo
               });
 
-              const mappedProfile = {
+              return {
                 id: profile.id,
                 name: profile.name || profile.businessName,
                 description: profile.description || '',
                 category: profile.category,
-                subCategory: profile.businessSubcategory || profile.subCategory || profile.subcategory,
-                subcategory: profile.businessSubcategory || profile.subCategory || profile.subcategory,
+                subCategory: profile.subCategory || profile.subcategory,
+                subcategory: profile.subCategory || profile.subcategory,
                 address: profile.address || '',
                 phone: profile.phone || '',
                 alternatePhone: profile.alternatePhone || '',
@@ -126,11 +126,6 @@ class BusinessProfileService {
                 subscriptionStatus: profile.subscriptionStatus,
                 isSubscriptionActive: profile.isSubscriptionActive,
               };
-
-              // Log the mapped subCategory for debugging
-              console.log("Mapped subCategory:", mappedProfile.subCategory);
-
-              return mappedProfile;
             });
             
             console.log(`✅ [BUSINESS PROFILES] Fetched ${businessProfiles.length} profiles`);

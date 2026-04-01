@@ -25,6 +25,18 @@ interface PlanCardProps {
 
 const PlanCard: React.FC<PlanCardProps> = ({ plan, isSelected, onSelect, isSinglePlan = false }) => {
   const { theme } = useTheme();
+  
+  // BUSINESS API VERIFICATION: Log plan data received by UI component
+  console.log('🏢 BUSINESS API VERIFICATION - PlanCard:');
+  console.log('📋 Plan data received:', {
+    id: plan.id,
+    name: plan.name,
+    price: plan.price,
+    duration: plan.duration,
+    featuresCount: plan.features?.length || 0,
+    popular: plan.popular,
+    isSelected
+  });
 
   return (
     <TouchableOpacity
