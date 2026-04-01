@@ -376,13 +376,22 @@ interface PosterEditorScreenProps {
       selectedTemplate?: string;
       posterCategory?: string;
       selectedBusinessProfile?: any;
+      type?: "business" | "greeting" | "calendar" | "featured";
+      categoryName?: string;
     };
   };
 }
 
 const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route, navigation }) => {
   const insets = useSafeAreaInsets();
-  const { selectedImage, selectedLanguage, selectedTemplateId, selectedTemplate: initialTemplate, posterCategory } = route.params;
+  const { selectedImage, selectedLanguage, selectedTemplateId, selectedTemplate: initialTemplate, posterCategory, type, categoryName } = route.params;
+  
+  // Add verification log for received parameters
+  console.log("🎨 PosterEditorScreen received params:", {
+    type,
+    categoryName,
+    posterCategory
+  });
   const { isSubscribed, checkPremiumAccess, refreshSubscription, isSubscriptionActive } = useSubscription();
   const { isDarkMode, theme } = useTheme();
   const { selectedBusinessProfile, selectedBusinessCategory, selectedBusinessId, isLoading: isContextLoading } = useBusinessProfile();

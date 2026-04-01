@@ -424,7 +424,16 @@ const PosterPlayerScreen: React.FC = () => {
     posterLimit,
     calendarDate,
     templateSource,
+    type,
+    categoryName,
   } = route.params;
+
+  // Add debug log for received parameters
+  console.log("📥 PosterPlayerScreen received params:", {
+    type,
+    categoryName,
+    templateSource
+  });
 
   // Use global state for business data instead of route parameters
   const { 
@@ -3126,6 +3135,8 @@ const PosterPlayerScreen: React.FC = () => {
   }, [navigation, originScreen]);
 
   const navigateToPosterEditor = useCallback(() => {
+    console.log("➡️ Navigating to PosterEditorScreen with type:", type);
+
     navigation.navigate('PosterEditor', {
       selectedImage: {
         uri: getHighQualityImageUrl(currentPoster),
@@ -3135,9 +3146,11 @@ const PosterPlayerScreen: React.FC = () => {
       selectedLanguage: selectedLanguage,
       selectedTemplateId: currentPoster.id,
       selectedTemplate: JSON.stringify(currentPoster),
-      posterCategory: currentPoster.category
+      posterCategory: currentPoster.category,
+      type: type,
+      categoryName: categoryName
     });
-  }, [navigation, currentPoster, selectedLanguage, getHighQualityImageUrl]);
+  }, [navigation, currentPoster, selectedLanguage, getHighQualityImageUrl, type, categoryName]);
 
   const handleNextPress = useCallback(() => {
     // Use selected business profile directly, no modal needed

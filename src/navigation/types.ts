@@ -22,6 +22,8 @@ export type MainStackParamList = {
     selectedTemplateId: string;
     selectedTemplate?: string;
     posterCategory?: string;
+    type?: "business" | "greeting" | "calendar" | "featured";
+    categoryName?: string;
   };
   PosterPlayer: {
     selectedPoster: any;
@@ -32,6 +34,8 @@ export type MainStackParamList = {
     originScreen?: string;
     posterLimit?: number;
     calendarDate?: string;
+    type?: "business" | "greeting" | "calendar" | "featured";
+    categoryName?: string;
   };
   MyBusinessPosterPlayer: undefined;
   AboutUs: undefined;
