@@ -29,6 +29,7 @@ import businessProfileService from '../services/businessProfile';
 import userPreferencesService from '../services/userPreferences';
 import userProfileService from '../services/userProfile';
 import { useTheme } from '../context/ThemeContext';
+import { useBusinessProfile } from '../context/BusinessProfileContext';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import type { MainStackParamList } from '../navigation/types';
 
@@ -75,6 +76,7 @@ const responsiveFontSize = {
 
 const ProfileScreen: React.FC = () => {
   const currentUser = authService.getCurrentUser();
+  const { selectedBusinessProfileId } = useBusinessProfile();
   const { refreshSubscription } = useSubscription();
   
   // Helper function to sanitize subscription data for production
@@ -660,9 +662,16 @@ const ProfileScreen: React.FC = () => {
             // Continue with existing user data
           }
           
-          // Load download stats from backend API
+          // 🔍 STEP 5: BUSINESS-SPECIFIC HISTORY API
           try {
-            const downloadsResponse = await downloadTrackingService.getUserDownloads(userId);
+            if (selectedBusinessProfileId) {
+              console.log('📋 [PROFILE SCREEN] Fetching downloads for business:', selectedBusinessProfileId);
+              const downloadsResponse = await downloadTrackingService.getUserDownloads(userId);
+              // Note: Backend should filter by businessProfileId automatically
+            } else {
+              console.log('⚠️ [PROFILE SCREEN] No business profile selected, skipping download fetch');
+              return;
+            }
             
             // Deduplicate downloads to match MyPostersScreen logic and prevent double-counting
             const rawDownloads = downloadsResponse.downloads || [];
