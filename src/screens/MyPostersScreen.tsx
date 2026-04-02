@@ -22,8 +22,9 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Share } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
+import { useBusinessProfile } from '../context/BusinessProfileContext';
 import downloadedPostersService, { DownloadedPoster } from '../services/downloadedPosters';
-import downloadTrackingService, { DownloadedContent } from '../services/downloadTracking';
+import downloadService from '../services/downloadService';
 import authService from '../services/auth';
 import cacheService from '../services/cacheService';
 import { MainStackParamList } from '../navigation/types';
@@ -86,6 +87,7 @@ const MyPostersScreen: React.FC = () => {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<MyPostersScreenNavigationProp>();
+  const { selectedBusinessProfileId } = useBusinessProfile();
   
   // Cache TTL configuration
   const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
@@ -199,50 +201,54 @@ const MyPostersScreen: React.FC = () => {
     filterPosters();
   }, [posters, searchQuery, selectedCategory]);
 
-  const loadPosters = async () => {
+  const loadPosters = useCallback(async () => {
     try {
-      console.log('🔄 [MY POSTERS] Starting to load posters...');
+      console.log('🔄 [MY POSTERS] Starting to load business posters...');
       setLoading(true);
       setError(null);
 
-      // Get current user ID from auth
-      const currentUser = authService.getCurrentUser();
-      const userId = currentUser?.id;
-      
-      console.log('👤 [MY POSTERS] User ID:', userId);
-
-      if (!userId) {
-        console.log('⚠️ [MY POSTERS] No user ID found, showing empty state');
+      // 🔥 CRITICAL: Check if business profile is selected
+      if (!selectedBusinessProfileId) {
+        console.log('❌ [MY POSTERS] No business profile selected');
         setPosters([]);
+        setCategories([]);
         setLoading(false);
         return;
       }
 
-      // Get downloaded posters using the updated service
-      const downloadedPosters = await downloadedPostersService.getDownloadedPosters(userId);
-      console.log('📊 [MY POSTERS] Loaded posters:', downloadedPosters.length);
+      // 🔥 CRITICAL: Call business-specific API
+      const businessDownloads = await downloadService.getBusinessDownloads(selectedBusinessProfileId);
+      console.log('📊 [MY POSTERS] Business downloads loaded:', businessDownloads.length);
       
-      // Debug: Check for calendar items specifically
-      const calendarItems = downloadedPosters.filter(p => 
-        (p.category || '').toLowerCase() === 'festival' || 
-        (p.category || '').toLowerCase() === 'calendar'
-      );
-      console.log('🎯 [MY POSTERS] Calendar items found:', calendarItems.length);
+      // 🔥 CRITICAL: Transform API response to DownloadedPoster format
+      const transformedPosters: DownloadedPoster[] = businessDownloads.map(item => ({
+        id: item.id || Date.now().toString(),
+        title: item.title || 'Downloaded Poster',
+        description: item.description || '',
+        imageUri: item.fileUrl,
+        thumbnailUri: item.thumbnailUrl || item.fileUrl,
+        downloadDate: item.downloadedAt || new Date().toISOString(),
+        templateId: item.templateId,
+        category: item.category,
+        tags: item.tags || [],
+        userId: selectedBusinessProfileId, // Track business association
+        size: item.size
+      }));
       
-      if (calendarItems.length > 0) {
-        console.log('🎯 [MY POSTERS] Sample calendar item:', JSON.stringify(calendarItems[0], null, 2));
-      }
-
-      setPosters(downloadedPosters);
+      setPosters(transformedPosters);
+      
+      // Extract categories for filtering
+      const uniqueCategories = [...new Set(transformedPosters.map(p => p.category).filter(Boolean)) as string[]];
+      setCategories(uniqueCategories);
       
     } catch (err) {
-      console.error('Error loading posters:', err);
-      setError('Failed to load downloaded posters. Please check your internet connection.');
-      Alert.alert('Error', 'Failed to load downloaded posters. Please check your internet connection.');
+      console.error('❌ [MY POSTERS] Error loading business posters:', err);
+      setError('Failed to load posters for this business. Please try again.');
+      Alert.alert('Error', 'Failed to load posters for this business. Please try again.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedBusinessProfileId]);
 
   // Helper function to process downloads data (used for both cached and fresh data)
   const processDownloadsData = async (downloads: DownloadedContent[], userId: string) => {
@@ -511,7 +517,19 @@ const MyPostersScreen: React.FC = () => {
     } finally {
       setRefreshing(false);
     }
-  }, []);
+  }, [loadPosters]);
+
+  // 🔥 CRITICAL: Handle business profile changes
+  useEffect(() => {
+    if (selectedBusinessProfileId) {
+      console.log('🔄 [MY POSTERS] Business profile changed, refreshing posters...');
+      loadPosters();
+    } else {
+      console.log('🔄 [MY POSTERS] No business profile selected, clearing posters...');
+      setPosters([]);
+      setCategories([]);
+    }
+  }, [selectedBusinessProfileId]);
 
   const handleSharePoster = async (poster: DownloadedPoster) => {
     try {

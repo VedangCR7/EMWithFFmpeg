@@ -378,37 +378,47 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
        console.log('=== CENTRALIZED DOWNLOAD START ===');
        console.log('Business Profile ID:', selectedBusinessProfileId);
        
-       // Use actual template ID from selectedImage if selectedTemplateId is invalid
-       const actualTemplateId = (selectedTemplateId && selectedTemplateId !== 'loading') 
-         ? selectedTemplateId 
-         : (selectedImage?.id || selectedImage?.templateId || 'unknown');
-       
-       // 🔍 TEMPLATE ID VALIDATION
-       console.log('🔍 [TEMPLATE ID] Validation:', {
+       // 🔍 CRITICAL: Determine correct resource ID for backend
+       console.log('🔍 [RESOURCE ID ANALYSIS]:', {
          selectedTemplateId,
          selectedImageId: selectedImage?.id,
          selectedImageTemplateId: selectedImage?.templateId,
-         actualTemplateId,
-         isValid: actualTemplateId !== 'unknown' && actualTemplateId !== 'loading'
+         selectedImageFull: selectedImage,
+         routeParams: route.params
        });
        
-       const posterTitle = selectedImage.title || 'Custom Poster';
-       const posterCategory = selectedImage.title?.toLowerCase().includes('event') ? 'Events' : 'General';
+       // 🎯 CORRECT RESOURCE ID LOGIC:
+       // selectedImage.id = actual poster/content ID from backend (MISSING) ❌
+       // selectedTemplateId = template ID from editor (HAS THE ID WE NEED) ✅
+       // selectedImage.templateId = template ID from image object (MISSING) ❌
+       
+       // 🔍 KEY INSIGHT: selectedImage only has uri/title/description, no ID fields
+       // We must use selectedTemplateId as the correct resource ID
+       const correctResourceId = selectedTemplateId;
+       
+       // 🔍 DEBUG: Try different resource types if POSTER fails
+       console.log('🚀 [RESOURCE TYPE DEBUG]: Trying POSTER resource type');
+       
+       console.log('🚀 [FINAL DOWNLOAD PAYLOAD]:', {
+         resourceId: correctResourceId,
+         resourceType: 'POSTER',
+         businessProfileId: selectedBusinessProfileId,
+         debugInfo: 'Template ID: ' + correctResourceId + ' | Type: POSTER'
+       });
        
        // 🔥 CRITICAL: Call backend download API FIRST
        const downloadSuccess = await downloadContent({
-         contentId: actualTemplateId,
-         contentType: 'poster',
-         fileUrl: capturedImageUri,
-         title: posterTitle,
-         thumbnail: capturedImageUri,
-         category: posterCategory
+         resourceId: correctResourceId,
+         resourceType: 'POSTER'
        });
        
        if (!downloadSuccess) {
          console.log('❌ Download failed - centralized service returned false');
          return;
        }
+       
+       const posterTitle = selectedImage.title || 'Custom Poster';
+       const posterCategory = selectedImage.title?.toLowerCase().includes('event') ? 'Events' : 'General';
        
        console.log('✅ Download API successful, now saving to gallery...');
        
@@ -429,7 +439,7 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
            title: posterTitle,
            description: selectedImage.description || 'Event poster created with EventMarketers',
            imageUri: capturedImageUri,
-           templateId: actualTemplateId,
+           templateId: correctResourceId, // ✅ Use the correct resource ID
            category: posterCategory,
            tags: ['poster', 'event', 'marketing'],
          }, userId);
