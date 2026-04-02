@@ -1,0 +1,304 @@
+NEXT BUTTON FUNCTIONALITY - DEEP CODE ANALYSIS REPORT
+========================================================
+
+Generated on: 2025-04-01
+Analysis Scope: PosterEditorScreen Next Button Category Validation
+
+========================================================
+1. NEXT BUTTON LOCATION
+========================================================
+
+File: src/screens/PosterEditorScreen.tsx
+Lines: 2644-2880
+
+Component Structure:
+- TouchableOpacity (nextButton) - Line 2644
+- LinearGradient (nextButtonGradient) - Line 2876
+- Text (nextButtonText) - Line 2878
+
+The Next button is located in the header section of the PosterEditorScreen and uses
+a gradient background with white text.
+
+========================================================
+2. FUNCTION TRIGGERED ON PRESS
+========================================================
+
+Handler: onPress (async function) - Lines 2647-2743+
+
+Entry Point:
+```typescript
+onPress={async () => {
+  console.log('🎯 [POSTER EDITOR] Next button clicked');
+  // ... validation logic
+}}
+```
+
+The handler is an inline async function that performs:
+1. Subscription validation
+2. Category validation
+3. Canvas preparation
+4. ViewShot capture
+
+========================================================
+3. VALIDATION FLOW BREAKDOWN
+========================================================
+
+Step-by-Step Execution Flow:
+
+1. **Subscription Check** (Lines 2657-2664):
+   - Validates isSubscribed && isSubscriptionActive
+   - Shows premium modal if not subscribed
+
+2. **Category Validation Start** (Line 2666):
+   - Logs "🔍 [POSTER EDITOR] Starting category validation..."
+
+3. **Template Category Mapping** (Lines 2669-2704):
+   - Defines getTemplateCategory() function with hardcoded mappings
+   - Maps template IDs to category names
+
+4. **Validation Data Logging** (Lines 2706-2710):
+   - Logs selectedTemplate, selectedBusinessCategory, posterCategory
+
+5. **Final Category Determination** (Line 2713):
+   - const finalPosterCategory = posterCategory || getTemplateCategory(selectedTemplate)
+
+6. **Category Comparison** (Line 2715):
+   - Compares selectedBusinessCategory vs finalPosterCategory (case-insensitive)
+
+7. **Mismatch Handling** (Lines 2716-2726):
+   - Logs mismatch details
+   - Redirects to BusinessProfiles screen
+
+8. **Success Path** (Line 2728):
+   - Continues to canvas preparation if validation passes
+
+========================================================
+4. CURRENT CATEGORY MATCHING LOGIC
+========================================================
+
+**INCORRECT LOGIC IDENTIFIED:**
+
+```typescript
+// Line 2715 - CURRENT PROBLEMATIC LOGIC
+if (selectedBusinessCategory && finalPosterCategory && 
+    selectedBusinessCategory.toLowerCase() !== finalPosterCategory.toLowerCase()) {
+  // Mismatch detected
+}
+```
+
+**Current Logic Flow:**
+1. selectedBusinessCategory = From BusinessProfileContext (profile's subcategory)
+2. finalPosterCategory = posterCategory (from navigation) OR getTemplateCategory(selectedTemplate)
+3. Comparison: selectedBusinessCategory vs finalPosterCategory
+
+**ISSUE:** The logic compares Business Profile's subcategory with Template's category,
+which is incorrect for the new navigation flow.
+
+========================================================
+5. ROOT CAUSE OF CATEGORY MISMATCH
+========================================================
+
+**Primary Issue: Wrong Category Source**
+
+The error log shows:
+```
+❌ [POSTER EDITOR] Category mismatch detected:
+{
+  posterCategory: 'Happy Sunday',           // From template/greeting
+  selectedBusinessCategory: 'Allopathy Clinic', // From business profile
+  selectedTemplate: '{"id":"loading","name":"Happy Sunday"...}' // JSON string
+}
+```
+
+**Root Causes Identified:**
+
+1. **Wrong Comparison Logic**: Comparing business subcategory with template category
+2. **Navigation Parameter Ignored**: The `type` and `categoryName` params are not used in validation
+3. **Template JSON String**: selectedTemplate contains JSON instead of template ID
+4. **Missing Type Check**: No validation for `type === "business"` condition
+
+**Specific Problems:**
+
+A. **Line 2713**: Uses posterCategory (template category) instead of categoryName (navigation param)
+B. **Line 2715**: Compares business subcategory with template category
+C. **Missing Logic**: No check for `type === "business"` to use different validation
+
+========================================================
+6. NAVIGATION PARAMETER HANDLING
+========================================================
+
+**Parameters Received (Line 387):**
+```typescript
+const { 
+  selectedImage, 
+  selectedLanguage, 
+  selectedTemplateId, 
+  selectedTemplate: initialTemplate, 
+  posterCategory, 
+  type,           // ← NEW: Not used in validation
+  categoryName    // ← NEW: Not used in validation
+} = route.params;
+```
+
+**Parameter Logging (Lines 390-394):**
+```typescript
+console.log("🎨 PosterEditorScreen received params:", {
+  type,
+  categoryName,
+  posterCategory
+});
+```
+
+**ISSUE**: The `type` and `categoryName` parameters are logged but NEVER used in the validation logic.
+
+========================================================
+7. SELECTED BUSINESS PROFILE DATA FLOW
+========================================================
+
+**Context Usage (Line 397):**
+```typescript
+const { 
+  selectedBusinessProfile, 
+  selectedBusinessCategory,    // ← Used in validation
+  selectedBusinessId, 
+  isLoading: isContextLoading 
+} = useBusinessProfile();
+```
+
+**BusinessProfileContext Logic:**
+- selectedBusinessCategory comes from profile.subCategory || profile.subcategory || profile.category
+- This is the user's actual business subcategory (e.g., "Allopathy Clinic")
+
+**ISSUE**: The validation uses the business's subcategory instead of comparing with the navigation categoryName.
+
+========================================================
+8. TEMPLATE CATEGORY HANDLING
+========================================================
+
+**selectedTemplate State (Line 1119):**
+```typescript
+const [selectedTemplate, setSelectedTemplate] = useState<string>(initialTemplate || 'business');
+```
+
+**Template Category Mapping (Lines 2669-2704):**
+- Hardcoded mapping from template IDs to category names
+- Used as fallback when posterCategory is not available
+
+**ISSUE**: 
+- selectedTemplate contains JSON string instead of template ID
+- getTemplateCategory() expects template ID but receives JSON
+- This causes incorrect category extraction
+
+**Error Evidence:**
+```
+selectedTemplate: '{"id":"loading","name":"Happy Sunday","thumbnail":"...","category":"Happy Sunday"}'
+```
+
+The selectedTemplate should be "loading" (template ID), not the full JSON object.
+
+========================================================
+9. STATE LIFECYCLE ANALYSIS
+========================================================
+
+**Initialization Order:**
+
+1. **Navigation Params Received** (Line 387)
+2. **Context Loading** (Line 397) - May be async
+3. **Template State Set** (Line 1119) - Uses initialTemplate
+4. **Context Loading Check** (Lines 399-402) - Returns null if loading
+
+**Potential Race Conditions:**
+
+1. **Context vs Navigation**: BusinessProfileContext might load after navigation params
+2. **Template Parsing**: selectedTemplate might be JSON string instead of ID
+3. **Category Availability**: categoryName might not be available during validation
+
+**State Dependencies:**
+- Validation depends on: selectedBusinessCategory (from context)
+- Navigation provides: type, categoryName (ignored in validation)
+- Template provides: selectedTemplate (possibly malformed)
+
+========================================================
+10. EXACT LINE CAUSING THE ERROR
+========================================================
+
+**Primary Error Location: Line 2715**
+```typescript
+if (selectedBusinessCategory && finalPosterCategory && 
+    selectedBusinessCategory.toLowerCase() !== finalPosterCategory.toLowerCase()) {
+```
+
+**Supporting Error Location: Line 2713**
+```typescript
+const finalPosterCategory = posterCategory || getTemplateCategory(selectedTemplate);
+```
+
+**Error Chain:**
+1. Line 2713: finalPosterCategory = 'Happy Sunday' (from posterCategory)
+2. Line 2715: Compares 'Allopathy Clinic' vs 'Happy Sunday'
+3. Line 2716-2720: Logs mismatch and redirects
+
+========================================================
+11. RISKS IN CURRENT IMPLEMENTATION
+========================================================
+
+**Critical Risks:**
+
+1. **Data Integrity**: Using wrong category sources leads to false mismatches
+2. **User Experience**: Users are incorrectly redirected to BusinessProfiles screen
+3. **Navigation Flow**: Business category flow is broken despite proper navigation setup
+4. **Template Handling**: JSON strings instead of IDs cause category mapping failures
+
+**Medium Risks:**
+
+1. **Race Conditions**: Context loading timing issues
+2. **State Inconsistency**: Multiple category sources (posterCategory, categoryName, selectedBusinessCategory)
+3. **Debugging Complexity**: Multiple category variables make troubleshooting difficult
+
+**Low Risks:**
+
+1. **Performance**: Additional validation overhead
+2. **Memory**: Extra state variables for category tracking
+
+========================================================
+12. RECOMMENDED FIX STRATEGY
+========================================================
+
+**NO CODE IMPLEMENTATION - Strategy Only**
+
+**Phase 1: Validation Logic Fix**
+- Add type check: `if (type === "business")`
+- Use categoryName instead of finalPosterCategory for business type
+- Compare: categoryName vs selectedBusinessCategory
+
+**Phase 2: Template Data Fix**
+- Fix selectedTemplate to contain template ID, not JSON
+- Update getTemplateCategory() to handle template IDs properly
+- Add validation for template data format
+
+**Phase 3: Navigation Parameter Utilization**
+- Use categoryName from navigation params for business type validation
+- Use posterCategory only for non-business types
+- Add proper type-based validation branching
+
+**Phase 4: State Management**
+- Clarify the difference between posterCategory and categoryName
+- Add proper state initialization order
+- Handle context loading states properly
+
+**Validation Logic Pseudocode:**
+```typescript
+if (type === "business") {
+  // Use navigation categoryName for business validation
+  const isValid = categoryName && selectedBusinessCategory && 
+                 categoryName.toLowerCase() === selectedBusinessCategory.toLowerCase();
+} else {
+  // Use existing logic for non-business
+  const isValid = selectedBusinessCategory && finalPosterCategory && 
+                 selectedBusinessCategory.toLowerCase() === finalPosterCategory.toLowerCase();
+}
+```
+
+========================================================
+END OF ANALYSIS REPORT
+========================================================

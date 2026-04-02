@@ -1,0 +1,221 @@
+MOBILE PAYMENT STATUS NORMALIZATION REPORT
+==========================================
+
+DATE: 2026-03-04
+PATCH: PRODUCTION SAFE MOBILE PAYMENT FAILURE STATUS NORMALIZATION
+
+-----------------------------------------------------
+
+PROBLEM IDENTIFIED
+------------------
+
+The mobile app was sending inconsistent payment failure statuses to the backend:
+
+- CANCELLED status was being sent for user payment cancellations
+- FAILED status was being sent for other payment failures
+- Backend expects only: FAILED, SUCCESS, PENDING
+
+This created inconsistent transaction states in the backend system.
+
+-----------------------------------------------------
+
+FILES MODIFIED
+--------------
+
+1. src/screens/SubscriptionScreen.tsx
+   - Line 524: Changed 'CANCELLED' to 'FAILED'
+
+2. src/screens/BusinessProfilesScreen.tsx
+   - No modifications required (no payment failure reporting found)
+
+-----------------------------------------------------
+
+OLD VS NEW STATUS LOGIC
+------------------------
+
+OLD CODE:
+---------
+if (error.code === 'PAYMENT_CANCELLED') {
+  // Do not record transaction for user cancellation
+  // Report failure to backend for analytics
+  if (orderDetails?.orderId) {
+    reportPaymentFailure(orderDetails.orderId, 'CANCELLED');  // ❌ INCONSISTENT
+  }
+} else {
+  try {
+    // ... transaction recording ...
+    // Report failure to backend
+    if (orderDetails?.orderId) {
+      reportPaymentFailure(orderDetails.orderId, 'FAILED');   // ✅ CORRECT
+    }
+  } catch (txnError) {
+    console.error('Error recording failed transaction:', txnError);
+  }
+}
+
+NEW CODE:
+---------
+if (error.code === 'PAYMENT_CANCELLED') {
+  // Do not record transaction for user cancellation
+  // Report failure to backend for analytics
+  if (orderDetails?.orderId) {
+    reportPaymentFailure(orderDetails.orderId, 'FAILED');    // ✅ NORMALIZED
+  }
+} else {
+  try {
+    // ... transaction recording ...
+    // Report failure to backend
+    if (orderDetails?.orderId) {
+      reportPaymentFailure(orderDetails.orderId, 'FAILED');  // ✅ CORRECT
+    }
+  } catch (txnError) {
+    console.error('Error recording failed transaction:', txnError);
+  }
+}
+
+-----------------------------------------------------
+
+RAZORPAY FAILURE CALLBACK LOCATION
+----------------------------------
+
+Function: reportPaymentFailure()
+Location: src/screens/SubscriptionScreen.tsx, lines 232-255
+
+Called from:
+1. Line 524: User payment cancellation (PAYMENT_CANCELLED error code)
+2. Line 546: Other payment failures
+
+-----------------------------------------------------
+
+VERIFICATION: SUCCESS FLOW UNTOUCHED
+------------------------------------
+
+✅ VERIFIED: Payment success flow remains completely unchanged:
+
+SUCCESS FLOW:
+Razorpay modal → verify-payment API → subscribe API
+
+No modifications were made to:
+- Razorpay initialization logic
+- Payment success handlers
+- Subscription activation logic
+- UI components
+- Existing APIs
+
+-----------------------------------------------------
+
+VERIFICATION: BACKEND PAYLOAD FORMAT
+------------------------------------
+
+✅ VERIFIED: Backend now always receives consistent payload:
+
+OLD PAYLOADS:
+{
+  orderId: "order_abc123",
+  status: "CANCELLED"  // ❌ Inconsistent
+}
+
+{
+  orderId: "order_abc123", 
+  status: "FAILED"     // ✅ Correct
+}
+
+NEW PAYLOAD (ALL FAILURE CASES):
+{
+  orderId: "order_abc123",
+  status: "FAILED"     // ✅ Consistent for all failures
+}
+
+-----------------------------------------------------
+
+VERIFICATION: NON-BLOCKING BEHAVIOR
+-----------------------------------
+
+✅ VERIFIED: reportPaymentFailure() function already implements safe non-blocking pattern:
+
+```typescript
+const reportPaymentFailure = async (orderId: string, status: string) => {
+  try {
+    console.log('🔴 Reporting payment failure to backend:', { orderId, status });
+    
+    // Non-blocking call to backend - don't await or throw errors
+    fetch(`${api.defaults.baseURL}/api/mobile/transactions/update-status`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${await AsyncStorage.getItem('authToken')}`,
+      },
+      body: JSON.stringify({
+        orderId: orderId,
+        status: status
+      })
+    }).catch(error => {
+      console.warn('⚠️ Failed to report payment status to backend:', error);
+      // Silently handle - don't show user-facing errors
+    });
+  } catch (error) {
+    console.warn('⚠️ Error in reportPaymentFailure:', error);
+    // Silently handle - don't affect user experience
+  }
+};
+```
+
+✅ Safe pattern confirmed:
+- Runs inside try/catch
+- Does not block UI
+- Does not show errors to user
+- Fails silently if network fails
+
+-----------------------------------------------------
+
+FINAL PAYMENT FLOW VERIFICATION
+------------------------------
+
+✅ VERIFIED: Payment flows are now correctly normalized:
+
+SUCCESS FLOW (UNCHANGED):
+Razorpay modal → verify-payment API → subscribe API
+
+FAILURE FLOW (NORMALIZED):
+Razorpay modal close → update-status API (status = "FAILED")
+
+All failure scenarios now send consistent status = "FAILED":
+- User cancellation (PAYMENT_CANCELLED)
+- Network errors
+- Payment processing errors
+- Invalid payment methods
+- Any other Razorpay failure
+
+-----------------------------------------------------
+
+PRODUCTION SAFETY CONFIRMATION
+------------------------------
+
+✅ PRODUCTION SAFE PATCH CONFIRMED:
+
+1. ✅ NO Razorpay initialization logic modified
+2. ✅ NO payment success flow modified  
+3. ✅ NO subscription activation logic modified
+4. ✅ NO UI components modified
+5. ✅ NO existing APIs changed
+6. ✅ ONLY failure status normalized to "FAILED"
+
+-----------------------------------------------------
+
+SUMMARY
+-------
+
+- Files modified: 1 (SubscriptionScreen.tsx)
+- Lines changed: 1 (Line 524)
+- Status normalization: CANCELLED → FAILED
+- Backend consistency: ✅ ACHIEVED
+- Production safety: ✅ CONFIRMED
+- Non-blocking behavior: ✅ VERIFIED
+
+The mobile app now consistently sends status = "FAILED" for all payment failure scenarios,
+eliminating inconsistent transaction states in the backend system.
+
+-----------------------------------------------------
+
+END OF REPORT
+-------------

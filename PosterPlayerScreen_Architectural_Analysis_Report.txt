@@ -1,0 +1,677 @@
+# POSTER PLAYER SCREEN DEEP ARCHITECTURAL ANALYSIS REPORT
+# Generated: March 2026
+# Purpose: Blueprint for MyBusinessPosterPlayerScreen implementation
+
+===============================================================================
+1. POSTER PLAYER SCREEN OVERVIEW
+===============================================================================
+
+PosterPlayerScreen is a complex, multi-purpose React Native component that serves as the primary poster viewing and selection interface for the EventMarketers mobile application. It handles four distinct data sources:
+
+• Business Category Posters - Professional templates for specific business categories
+• Greeting Category Templates - Social media greeting templates  
+• Calendar Posters - Date-specific festival/event posters
+• General Posters - Standalone poster viewing with related posters
+
+The screen features sophisticated state management, responsive design, language filtering, and performance optimizations including image preloading and skeleton loading states.
+
+Key Characteristics:
+- 4,037 lines of highly complex TypeScript code
+- Multi-source data handling with race condition protection
+- Advanced responsive design for tablets, phones, and foldable devices
+- Sophisticated language detection and filtering system
+- Performance-optimized with memoization and lazy loading
+- Production-critical component with extensive error handling
+
+===============================================================================
+2. FILE STRUCTURE
+===============================================================================
+
+Location: src/screens/PosterPlayerScreen.tsx
+
+STRUCTURE BREAKDOWN:
+├── Imports & Dependencies (Lines 1-34)
+├── Language Detection Utilities (Lines 36-156)
+├── Helper Functions (Lines 158-182)
+├── RelatedPosterItem Component (Lines 184-294)
+├── Type Definitions (Lines 296-298)
+├── Main Component: PosterPlayerScreen (Lines 299-3374)
+│   ├── Hooks & Context Setup (Lines 300-458)
+│   ├── State Variables & Refs (Lines 459-531)
+│   ├── Language & Service Filter Logic (Lines 600-802)
+│   ├── Image Preloading System (Lines 804-868)
+│   ├── Navigation Parameter Handling (Lines 870-985)
+│   ├── Business Category Fetching (Lines 987-1134)
+│   ├── Greeting Category Fetching (Lines 1136-2065)
+│   ├── Calendar Posters Fetching (Lines 2067-2166)
+│   ├── State Synchronization Logic (Lines 2168-2266)
+│   ├── Language Detection System (Lines 2268-2437)
+│   ├── Language Filter Enforcement (Lines 2479-2560)
+│   ├── User Interaction Handlers (Lines 2572-2810)
+│   ├── Responsive Design Calculations (Lines 2812-2948)
+│   ├── Navigation Handlers (Lines 2968-2998)
+│   ├── Render Components (Lines 3000-3112)
+│   └── Main Render Function (Lines 3124-3372)
+├── StyleSheet Definition (Lines 3376-4033)
+└── Export Statement (Line 4035)
+
+===============================================================================
+3. DATA FLOW ANALYSIS
+===============================================================================
+
+COMPLETE DATA PIPELINE:
+
+API / BACKEND
+├── businessCategoryPostersApi.getPostersByCategory()
+├── greetingTemplatesService (multiple endpoints)
+├── calendarApi.getPostersByDate()
+└── Navigation params (initialPoster, relatedPosters)
+
+↓
+
+SERVICE LAYER
+├── BusinessCategoryPoster → Template conversion
+├── GreetingTemplate → Template conversion  
+├── CalendarPoster → Template conversion
+├── Language extraction from tags
+└── Duplicate removal & normalization
+
+↓
+
+POSTER PLAYER SCREEN
+├── useEffect hooks for each data source
+├── Race condition protection (activeCategoryRef)
+├── Template merging with language info
+└── setAllTemplates() wrapper with logging
+
+↓
+
+STATE MANAGEMENT
+├── allTemplates (master array)
+├── currentPoster (selected poster)
+├── selectedLanguage (filter state)
+├── selectedServiceFilter (event planner only)
+└── User selection tracking refs
+
+↓
+
+UI RENDERING
+├── filteredPosters (memoized computed value)
+├── Language filtering (templateContainsLanguage)
+├── Service filtering (templateMatchesServiceFilter)
+└── FlatList with RelatedPosterItem components
+
+===============================================================================
+4. CATEGORY HANDLING
+===============================================================================
+
+CATEGORY SOURCE ANALYSIS:
+
+Business Category:
+- Source: route.params.businessCategory (string or object)
+- Storage: activeCategoryRef.current = { type: 'business', value: categoryName }
+- API: /api/mobile/posters/category/{categoryName}?limit={limit}
+- Cache: businessCategoryPostersApi.clearCategoryCache() called for "My Business"
+
+Greeting Category:
+- Source: route.params.greetingCategory (string)
+- Storage: activeCategoryRef.current = { type: 'greeting', value: greetingCategory }
+- API: Multiple greetingTemplatesService calls with search variations
+- Cache: In-memory serviceFilterTemplates for EventPlanner
+
+Calendar Date:
+- Source: route.params.calendarDate (string)
+- Storage: activeCategoryRef.current = { type: 'calendar', value: calendarDate }
+- API: calendarApi.getPostersByDate(date)
+- Cache: No caching, fresh fetch each time
+
+General/Individual Posters:
+- Source: route.params.initialPoster + route.params.initialRelatedPosters
+- Storage: activeCategoryRef.current = { type: null, value: null }
+- API: No API calls, uses provided data
+- Cache: N/A
+
+CATEGORY SWITCHING LOGIC:
+- Language reset to "All" when switching categories
+- User manual language selection tracking reset
+- allTemplates cleared immediately to prevent showing old data
+- Race condition protection with activeCategoryRef checks
+
+===============================================================================
+5. LANGUAGE HANDLING
+===============================================================================
+
+LANGUAGE SYSTEM ARCHITECTURE:
+
+Supported Languages:
+- English (id: 'english')
+- Hindi (id: 'hindi') 
+- All (id: 'all') - shows all languages
+
+Language Detection Process:
+1. Extract keywords from template tags using LANGUAGE_KEYWORDS mapping
+2. Check template.languages array (explicit language data)
+3. Merge both sources with mergeTemplateLanguages()
+4. Prioritize Hindi/Marathi over English when both detected
+
+Language State Management:
+- selectedLanguage: Current filter selection
+- userManuallySelectedLanguageRef: Tracks manual user selection
+- lastAutoDetectedPosterIdRef: Prevents duplicate auto-detection
+- Auto-detection skipped when user manually selects language
+
+Language Filtering Logic:
+- "All" = No language filtering applied
+- Specific language = templateContainsLanguage() function
+- Word boundary regex matching prevents false positives
+- Templates without language info default to English only
+
+Language Change Triggers:
+- Category switching (resets to "All")
+- Poster selection via handlePosterSelect()
+- Initial poster mount (auto-detection)
+- Current poster change for category/calendar modes
+
+===============================================================================
+6. POSTER LOADING SYSTEM
+===============================================================================
+
+API ENDPOINTS:
+
+Business Category:
+- Endpoint: /api/mobile/posters/category/{categoryName}?limit={limit}
+- Method: businessCategoryPostersApi.getPostersByCategory()
+- Limit: 1000 for "My Business", configurable via posterLimit param
+- Cache: Cleared for "My Business" to ensure fresh data
+
+Greeting Category:
+- Primary: greetingTemplatesService.getTemplates({ category, limit })
+- Search: greetingTemplatesService.searchTemplates(term, undefined, limit)
+- Variations: Multiple searches with normalized category terms
+- Progressive loading: 50 initial, 200 background after render
+- Cache: In-memory with serviceFilterTemplates
+
+Calendar Posters:
+- Endpoint: calendarApi.getPostersByDate(date)
+- Method: Direct API call
+- Cache: No caching implemented
+
+CACHING LOGIC:
+- Image preloading with preloadedImagesRef Set
+- Template caching in serviceFilterTemplates for EventPlanner
+- API response caching handled by service layers
+- Memory cleanup on unmount
+
+SKELETON LOADING:
+- SkeletonItem component with shimmer animation
+- Shows during isBusinessCategoryLoading or isGreetingCategoryLoading
+- 6 skeleton items displayed in grid layout
+- Animated.Value with 1000ms duration loop
+
+ERROR HANDLING:
+- Try-catch blocks around all API calls
+- Graceful fallbacks for missing data
+- Console logging for debugging
+- Loading state management for UI feedback
+
+===============================================================================
+7. UI COMPONENT TREE
+===============================================================================
+
+MAIN RENDER STRUCTURE:
+
+PosterPlayerScreen
+├── StatusBar (transparent, dark-content)
+├── LinearGradient (theme.colors.gradient)
+│   ├── Safe Area Top Spacing (insets.top + 12)
+│   ├── Header (topHeader)
+│   │   ├── Back Button (chevron-left icon)
+│   │   ├── Category Title (dynamic based on source)
+│   │   └── Next Button (navigate to PosterEditor)
+│   ├── Poster Preview Section (posterContainer)
+│   │   └── LazyFullImage (high quality, swipeable)
+│   ├── Language Filter Section
+│   │   ├── Language Filter Buttons (All, English, Hindi)
+│   │   └── Service Filter Buttons (Event Planner only)
+│   ├── Related Posters Grid Section (relatedSection)
+│   │   ├── Skeleton Loading (6 animated placeholders)
+│   │   ├── FlatList (filteredPosters grid)
+│   │   │   └── RelatedPosterItem (memoized cards)
+│   │   └── No Posters Message (empty state)
+│   └── Safe Area Bottom Spacing (insets.bottom)
+
+RELATED POSTER ITEM COMPONENT:
+RelatedPosterItem
+├── TouchableOpacity (card container)
+├── Selected Glow (overlay for selected state)
+├── OptimizedImage (thumbnail preview)
+├── Selected Overlay (gradient overlay)
+└── Selected Badge ("Previewing" text)
+
+SKELETON LOADING COMPONENT:
+SkeletonItem
+├── Animated Shimmer Overlay
+└── Content Structure
+    ├── Image Placeholder
+    └── Text Placeholders (2 lines)
+
+===============================================================================
+8. STYLING SYSTEM
+===============================================================================
+
+STYLING SOURCES:
+- StyleSheet.create() with 150+ style definitions
+- Theme context integration (theme.colors.gradient)
+- Responsive scaling functions (scale, moderateScale, verticalScale)
+- Dynamic inline styles for responsive dimensions
+
+RESPONSIVE DESIGN BREAKPOINTS:
+- Tablet: screenWidth >= 768px
+- Fold Phone Unfolded: screenWidth >= 900px
+- Large Phone: screenWidth >= 600px
+- Medium Phone: screenWidth >= 400px
+- Small Phone: screenWidth < 400px
+
+DYNAMIC DIMENSIONS:
+- numColumns: 4 (tablet/fold), 3 (phone)
+- cardWidth: Calculated based on screen width and columns
+- cardHeight: Equal to cardWidth (square cards)
+- computedPreviewHeight: Based on image aspect ratio and screen constraints
+
+COLOR SYSTEM:
+- Primary: theme.colors.primary (#764ba2 default)
+- Secondary: theme.colors.secondary (#667eea default)
+- Gradient: theme.colors.gradient array
+- Text: #333333, #666666, #ffffff (white)
+- Borders: rgba(255,255,255,0.15), #ffd166 (selected)
+
+TYPOGRAPHY:
+- Font Sizes: 7px to 14px (scaled with moderateScale)
+- Font Weights: 500, 600, 700
+- Letter Spacing: 0.2 to 0.3
+- Font Families: System default
+
+SHADOW & ELEVATION:
+- Shadow Color: #000 (black)
+- Shadow Opacity: 0.08 to 0.9 (varies by element)
+- Shadow Radius: 1 to 8 (moderateScale)
+- Elevation: 2 to 6 (Android)
+
+===============================================================================
+9. NAVIGATION BEHAVIOR
+===============================================================================
+
+NAVIGATION PARAMETERS RECEIVED:
+interface PosterPlayerRouteParams {
+  selectedPoster: Template;
+  relatedPosters: Template[];
+  businessCategory?: string | { name: string };
+  greetingCategory?: string;
+  originScreen?: string;
+  posterLimit?: number;
+  calendarDate?: string;
+  templateSource?: string;
+  selectedBusinessProfile?: BusinessProfile;
+  selectedBusinessProfileId?: string;
+}
+
+NAVIGATION SOURCES:
+- HomeScreen (business categories)
+- GreetingTemplates (greeting categories)
+- CalendarScreen (calendar dates)
+- MainTabs/MyBusiness (user business profile)
+- PosterEditor (back navigation)
+
+BACK NAVIGATION LOGIC:
+handleBackPress() {
+  if (originScreen === 'GreetingTemplates') {
+    navigation.navigate('GreetingTemplates');
+  } else if (navigation.canGoBack()) {
+    navigation.goBack();
+  } else {
+    navigation.navigate('MainTabs');
+  }
+}
+
+FORWARD NAVIGATION:
+navigateToPosterEditor() {
+  navigation.navigate('PosterEditor', {
+    selectedImage: {
+      uri: getHighQualityImageUrl(currentPoster),
+      title: currentPoster.name,
+      description: currentPoster.category,
+    },
+    selectedLanguage: selectedLanguage,
+    selectedTemplateId: currentPoster.id,
+    selectedBusinessProfile: activeBusinessProfile,
+  });
+}
+
+ROUTE PARAM HANDLING:
+- useRoute() hook to extract parameters
+- useFocusEffect() to reset language on screen focus
+- Parameter change detection with prevInitialPosterIdRef
+- Race condition protection for category switching
+
+===============================================================================
+10. STATE MANAGEMENT BREAKDOWN
+===============================================================================
+
+PRIMARY STATE VARIABLES:
+
+Core Data:
+- currentPoster: Template (currently selected poster)
+- allTemplates: Template[] (master array of all posters)
+- selectedLanguage: string ('all' | 'english' | 'hindi')
+- selectedServiceFilter: string | null (event planner services)
+
+Loading States:
+- isBusinessCategoryLoading: boolean
+- isGreetingCategoryLoading: boolean
+- isLoadingServiceFilter: Record<string, boolean>
+
+UI State:
+- dimensions: { width: number; height: number }
+- imageDimensions: { width: number; height: number } | null
+- userBusinessProfiles: BusinessProfile[]
+
+CRITICAL REFS FOR STATE COORDINATION:
+- prevInitialPosterIdRef: string | null (detects navigation changes)
+- activeCategoryRef: { type: string; value: string } (race condition protection)
+- userSelectedPosterRef: string | null (prevents auto-selection override)
+- userManuallySelectedLanguageRef: boolean (prevents auto-detection override)
+- lastAutoDetectedPosterIdRef: string | null (prevents duplicate detection)
+- preloadedImagesRef: Set<string> (image cache tracking)
+- allTemplatesRef: Template[] (state wrapper for logging)
+
+STATE UPDATE PATTERNS:
+1. API Response → Convert to Template → setAllTemplates()
+2. User Interaction → Update currentPoster → Language auto-detection
+3. Language Change → Filter templates → Update currentPoster if needed
+4. Category Switch → Reset state → Fetch new data
+
+MEMOIZED COMPUTED VALUES:
+- filteredPosters: Language and service filtered templates
+- previewOverlayColors: Theme-based gradient colors
+- responsive dimensions: cardWidth, cardHeight, etc.
+
+===============================================================================
+11. REUSABLE COMPONENTS IDENTIFICATION
+===============================================================================
+
+HIGHLY REUSABLE COMPONENTS:
+
+1. RelatedPosterItem (Lines 184-294)
+   - Purpose: Poster card with selection state
+   - Props: item, cardWidth, cardHeight, imageUrl, onPress, isSelected, overlayColors
+   - Memoized with custom comparison function
+   - Reusability: 100% - Can be used anywhere poster grids are needed
+
+2. LazyFullImage (Imported)
+   - Purpose: Progressive image loading with thumbnail
+   - Props: thumbnailUri, fullImageUri, style, resizeMode, quality, etc.
+   - Reusability: 100% - Standard image component across app
+
+3. OptimizedImage (Imported)
+   - Purpose: Optimized thumbnail rendering
+   - Reusability: 100% - Can be used in any list/grid
+
+4. SkeletonItem (Lines 3049-3112)
+   - Purpose: Animated loading placeholder
+   - Props: cardWidth, cardHeight (from closure)
+   - Reusability: 90% - Needs dimension props extraction
+
+REUSABLE UTILITY FUNCTIONS:
+
+1. extractLanguagesFromTags (Lines 42-67)
+   - Purpose: Extract language keywords from template tags
+   - Reusability: 100% - Can be moved to utilities
+
+2. mergeTemplateLanguages (Lines 70-84)
+   - Purpose: Merge explicit languages with tag-extracted languages
+   - Reusability: 100% - Template processing utility
+
+3. templateContainsLanguage (Lines 87-156)
+   - Purpose: Check if template matches language filter
+   - Reusability: 100% - Core filtering logic
+
+4. hexToRgba (Lines 158-182)
+   - Purpose: Convert hex colors to RGBA
+   - Reusability: 100% - Color utility
+
+5. getHighQualityImageUrl (Lines 494-598)
+   - Purpose: Generate high-quality image URLs from thumbnails
+   - Reusability: 100% - Image processing utility
+
+REUSABLE HOOKS PATTERNS:
+
+1. Responsive design calculations (Lines 2812-2948)
+   - Device detection, scaling, dimension calculations
+   - Can be extracted into custom hook
+
+2. Image preloading system (Lines 804-868)
+   - Progressive loading with viewability tracking
+   - Can be extracted into custom hook
+
+===============================================================================
+12. WHAT MUST NOT BE MODIFIED
+===============================================================================
+
+CRITICAL PRODUCTION COMPONENTS - DO NOT MODIFY:
+
+1. API INTEGRATION LAYER
+   - businessCategoryPostersApi endpoints and response handling
+   - greetingTemplatesService integration and multi-source merging
+   - calendarApi integration and date-based fetching
+   - RISK: Breaking poster data flow across entire app
+
+2. LANGUAGE DETECTION SYSTEM
+   - LANGUAGE_KEYWORDS mapping and extractLanguagesFromTags logic
+   - templateContainsLanguage filtering algorithm
+   - Auto-detection vs manual selection state management
+   - RISK: Language filtering failure across all poster screens
+
+3. CACHING & PERFORMANCE SYSTEMS
+   - Image preloading with preloadedImagesRef
+   - LazyFullImage integration and quality settings
+   - Skeleton loading states and animations
+   - RISK: Performance degradation and poor user experience
+
+4. NAVIGATION INTEGRATION
+   - Route parameter extraction and handling
+   - Back navigation logic with originScreen detection
+   - PosterEditor navigation with parameter passing
+   - RISK: Breaking navigation flows and user journey
+
+5. STATE MANAGEMENT CORE
+   - activeCategoryRef race condition protection
+   - User selection tracking (userSelectedPosterRef, userManuallySelectedLanguageRef)
+   - allTemplates wrapper with logging
+   - RISK: State corruption and unpredictable behavior
+
+6. RESPONSIVE DESIGN SYSTEM
+   - Device detection breakpoints and scaling functions
+   - Card dimension calculations matching HomeScreen
+   - StyleSheet definitions and theme integration
+   - RISK: UI inconsistency across different devices
+
+SAFE AREAS FOR MODIFICATION:
+- Adding new props to existing components
+- Extending styling with new style classes
+- Adding new utility functions
+- Creating new derived state from existing state
+
+===============================================================================
+13. REQUIRED CHANGES FOR MY BUSINESS POSTER PLAYER SCREEN
+===============================================================================
+
+ARCHITECTURAL ADAPTATIONS NEEDED:
+
+1. DATA SOURCE SIMPLIFICATION
+   - REMOVE: Greeting category fetching (lines 1136-2065)
+   - REMOVE: Calendar date fetching (lines 2067-2166)
+   - REMOVE: General poster synchronization (lines 2168-2266)
+   - KEEP: Business category fetching only (lines 987-1134)
+
+2. CATEGORY HANDLING MODIFICATION
+   - FORCE: businessCategory from HomeScreen dropdown selection
+   - REMOVE: Multi-category switching logic
+   - SIMPLIFY: activeCategoryRef to only track 'business' type
+   - REMOVE: Category reset language logic (keep simple reset)
+
+3. NAVIGATION PARAMETER CHANGES
+   - EXPECT: selectedBusinessProfile from HomeScreen context
+   - EXPECT: businessCategory from user dropdown selection
+   - REMOVE: greetingCategory, calendarDate, templateSource params
+   - SIMPLIFY: originScreen to always be "MainTabs"
+
+4. UI SIMPLIFICATIONS
+   - REMOVE: Service filter buttons (Event Planner specific)
+   - REMOVE: Subscription message logic
+   - KEEP: Language filter buttons (All, English, Hindi)
+   - SIMPLIFY: Header title to always show business category
+
+5. STATE REDUCTION
+   - REMOVE: isGreetingCategoryLoading state
+   - REMOVE: calendarDate related state and effects
+   - REMOVE: service filter state and templates
+   - KEEP: Core business poster state only
+
+6. PERFORMANCE OPTIMIZATIONS
+   - KEEP: All image preloading and caching
+   - KEEP: Skeleton loading states
+   - KEEP: Responsive design system
+   - KEEP: All memoization and optimizations
+
+BEHAVIORAL CHANGES:
+- Open when user clicks "My Business" tab
+- Show posters ONLY for selected business category
+- Use user's selected business profile from context
+- Maintain exact same UI layout and styling
+- Preserve all language filtering functionality
+
+===============================================================================
+14. RISK ANALYSIS
+===============================================================================
+
+POTENTIAL RISKS & MITIGATION STRATEGIES:
+
+1. SHARED STATE CONFLICTS
+   - Risk: Language state leakage between PosterPlayerScreen and MyBusinessPosterPlayerScreen
+   - Mitigation: Use independent language state refs (userManuallySelectedLanguageRef, etc.)
+   - Impact: High - Could cause unexpected language switching
+
+2. CACHING COLLISIONS
+   - Risk: Image preloading cache conflicts between screens
+   - Mitigation: Use separate cache keys or clear cache on screen unmount
+   - Impact: Medium - Could cause memory issues or stale images
+
+3. NAVIGATION CONFUSION
+   - Risk: Back navigation going to wrong screen
+   - Mitigation: Explicit originScreen handling for MyBusiness flow
+   - Impact: High - Could break user journey
+
+4. API RATE LIMITING
+   - Risk: Both screens calling same business category API simultaneously
+   - Mitigation: Share API cache or implement request deduplication
+   - Impact: Medium - Could trigger rate limiting
+
+5. BUSINESS PROFILE CONTEXT CONFLICTS
+   - Risk: Global business profile changes affecting both screens
+   - Mitigation: Pass business profile as navigation param instead of relying on context
+   - Impact: High - Could show wrong business posters
+
+6. MEMORY LEAKS
+   - Risk: Component not properly cleaning up refs and listeners
+   - Mitigation: Ensure all useEffect cleanup functions are preserved
+   - Impact: Medium - Could cause performance degradation
+
+7. RESPONSIVE DESIGN BREAKS
+   - Risk: New screen not matching exact layout of original
+   - Mitigation: Copy all styling and responsive logic exactly
+   - Impact: Medium - Could cause UI inconsistency
+
+8. LANGUAGE FILTERING BUGS
+   - Risk: Language detection not working for business-only flow
+   - Mitigation: Test language detection with business category posters
+   - Impact: High - Could break core functionality
+
+CRITICAL TESTING AREAS:
+- Business category poster loading and filtering
+- Language auto-detection and manual selection
+- Responsive design on all device types
+- Back navigation from MyBusiness flow
+- Memory usage and cleanup
+
+===============================================================================
+15. IMPLEMENTATION BLUEPRINT (NO CODE)
+===============================================================================
+
+MY BUSINESS POSTER PLAYER SCREEN ARCHITECTURE:
+
+SCREEN PURPOSE:
+- Display posters for user's selected business category only
+- Replicate PosterPlayerScreen UI and behavior exactly
+- Integrate with HomeScreen business category dropdown
+- Use user's selected business profile
+
+REQUIRED PROPS:
+```typescript
+interface MyBusinessPosterPlayerRouteParams {
+  selectedPoster: Template;
+  businessCategory: string; // From HomeScreen dropdown
+  selectedBusinessProfile: BusinessProfile; // From context
+  posterLimit?: number; // Default to 1000 for business
+}
+```
+
+DATA FLOW DESIGN:
+1. Screen opens with businessCategory from navigation
+2. Fetch posters using businessCategoryPostersApi.getPostersByCategory()
+3. Apply language filtering (same as PosterPlayerScreen)
+4. Display in identical grid layout with same styling
+5. Navigate to PosterEditor with business profile context
+
+STATE MANAGEMENT:
+- Keep all core state: currentPoster, allTemplates, selectedLanguage
+- Remove greeting/calendar related state
+- Simplify activeCategoryRef to only handle business type
+- Preserve all user selection tracking refs
+
+COMPONENT REUSE:
+- RelatedPosterItem: Use unchanged
+- LazyFullImage: Use unchanged  
+- SkeletonItem: Use unchanged
+- All utility functions: Copy unchanged
+- StyleSheet: Copy all styles unchanged
+
+INTEGRATION POINTS:
+- HomeScreen: Pass businessCategory and selectedBusinessProfile
+- BusinessProfileContext: Use for profile data
+- PosterEditor: Navigate with business profile
+- Navigation: Handle back to MainTabs specifically
+
+PERFORMANCE REQUIREMENTS:
+- Maintain all image preloading optimizations
+- Keep skeleton loading states
+- Preserve all memoization
+- Maintain responsive design calculations
+
+TESTING REQUIREMENTS:
+- Verify business category poster loading
+- Test language filtering with business posters
+- Confirm responsive design on all devices
+- Validate back navigation to MainTabs
+- Test business profile integration
+
+DEPLOYMENT CONSIDERATIONS:
+- Can be deployed alongside existing PosterPlayerScreen
+- No changes to existing navigation or API contracts
+- Backward compatible with existing business profile system
+- Safe rollback path if issues arise
+
+===============================================================================
+END OF ANALYSIS REPORT
+===============================================================================
+
+This analysis provides a complete blueprint for implementing MyBusinessPosterPlayerScreen while maintaining production stability and preserving all existing functionality of PosterPlayerScreen.

@@ -1,0 +1,27 @@
+Play Store Release Notes (v9)
+
+🔄 Version 9 - 16 KB Page Size Support & Stability Improvements
+
+📱 What's New:
+- ✅ Fixed 16 KB memory page size support for Android 15+ devices
+  - Added Android Gradle Plugin (AGP) 8.7.3 for automatic native library alignment
+  - Configured manifest metadata for 16 KB page size compatibility
+  - Updated packaging options to ensure proper library alignment
+  - This ensures your app works correctly on the latest Android devices
+
+🔧 Technical Improvements:
+- Updated to AGP 8.7.3 for automatic 16 KB page size alignment
+- Configured native library packaging for 16 KB compatibility
+- Improved build configuration for better Android 15+ support
+
+🐛 Bug Fixes:
+- Resolved Play Store rejection for 16 KB page size incompatibility
+- Fixed native library alignment issues that affected Android 15+ devices
+
+📋 Additional Notes:
+- Version Code: 9
+- Target SDK: Android 15 (API 35)
+- Minimum SDK: Android 7.0 (API 24)
+
+Thank you for using Market Brand! 🎉
+

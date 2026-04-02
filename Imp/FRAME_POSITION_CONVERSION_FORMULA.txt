@@ -1,0 +1,158 @@
+================================================================================
+FRAME POSITION CONVERSION FORMULA
+================================================================================
+
+When positioning elements in the PosterEditorScreen, the debug output shows 
+canvas coordinates. These need to be converted to reference frame coordinates 
+before storing in src/data/frames.ts.
+
+================================================================================
+REFERENCE FRAME DIMENSIONS
+================================================================================
+Standard Width:  720 pixels
+Standard Height: 487.2 pixels
+
+These are defined in: src/utils/frameUtils.ts (lines 71-72)
+
+================================================================================
+CANVAS DIMENSIONS (typical on test device)
+================================================================================
+Canvas Width:  345.6 pixels (approximately)
+Canvas Height: 300.93 pixels (approximately)
+
+Note: Canvas size varies by device screen size. The debug output shows the 
+actual canvas size used.
+
+================================================================================
+CONVERSION FORMULA
+================================================================================
+
+To convert from CANVAS coordinates (from debug output) to REFERENCE coordinates 
+(for frames.ts):
+
+  referenceX = canvasX × (720 / canvasWidth)
+  referenceY = canvasY × (487.2 / canvasHeight)
+
+Or using the scale factors:
+
+  scaleX = canvasWidth / 720
+  scaleY = canvasHeight / 487.2
+  
+  referenceX = canvasX / scaleX
+  referenceY = canvasY / scaleY
+
+================================================================================
+STEP-BY-STEP PROCESS
+================================================================================
+
+1. Apply the frame in PosterEditorScreen
+2. Position elements where you want them
+3. Check the debug console output which shows:
+   - Canvas coordinates (X, Y)
+   - Canvas size (width x height)
+   - Frame name (e.g., "For frame6.png, use: x: 8, y: 273")
+
+4. Convert coordinates using the formula:
+   - Get canvasWidth and canvasHeight from debug output
+   - Calculate: referenceX = canvasX × (720 / canvasWidth)
+   - Calculate: referenceY = canvasY × (487.2 / canvasHeight)
+   - Round to nearest integer
+
+5. Update src/data/frames.ts with the reference coordinates
+
+================================================================================
+EXAMPLE CONVERSION (Frame6)
+================================================================================
+
+Debug Output:
+  🎯 DEBUG: phone moved to position:
+     📍 X: 8.4, Y: 273.1
+     📏 Canvas Size: 345.59999999999997x300.93333282470707
+     🔧 For frame6.png, use: x: 8, y: 273
+
+Conversion:
+  canvasX = 8
+  canvasY = 273
+  canvasWidth = 345.6
+  canvasHeight = 300.93
+  
+  referenceX = 8 × (720 / 345.6) = 8 × 2.083 = 16.67 ≈ 17
+  referenceY = 273 × (487.2 / 300.93) = 273 × 1.619 = 441.99 ≈ 442
+
+Store in frames.ts:
+  {
+    type: 'text',
+    key: 'phone',
+    x: 17,
+    y: 442,
+    ...
+  }
+
+================================================================================
+COMPLETE FRAME6 EXAMPLE
+================================================================================
+
+Debug Output (Canvas Coordinates):
+  - phone:   x: 8,   y: 273  (Canvas: 345.6 x 300.93)
+  - email:   x: 65,  y: 274
+  - address: x: 151, y: 273
+  - website: x: 261, y: 274
+
+Converted (Reference Coordinates for frames.ts):
+  - phone:   x: 17,  y: 442
+  - email:   x: 135, y: 444
+  - address: x: 315, y: 442
+  - website: x: 544, y: 444
+
+================================================================================
+QUICK REFERENCE TABLE (for canvas 345.6 x 300.93)
+================================================================================
+
+Canvas X → Reference X (multiply by 2.083)
+Canvas Y → Reference Y (multiply by 1.619)
+
+Canvas X  | Reference X
+----------|------------
+0         | 0
+10        | 21
+50        | 104
+100       | 208
+150       | 312
+200       | 417
+250       | 521
+300       | 625
+345       | 719
+
+Canvas Y  | Reference Y
+----------|------------
+0         | 0
+50        | 81
+100       | 162
+150       | 243
+200       | 324
+250       | 405
+273       | 442
+300       | 486
+
+================================================================================
+IMPORTANT NOTES
+================================================================================
+
+1. The debug output already shows rounded coordinates suitable for direct use
+   in the conversion formula.
+
+2. Always use the CANVAS SIZE from the debug output for your calculations, as
+   it may vary slightly between devices.
+
+3. The conversion ensures that elements will appear in the exact same position
+   on any device, regardless of screen size.
+
+4. Logo and companyName positions at the top of frames typically don't need
+   adjustment as they're already correctly positioned in the frame definitions.
+
+5. After updating frames.ts, reload the app to see the changes take effect.
+
+================================================================================
+END OF DOCUMENT
+================================================================================
+

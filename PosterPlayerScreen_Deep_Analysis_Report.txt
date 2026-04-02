@@ -1,0 +1,517 @@
+# PosterPlayerScreen Deep Analysis Report
+
+## 1. PosterPlayerScreen Overview
+
+PosterPlayerScreen is a complex, multi-purpose screen that displays posters in a preview format with a grid below for browsing. It handles multiple data sources:
+- Business category posters (from business profiles)
+- Greeting category posters (from greeting templates)
+- Calendar posters (from calendar dates)
+- General poster browsing (from related posters)
+
+The screen features:
+- Large poster preview with swipe navigation
+- Language filtering (All, English, Hindi)
+- Service filtering for Event Planner category
+- Responsive grid layout for related posters
+- Navigation to PosterEditor
+- Complex state management for poster selection and filtering
+
+## 2. File Structure
+
+**File Location:** `src/screens/PosterPlayerScreen.tsx`
+**File Size:** 4,037 lines
+**Component Type:** React Functional Component with extensive hooks
+
+**Key Sections:**
+- Lines 1-295: Imports, constants, and helper components
+- Lines 296-833: Main component with state management
+- Lines 834-4037: StyleSheet definitions
+
+## 3. Data Flow
+
+### API / Backend → Service Layer → Screen State → Render Components
+
+**Business Category Flow:**
+```
+businessCategoryPostersApi.getPostersByCategory()
+↓
+useEffect() (lines 988-1134)
+↓
+setAllTemplates() → setCurrentPoster()
+↓
+filteredPosters (memoized)
+↓
+FlatList render
+```
+
+**Greeting Category Flow:**
+```
+greetingTemplatesService.getTemplates() & searchTemplates()
+↓
+Multiple API calls with variations (lines 1137-2065)
+↓
+Template conversion + language merging
+↓
+setAllTemplates() → setCurrentPoster()
+↓
+filteredPosters (memoized)
+↓
+FlatList render
+```
+
+**Calendar Flow:**
+```
+calendarApi.getPostersByDate()
+↓
+useEffect() (lines 2068-2166)
+↓
+Template conversion
+↓
+setAllTemplates() → setCurrentPoster()
+↓
+filteredPosters (memoized)
+↓
+FlatList render
+```
+
+## 4. Category Handling
+
+### Selected Business Category Storage
+**Primary Source:** Navigation params
+```typescript
+const {
+  businessCategory,        // From navigation params
+  greetingCategory,       // From navigation params  
+  calendarDate,          // From navigation params
+  originScreen,          // From navigation params
+} = route.params;
+```
+
+**Secondary Source:** BusinessProfile Context
+```typescript
+const { selectedBusinessProfile: globalSelectedProfile } = useBusinessProfile();
+const activeBusinessProfile = useMemo(() => {
+  return globalSelectedProfile || initialBusinessProfile;
+}, [globalSelectedProfile, initialBusinessProfile]);
+```
+
+**Category Priority:**
+1. Navigation param businessCategory
+2. Navigation param greetingCategory  
+3. Navigation param calendarDate
+4. Context business profile (fallback)
+
+**Active Category Tracking:**
+```typescript
+const activeCategoryRef = useRef<{ type: 'business' | 'greeting' | 'calendar' | null; value: string | null }>({ type: null, value: null });
+```
+
+## 5. Language Handling
+
+### Language Detection System
+**Supported Languages:** English, Hindi
+**Language Keywords:**
+```typescript
+const LANGUAGE_KEYWORDS: Record<string, string[]> = {
+  english: ['english'],
+  marathi: ['marathi'], 
+  hindi: ['hindi'],
+};
+```
+
+**Detection Logic:**
+1. Extract languages from template.languages array
+2. Extract languages from template.tags using regex word boundary matching
+3. Merge both sources
+4. Auto-detect language from poster tags
+5. Allow manual override via language buttons
+
+**Language State Management:**
+```typescript
+const [selectedLanguage, setSelectedLanguage] = useState<string>('all');
+const userManuallySelectedLanguageRef = useRef<boolean>(false);
+const lastAutoDetectedPosterIdRef = useRef<string | null>(null);
+```
+
+**Auto-Detection Rules:**
+- Only runs when user hasn't manually selected language
+- Resets when category changes
+- Prioritizes Hindi over English when both detected
+- Uses word boundary regex to avoid false positives
+
+## 6. Poster Loading System
+
+### Business Category Loading
+**API Endpoint:** `/api/mobile/posters/category/${categoryName}?limit=${limit}`
+**Service:** `businessCategoryPostersApi.getPostersByCategory()`
+**Cache:** Clears category cache before fetch
+**Limit:** 1000 for "My Business", 5 for other cases
+
+### Greeting Category Loading  
+**Multiple API Calls:**
+1. `greetingTemplatesService.getTemplates({ category, limit: 50 })`
+2. `greetingTemplatesService.searchTemplates(category, undefined, 50)`
+3. `greetingTemplatesService.searchTemplates(normalizedCategory, undefined, 50)`
+4. Variations with individual words (up to 3 variations)
+
+**Progressive Loading:**
+- Initial 50 items for fast render
+- Background load of 200 items after render
+- Strict category filtering to prevent cross-contamination
+
+### Calendar Loading
+**API Endpoint:** `calendarApi.getPostersByDate(date)`
+**Template Conversion:** Maps CalendarPoster to Template format
+
+## 7. UI Component Tree
+
+```
+PosterPlayerScreen
+├── SafeAreaView (with theme gradient background)
+├── StatusBar (transparent, dark-content)
+├── LinearGradient (full screen gradient)
+│   ├── Safe Area Top Spacing
+│   ├── Header (Back Arrow, Category Title, Next Button)
+│   │   ├── TouchableOpacity (Back with gradient)
+│   │   ├── View (Title container with gradient)
+│   │   └── TouchableOpacity (Next with gradient)
+│   ├── Poster Preview Section
+│   │   ├── View (poster container with swipe handlers)
+│   │   │   └── LazyFullImage (high quality poster)
+│   │   └── PanResponder (swipe gestures)
+│   ├── Language Filter Section OR Subscription Message
+│   │   ├── Language Filter Buttons (All, English, Hindi)
+│   │   └── Service Filter (Event Planner only)
+│   └── Related Posters Grid
+│       ├── FlatList (skeleton loading OR actual posters)
+│       │   ├── RelatedPosterItem (memoized poster card)
+│       │   └── SkeletonItem (animated loading placeholder)
+│       └── Safe Area Bottom Spacing
+└── ComingSoonModal (conditional)
+```
+
+## 8. Styling System
+
+### Theme Integration
+**Theme Source:** `useTheme()` context
+**Color Usage:** `theme.colors.gradient`, `theme.colors.primary`, `theme.colors.secondary`
+
+### Responsive Design
+**Base Dimensions:** 375x667 (iPhone standard)
+**Scaling Functions:**
+```typescript
+const scale = (size: number) => (SCREEN_WIDTH / 375) * size;
+const verticalScale = (size: number) => (SCREEN_HEIGHT / 667) * size;
+const moderateScale = (size: number, factor = 0.5) => size + (scale(size) - size) * factor;
+```
+
+**Device Detection:**
+```typescript
+const isTabletDevice = useMemo(() => screenWidth >= 768, [screenWidth]);
+const isFoldPhoneUnfolded = useMemo(() => screenWidth >= 900, [screenWidth]);
+```
+
+**Dynamic Grid Layout:**
+- Tablets/Unfolded: 4 columns
+- Phones: 3 columns
+- Card width calculated to fill available space exactly
+- Square cards (height = width)
+
+### Typography
+**Font Sizes:** Scaled using `moderateScale()`
+**Font Weights:** 300-700
+**Letter Spacing:** 0.2-0.3
+
+### Color Scheme
+**Primary:** #667eea (blue)
+**Secondary:** Theme gradient colors
+**Background:** Transparent with gradient overlay
+**Text:** #333333 (dark), #ffffff (white on gradients)
+
+## 9. Navigation Behavior
+
+### Entry Points
+1. **From HomeScreen Business Cards:**
+   ```typescript
+   navigation.navigate('PosterPlayer', {
+     selectedPoster: template,
+     relatedPosters: relatedTemplates,
+     businessCategory: category.name,
+     posterLimit: 200,
+     originScreen: 'MainTabs'
+   });
+   ```
+
+2. **From Greeting Templates:**
+   ```typescript
+   navigation.navigate('PosterPlayer', {
+     selectedPoster: template,
+     relatedPosters: relatedTemplates,
+     greetingCategory: category,
+     originScreen: 'GreetingTemplates'
+   });
+   ```
+
+3. **From Calendar:**
+   ```typescript
+   navigation.navigate('PosterPlayer', {
+     selectedPoster: template,
+     relatedPosters: relatedTemplates,
+     calendarDate: selectedDate,
+     originScreen: 'CalendarScreen'
+   });
+   ```
+
+### Exit Points
+1. **Back Button:** `navigation.goBack()` or navigate to source screen
+2. **Next Button:** `navigation.navigate('PosterEditor', { ... })`
+
+### Navigation Params
+```typescript
+interface PosterPlayerScreenRouteProp {
+  selectedPoster: Template;
+  relatedPosters?: Template[];
+  businessCategory?: string | { name: string };
+  greetingCategory?: string;
+  calendarDate?: string;
+  originScreen?: string;
+  posterLimit?: number;
+  selectedBusinessProfile?: BusinessProfile;
+  selectedBusinessProfileId?: string;
+  templateSource?: string;
+}
+```
+
+## 10. State Management Breakdown
+
+### Core State Variables
+
+**Poster Management:**
+```typescript
+const [currentPoster, setCurrentPoster] = useState<Template>(convertedInitialPoster);
+const [allTemplates, setAllTemplates] = useState<Template[]>([]);
+const allTemplatesRef = useRef<Template[]>([]);
+```
+
+**Language Management:**
+```typescript
+const [selectedLanguage, setSelectedLanguage] = useState<string>('all');
+const userManuallySelectedLanguageRef = useRef<boolean>(false);
+const lastAutoDetectedPosterIdRef = useRef<string | null>(null);
+```
+
+**Loading States:**
+```typescript
+const [isBusinessCategoryLoading, setIsBusinessCategoryLoading] = useState(false);
+const [isGreetingCategoryLoading, setIsGreetingCategoryLoading] = useState(false);
+```
+
+**UI State:**
+```typescript
+const [dimensions, setDimensions] = useState({ width, height });
+const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
+const [selectedServiceFilter, setSelectedServiceFilter] = useState<string | null>(null);
+```
+
+**Business Profile:**
+```typescript
+const [userBusinessProfiles, setUserBusinessProfiles] = useState<BusinessProfile[]>([]);
+const { selectedBusinessProfile: globalSelectedProfile } = useBusinessProfile();
+```
+
+### Key Effects
+
+**Dimension Changes:**
+```typescript
+useEffect(() => {
+  const subscription = Dimensions.addEventListener('change', ({ window }) => {
+    setDimensions({ width: window.width, height: window.height });
+  });
+  return () => subscription?.remove();
+}, []);
+```
+
+**Category-Based Loading:** Separate useEffect for each category type with race condition protection
+
+**Language Auto-Detection:** Multiple useEffect hooks for different scenarios (initial mount, poster change, category change)
+
+## 11. Reusable Components
+
+### RelatedPosterItem (Memoized)
+**Purpose:** Individual poster card in grid
+**Features:**
+- Custom memo comparison function
+- Optimized image with OptimizedImage component
+- Selection state with glow effect
+- Loading indicator fallback
+- Overlay gradient for selected state
+
+### LazyFullImage
+**Purpose:** High-quality poster preview
+**Features:**
+- Progressive loading (thumbnail → full image)
+- Memory optimization
+- Maximum quality rendering
+
+### SkeletonItem
+**Purpose:** Loading placeholder
+**Features:**
+- Animated shimmer effect
+- Consistent with card dimensions
+- Performance optimized
+
+## 12. Required Changes for MyBusinessPosterPlayerScreen
+
+### Core Differences Required
+
+**Data Source:**
+- **PosterPlayerScreen:** Multi-source (business, greeting, calendar, general)
+- **MyBusinessPosterPlayerScreen:** Single source (user's selected business category ONLY)
+
+**Category Input:**
+- **PosterPlayerScreen:** Receives category via navigation params
+- **MyBusinessPosterPlayerScreen:** Must read from HomeScreen business profile dropdown selection
+
+**API Integration:**
+```typescript
+// Required: Get selected business profile from AsyncStorage/Context
+const selectedBusinessProfile = await AsyncStorage.getItem('selectedBusinessProfile');
+const businessCategory = selectedBusinessProfile?.category;
+
+// Use existing API but force user's category
+const response = await businessCategoryPostersApi.getPostersByCategory(businessCategory, 200);
+```
+
+**Simplified Logic:**
+- Remove greeting/calendar handling
+- Remove service filter logic  
+- Remove category switching logic
+- Keep language detection and filtering
+- Keep poster selection and swipe navigation
+
+**Navigation Integration:**
+```typescript
+// Called from HomeScreen after business profile selection
+navigation.navigate('MyBusinessPosterPlayer', {
+  businessCategory: selectedProfile.category,
+  selectedBusinessProfile: selectedProfile
+});
+```
+
+## 13. Risk Analysis
+
+### Shared States
+**Risk:** BusinessProfile context changes could affect both screens
+**Mitigation:** Use separate navigation param for business category
+
+**API Cache Conflicts:**
+**Risk:** businessCategoryPostersApi cache could serve stale data
+**Mitigation:** Clear cache specifically for user's category before fetching
+
+**Memory Leaks:**
+**Risk:** Complex useEffect dependencies could cause infinite re-renders
+**Mitigation:** Careful dependency arrays and ref usage for tracking
+
+**Race Conditions:**
+**Risk:** Multiple category useEffects could overwrite each other
+**Mitigation:** Use activeCategoryRef pattern for protection
+
+**Navigation State:**
+**Risk:** Global language state could conflict between screens
+**Mitigation:** Maintain separate language state or reset on mount
+
+## 14. Implementation Blueprint
+
+### Required Data Inputs
+```typescript
+interface MyBusinessPosterPlayerScreenParams {
+  businessCategory: string;              // User's selected business category
+  selectedBusinessProfile: BusinessProfile; // Complete profile object
+  posterLimit?: number;                   // Optional limit override
+}
+```
+
+### Required States
+```typescript
+const [currentPoster, setCurrentPoster] = useState<Template>(null);
+const [businessPosters, setBusinessPosters] = useState<Template[]>([]);
+const [selectedLanguage, setSelectedLanguage] = useState<string>('all');
+const [loading, setLoading] = useState(false);
+```
+
+### Required Components
+- Reuse `RelatedPosterItem` component unchanged
+- Reuse `LazyFullImage` component unchanged  
+- Reuse language filter buttons unchanged
+- Remove service filter section
+- Simplify header (remove calendar date handling)
+
+### Required Navigation
+```typescript
+// Entry from HomeScreen
+navigation.navigate('MyBusinessPosterPlayer', {
+  businessCategory: selectedCategory,
+  selectedBusinessProfile: selectedProfile
+});
+
+// Exit to PosterEditor
+navigation.navigate('PosterEditor', {
+  selectedImage: { uri: highQualityUrl, ... },
+  selectedLanguage: selectedLanguage,
+  selectedTemplateId: currentPoster.id,
+  selectedBusinessProfile: activeBusinessProfile
+});
+```
+
+### Poster Filtering Logic
+```typescript
+// Simplified filtering - only business category and language
+const filteredPosters = useMemo(() => {
+  if (selectedLanguage === 'all') {
+    return businessPosters.filter(templateContainsLanguage);
+  }
+  return businessPosters.filter(template => 
+    templateContainsLanguage(template, selectedLanguage)
+  );
+}, [businessPosters, selectedLanguage]);
+```
+
+### API Integration Pattern
+```typescript
+useEffect(() => {
+  const fetchBusinessPosters = async () => {
+    setLoading(true);
+    try {
+      // Clear cache for fresh data
+      businessCategoryPostersApi.clearCategoryCache(businessCategory);
+      
+      const response = await businessCategoryPostersApi.getPostersByCategory(
+        businessCategory, 
+        posterLimit || 200
+      );
+      
+      if (response.success && response.data.posters) {
+        const templates = response.data.posters.map(convertToTemplate);
+        setBusinessPosters(templates);
+        
+        // Set first poster as current if none selected
+        if (!currentPoster && templates.length > 0) {
+          setCurrentPoster(templates[0]);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching business posters:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  fetchBusinessPosters();
+}, [businessCategory, posterLimit]);
+```
+
+---
+
+**Report Generated:** December 12, 2024
+**Analysis Scope:** Complete architectural review of PosterPlayerScreen.tsx (4,037 lines)
+**Purpose:** Foundation for implementing MyBusinessPosterPlayerScreen

@@ -1,0 +1,251 @@
+# SEARCH RESULT LAYOUT ANALYSIS REPORT
+# Generated: 2026-03-13
+# Issue: Search results appear only on LEFT side of screen, RIGHT side remains empty
+
+===========================================================================
+PROBLEM SUMMARY
+===========================================================================
+- Search results are constrained to a narrow area on the left side of the screen
+- Right side shows large empty space
+- Horizontal scrolling works correctly within the constrained area
+- Issue appears to be layout-related, not scroll functionality
+
+===========================================================================
+COMPONENT HIERARCHY ANALYSIS
+===========================================================================
+
+1. ROOT CONTAINER
+   SafeAreaView
+   └── style: [styles.container, { backgroundColor: theme.colors.gradient[0] }]
+   └── styles.container: { flex: 1 }
+
+2. MAIN SCROLLVIEW
+   ScrollView
+   └── ref: scrollViewRef
+   └── style: styles.content
+   └── contentContainerStyle: [styles.scrollContent, { paddingBottom: 80 + insets.bottom }]
+   └── styles.content: { flex: 1 }
+   └── styles.scrollContent: { paddingBottom: 100 }
+
+3. SEARCH RESULTS CONTAINER
+   View (inside ScrollView)
+   └── Rendered conditionally: {isSearching && searchQuery.trim() !== ''}
+   └── Contains:
+       - Matching Categories Section (optional)
+       - Templates Section
+
+4. TEMPLATES SECTION
+   View
+   └── style: styles.templatesSection
+   └── styles.templatesSection: {
+       paddingBottom: verticalScale(15),
+       paddingHorizontal: moderateScale(8)
+     }
+
+5. SECTION HEADER
+   View
+   └── style: styles.sectionHeader
+   └── styles.sectionHeader: {
+       flexDirection: 'row',
+       justifyContent: 'space-between',
+       alignItems: 'center',
+       paddingHorizontal: moderateScale(10),
+       marginBottom: verticalScale(4)
+     }
+
+6. SEARCH RESULTS FLATLIST
+   FlatList
+   └── horizontal={false} (VERTICAL scrolling)
+   └── data: templates
+   └── renderItem: renderTemplate
+   └── contentContainerStyle: styles.verticalSearchList
+   └── styles.verticalSearchList: {
+       paddingVertical: moderateScale(5),
+       paddingHorizontal: moderateScale(3)
+     }
+
+===========================================================================
+RENDERTEMPLATE FUNCTION ANALYSIS
+===========================================================================
+
+CASE 1: Category Items (item.type === 'category')
+   View
+   └── style: styles.searchCategoryContainer
+   └── styles.searchCategoryContainer: {
+       width: moderateScale(300),  // ⚠️ FIXED WIDTH ISSUE!
+       paddingVertical: moderateScale(12),
+       paddingHorizontal: moderateScale(8),
+       backgroundColor: 'rgba(0, 0, 0, 0.05)',
+       borderRadius: moderateScale(8),
+       marginRight: moderateScale(12)
+     }
+   └── Contains nested horizontal FlatList with styles.horizontalList
+
+CASE 2: Individual Templates
+   View
+   └── style: styles.verticalTemplateContainer
+   └── styles.verticalTemplateContainer: {
+       marginBottom: moderateScale(8),
+       alignItems: 'center'  // ⚠️ CENTER ALIGNMENT ISSUE!
+     }
+   └── Contains TemplateCard with responsive cardWidth
+
+===========================================================================
+CARD WIDTH CALCULATION
+===========================================================================
+
+getCardWidth() function:
+- Tablet (>=768px): screenWidth * 0.15 (6-7 cards)
+- Medium phones (>=600px): screenWidth * 0.22 (4 cards)
+- Regular phones (>=400px): screenWidth * 0.28 (3 cards)
+- Small phones (<400px): screenWidth * 0.32 (3 cards, more spacing)
+
+TemplateCard component receives cardWidth prop and renders with calculated dimensions.
+
+===========================================================================
+ROOT CAUSE IDENTIFICATION
+===========================================================================
+
+PRIMARY ISSUE: styles.searchCategoryContainer
+- FIXED WIDTH: width: moderateScale(300) ≈ 150px on most devices
+- This constrains category sections to a fixed narrow width
+- Causes large empty space on the right side
+
+SECONDARY ISSUE: styles.verticalTemplateContainer
+- CENTER ALIGNMENT: alignItems: 'center'
+- This centers individual template cards instead of stretching them
+- Contributes to unused horizontal space
+
+TERTIARY ISSUE: Multiple padding layers
+- templatesSection: paddingHorizontal: moderateScale(8)
+- sectionHeader: paddingHorizontal: moderateScale(10)
+- verticalSearchList: paddingHorizontal: moderateScale(3)
+- Combined padding reduces available width
+
+===========================================================================
+WHY HORIZONTAL SCROLL STILL WORKS
+===========================================================================
+
+The horizontal scrolling within category sections works because:
+1. Each category has its own horizontal FlatList
+2. The FlatList content can scroll within its fixed-width container
+3. The scroll functionality is independent of the parent container width
+
+===========================================================================
+NESTED SCROLLVIEW ANALYSIS
+===========================================================================
+
+POTENTIAL ISSUE: VirtualizedLists inside ScrollView
+- Main ScrollView (vertical) contains multiple FlatList components
+- Category FlatLists are horizontal={true} (different orientation - OK)
+- Search results FlatList is horizontal={false} (SAME orientation - PROBLEMATIC)
+
+WARNING: "VirtualizedLists should never be nested inside plain ScrollViews with the same orientation"
+
+The search results FlatList (vertical) is nested inside the main ScrollView (vertical), which can cause:
+- Performance issues
+- Scrolling conflicts
+- Layout calculation problems
+
+===========================================================================
+LAYOUT CALCULATION EXAMPLE
+===========================================================================
+
+For a typical phone (screenWidth = 375px):
+1. Main container: 375px full width
+2. templatesSection padding: 8px × 2 = 16px
+3. Available width: 375 - 16 = 359px
+4. Category container: fixed 300px width
+5. Empty space: 359 - 300 = 59px (16% of screen width)
+
+For larger screens, the percentage of wasted space increases significantly.
+
+===========================================================================
+RECOMMENDED FIX STRATEGY
+===========================================================================
+
+IMMEDIATE FIXES:
+
+1. REMOVE FIXED WIDTH FROM CATEGORIES:
+   ```typescript
+   // Change from:
+   searchCategoryContainer: {
+     width: moderateScale(300), // REMOVE THIS
+     ...
+   }
+   
+   // To:
+   searchCategoryContainer: {
+     width: '100%', // ADD THIS
+     ...
+   }
+   ```
+
+2. FIX TEMPLATE ALIGNMENT:
+   ```typescript
+   // Change from:
+   verticalTemplateContainer: {
+     alignItems: 'center', // CHANGE THIS
+     ...
+   }
+   
+   // To:
+   verticalTemplateContainer: {
+     alignItems: 'stretch', // ADD THIS
+     ...
+   }
+   ```
+
+3. OPTIMIZE PADDING:
+   ```typescript
+   // Reduce redundant padding layers
+   // Keep only one level of horizontal padding
+   ```
+
+ADVANCED FIXES:
+
+4. REPLACE NESTED VERTICAL FLATLIST:
+   - Convert search results to use mapped View components instead of FlatList
+   - Or implement custom virtualized list solution
+   - This eliminates the VirtualizedList nesting warning
+
+5. IMPLEMENT RESPONSIVE CATEGORY WIDTH:
+   ```typescript
+   searchCategoryContainer: {
+     width: screenWidth - moderateScale(20),
+     maxWidth: moderateScale(400),
+     ...
+   }
+   ```
+
+===========================================================================
+EXPECTED OUTCOME AFTER FIXES
+===========================================================================
+
+After implementing the recommended fixes:
+1. Category sections will occupy full available width
+2. Individual templates will stretch to fill container width
+3. No empty space on the right side of the screen
+4. Better responsive behavior across different screen sizes
+5. Improved performance by eliminating nested VirtualizedLists
+
+===========================================================================
+VERIFICATION STEPS
+===========================================================================
+
+1. Test on multiple screen sizes (small, medium, large phones, tablets)
+2. Verify horizontal scrolling still works in category sections
+3. Check that vertical scrolling works for search results
+4. Ensure no layout overflow or clipping issues
+5. Monitor for VirtualizedList nesting warnings in console
+
+===========================================================================
+PRIORITY IMPLEMENTATION ORDER
+===========================================================================
+
+1. HIGH: Remove fixed width from searchCategoryContainer
+2. HIGH: Change alignItems to 'stretch' in verticalTemplateContainer
+3. MEDIUM: Optimize padding layers
+4. LOW: Replace nested vertical FlatList (performance optimization)
+
+===========================================================================

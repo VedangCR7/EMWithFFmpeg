@@ -1,0 +1,39 @@
+BUSINESS PROFILE SUBSCRIPTION LOCKING - IMPLEMENTATION REPORT
+
+1. OBJECTIVE
+Implement UI-level access control for business profiles to ensure they remain locked and inaccessible until their Razorpay subscription is activated via webhook.
+
+2. KEY CHANGES IMPLEMENTED
+
+   A. Profile Selection Enforcement (BusinessProfilesScreen.tsx)
+      - Profiles with 'PENDING' or 'INACTIVE' subscription status are now visually locked.
+      - A "Locked" overlay with a lock icon is displayed over inactive profile cards.
+      - An "Activate Now" button is provided for inactive profiles to initiate/resume the subscription flow.
+      - Selection is disabled for inactive profiles, preventing them from being set as the active profile.
+
+   B. Context-Level Validation (BusinessProfileContext.tsx)
+      - Updated 'setSelectedBusinessProfile' to validate the subscription status using SubscriptionContext.
+      - Added 'isSubscriptionActive' boolean to the context, which is 'true' for personal profiles and 'ACTIVE' business profiles, and 'false' otherwise.
+      - This serves as the single source of truth for app-wide profile access.
+
+   C. App-Wide Access Checks (HomeScreen.tsx & PosterEditorScreen.tsx)
+      - HomeScreen: Added checks to 'handleTemplatePress' and 'handleBannerPress'. If the current profile is locked, an Alert is shown prompting activation.
+      - PosterEditorScreen: Added a safety useEffect that blocks editing and shows a persistent alert if reached with an inactive profile, providing navigation back or to activation.
+
+   D. Automatic Synchronization
+      - Implemented automatic subscription status refreshing in 'BusinessProfilesScreen' using 'useFocusEffect'. This ensures profiles unlock instantly once the webhook processes the payment and the user returns to the screen.
+
+3. VERIFICATION RESULTS
+   - Profile Selection: Inactive profiles correctly show the locked UI and reject selection attempts.
+   - Activation Flow: The "Activate Now" button correctly triggers the Razorpay mandate flow.
+   - App-wide Locking: Attempting to edit a poster while an inactive profile is selected (e.g. if the subscription expires while the app is active) correctly triggers the "Subscription Required" alert.
+   - Provider Hierarchy: Confirmed SubscriptionProvider now wraps BusinessProfileProvider, allowing cross-context access.
+
+4. FILES MODIFIED
+   - src/context/BusinessProfileContext.tsx (Business Logic)
+   - src/screens/BusinessProfilesScreen.tsx (UI & Enforcement)
+   - src/screens/HomeScreen.tsx (Global Access Check)
+   - src/screens/PosterEditorScreen.tsx (Safety Enforcement)
+   - App.tsx (Hierarchy Fix)
+
+IMPLEMENTATION COMPLETED SUCCESSFULLY.

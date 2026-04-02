@@ -1,0 +1,407 @@
+================================================================================
+HOME SCREEN API CALLS DOCUMENTATION
+================================================================================
+This document lists all API calls present in src/screens/HomeScreen.tsx
+Generated on: 2024
+
+================================================================================
+1. HOME API SERVICE (homeApi)
+================================================================================
+
+1.1. getFeaturedContent()
+   - Location: Line 787
+   - Called in: loadApiData() function
+   - Parameters: { limit: 10 }
+   - Purpose: Fetch featured banners, promotions, and highlights for home screen
+   - Endpoint: GET /api/mobile/home/featured?limit=10
+   - Cached: Yes (5 minutes TTL)
+   - Error Handling: Network/timeout errors tracked separately
+
+1.2. getUpcomingEvents()
+   - Location: Line 795
+   - Called in: loadApiData() function
+   - Parameters: { limit: 200 }
+   - Purpose: Fetch upcoming events/festivals for home screen
+   - Endpoint: GET /api/mobile/home/upcoming-events?limit=200
+   - Cached: Yes (2 minutes TTL - time-sensitive data)
+   - Error Handling: Network/timeout errors tracked separately
+
+1.3. getProfessionalTemplates()
+   - Location: Line 803
+   - Called in: loadApiData() function
+   - Parameters: { limit: 200 }
+   - Purpose: Fetch professional templates for home screen
+   - Endpoint: GET /api/mobile/home/templates?limit=200
+   - Cached: Yes (5 minutes TTL)
+   - Error Handling: Network/timeout errors tracked separately
+
+1.4. getVideoContent()
+   - Location: Line 811
+   - Called in: loadApiData() function
+   - Parameters: { limit: 20 }
+   - Purpose: Fetch video templates and content for home screen
+   - Endpoint: GET /api/mobile/home/video-content?limit=20
+   - Cached: Yes (5 minutes TTL)
+   - Error Handling: Network/timeout errors tracked separately
+
+1.5. clearCache()
+   - Location: Line 1513
+   - Called in: onRefresh() function
+   - Parameters: None
+   - Purpose: Clear all home screen related cache entries
+   - Note: Used during pull-to-refresh action
+
+================================================================================
+2. GREETING TEMPLATES SERVICE (greetingTemplatesService)
+================================================================================
+
+2.1. searchTemplates('motivational')
+   - Location: Line 925
+   - Called in: loadApiData() function
+   - Parameters: 'motivational' (search query)
+   - Purpose: Fetch motivational greeting templates
+   - Endpoint: GET /api/mobile/greetings/templates?search=motivational&limit=200
+   - Cached: Yes (5 minutes TTL)
+   - Error Handling: Returns empty array on error
+
+2.2. searchTemplates('good morning')
+   - Location: Line 926
+   - Called in: loadApiData() function
+   - Parameters: 'good morning' (search query)
+   - Purpose: Fetch good morning greeting templates
+   - Endpoint: GET /api/mobile/greetings/templates?search=good%20morning&limit=200
+   - Cached: Yes (5 minutes TTL)
+   - Error Handling: Returns empty array on error
+
+2.3. searchTemplates('business ethics')
+   - Location: Line 927
+   - Called in: loadApiData() function
+   - Parameters: 'business ethics' (search query)
+   - Purpose: Fetch business ethics greeting templates
+   - Endpoint: GET /api/mobile/greetings/templates?search=business%20ethics&limit=200
+   - Cached: Yes (5 minutes TTL)
+   - Error Handling: Returns empty array on error
+
+2.4. searchTemplates('devotional')
+   - Location: Line 928
+   - Called in: loadApiData() function
+   - Parameters: 'devotional' (search query)
+   - Purpose: Fetch devotional greeting templates
+   - Endpoint: GET /api/mobile/greetings/templates?search=devotional&limit=200
+   - Cached: Yes (5 minutes TTL)
+   - Error Handling: Returns empty array on error
+
+2.5. searchTemplates('leader quotes')
+   - Location: Line 929
+   - Called in: loadApiData() function
+   - Parameters: 'leader quotes' (search query)
+   - Purpose: Fetch leader quotes greeting templates
+   - Endpoint: GET /api/mobile/greetings/templates?search=leader%20quotes&limit=200
+   - Cached: Yes (5 minutes TTL)
+   - Error Handling: Returns empty array on error
+
+2.6. searchTemplates('atmanirbhar bharat')
+   - Location: Line 930
+   - Called in: loadApiData() function
+   - Parameters: 'atmanirbhar bharat' (search query)
+   - Purpose: Fetch Atmanirbhar Bharat greeting templates
+   - Endpoint: GET /api/mobile/greetings/templates?search=atmanirbhar%20bharat&limit=200
+   - Cached: Yes (5 minutes TTL)
+   - Error Handling: Returns empty array on error
+
+2.7. searchTemplates('good thoughts')
+   - Location: Line 931
+   - Called in: loadApiData() function
+   - Parameters: 'good thoughts' (search query)
+   - Purpose: Fetch good thoughts greeting templates
+   - Endpoint: GET /api/mobile/greetings/templates?search=good%20thoughts&limit=200
+   - Cached: Yes (5 minutes TTL)
+   - Error Handling: Returns empty array on error
+
+2.8. searchTemplates('trending')
+   - Location: Line 932
+   - Called in: loadApiData() function
+   - Parameters: 'trending' (search query)
+   - Purpose: Fetch trending greeting templates
+   - Endpoint: GET /api/mobile/greetings/templates?search=trending&limit=200
+   - Cached: Yes (5 minutes TTL)
+   - Error Handling: Returns empty array on error
+
+2.9. searchTemplates('bhagvat gita')
+   - Location: Line 933
+   - Called in: loadApiData() function
+   - Parameters: 'bhagvat gita' (search query)
+   - Purpose: Fetch Bhagvat Gita greeting templates
+   - Endpoint: GET /api/mobile/greetings/templates?search=bhagvat%20gita&limit=200
+   - Cached: Yes (5 minutes TTL)
+   - Error Handling: Returns empty array on error
+
+2.10. searchTemplates('books')
+   - Location: Line 934
+   - Called in: loadApiData() function
+   - Parameters: 'books' (search query)
+   - Purpose: Fetch books greeting templates
+   - Endpoint: GET /api/mobile/greetings/templates?search=books&limit=200
+   - Cached: Yes (5 minutes TTL)
+   - Error Handling: Returns empty array on error
+
+2.11. searchTemplates('celebrates the moments')
+   - Location: Line 935
+   - Called in: loadApiData() function
+   - Parameters: 'celebrates the moments' (search query)
+   - Purpose: Fetch celebrates the moments greeting templates
+   - Endpoint: GET /api/mobile/greetings/templates?search=celebrates%20the%20moments&limit=200
+   - Cached: Yes (5 minutes TTL)
+   - Error Handling: Returns empty array on error
+
+2.12. searchTemplates(category.name)
+   - Location: Line 1110
+   - Called in: fetchGreetingCategoryPreviewImages() function
+   - Parameters: category.name (dynamic - category name)
+   - Purpose: Search templates by category name for preview images
+   - Endpoint: GET /api/mobile/greetings/templates?search={categoryName}&limit=200
+   - Cached: Yes (5 minutes TTL)
+   - Error Handling: Returns empty array on error, logged as warning
+
+2.13. searchTemplates(searchQuery)
+   - Location: Line 1471
+   - Called in: Search handler (debounced search effect)
+   - Parameters: searchQuery (user input)
+   - Purpose: Search greeting templates based on user search query
+   - Endpoint: GET /api/mobile/greetings/templates?search={searchQuery}&limit=200
+   - Cached: Yes (5 minutes TTL)
+   - Error Handling: Error logged, search continues with local results
+
+2.14. getCategories()
+   - Location: Line 1177
+   - Called in: useEffect hook (on component mount)
+   - Parameters: None
+   - Purpose: Fetch all greeting categories
+   - Endpoint: GET /api/mobile/greetings/categories
+   - Cached: Yes (5 minutes TTL)
+   - Error Handling: Error logged, empty array returned
+
+2.15. clearCache()
+   - Location: Line 1514
+   - Called in: onRefresh() function
+   - Parameters: None
+   - Purpose: Clear greeting templates cache
+   - Note: Used during pull-to-refresh action
+
+2.16. refreshCategories()
+   - Location: Line 1517
+   - Called in: onRefresh() function
+   - Parameters: None
+   - Purpose: Force refresh greeting categories (clears cache and fetches fresh)
+   - Endpoint: GET /api/mobile/greetings/categories
+   - Note: Used during pull-to-refresh to ensure deleted categories are removed
+
+================================================================================
+3. BUSINESS CATEGORIES SERVICE (businessCategoriesService)
+================================================================================
+
+3.1. getBusinessCategories()
+   - Location: Line 1218
+   - Called in: useEffect hook (on component mount)
+   - Parameters: None
+   - Purpose: Fetch all business categories
+   - Endpoint: GET /api/mobile/business-categories/business
+   - Cached: Yes (10 minutes TTL)
+   - Error Handling: Error logged, mock data returned as fallback
+   - Note: Filters out user's own business category for section display
+
+================================================================================
+4. BUSINESS CATEGORY POSTERS API (businessCategoryPostersApi)
+================================================================================
+
+4.1. getPostersByCategory(category.name, 5)
+   - Location: Line 1066
+   - Called in: fetchBusinessCategoryPreviewImages() function
+   - Parameters: category.name (string), 5 (limit)
+   - Purpose: Fetch preview posters for business category cards
+   - Endpoint: GET /api/mobile/posters/category/{categoryName}?limit=5
+   - Cached: No explicit cache (may be cached by API interceptor)
+   - Error Handling: Error logged as warning, undefined returned
+
+4.2. getPostersByCategory(category.name, 5)
+   - Location: Line 2113
+   - Called in: handleBusinessCategoryPress() function
+   - Parameters: category.name (string), 5 (limit)
+   - Purpose: Fetch posters when user clicks on a business category
+   - Endpoint: GET /api/mobile/posters/category/{categoryName}?limit=5
+   - Cached: No explicit cache (may be cached by API interceptor)
+   - Error Handling: Error logged, navigation continues with loading state
+
+================================================================================
+5. DASHBOARD SERVICE (dashboardService)
+================================================================================
+
+5.1. searchTemplates(searchQuery)
+   - Location: Line 1468
+   - Called in: Search handler (debounced search effect)
+   - Parameters: searchQuery (user input)
+   - Purpose: Search professional templates based on user search query
+   - Endpoint: GET /api/mobile/templates?search={searchQuery}
+   - Cached: May be cached by API interceptor
+   - Error Handling: Error logged, search continues with local results
+
+5.2. searchTemplates(searchQuery)
+   - Location: Line 1620
+   - Called in: handleSearch() function
+   - Parameters: searchQuery (user input)
+   - Purpose: Search professional templates when user triggers search
+   - Endpoint: GET /api/mobile/templates?search={searchQuery}
+   - Cached: May be cached by API interceptor
+   - Error Handling: Error logged
+
+5.3. downloadTemplate(templateId)
+   - Location: Line 1567
+   - Called in: handleDownloadTemplate() function (background call)
+   - Parameters: templateId (string)
+   - Purpose: Track template download
+   - Endpoint: POST /api/mobile/templates/{templateId}/download
+   - Cached: No (POST request)
+   - Error Handling: Error logged, local state already updated
+
+5.4. getTemplatesByTab(activeTab)
+   - Location: Line 1591
+   - Called in: handleSearch() function (when clearing search)
+   - Parameters: activeTab (string: 'trending', 'daily', 'festival', 'special', 'all')
+   - Purpose: Fetch templates filtered by tab
+   - Endpoint: GET /api/mobile/templates?tab={activeTab}
+   - Cached: May be cached by API interceptor
+   - Error Handling: Error logged
+
+================================================================================
+6. AUTH SERVICE (authService)
+================================================================================
+
+6.1. getCurrentUser()
+   - Location: Line 547
+   - Called in: useMemo hook (component initialization)
+   - Parameters: None
+   - Purpose: Get current logged-in user information
+   - Note: Not an API call - reads from AsyncStorage/local state
+   - Returns: User object with id, name, username, category, etc.
+
+6.2. getCurrentUser()
+   - Location: Line 1232
+   - Called in: loadBusinessCategories() function
+   - Parameters: None
+   - Purpose: Get user's business category to filter it out from categories list
+   - Note: Not an API call - reads from AsyncStorage/local state
+
+================================================================================
+API CALL SUMMARY
+================================================================================
+
+Total API Calls: 23 unique API endpoints
+
+By Service:
+- homeApi: 5 calls (4 GET + 1 cache clear)
+- greetingTemplatesService: 16 calls (14 search + 1 getCategories + 1 refresh)
+- businessCategoriesService: 1 call
+- businessCategoryPostersApi: 2 calls
+- dashboardService: 4 calls
+- authService: 2 calls (local storage, not API)
+
+By Call Type:
+- GET Requests: 22
+- POST Requests: 1 (downloadTemplate)
+- Cache Operations: 2 (clearCache, refreshCategories)
+
+By Timing:
+- On Component Mount: 3 calls
+  * homeApi.getFeaturedContent()
+  * homeApi.getUpcomingEvents()
+  * homeApi.getProfessionalTemplates()
+  * homeApi.getVideoContent()
+  * greetingTemplatesService.searchTemplates() x 11
+  * greetingTemplatesService.getCategories()
+  * businessCategoriesService.getBusinessCategories()
+
+- On User Interaction: 6 calls
+  * businessCategoryPostersApi.getPostersByCategory() (on category click)
+  * dashboardService.searchTemplates() (on search)
+  * greetingTemplatesService.searchTemplates() (on search)
+  * dashboardService.downloadTemplate() (on download)
+  * dashboardService.getTemplatesByTab() (on tab change)
+
+- Background/Lazy Loading: 2 calls
+  * businessCategoryPostersApi.getPostersByCategory() (for preview images)
+  * greetingTemplatesService.searchTemplates() (for category preview images)
+
+- On Refresh: 2 calls
+  * homeApi.clearCache()
+  * greetingTemplatesService.clearCache()
+  * greetingTemplatesService.refreshCategories()
+
+================================================================================
+CACHING INFORMATION
+================================================================================
+
+All API calls now use the centralized cache service with the following TTLs:
+
+- Featured Content: 5 minutes
+- Upcoming Events: 2 minutes (time-sensitive)
+- Professional Templates: 5 minutes
+- Video Content: 5 minutes
+- Greeting Templates: 5 minutes
+- Greeting Categories: 5 minutes
+- Business Categories: 10 minutes (rarely change)
+
+Cache Strategy:
+- Stale-while-revalidate: Shows cached data immediately, fetches fresh in background
+- Persistent Storage: Cache survives app restarts via AsyncStorage
+- Automatic Expiration: Expired entries are cleaned up automatically
+
+================================================================================
+ERROR HANDLING STRATEGY
+================================================================================
+
+1. Main API Calls (Featured, Events, Templates, Videos):
+   - Network errors tracked separately
+   - Only show error if ALL 4 requests fail
+   - Partial success is acceptable
+
+2. Greeting Section Calls:
+   - Failures don't trigger network error
+   - Returns empty array on error
+   - App remains functional even if some sections fail
+
+3. Search Calls:
+   - Local search happens immediately
+   - API search happens in background
+   - Falls back to local results if API fails
+
+4. Preview Image Calls:
+   - Errors logged as warnings
+   - Doesn't block UI rendering
+   - Missing previews show fallback icons
+
+================================================================================
+PERFORMANCE OPTIMIZATIONS
+================================================================================
+
+1. Parallel Loading:
+   - Main 4 APIs loaded in parallel using Promise.allSettled
+   - 11 greeting section searches loaded in parallel
+   - Category previews loaded in parallel
+
+2. Caching:
+   - All GET requests are cached
+   - Instant load times on repeat visits
+   - Background refresh for stale data
+
+3. Lazy Loading:
+   - Category preview images loaded on demand
+   - Search results loaded only when needed
+
+4. Debouncing:
+   - Search queries debounced by 300ms
+   - Prevents excessive API calls while typing
+
+================================================================================
+END OF DOCUMENTATION
+================================================================================
+

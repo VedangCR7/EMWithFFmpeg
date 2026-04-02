@@ -1,0 +1,74 @@
+BUSINESS PROFILE SERVICE - SUBCATEGORY MAPPING FIX SUMMARY
+=========================================================
+
+Date: 2025-04-01
+File Modified: src/services/businessProfile.ts
+Function: getUserBusinessProfiles()
+Lines Changed: 111-112, 131
+
+=========================================================
+PROBLEM IDENTIFIED
+=========================================================
+- Backend API returns: businessSubcategory
+- Frontend BusinessProfile interface expects: subCategory
+- Missing mapping caused subcategory data loss
+
+=========================================================
+SOLUTION IMPLEMENTED
+=========================================================
+
+OLD MAPPING:
+```typescript
+subCategory: profile.subCategory || profile.subcategory,
+subcategory: profile.subCategory || profile.subcategory,
+```
+
+NEW MAPPING:
+```typescript
+subCategory: profile.businessSubcategory || profile.subCategory || profile.subcategory,
+subcategory: profile.businessSubcategory || profile.subCategory || profile.subcategory,
+```
+
+=========================================================
+PRIORITY ORDER IMPLEMENTED
+=========================================================
+1. profile.businessSubcategory (primary - from backend API)
+2. profile.subCategory (fallback - alternative field)
+3. profile.subcategory (fallback - alternative field)
+
+=========================================================
+DEBUGGING ADDED
+=========================================================
+```typescript
+// Log the mapped subCategory for debugging
+console.log("Mapped subCategory:", mappedProfile.subCategory);
+```
+
+=========================================================
+KEY CHANGES
+=========================================================
+1. ✅ Added businessSubcategory as primary mapping source
+2. ✅ Maintained backward compatibility with existing fields
+3. ✅ Added console log for debugging subCategory mapping
+4. ✅ Applied to both subCategory and subcategory fields
+
+=========================================================
+IMPACT
+=========================================================
+- Frontend now correctly receives backend's businessSubcategory
+- Eliminates subcategory data loss during API mapping
+- Ensures BusinessProfileContext receives correct subCategory
+- Maintains compatibility with existing fallback fields
+
+=========================================================
+VERIFICATION
+================================================================
+The fix ensures:
+- Backend businessSubcategory → Frontend subCategory mapping
+- Proper fallback chain for backward compatibility
+- Debug logging for troubleshooting mapping issues
+- Consistent subcategory handling across service layer
+
+=========================================================
+END OF SUMMARY
+========================================================
