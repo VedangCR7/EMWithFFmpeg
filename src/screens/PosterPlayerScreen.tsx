@@ -418,6 +418,7 @@ const PosterPlayerScreen: React.FC = () => {
 
   const {
     selectedPoster: initialPoster,
+    selectedTemplateId: initialTemplateId,  // ✅ PRIMARY DATA - ID as source of truth
     relatedPosters: initialRelatedPosters,
     greetingCategory,
     originScreen,
@@ -509,6 +510,7 @@ const PosterPlayerScreen: React.FC = () => {
   }, [initialPoster]);
 
   const [currentPoster, setCurrentPoster] = useState<Template>(convertedInitialPoster);
+  const [currentId, setCurrentId] = useState<string>(initialTemplateId || initialPoster?.id || '');  // ✅ PRIMARY DATA - ID as source of truth
   const [allTemplates, setAllTemplatesState] = useState<Template[]>([]);
   const allTemplatesRef = useRef<Template[]>([]);
 
@@ -546,6 +548,9 @@ const PosterPlayerScreen: React.FC = () => {
   const [selectedLanguage, setSelectedLanguage] = useState<string>('all');
   const [isBusinessCategoryLoading, setIsBusinessCategoryLoading] = useState(false);
   const [isGreetingCategoryLoading, setIsGreetingCategoryLoading] = useState(false);
+  const [isTemplateLoading, setIsTemplateLoading] = useState<boolean>(
+    convertedInitialPoster?.id === 'loading'
+  );
   const lastAutoDetectedPosterIdRef = useRef<string | null>(null); // Track which poster triggered auto-detection to prevent duplicate detection
   const userSelectedPosterRef = useRef<string | null>(null); // Track user-selected poster (via swipe or click) to prevent reset
   const userManuallySelectedLanguageRef = useRef<boolean>(false); // Track if user manually selected a language (including "All")
@@ -566,6 +571,11 @@ const PosterPlayerScreen: React.FC = () => {
       setSelectedLanguage("all");
     }
   }, [originScreen]);
+
+  // Update loading state when poster changes
+  useEffect(() => {
+    setIsTemplateLoading(currentPoster?.id === 'loading' || !currentPoster?.thumbnail);
+  }, [currentPoster]);
 
   // Reset language to "All" whenever PosterPlayerScreen becomes active
   useFocusEffect(
@@ -1225,6 +1235,12 @@ const PosterPlayerScreen: React.FC = () => {
             });
 
             setCurrentPoster(posterToSet);
+
+            // ✅ CRITICAL: Update currentId to real template ID when available
+            if (posterToSet.id !== 'loading' && !posterToSet.id.startsWith('category_')) {
+              setCurrentId(posterToSet.id);
+              console.log('🔍 [BUSINESS FETCH] Updated currentId to real template ID:', posterToSet.id);
+            }
 
             // Auto-detect language from the selected poster
             if (!userManuallySelectedLanguageRef.current &&
@@ -2113,6 +2129,13 @@ const PosterPlayerScreen: React.FC = () => {
               prevPoster.thumbnail === finalPoster.thumbnail) {
               return prevPoster; // No change needed
             }
+            
+            // ✅ CRITICAL: Update currentId to real template ID when available
+            if (finalPoster.id !== 'loading' && !finalPoster.id.startsWith('category_')) {
+              setCurrentId(finalPoster.id);
+              console.log('🔍 [GREETING FETCH] Updated currentId to real template ID:', finalPoster.id);
+            }
+            
             console.log('🔍 [GREETING FETCH] Setting currentPoster:', {
               prevPosterId: prevPoster.id,
               newPosterId: finalPoster.id,
@@ -2306,6 +2329,12 @@ const PosterPlayerScreen: React.FC = () => {
             // Ensure the selected poster has languages properly merged
             const finalPoster = mergeTemplateLanguages(posterToSet);
             setCurrentPoster(finalPoster);
+            
+            // ✅ CRITICAL: Update currentId to real template ID when available
+            if (finalPoster.id !== 'loading' && !finalPoster.id.startsWith('category_')) {
+              setCurrentId(finalPoster.id);
+              console.log('🔍 [GREETING FETCH] Updated currentId to real template ID:', finalPoster.id);
+            }
           }
         }
       } catch (error) {
@@ -2404,6 +2433,13 @@ const PosterPlayerScreen: React.FC = () => {
         if (prevInitialPosterIdRef.current !== initialPoster.id) {
           prevInitialPosterIdRef.current = initialPoster.id;
         }
+        
+        // ✅ CRITICAL: Update currentId to real template ID when available
+        if (ensuredInitialPoster.id !== 'loading' && !ensuredInitialPoster.id.startsWith('category_')) {
+          setCurrentId(ensuredInitialPoster.id);
+          console.log('🔍 [INITIAL POSTER CHANGE] Updated currentId to real template ID:', ensuredInitialPoster.id);
+        }
+        
         return ensuredInitialPoster;
       }
 
@@ -2411,6 +2447,11 @@ const PosterPlayerScreen: React.FC = () => {
       if (prevPoster.id === 'loading' || !prevPoster.thumbnail) {
         // If we have a valid poster with thumbnail, use it
         if (ensuredInitialPoster.thumbnail) {
+          // ✅ CRITICAL: Update currentId to real template ID when available
+          if (ensuredInitialPoster.id !== 'loading' && !ensuredInitialPoster.id.startsWith('category_')) {
+            setCurrentId(ensuredInitialPoster.id);
+            console.log('🔍 [INITIAL POSTER CHANGE] Updated currentId to real template ID:', ensuredInitialPoster.id);
+          }
           return ensuredInitialPoster;
         }
       }
@@ -3135,6 +3176,12 @@ const PosterPlayerScreen: React.FC = () => {
   }, [navigation, originScreen]);
 
   const navigateToPosterEditor = useCallback(() => {
+    // ✅ SAFETY: Use ID as primary source of truth
+    if (!currentId || currentId === 'loading') {
+      console.error('❌ Cannot navigate - invalid template ID');
+      return;
+    }
+
     console.log("➡️ Navigating to PosterEditorScreen with type:", type);
 
     navigation.navigate('PosterEditor', {
@@ -3144,18 +3191,23 @@ const PosterPlayerScreen: React.FC = () => {
         description: currentPoster.category,
       },
       selectedLanguage: selectedLanguage,
-      selectedTemplateId: currentPoster.id,
+      selectedTemplateId: currentId,  // ✅ PRIMARY DATA - ID flows unchanged
       selectedTemplate: JSON.stringify(currentPoster),
       posterCategory: currentPoster.category,
       type: type,
       categoryName: categoryName
     });
-  }, [navigation, currentPoster, selectedLanguage, getHighQualityImageUrl, type, categoryName]);
+  }, [navigation, currentPoster, selectedLanguage, getHighQualityImageUrl, type, categoryName, currentId]);
 
   const handleNextPress = useCallback(() => {
-    // Use selected business profile directly, no modal needed
+    // ✅ SAFETY: Use ID as primary validation
+    if (!currentId || currentId === 'loading' || isTemplateLoading || !currentPoster?.thumbnail) {
+      console.log('❌ Cannot navigate - invalid template ID or still loading');
+      return;
+    }
+    
     navigateToPosterEditor();
-  }, [navigateToPosterEditor]);
+  }, [navigateToPosterEditor, isTemplateLoading, currentPoster, currentId]);
 
   // Compute image props
   const imageProps = useMemo(() => {
@@ -3281,6 +3333,8 @@ const PosterPlayerScreen: React.FC = () => {
     return <SkeletonItem />;
   }, [SkeletonItem]);
 
+  const isNextDisabled = isTemplateLoading || !currentPoster?.thumbnail || !currentId || currentId === 'loading';
+
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.gradient[0] || '#e8e8e8' }]}>
       <StatusBar
@@ -3335,16 +3389,22 @@ const PosterPlayerScreen: React.FC = () => {
 
           <TouchableOpacity
             onPress={handleNextPress}
-            style={styles.headerTextButton}
-            activeOpacity={0.85}
+            disabled={isNextDisabled}
+            style={[
+              styles.headerTextButton,
+              isNextDisabled && { opacity: 0.5 }
+            ]}
+            activeOpacity={isNextDisabled ? 1 : 0.85}
           >
             <LinearGradient
-              colors={[theme.colors.secondary, theme.colors.primary]}
+              colors={isNextDisabled ? ['#ccc', '#999'] : [theme.colors.secondary, theme.colors.primary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.headerTextButtonGradient}
             >
-              <Text style={styles.headerButtonText}>Next</Text>
+              <Text style={styles.headerButtonText}>
+                {isNextDisabled ? 'Loading...' : 'Next'}
+              </Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
