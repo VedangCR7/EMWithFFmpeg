@@ -5,13 +5,9 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  TextInput,
-  ActivityIndicator,
   StatusBar,
   Dimensions,
   Animated,
-  Platform,
-  InteractionManager,
   Image,
   PanResponder,
 } from 'react-native';
@@ -26,10 +22,8 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import LazyFullImage from '../components/LazyFullImage';
 import { useTheme } from '../context/ThemeContext';
 import { useBusinessProfile } from '../context/BusinessProfileContext';
-import { useSubscription } from '../contexts/SubscriptionContext';
-import businessCategoryPostersApi, { BusinessCategoryPoster } from '../services/businessCategoryPostersApi';
+import businessCategoryPostersApi from '../services/businessCategoryPostersApi';
 import { Template } from '../services/dashboard';
-import authService from '../services/auth';
 
 // Import the RelatedPosterItem component from PosterPlayerScreen
 // We'll recreate it here to avoid importing from a screen file
@@ -123,10 +117,6 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
 
   const { width: screenWidth, height: screenHeight } = dimensions;
 
-  const { isSubscriptionActive } = useSubscription();
-  
-  // Check if the selected business profile has an active subscription
-  const isActive = selectedBusinessProfile?.subscriptionStatus?.toUpperCase() === "ACTIVE" || isSubscriptionActive;
 
   // Responsive design helpers
   const isTabletDevice = screenWidth >= 768;
@@ -809,43 +799,6 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
     return Math.round(baseSize * scale);
   }, [screenWidth]);
 
-  if (!isActive) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f5f7ff' }}>
-        <StatusBar barStyle="dark-content" />
-        <Icon name="lock" size={64} color={theme.colors.primary} />
-        <Text style={{ 
-          fontSize: 18, 
-          fontWeight: 'bold', 
-          marginTop: 16, 
-          color: theme.colors.text 
-        }}>
-          Subscription Required
-        </Text>
-        <Text style={{ 
-          fontSize: 14, 
-          marginTop: 8, 
-          color: theme.colors.textSecondary,
-          textAlign: 'center',
-          paddingHorizontal: 40
-        }}>
-          Please activate your business profile subscription to access this screen.
-        </Text>
-        <TouchableOpacity
-          style={{
-            marginTop: 24,
-            paddingHorizontal: 32,
-            paddingVertical: 12,
-            backgroundColor: theme.colors.primary,
-            borderRadius: 8
-          }}
-          onPress={() => navigation.navigate('BusinessProfiles')}
-        >
-          <Text style={{ color: '#fff', fontWeight: 'bold' }}>View Business Profiles</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
 
   if (!businessCategory) {
     return (

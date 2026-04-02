@@ -5,27 +5,18 @@ import {
   TouchableOpacity,
   Image,
   Dimensions,
-  Modal,
-  ActivityIndicator,
   Animated,
   Easing,
   InteractionManager,
-  StyleSheet,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import { useTheme } from '../context/ThemeContext';
-import { useBusinessProfile } from '../context/BusinessProfileContext';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const CustomTabBar = (props: any) => {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
-  const { selectedBusinessProfile } = useBusinessProfile();
   
-  const [isLoadingPosters, setIsLoadingPosters] = useState<boolean>(false);
   const isMyBusinessFocused = props.state.routes[props.state.index]?.name === 'MyBusiness';
   const isHomeFocused = props.state.routes[props.state.index]?.name === 'Home';
 
@@ -51,14 +42,6 @@ const CustomTabBar = (props: any) => {
   const fontSize = currentModerateScale(isCurrentlySmall ? 10 : 8);
   const borderWidth = currentModerateScale(0.8);
 
-  const handlePosterPlayerShortcut = useCallback(() => {
-    const isActive = selectedBusinessProfile?.subscriptionStatus?.toUpperCase() === "ACTIVE";
-    if (!isActive) {
-      props.navigation.navigate('BusinessProfiles');
-      return;
-    }
-    props.navigation.navigate('MyBusiness');
-  }, [props.navigation, selectedBusinessProfile]);
 
   const handleTodaysPickPress = useCallback(() => {
     const parentNavigator = props.navigation.getParent();
@@ -179,8 +162,6 @@ const CustomTabBar = (props: any) => {
 
   const animatedBorderWidth = borderAnim.interpolate({ inputRange: [0, 1], outputRange: [2, 4] });
   const animatedBorderColor = borderAnim.interpolate({ inputRange: [0, 1], outputRange: [theme.colors.primary, theme.colors.secondary] });
-  const animatedShadowRadius = shadowAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 16] });
-  const animatedShadowOpacity = shadowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.6] });
   const floatTranslateY = floatAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -8] });
 
   const handlePressIn = () => Animated.spring(pressAnim, { toValue: 0.9, useNativeDriver: true, tension: 300, friction: 10 }).start();
@@ -215,7 +196,7 @@ const CustomTabBar = (props: any) => {
           height: logoContainerSize, borderRadius: logoContainerSize / 2,
         }} />
         <TouchableOpacity
-          onPress={handlePosterPlayerShortcut}
+          onPress={() => props.navigation.navigate('MyBusiness')}
           activeOpacity={0.7}
           style={{
             position: 'absolute', top: logoTopOffset, left: '50%',
@@ -235,9 +216,15 @@ const CustomTabBar = (props: any) => {
             const label = options.tabBarLabel ?? options.title ?? route.name;
             const isFocused = props.state.index === index;
             const onPress = () => {
-              if (route.name === 'MyBusiness') { handlePosterPlayerShortcut(); return; }
-              const event = props.navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-              if (!isFocused && !event.defaultPrevented) props.navigation.navigate(route.name);
+              const event = props.navigation.emit({
+                type: 'tabPress',
+                target: route.key,
+                canPreventDefault: true,
+              });
+
+              if (!isFocused && !event.defaultPrevented) {
+                props.navigation.navigate(route.name);
+              }
             };
             return (
               <TouchableOpacity key={route.key} onPress={onPress} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: currentModerateScale(4) }}>
