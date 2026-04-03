@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BusinessProfile } from '../services/businessProfile';
 import businessProfileService from '../services/businessProfile';
 import authService from '../services/auth';
+import subscriptionApi from '../services/subscriptionApi';
 
 interface BusinessProfileContextType {
   selectedBusinessProfile: BusinessProfile | null;
@@ -89,7 +90,7 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
     }
   }, [clearProfileCache]);
 
-  // Silently refresh the selected profile from the API to get latest fields (e.g., subscriptionStatus)
+  // Silently refresh the selected profile from the API to get latest fields (e.g., subscriptionStatus, businessSubscriptionStatus)
   const refreshSelectedProfileFromApi = useCallback(async (userId: string, currentProfileId: string) => {
     if (isRefreshingRef.current) return;
     
@@ -104,15 +105,52 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
       const freshProfile = profiles.find(p => p.id === currentProfileId);
       
       if (freshProfile) {
-        // Only update if something actual changed (like subscriptionStatus) to avoid unnecessary re-renders
+        // STEP 3: MERGE DATA - Fetch business subscription status
+        let businessSubscriptionStatus: string | null = null;
+        
+        try {
+          console.log(`🔍 [BUSINESS PROFILE CONTEXT] Fetching business subscription status for profile ${currentProfileId}...`);
+          const subscriptionResponse = await subscriptionApi.getBusinessProfileSubscriptionStatus(currentProfileId);
+          
+          if (subscriptionResponse.success && subscriptionResponse.data) {
+            businessSubscriptionStatus = subscriptionResponse.data.status === 'active' ? 'Active' : 
+                                       subscriptionResponse.data.status === 'expired' ? 'Expired' : 
+                                       subscriptionResponse.data.status === 'cancelled' ? 'Cancelled' : 
+                                       subscriptionResponse.data.status === 'pending' ? 'Pending' : 'Inactive';
+            
+            console.log(`✅ [BUSINESS PROFILE CONTEXT] Business subscription status: ${businessSubscriptionStatus}`);
+          } else {
+            console.log(`⚠️ [BUSINESS PROFILE CONTEXT] No business subscription data found for profile ${currentProfileId}`);
+          }
+        } catch (subscriptionError: any) {
+          console.error(`❌ [BUSINESS PROFILE CONTEXT] Failed to fetch business subscription status:`, subscriptionError.message);
+          businessSubscriptionStatus = null;
+        }
+        
+        // Create enriched profile with business subscription data
+        const enrichedProfile = {
+          ...freshProfile,
+          businessSubscriptionStatus,
+        };
+        
+        // STEP 5: ADD DEBUG LOGGING
+        console.log("✅ [BUSINESS PROFILE CONTEXT] Enriched Business Profile:", {
+          id: enrichedProfile.id,
+          name: enrichedProfile.name,
+          subscriptionStatus: enrichedProfile.subscriptionStatus,
+          businessSubscriptionStatus: enrichedProfile.businessSubscriptionStatus,
+        });
+        
+        // Only update if something actual changed (like subscriptionStatus or businessSubscriptionStatus) to avoid unnecessary re-renders
         setSelectedBusinessProfileState(prev => {
-          if (!prev || JSON.stringify(prev) !== JSON.stringify(freshProfile)) {
+          if (!prev || 
+              JSON.stringify(prev) !== JSON.stringify(enrichedProfile)) {
             console.log(`✅ [BUSINESS PROFILE CONTEXT] Profile ${currentProfileId} successfully refreshed and updated in state.`);
             // Also update async storage in background
-            AsyncStorage.setItem(SELECTED_PROFILE_KEY, JSON.stringify(freshProfile)).catch(e => 
+            AsyncStorage.setItem(SELECTED_PROFILE_KEY, JSON.stringify(enrichedProfile)).catch(e => 
               console.error('❌ Failed to update storage with fresh profile', e)
             );
-            return freshProfile;
+            return enrichedProfile;
           }
           return prev;
         });
@@ -190,7 +228,47 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
   const setSelectedBusinessProfile = useCallback(async (profile: BusinessProfile | null) => {
     // Remove frontend subscription check - let backend API handle subscription validation
     try {
-      setSelectedBusinessProfileState(profile);
+      let enrichedProfile = profile;
+      
+      // Fetch business subscription data if profile is provided
+      if (profile && profile.id) {
+        let businessSubscriptionStatus: string | null = null;
+        
+        try {
+          console.log(`🔍 [BUSINESS PROFILE CONTEXT] Fetching business subscription status for manually selected profile ${profile.id}...`);
+          const subscriptionResponse = await subscriptionApi.getBusinessProfileSubscriptionStatus(profile.id);
+          
+          if (subscriptionResponse.success && subscriptionResponse.data) {
+            businessSubscriptionStatus = subscriptionResponse.data.status === 'active' ? 'Active' : 
+                                       subscriptionResponse.data.status === 'expired' ? 'Expired' : 
+                                       subscriptionResponse.data.status === 'cancelled' ? 'Cancelled' : 
+                                       subscriptionResponse.data.status === 'pending' ? 'Pending' : 'Inactive';
+            
+            console.log(`✅ [BUSINESS PROFILE CONTEXT] Manual selection - Business subscription status: ${businessSubscriptionStatus}`);
+          } else {
+            console.log(`⚠️ [BUSINESS PROFILE CONTEXT] No business subscription data found for manual selection profile ${profile.id}`);
+          }
+        } catch (subscriptionError: any) {
+          console.error(`❌ [BUSINESS PROFILE CONTEXT] Failed to fetch business subscription status for manual selection:`, subscriptionError.message);
+          businessSubscriptionStatus = null;
+        }
+        
+        // Create enriched profile with business subscription data
+        enrichedProfile = {
+          ...profile,
+          businessSubscriptionStatus: businessSubscriptionStatus || undefined,
+        };
+        
+        // STEP 5: ADD DEBUG LOGGING
+        console.log("✅ [BUSINESS PROFILE CONTEXT] Enriched Manual Selection Profile:", {
+          id: enrichedProfile?.id,
+          name: enrichedProfile?.name,
+          subscriptionStatus: enrichedProfile?.subscriptionStatus,
+          businessSubscriptionStatus: enrichedProfile?.businessSubscriptionStatus,
+        });
+      }
+      
+      setSelectedBusinessProfileState(enrichedProfile);
 
       // Auto-sync business category when profile changes
       if (profile?.category || profile?.subCategory || profile?.subcategory) {
@@ -210,13 +288,13 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
         console.log('✅ [BUSINESS PROFILE CONTEXT] Auto-synced business category from profile:', displayCategory);
       }
 
-      if (profile) {
+      if (enrichedProfile) {
         const currentUser = authService.getCurrentUser();
-        await AsyncStorage.setItem(SELECTED_PROFILE_KEY, JSON.stringify(profile));
+        await AsyncStorage.setItem(SELECTED_PROFILE_KEY, JSON.stringify(enrichedProfile));
         if (currentUser?.id) {
           await AsyncStorage.setItem(SELECTED_PROFILE_UID_KEY, currentUser.id);
         }
-        console.log('✅ [BUSINESS PROFILE CONTEXT] Saved selected profile to storage:', profile.name);
+        console.log('✅ [BUSINESS PROFILE CONTEXT] Saved enriched selected profile to storage:', enrichedProfile.name);
       } else {
         await clearProfileCache();
       }

@@ -29,6 +29,7 @@ export interface BusinessProfile {
   // Subscription status fields from API response
   subscriptionStatus?: string; // "ACTIVE", "NONE", "PENDING", "EXPIRED", etc.
   isSubscriptionActive?: boolean; // true/false for quick checking
+  businessSubscriptionStatus?: string; // "Active", "Inactive", "Expired" - Business-specific subscription
 }
 
 export interface CreateBusinessProfileData {
