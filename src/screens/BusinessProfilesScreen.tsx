@@ -251,7 +251,31 @@ const BusinessProfilesScreen: React.FC = () => {
       const paymentStatus = await businessProfileService.checkBusinessProfilePaymentStatus();
 
       if (!paymentStatus.hasPaid) {
-        console.log('ℹ️ Payment not verified yet. Waiting for successful payment...');
+        console.log('Payment not verified yet. Starting polling...');
+
+        if (!pollingCleanupRef.current) {
+          pollingCleanupRef.current = startSubscriptionPolling(
+            () => {
+              console.log('Payment verified via polling');
+
+              loadBusinessProfiles();
+
+              if (pollingCleanupRef.current) {
+                pollingCleanupRef.current();
+                pollingCleanupRef.current = null;
+              }
+            },
+            () => {
+              console.log('Polling timed out');
+
+              if (pollingCleanupRef.current) {
+                pollingCleanupRef.current();
+                pollingCleanupRef.current = null;
+              }
+            }
+          );
+        }
+
         return;
       }
 
