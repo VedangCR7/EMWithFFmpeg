@@ -27,6 +27,7 @@ export type MainStackParamList = {
   };
   PosterPlayer: {
     selectedPoster: any;
+    selectedTemplateId: string;  // ✅ PRIMARY DATA - ID as source of truth
     relatedPosters: any[];
     searchQuery?: string;
     templateSource?: 'greeting' | 'professional' | 'featured';

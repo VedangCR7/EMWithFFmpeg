@@ -549,7 +549,8 @@ const GreetingCard: React.FC<GreetingCardProps> = React.memo(({ item, cardWidth,
     // Navigate immediately - related templates already computed
     // Pass greetingCategory derived from searchQuery so PosterPlayerScreen can fetch the correct templates
     navigation.navigate('PosterPlayer', {
-      selectedPoster: item,
+      selectedTemplateId: item.id,  // ✅ PRIMARY DATA - ID as source of truth
+      selectedPoster: item,        // ✅ OPTIONAL - UI only
       relatedPosters: relatedTemplates,
       searchQuery: searchQuery || '',
       templateSource: 'greeting',
@@ -700,6 +701,7 @@ const HomeScreen: React.FC = React.memo(() => {
   const [displayedCategoriesCount, setDisplayedCategoriesCount] = useState(5);
   const [greetingCategoriesLoading, setGreetingCategoriesLoading] = useState(false);
   const [greetingCategoryImages, setGreetingCategoryImages] = useState<Record<string, string>>({});
+  const [greetingCategoryPreviews, setGreetingCategoryPreviews] = useState<Record<string, Template[]>>({});
   const memoizedGreetingCategoryImages = useMemo(() => greetingCategoryImages, [greetingCategoryImages]);
 
   const filteredGreetingCategoriesList = useMemo(() => {
@@ -1146,7 +1148,8 @@ const HomeScreen: React.FC = React.memo(() => {
                           onPress={() => {
                             // Handle poster press
                             navigation.navigate('PosterPlayer', {
-                              selectedPoster: poster,
+                              selectedTemplateId: poster.id,  // ✅ PRIMARY DATA - ID as source of truth
+                              selectedPoster: poster,          // ✅ OPTIONAL - UI only
                               relatedPosters: [],
                             });
                           }}
@@ -1422,6 +1425,13 @@ const HomeScreen: React.FC = React.memo(() => {
             }
           });
 
+          // Greeting category preview images (first image from each category)
+          Object.values(memoizedGreetingCategoryPreviews).forEach(templates => {
+            if (templates?.[0]?.thumbnail) {
+              mediumPriorityImages.push(templates[0].thumbnail);
+            }
+          });
+
           // More greeting templates (next 3 from each section)
           [
             ...businessEthicsTemplates.slice(3, 6),
@@ -1486,7 +1496,7 @@ const HomeScreen: React.FC = React.memo(() => {
     };
 
     preloadCriticalImages();
-  }, [featuredContent, businessEthicsTemplates, successMindsetTemplates, socialMediaGrowthTemplates, moneyAndFinanceTemplates, businessLegendQuoteTemplates, businessMarketingTipsTemplates, businessQuotesTemplates, /* videoContent, */ businessCategoryPreviews, calendarPosters]);
+  }, [featuredContent, businessEthicsTemplates, successMindsetTemplates, socialMediaGrowthTemplates, moneyAndFinanceTemplates, businessLegendQuoteTemplates, businessMarketingTipsTemplates, businessQuotesTemplates, /* videoContent, */ businessCategoryPreviews, memoizedGreetingCategoryPreviews, calendarPosters]);
 
   // Load data from APIs with caching for instant loads and request deduplication
   const loadApiData = useCallback(async (isRefresh: boolean = false) => {
@@ -2383,6 +2393,51 @@ const HomeScreen: React.FC = React.memo(() => {
     fetchGreetingCategoryPreviewImages,
   ]);
 
+  // Prefetch templates for frequently used greeting categories
+  useEffect(() => {
+    // Prevent duplicate prefetch calls
+    if (greetingCategoriesLoadedRef.current) {
+      return;
+    }
+
+    const prefetchFrequentCategories = async () => {
+      const frequentCategories = ['birthday', 'wedding', 'anniversary', 'festival'];
+      
+      for (const categoryName of frequentCategories) {
+        try {
+          // Check if already cached
+          const existingCategory = allGreetingCategories.find(cat => 
+            cat.name.toLowerCase() === categoryName.toLowerCase()
+          );
+          
+          if (existingCategory && !greetingCategoryPreviews[existingCategory.id]) {
+            const templates = await greetingTemplatesService.searchTemplates(categoryName);
+            if (templates && templates.length > 0) {
+              const validTemplates = templates.filter(template => template.thumbnail);
+              
+              // Update cache
+              React.startTransition(() => {
+                setGreetingCategoryPreviews(prev => ({
+                  ...prev,
+                  [existingCategory.id]: validTemplates,
+                }));
+              });
+            }
+          }
+        } catch (error) {
+          if (__DEV__) {
+            devWarn(`Failed to prefetch templates for ${categoryName}:`, error);
+          }
+        }
+      }
+    };
+
+    // Start prefetching after a short delay to not block initial render
+    const timeoutId = setTimeout(prefetchFrequentCategories, 2000);
+    
+    return () => clearTimeout(timeoutId);
+  }, [allGreetingCategories, greetingCategoryPreviews]);
+
   // Load business categories and filter out user's own category (only called once on mount with ref guard)
   useEffect(() => {
     let isMounted = true;
@@ -2962,6 +3017,11 @@ const HomeScreen: React.FC = React.memo(() => {
     return businessCategoryPreviews;
   }, [businessCategoryPreviews]);
 
+  // Memoize greeting category previews to prevent unnecessary re-renders
+  const memoizedGreetingCategoryPreviews = useMemo(() => {
+    return greetingCategoryPreviews;
+  }, [greetingCategoryPreviews]);
+
   const handleTemplatePress = useCallback((template: Template | VideoContent | any) => {
     // Check for active subscription if a business profile is selected
     if (!isActive && selectedBusinessProfile) {
@@ -2998,7 +3058,8 @@ const HomeScreen: React.FC = React.memo(() => {
       // Navigate immediately with pre-computed related templates
       const relatedTemplates = allGreetingTemplates.filter(t => t.id !== template.id);
       navigation.navigate('PosterPlayer', {
-        selectedPoster: template.originalTemplate,
+        selectedTemplateId: template.originalTemplate.id,  // ✅ PRIMARY DATA - ID as source of truth
+        selectedPoster: template.originalTemplate,        // ✅ OPTIONAL - UI only
         relatedPosters: relatedTemplates.map(t => t.originalTemplate || t),
         searchQuery: searchQuery,
         templateSource: 'greeting',
@@ -3008,7 +3069,8 @@ const HomeScreen: React.FC = React.memo(() => {
 
     // Navigate to PosterPlayer with template
     navigation.navigate('PosterPlayer', {
-      selectedPoster: template as Template,
+      selectedTemplateId: template.id,  // ✅ PRIMARY DATA - ID as source of truth
+      selectedPoster: template as Template, // ✅ OPTIONAL - UI only
       relatedPosters: [],
     });
   }, [videoContentMap, videoContent, allGreetingTemplates, navigation, searchQuery, isActive, selectedBusinessProfile]);
@@ -4185,21 +4247,24 @@ const HomeScreen: React.FC = React.memo(() => {
       return;
     }
 
-    // Navigate immediately with loading state, then load data in background
-    // Use loading placeholder since we'll fetch actual data in background
-    const firstPoster = null;
-
-    console.log('📋 No cached templates found, using loading state');
+    // Navigate immediately with valid ID, then load data in background
+    // ❌ REMOVE: loading placeholder
+    // ✅ NEW: Always use valid ID
+    
+    const categoryId = `business_category_${category.id}`;
+    
+    console.log('📋 No cached templates found, using valid category ID');
     navigation.navigate('PosterPlayer', {
-      selectedPoster: firstPoster || {
-        id: 'loading',
+      selectedTemplateId: categoryId,  // ✅ VALID ID - never 'loading'
+      selectedPoster: {                // ✅ OPTIONAL - UI only
+        id: categoryId,
         name: category.name,
         thumbnail: '',
         category: category.name,
         downloads: 0,
         isDownloaded: false,
       },
-      relatedPosters: firstPoster ? [firstPoster] : [],
+      relatedPosters: [],
       searchQuery: '',
       templateSource: 'professional' as const, // Show subscription message for direct business category access
       posterLimit: 200, // Request all posters for business categories from HomeScreen
@@ -4711,25 +4776,72 @@ const HomeScreen: React.FC = React.memo(() => {
 
   // Handler for greeting category press - navigate to PosterPlayerScreen with selected greeting category
   const handleGreetingCategoryPress = useCallback((category: { id: string; name: string; icon: string; color?: string }, categoryImage: string | null) => {
-    // Use categoryImage as thumbnail if available, otherwise use empty string
-    // PosterPlayerScreen will fetch templates and display the first one, but we want to show the category image initially
-    const thumbnail = categoryImage || '';
+    const cachedTemplates = greetingCategoryPreviews[category.id];
 
-    navigation.navigate('PosterPlayer', {
-      selectedPoster: {
-        id: 'loading',
-        name: category.name,
-        thumbnail: thumbnail, // Pass the category image as thumbnail
-        category: category.name,
-        downloads: 0,
-        isDownloaded: false,
-      },
-      relatedPosters: [],
-      searchQuery: '',
-      templateSource: 'greeting',
-      greetingCategory: category.name, // Pass the selected greeting category
-    });
-  }, [navigation]);
+    // Navigate immediately if we have cached templates
+    if (cachedTemplates && cachedTemplates.length > 0) {
+      const firstTemplate = cachedTemplates[0];
+      const relatedPosters = cachedTemplates.slice(1);
+
+      navigation.navigate('PosterPlayer', {
+        selectedTemplateId: firstTemplate.id,  // ✅ PRIMARY DATA - ID as source of truth
+        selectedPoster: {                      // ✅ OPTIONAL - UI only
+          id: firstTemplate.id,
+          name: firstTemplate.name,
+          thumbnail: firstTemplate.thumbnail || categoryImage || '',
+          category: category.name,
+          downloads: 0,
+          isDownloaded: false,
+        },
+        relatedPosters: relatedPosters.map(template => ({
+          id: template.id,
+          name: template.name,
+          thumbnail: template.thumbnail || '',
+          category: category.name,
+          downloads: 0,
+          isDownloaded: false,
+        })),
+        searchQuery: '',
+        templateSource: 'greeting',
+        greetingCategory: category.name,
+      });
+    } else {
+      // ❌ REMOVE: Fallback to loading placeholder
+      // ✅ NEW: Always pass a valid ID, never 'loading'
+      
+      // Generate a deterministic ID based on category for navigation
+      const categoryId = `category_${category.id}`;
+      
+      navigation.navigate('PosterPlayer', {
+        selectedTemplateId: categoryId,  // ✅ VALID ID - never 'loading'
+        selectedPoster: {                // ✅ OPTIONAL - UI only
+          id: categoryId,
+          name: category.name,
+          thumbnail: categoryImage || '',
+          category: category.name,
+          downloads: 0,
+          isDownloaded: false,
+        },
+        relatedPosters: [],
+        searchQuery: '',
+        templateSource: 'greeting',
+        greetingCategory: category.name,
+      });
+
+      // Fetch templates in background and update cache
+      greetingTemplatesService.searchTemplates(category.name).then(templates => {
+        if (templates && templates.length > 0) {
+          const validTemplates = templates.filter(template => template.thumbnail);
+          
+          // Update preview cache for future use
+          setGreetingCategoryPreviews(prev => ({
+            ...prev,
+            [category.id]: validTemplates,
+          }));
+        }
+      });
+    }
+  }, [navigation, greetingCategoryPreviews]);
 
   // Render function for search category items
   const renderSearchCategoryItem = useCallback(({ item }: { item: { id: string; name: string; icon: string; color?: string; imageUrl?: string } }) => {

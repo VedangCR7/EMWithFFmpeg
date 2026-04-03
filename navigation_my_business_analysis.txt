@@ -1,0 +1,319 @@
+DEEP CODEBASE ANALYSIS: My Business Tab Navigation Flow
+========================================================
+
+OBJECTIVE:
+Identify why clicking the "My Business" tab in the bottom navigation directly navigates to BusinessProfileScreen.
+
+ANALYSIS DATE: April 2, 2026
+CODEBASE: Market_Brand2 Mobile Application
+
+===============================================================================
+1. NAVIGATION STRUCTURE OVERVIEW
+===============================================================================
+
+The application uses a hierarchical navigation structure:
+
+Root Level:
+├── AppNavigator (Root Stack Navigator)
+└── TabNavigator (Main Stack Navigator)
+    └── MainTabNavigator (Bottom Tab Navigator)
+        ├── Home Tab → HomeScreen
+        ├── Templates Tab → TemplateGalleryScreen
+        ├── MyBusiness Tab → MyBusinessPosterPlayerScreen
+        ├── Greetings Tab → GreetingTemplatesScreen
+        └── Profile Tab → ProfileScreen
+
+Key Navigation Files:
+- d:\RSL Solutions\Market_Brand2\src\navigation\AppNavigator.tsx (Root Navigator)
+- d:\RSL Solutions\Market_Brand2\src\navigation\TabNavigator.tsx (Main Stack Navigator)
+- d:\RSL Solutions\Market_Brand2\src\navigation\MainTabNavigator.tsx (Bottom Tab Navigator)
+- d:\RSL Solutions\Market_Brand2\src\navigation\CustomTabBar.tsx (Custom Tab Bar Component)
+- d:\RSL Solutions\Market_Brand2\src\navigation\types.ts (Navigation Type Definitions)
+
+===============================================================================
+2. BOTTOM TAB NAVIGATOR IMPLEMENTATION
+===============================================================================
+
+File: d:\RSL Solutions\Market_Brand2\src\navigation\MainTabNavigator.tsx
+
+The MainTabNavigator uses createBottomTabNavigator from React Navigation:
+
+```typescript
+const Tab = createBottomTabNavigator<TabParamList>();
+
+const MainTabNavigator = () => {
+  return (
+    <Tab.Navigator
+      safeAreaInsets={{ bottom: 0 }}
+      tabBar={(props) => <CustomTabBar {...props} />}
+      screenOptions={{ headerShown: false }}
+    >
+      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Templates" component={TemplateGalleryScreen} />
+      <Tab.Screen
+        name="MyBusiness"
+        component={MyBusinessPosterPlayerScreen}
+        options={{ title: 'My Business' }}
+      />
+      <Tab.Screen name="Greetings" component={GreetingTemplatesScreen} />
+      <Tab.Screen name="Profile" component={ProfileScreen} />
+    </Tab.Navigator>
+  );
+};
+```
+
+IMPORTANT FINDING:
+The "My Business" tab is directly mapped to MyBusinessPosterPlayerScreen component, NOT BusinessProfileScreen.
+
+===============================================================================
+3. "MY BUSINESS" TAB CONFIGURATION
+===============================================================================
+
+Tab Configuration in MainTabNavigator.tsx:
+- Tab Name: "MyBusiness"
+- Component: MyBusinessPosterPlayerScreen
+- Title: "My Business"
+- No tabBarIcon specified (uses custom tab bar)
+
+Navigation Type Definition (types.ts):
+```typescript
+export type TabParamList = {
+  Home: undefined;
+  Templates: undefined;
+  MyBusiness: undefined;
+  Greetings: undefined;
+  Profile: undefined;
+};
+```
+
+===============================================================================
+4. CUSTOM TAB BAR IMPLEMENTATION
+===============================================================================
+
+File: d:\RSL Solutions\Market_Brand2\src\navigation\CustomTabBar.tsx
+
+The CustomTabBar component overrides the default tab behavior and implements special logic for the "My Business" tab:
+
+```typescript
+const CustomTabBar = (props: any) => {
+  const { selectedBusinessProfile } = useBusinessProfile();
+  
+  const handlePosterPlayerShortcut = useCallback(() => {
+    const isActive = selectedBusinessProfile?.subscriptionStatus?.toUpperCase() === "ACTIVE";
+    if (!isActive) {
+      props.navigation.navigate('BusinessProfiles');
+      return;
+    }
+    props.navigation.navigate('MyBusiness');
+  }, [props.navigation, selectedBusinessProfile]);
+
+  // In the tab press handler:
+  const onPress = () => {
+    if (route.name === 'MyBusiness') { 
+      handlePosterPlayerShortcut(); 
+      return; 
+    }
+    // Normal tab navigation logic for other tabs
+    const event = props.navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+    if (!isFocused && !event.defaultPrevented) props.navigation.navigate(route.name);
+  };
+};
+```
+
+KEY FINDING:
+The CustomTabBar intercepts clicks on the "My Business" tab and implements conditional navigation logic.
+
+===============================================================================
+5. CONDITIONAL NAVIGATION LOGIC
+===============================================================================
+
+The CustomTabBar implements the following conditional logic for "My Business" tab:
+
+Condition Check:
+```typescript
+const isActive = selectedBusinessProfile?.subscriptionStatus?.toUpperCase() === "ACTIVE";
+```
+
+Navigation Logic:
+1. IF subscription is NOT active OR no business profile is selected:
+   → Navigate to 'BusinessProfiles' screen
+   → RETURN (stop further execution)
+
+2. IF subscription IS active:
+   → Navigate to 'MyBusiness' screen (MyBusinessPosterPlayerScreen)
+
+Business Profile Context:
+- Uses useBusinessProfile() hook from '../context/BusinessProfileContext'
+- Checks selectedBusinessProfile?.subscriptionStatus
+
+===============================================================================
+6. MY BUSINESS POSTER PLAYER SCREEN ANALYSIS
+===============================================================================
+
+File: d:\RSL Solutions\Market_Brand2\src\screens\MyBusinessPosterPlayerScreen.tsx
+
+This screen implements additional subscription checks:
+
+```typescript
+const { selectedBusinessProfile } = useBusinessProfile();
+const { isSubscriptionActive } = useSubscription();
+
+// Check if the selected business profile has an active subscription
+const isActive = selectedBusinessProfile?.subscriptionStatus?.toUpperCase() === "ACTIVE" || isSubscriptionActive;
+
+if (!isActive) {
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <Icon name="lock" size={64} color={theme.colors.primary} />
+      <Text>Subscription Required</Text>
+      <Text>Please activate your business profile subscription to access this screen.</Text>
+      <TouchableOpacity
+        onPress={() => navigation.navigate('BusinessProfiles')}
+      >
+        <Text>View Business Profiles</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+```
+
+Additional Business Category Check:
+```typescript
+if (!businessCategory) {
+  return (
+    <SafeAreaView>
+      <View style={styles.noPostersContainer}>
+        <Text>No Business Category Selected</Text>
+        <Text>Please select a business profile to view posters</Text>
+      </View>
+    </SafeAreaView>
+  );
+}
+```
+
+===============================================================================
+7. BUSINESS PROFILES SCREEN
+===============================================================================
+
+File: d:\RSL Solutions\Market_Brand2\src\screens\BusinessProfilesScreen.tsx
+
+This screen is registered in TabNavigator.tsx:
+```typescript
+<MainStack.Screen name="BusinessProfiles" component={BusinessProfilesScreen} options={{ headerShown: false }} />
+```
+
+This is NOT BusinessProfileScreen (singular), but BusinessProfilesScreen (plural) - the list/management screen for business profiles.
+
+===============================================================================
+8. NAVIGATION FLOW TRACE
+===============================================================================
+
+Complete Step-by-Step Navigation Flow:
+
+1. USER CLICKS "My Business" TAB
+   ↓
+2. CustomTabBar.onPress() is triggered
+   ↓
+3. Condition: route.name === 'MyBusiness' → TRUE
+   ↓
+4. handlePosterPlayerShortcut() is called
+   ↓
+5. Check: selectedBusinessProfile?.subscriptionStatus?.toUpperCase() === "ACTIVE"
+   ↓
+6. IF FALSE (no active subscription):
+   → navigation.navigate('BusinessProfiles') 
+   → User sees BusinessProfilesScreen (list of business profiles)
+   → User can select/activate a business profile
+   
+   IF TRUE (active subscription):
+   → navigation.navigate('MyBusiness')
+   → User sees MyBusinessPosterPlayerScreen
+   ↓
+7. MyBusinessPosterPlayerScreen renders
+   ↓
+8. Additional subscription check: isActive = selectedBusinessProfile?.subscriptionStatus?.toUpperCase() === "ACTIVE" || isSubscriptionActive
+   ↓
+9. IF FALSE:
+   → Shows "Subscription Required" screen with lock icon
+   → Button to navigate to 'BusinessProfiles'
+   
+   IF TRUE:
+   → Check businessCategory availability
+   → Shows business poster content
+
+===============================================================================
+9. FILES INVOLVED IN NAVIGATION
+===============================================================================
+
+Primary Navigation Files:
+- d:\RSL Solutions\Market_Brand2\src\navigation\MainTabNavigator.tsx (Bottom tab configuration)
+- d:\RSL Solutions\Market_Brand2\src\navigation\CustomTabBar.tsx (Tab bar with conditional logic)
+- d:\RSL Solutions\Market_Brand2\src\navigation\TabNavigator.tsx (Stack navigator registration)
+- d:\RSL Solutions\Market_Brand2\src\navigation\types.ts (Type definitions)
+
+Screen Components:
+- d:\RSL Solutions\Market_Brand2\src\screens\MyBusinessPosterPlayerScreen.tsx (Primary "My Business" screen)
+- d:\RSL Solutions\Market_Brand2\src\screens\BusinessProfilesScreen.tsx (Business profiles list)
+- d:\RSL Solutions\Market_Brand2\src\screens\HomeScreen.tsx (Contains additional navigation logic)
+
+Context Providers:
+- d:\RSL Solutions\Market_Brand2\src\context\BusinessProfileContext.tsx (Business profile state)
+- d:\RSL Solutions\Market_Brand2\src\contexts\SubscriptionContext.tsx (Subscription state)
+
+===============================================================================
+10. POTENTIAL BUGS OR MISCONFIGURATIONS
+===============================================================================
+
+ISSUE IDENTIFIED: BusinessProfileScreen vs BusinessProfilesScreen
+
+The analysis reveals that there is NO BusinessProfileScreen (singular) in the codebase. The user's assumption about navigating to "BusinessProfileScreen" is incorrect.
+
+Actual Navigation Targets:
+1. MyBusinessPosterPlayerScreen - The main "My Business" tab screen
+2. BusinessProfilesScreen (plural) - The business profiles list/management screen
+
+Potential Confusion Points:
+1. User expects BusinessProfileScreen but it doesn't exist
+2. The actual screen is BusinessProfilesScreen (plural)
+3. Navigation logic correctly routes to existing screens
+
+===============================================================================
+11. FINAL CONCLUSION
+===============================================================================
+
+WHY CLICKING "My Business" DOES NOT OPEN BusinessProfileScreen:
+
+**BusinessProfileScreen does not exist in the codebase.**
+
+The actual navigation behavior is:
+
+1. **Normal Case (Active Subscription):**
+   - "My Business" tab → MyBusinessPosterPlayerScreen
+   - Shows business poster content for the selected business profile
+
+2. **No Active Subscription Case:**
+   - "My Business" tab → BusinessProfilesScreen (plural)
+   - Shows list of business profiles for user to select/activate
+
+The navigation system is working correctly and routing to the appropriate existing screens. The confusion stems from the non-existent BusinessProfileScreen (singular) that the user expected.
+
+Key Navigation Logic:
+- CustomTabBar intercepts "My Business" tab clicks
+- Checks subscription status via BusinessProfileContext
+- Routes to MyBusinessPosterPlayerScreen if subscription is active
+- Routes to BusinessProfilesScreen if subscription is inactive
+
+No bugs or misconfigurations found. The navigation system is functioning as designed.
+
+===============================================================================
+12. RECOMMENDATIONS
+===============================================================================
+
+1. **Clarify Screen Naming:** Consider renaming BusinessProfilesScreen to BusinessProfileListScreen for clarity
+2. **Update Documentation:** Ensure all documentation references the correct screen names
+3. **User Education:** Clarify in UI that "My Business" leads to poster content, not profile management
+4. **Error Handling:** Add proper error handling if BusinessProfileContext is not available
+
+===============================================================================
+ANALYSIS COMPLETE
+===============================================================================
