@@ -96,7 +96,7 @@ const SubscriptionScreen: React.FC = () => {
   const { theme } = useTheme();
 
   // BUSINESS PROFILE SUBSCRIPTION LOGIC: Use business profile when available
-  const isBusinessActive = effectiveBusinessProfile?.subscriptionStatus?.toUpperCase() === 'ACTIVE' || businessSubscriptionStatus?.isActive === true;
+  const isBusinessActive = businessSubscriptionStatus?.status?.toUpperCase() === 'ACTIVE';
   console.log('🏢 BUSINESS SUBSCRIPTION LOGIC: isBusinessActive =', isBusinessActive, 'for profile:', effectiveBusinessProfile?.name);
   console.log('🏢 BUSINESS SUBSCRIPTION STATUS:', businessSubscriptionStatus);
   
@@ -212,25 +212,10 @@ const SubscriptionScreen: React.FC = () => {
 
     console.log('[APP] 🔍 Raw status object:', status);
 
-    // Normalize status
-    const normalizedStatus = status.status?.toLowerCase();
-
-    // PRIMARY condition (MOST IMPORTANT)
-    if (status.isActive === true) {
-      console.log('[APP] ✅ Active via isActive');
-      return true;
-    }
-
-    // FALLBACK condition
-    if (normalizedStatus === 'active') {
-      console.log('[APP] ✅ Active via status field');
-      return true;
-    }
-
-    // OPTIONAL fallback (if expiry exists)
-    const expiryDate = status.expiryDate || status.endDate;
-    if (expiryDate && new Date(expiryDate) > new Date()) {
-      console.log('[APP] ✅ Active via expiry date');
+    // PRIMARY condition: Use subscriptionStatus field
+    const subscriptionStatus = status.subscriptionStatus || status.status;
+    if (subscriptionStatus?.toUpperCase() === 'ACTIVE') {
+      console.log('[APP] ✅ Active via subscriptionStatus');
       return true;
     }
 
@@ -254,22 +239,22 @@ const SubscriptionScreen: React.FC = () => {
         console.log('⚠️ No business subscription found, setting inactive status');
         setBusinessSubscriptionStatus({
           isActive: false,
-          planId: null,
-          planName: null,
-          expiryDate: null,
+          status: 'inactive',
+          planId: undefined,
+          planName: undefined,
+          expiryDate: undefined,
           autoRenew: false,
-          status: 'inactive'
         });
       }
     } catch (error) {
       console.error('❌ Error fetching business subscription status:', error);
       setBusinessSubscriptionStatus({
         isActive: false,
-        planId: null,
-        planName: null,
-        expiryDate: null,
+        status: 'inactive',
+        planId: undefined,
+        planName: undefined,
+        expiryDate: undefined,
         autoRenew: false,
-        status: 'inactive'
       });
     } finally {
       setIsBusinessSubscriptionLoading(false);
@@ -283,6 +268,13 @@ const SubscriptionScreen: React.FC = () => {
       if (paymentInProgress) {
         console.log('🔄 Payment in progress, skipping subscription refresh');
         return;
+      }
+
+      // Reset states when business profile changes
+      if (isBusinessProfileMode && businessProfileId) {
+        console.log('🔄 BUSINESS_PROFILE_MODE - Resetting states for new profile:', businessProfileId);
+        setBusinessSubscriptionStatus(null);
+        setIsBusinessSubscriptionLoading(false);
       }
 
       if (isBusinessProfileMode) {
@@ -301,7 +293,7 @@ const SubscriptionScreen: React.FC = () => {
       if (!selectedPlanId && purchasablePlans.length > 0) {
         setSelectedPlanId(purchasablePlans[0].id);
       }
-    }, [isBusinessProfileMode, fetchBusinessSubscriptionStatus, refreshSubscription, refreshPlans, refreshAutopayStatus, selectedPlanId, purchasablePlans, paymentInProgress])
+    }, [isBusinessProfileMode, businessProfileId, fetchBusinessSubscriptionStatus, refreshSubscription, refreshPlans, refreshAutopayStatus, selectedPlanId, purchasablePlans, paymentInProgress])
   );
 
   // Helper function to show error modal
@@ -474,6 +466,7 @@ const SubscriptionScreen: React.FC = () => {
       orderDetails = await subscriptionApi.createPaymentOrder({
         planId: selectedPlan.id,
         currency: 'INR',
+        ...(isBusinessProfileMode && businessProfileId && { businessProfileId }),
       });
 
       if (!orderDetails?.orderId) {
@@ -632,6 +625,7 @@ const SubscriptionScreen: React.FC = () => {
               planId: selectedPlan.id,
               email: currentUserForTransaction?.email,
               contact: currentUserForTransaction?.phoneNumber,
+              ...(isBusinessProfileMode && businessProfileId && { businessProfileId }),
             });
             console.log('✅ PAYMENT_SUCCESS - Payment verified:', verifyResult);
 
@@ -1160,10 +1154,10 @@ const SubscriptionScreen: React.FC = () => {
       // Return a failure status
       return {
         isActive: false,
+        status: 'inactive',
         plan: null,
         expiryDate: null,
         autoRenew: false,
-        status: 'inactive' as const
       };
     }
   };
@@ -1238,7 +1232,7 @@ const SubscriptionScreen: React.FC = () => {
       >
 
         {/* Current Subscription Status (if subscribed) */}
-        {effectiveIsSubscribed && effectiveSubscriptionStatus && (
+        {effectiveSubscriptionStatus?.status?.toUpperCase() === 'ACTIVE' && (
           <View style={[styles.currentSubscriptionCard, {
             backgroundColor: theme.colors.cardBackground,
             marginBottom: dynamicModerateScale(12),
@@ -1522,10 +1516,10 @@ const SubscriptionScreen: React.FC = () => {
             marginBottom: isTabletDevice ? dynamicModerateScale(8) : dynamicModerateScale(6),
           }]}
           onPress={handleAutopayPayment}
-          disabled={isProcessing || effectiveIsSubscribed || paymentInProgress || isAuthenticating || isTransactionPending}
+          disabled={isProcessing || effectiveSubscriptionStatus?.status?.toUpperCase() === 'ACTIVE' || paymentInProgress || isAuthenticating || isTransactionPending}
         >
           <LinearGradient
-            colors={effectiveIsSubscribed
+            colors={effectiveSubscriptionStatus?.status?.toUpperCase() === 'ACTIVE'
               ? ['#28a745', '#20c997']
               : isAuthenticating
                 ? ['#ff9800', '#f57c00'] // Orange for authenticating
@@ -1543,7 +1537,7 @@ const SubscriptionScreen: React.FC = () => {
             <Text style={[styles.upgradeButtonText, {
               fontSize: dynamicModerateScale(11),
             }]}>
-              {effectiveIsSubscribed
+              {effectiveSubscriptionStatus?.status?.toUpperCase() === 'ACTIVE'
                 ? 'Already Pro'
                 : isAuthenticating
                   ? 'Authenticating...'
@@ -1559,7 +1553,7 @@ const SubscriptionScreen: React.FC = () => {
           </LinearGradient>
         </TouchableOpacity>
 
-        {!effectiveIsSubscribed && (
+        {effectiveSubscriptionStatus?.status?.toUpperCase() !== 'ACTIVE' && (
           <Text style={[styles.termsText, {
             color: theme.colors.textSecondary,
             fontSize: dynamicModerateScale(7.5),
