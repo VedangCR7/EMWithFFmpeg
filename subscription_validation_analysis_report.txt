@@ -1,0 +1,189 @@
+SUBSCRIPTION VALIDATION LOGIC ANALYSIS REPORT
+==============================================
+
+1. CURRENT SUBSCRIPTION FLOW (STEP-BY-STEP)
+--------------------------------------------
+
+PosterEditorScreen Next Button Flow:
+1. User clicks Next button (line 2645)
+2. Check type parameter from navigation params
+3. IF type === "business":
+   - Validate category: categoryName === selectedBusinessCategory
+   - Validate business subscription: selectedBusinessProfile?.businessSubscriptionStatus === "Active"
+4. ELSE (non-business):
+   - Validate normal subscription: selectedBusinessProfile?.subscriptionStatus === "ACTIVE"
+5. IF validation passes → Continue to canvas preparation and capture
+6. IF validation fails → Block with return statement
+
+2. ALL USAGE LOCATIONS (FILE + LINE)
+-----------------------------------
+
+subscriptionStatus Usage:
+- src/screens/PosterEditorScreen.tsx:403 - isActive calculation
+- src/screens/PosterEditorScreen.tsx:2674 - Non-business validation
+- src/screens/PosterEditorScreen.tsx:2678 - Non-business validation check
+- src/services/businessProfile.ts:30 - Interface definition
+- src/services/businessProfile.ts:126 - API mapping
+- src/services/businessProfile.ts:193 - API mapping
+- src/services/businessProfile.ts:242 - API mapping
+- src/services/auth.ts:451 - isSubscriptionActive method
+- src/screens/BusinessProfilesScreen.tsx:158 - Debug logging
+- src/screens/BusinessProfilesScreen.tsx:344 - Profile selection
+- src/screens/BusinessProfilesScreen.tsx:349 - isActive calculation
+- src/screens/BusinessProfilesScreen.tsx:441 - Status badge logic
+- src/screens/BusinessProfilesScreen.tsx:533 - Debug logging
+- src/screens/BusinessProfilesScreen.tsx:538 - isActive calculation
+- src/screens/HomeScreen.tsx:3123 - Debug logging
+- src/screens/HomeScreen_Backup.tsx:3605 - Debug logging
+- src/services/loginAPIs.ts:74 - User interface
+- src/utils/subscriptionPolling.ts:53 - Polling logic
+
+businessSubscriptionStatus Usage:
+- src/screens/PosterEditorScreen.tsx:2664 - Business validation logging
+- src/screens/PosterEditorScreen.tsx:2668 - Business validation check
+
+checkPremiumAccess Usage:
+- src/screens/PosterEditorScreen.tsx:393 - Import from useSubscription
+
+3. LOGIC CLASSIFICATION
+------------------------
+
+Business-Specific Flows:
+- Uses: businessSubscriptionStatus
+- Location: PosterEditorScreen Next button (type === "business")
+- Logic: selectedBusinessProfile?.businessSubscriptionStatus === "Active"
+
+Non-Business Flows:
+- Uses: subscriptionStatus  
+- Location: PosterEditorScreen Next button (type !== "business")
+- Logic: selectedBusinessProfile?.subscriptionStatus === "ACTIVE"
+
+Shared/Common Flows:
+- BusinessProfilesScreen: Uses subscriptionStatus for UI badges
+- HomeScreen: Uses subscriptionStatus for debug logging
+- Auth service: Uses subscriptionStatus for user-level checks
+
+4. DEPENDENCY ANALYSIS
+----------------------
+
+businessSubscriptionStatus Availability:
+- Field exists in BusinessProfile interface? NO - Not defined in interface
+- Actual usage: Only in PosterEditorScreen validation
+- Risk: Field may not exist in API response
+
+subscriptionStatus Availability:
+- Field exists in BusinessProfile interface: YES (line 30)
+- Provided by: businessProfile API
+- Always available: YES (with fallback to null)
+
+Fallback Logic:
+- PosterEditorScreen line 403: subscriptionStatus?.toUpperCase() === "ACTIVE" || isSubscriptionActive
+- Indicates fallback to user-level subscription exists
+
+5. NAVIGATION IMPACT
+-------------------
+
+PosterEditorScreen → PosterPreviewScreen:
+- Business: Validates businessSubscriptionStatus before navigation
+- Non-business: Validates subscriptionStatus before navigation
+- No subscription checks in PosterPreviewScreen itself
+
+Download Flow:
+- No subscription validation found in download components
+- Relies on pre-validation in editor
+
+6. API/DATA AVAILABILITY
+-----------------------
+
+subscriptionStatus:
+- Source: businessProfile API (/api/mobile/business-profile/{userId})
+- Always included in response: YES
+- Field mapping: Lines 126, 193, 242 in businessProfile.ts
+
+businessSubscriptionStatus:
+- Source: NOT found in businessProfile API
+- Source: Likely from subscriptionApi.getBusinessProfileSubscriptionStatus
+- Availability: UNKNOWN - may require separate API call
+
+7. EDGE CASES
+------------
+
+1. User without business profile:
+   - selectedBusinessProfile = null
+   - Current: Both validations fail (null checks)
+
+2. Business selected but no subscription:
+   - subscriptionStatus = "NONE" or null
+   - businessSubscriptionStatus = undefined or null
+
+3. Expired business subscription:
+   - businessSubscriptionStatus = "Expired" or "Inactive"
+
+4. Multiple business profiles:
+   - Uses selectedBusinessProfile from context
+   - Only validates currently selected profile
+
+5. Switching business from dropdown:
+   - Context updates selectedBusinessProfile
+   - Validation uses new profile data
+
+8. ROOT DECISION POINTS
+-----------------------
+
+EXACT lines where system decides subscription source:
+
+Line 2648: if (type === "business") {
+  → Decision point: Business vs Non-business flow
+
+Line 2668: if (!selectedBusinessProfile?.businessSubscriptionStatus || ...)
+  → Decision point: Business subscription validation
+
+Line 2678: if (!selectedBusinessProfile?.subscriptionStatus || ...)
+  → Decision point: Normal subscription validation
+
+9. RISK ANALYSIS
+---------------
+
+Switching to businessSubscriptionStatus ONLY:
+
+HIGH RISKS:
+1. businessSubscriptionStatus field not defined in BusinessProfile interface
+2. Field may not exist in API response
+3. No fallback logic for missing business subscription
+4. May break for users without business profiles
+
+MEDIUM RISKS:
+1. API latency for business subscription status
+2. Race conditions between business profile and subscription data
+3. UI components (BusinessProfilesScreen) still use subscriptionStatus
+
+LOW RISKS:
+1. Case sensitivity differences ("Active" vs "ACTIVE")
+2. Null/undefined handling
+
+10. MIGRATION RECOMMENDATIONS
+-----------------------------
+
+CRITICAL REQUIREMENTS:
+1. Add businessSubscriptionStatus to BusinessProfile interface
+2. Ensure businessSubscriptionStatus is always available in API response
+3. Add fallback logic for users without business profiles
+4. Update all UI components to use businessSubscriptionStatus
+
+RECOMMENDED APPROACH:
+1. Phase 1: Add businessSubscriptionStatus field to interface and API
+2. Phase 2: Add fallback logic in PosterEditorScreen
+3. Phase 3: Update UI components (BusinessProfilesScreen, etc.)
+4. Phase 4: Remove subscriptionStatus dependencies
+
+FALLBACK LOGIC NEEDED:
+```typescript
+// For users without business profile
+const getEffectiveSubscriptionStatus = () => {
+  if (selectedBusinessProfile?.businessSubscriptionStatus) {
+    return selectedBusinessProfile.businessSubscriptionStatus === "Active";
+  }
+  // Fallback to user subscription or default
+  return isSubscriptionActive;
+};
+```

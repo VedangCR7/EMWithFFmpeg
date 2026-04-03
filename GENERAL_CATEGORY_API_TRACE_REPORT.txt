@@ -1,0 +1,268 @@
+# GENERAL CATEGORY API TRACE REPORT
+## Complete Analysis of General Category Images API Endpoint
+
+=====================================
+
+## 1. UI COMPONENT TRACE (HomeScreen → component → function)
+
+### Entry Point: HomeScreen.tsx
+```typescript
+// Line 5293-5305
+<GeneralCategoriesSection
+  greetingCategoriesList={filteredGreetingCategoriesList}
+  greetingCategoryImages={memoizedGreetingCategoryImages}
+  cardWidth={cardWidth}
+  theme={theme}
+  getItemLayout={getItemLayout}
+  onCategoryPress={(category) => {
+    const categoryImage = memoizedGreetingCategoryImages[category.id] || null;
+    handleGreetingCategoryPress(category, categoryImage);
+  }}
+  // ...
+/>
+```
+
+### Data Flow:
+1. **Component**: `GeneralCategoriesSection` (imported from `../components/sections/GeneralCategoriesSection`)
+2. **Data Source**: `greetingCategoriesList` (state variable)
+3. **Image Source**: `greetingCategoryImages` (state variable)
+4. **Handler**: `handleGreetingCategoryPress` (navigation function)
+
+### State Management:
+```typescript
+// Line 698-703
+const [greetingCategoriesList, setGreetingCategoriesList] = useState<Array<{ id: string; name: string; icon: string; color?: string; imageUrl?: string; parentCategoryName?: string }>>([]);
+const [greetingCategoryImages, setGreetingCategoryImages] = useState<Record<string, string>>({});
+const [greetingCategoryPreviews, setGreetingCategoryPreviews] = useState<Record<string, Template[]>>({});
+```
+
+=====================================
+
+## 2. SERVICE TRACE (function → service → API call)
+
+### Primary Service: greetingTemplatesService
+**File**: `src/services/greetingTemplates.ts`
+
+### Function Chain:
+1. **Categories Loading**: `greetingTemplatesService.getCategories()`
+2. **Image Preview Loading**: `greetingTemplatesService.searchTemplatesFast(category.name, undefined, 1)`
+
+### API Call Flow:
+```typescript
+// Line 2299 - Categories API
+const categories = await greetingTemplatesService.getCategories();
+
+// Line 2228 - Template Preview API  
+const templates = await greetingTemplatesService.searchTemplatesFast(category.name, undefined, 1);
+```
+
+=====================================
+
+## 3. API DETAILS
+
+### A. Categories API
+- **Endpoint**: `/api/mobile/greetings/categories`
+- **Method**: `GET`
+- **Full URL**: `https://eventmarketersbackend.onrender.com/api/mobile/greetings/categories`
+- **Payload**: None (GET request)
+- **Cache TTL**: 5 minutes
+
+### B. Template Preview API
+- **Endpoint**: `/api/mobile/greetings/templates`
+- **Method**: `GET` 
+- **Full URL**: `https://eventmarketersbackend.onrender.com/api/mobile/greetings/templates?search={categoryName}&language=all&limit=1`
+- **Payload**: Query parameters
+  - `search`: Category name (e.g., "birthday", "wedding")
+  - `language`: "all" (default)
+  - `limit`: 1 (for preview images)
+- **Cache TTL**: 5 minutes
+
+### Implementation Details:
+```typescript
+// Line 193 - Categories API Call
+const response = await api.get('/api/mobile/greetings/categories');
+
+// Line 613 - Templates API Call
+const response = await api.get(`/api/mobile/greetings/templates?${params.toString()}`);
+```
+
+=====================================
+
+## 4. RESPONSE STRUCTURE (sample object)
+
+### A. Categories Response:
+```typescript
+{
+  success: true,
+  data: {
+    categories: [
+      {
+        id: "birthday_category_id",
+        name: "Birthday",
+        icon: "cake",
+        color: "#FF6B6B",
+        parentCategoryName?: "Celebrations" // Optional
+      }
+      // ... more categories
+    ]
+  }
+}
+```
+
+### B. Templates Response:
+```typescript
+{
+  success: true,
+  data: {
+    templates: [
+      {
+        id: "template_12345",
+        title: "Happy Birthday Template",
+        description: "Birthday celebration template",
+        category: "Birthday",
+        thumbnailUrl: "https://example.com/thumb.jpg",
+        imageUrl: "https://example.com/full.jpg",
+        downloads: 150,
+        isPremium: false,
+        tags: ["birthday", "celebration", "party"]
+      }
+    ],
+    businessCategoryImages: [] // Fallback data
+  }
+}
+```
+
+### Mapped Frontend Structure:
+```typescript
+interface GreetingTemplate {
+  id: string;                    // ✅ VALID ID from backend
+  name: string;                  // backend.title
+  thumbnail: string;             // optimized.thumbnail
+  category: string;              // backend.category
+  content: {
+    text?: string;               // backend.description
+    background?: string;         // optimized.background
+    layout?: 'vertical' | 'horizontal' | 'square';
+  };
+  downloads: number;             // backend.downloads
+  isDownloaded: boolean;         // false (frontend state)
+  isPremium: boolean;            // backend.isPremium
+  tags?: string[];               // backend.tags
+}
+```
+
+=====================================
+
+## 5. DATA FLOW DIAGRAM (API → state → UI)
+
+```
+Backend API
+     ↓
+/api/mobile/greetings/categories
+     ↓
+greetingTemplatesService.getCategories()
+     ↓
+HomeScreen useEffect (Line 2287)
+     ↓
+setGreetingCategoriesList() → setAllGreetingCategories()
+     ↓
+GeneralCategoriesSection (UI)
+     ↓
+User clicks category
+     ↓
+/api/mobile/greetings/templates?search={category}&limit=1
+     ↓
+greetingTemplatesService.searchTemplatesFast()
+     ↓
+setGreetingCategoryImages() → setGreetingCategoryPreviews()
+     ↓
+UI updates with category images
+```
+
+=====================================
+
+## 6. TEMPLATE ID TRACE
+
+### Where ID is Set:
+1. **Backend Response**: `backendTemplate.id` (Line 657)
+2. **Frontend Mapping**: `id: backendTemplate.id` (Direct assignment)
+3. **State Storage**: `greetingCategoryPreviews[category.id]` (Cache)
+4. **Navigation**: `selectedPoster.id = firstTemplate.id` (Line 4781)
+
+### ID Preservation:
+✅ **VALID**: Template IDs are preserved from backend through all transformations  
+✅ **NO LOSS**: No transformation removes or modifies template IDs  
+✅ **DIRECT MAPPING**: `id: backendTemplate.id` ensures 1:1 mapping  
+
+### Critical Code:
+```typescript
+// Line 657 - ID Preservation
+return {
+  id: backendTemplate.id,  // ✅ Direct mapping - no transformation
+  name: backendTemplate.title,
+  thumbnail: optimized.thumbnail,
+  // ... other fields
+};
+```
+
+=====================================
+
+## 7. FINAL CONCLUSION
+
+### Exact API Responsible for General Category Images:
+
+**PRIMARY API**: `/api/mobile/greetings/categories`
+- **Purpose**: Fetches category list with metadata (id, name, icon, color)
+- **Used for**: Category list rendering in GeneralCategoriesSection
+
+**SECONDARY API**: `/api/mobile/greetings/templates`
+- **Purpose**: Fetches template preview images for categories
+- **Used for**: Category thumbnail images and template data
+
+### Template ID Verification:
+✅ **VALID IDs**: Backend provides proper template IDs  
+✅ **NO TRANSFORMATION LOSS**: IDs preserved through entire flow  
+✅ **CACHE FRIENDLY**: IDs stored in `greetingCategoryPreviews` for instant access  
+
+### Key Findings:
+
+1. **API Endpoints Identified**:
+   - Categories: `GET /api/mobile/greetings/categories`
+   - Templates: `GET /api/mobile/greetings/templates?search={category}&limit=1`
+
+2. **Template ID Flow**:
+   - Backend provides valid `id` field
+   - Frontend maps directly: `id: backendTemplate.id`
+   - No ID transformation or loss occurs
+
+3. **Data Structure**:
+   - Categories have `id`, `name`, `icon`, `color` fields
+   - Templates have `id`, `title`, `category`, `thumbnailUrl` fields
+   - All necessary IDs are present and valid
+
+4. **Caching Strategy**:
+   - Categories cached for 5 minutes
+   - Template previews cached for 5 minutes
+   - Frontend maintains `greetingCategoryPreviews` for instant navigation
+
+5. **General vs Business Difference**:
+   - **General**: Uses `/api/mobile/greetings/*` endpoints
+   - **Business**: Uses `/api/mobile/business-categories/*` endpoints
+   - **Separate APIs**: Completely different backend services
+
+### Root Cause Analysis:
+The `selectedTemplateId = 'loading'` issue is NOT caused by missing template IDs from the API. The General Category API provides valid template IDs. The issue occurs in the navigation logic when cache misses happen and fallback to `'loading'` placeholder is used.
+
+=====================================
+
+## API VERIFICATION SUMMARY
+
+✅ **Endpoint Identified**: `/api/mobile/greetings/categories` and `/api/mobile/greetings/templates`  
+✅ **Template IDs Valid**: Backend provides proper `id` fields  
+✅ **No ID Loss**: Direct mapping preserves IDs through entire flow  
+✅ **Response Structure**: Well-defined with all necessary fields  
+✅ **Caching Works**: Proper caching strategy implemented  
+
+The General Category API is functioning correctly and provides valid template IDs for downstream navigation.
+
+=====================================

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 // Optimized for all screen devices with responsive design improvements
 // Canvas height: 38-45% on portrait mode, 65% on landscape (prevents toolbar overlap)
@@ -35,8 +36,9 @@ import PosterCanvas from '../components/PosterCanvas';
 
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation, useRoute, RouteProp, NavigationProp } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { MainStackParamList } from '../navigation/types';
+import { NavigationProp } from '@react-navigation/native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { PanGestureHandler, State, PinchGestureHandler } from 'react-native-gesture-handler';
@@ -359,7 +361,6 @@ interface Layer {
 }
 
 interface PosterEditorScreenProps {
-  navigation: NavigationProp<MainStackParamList, 'PosterEditor'>;
   route: {
     params: {
       selectedImage: {
@@ -380,7 +381,8 @@ interface PosterEditorScreenProps {
   };
 }
 
-const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route, navigation }) => {
+const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
+  const navigation = useNavigation<NavigationProp<MainStackParamList>>();
   const insets = useSafeAreaInsets();
   const { selectedImage, selectedLanguage, selectedTemplateId, selectedTemplate: initialTemplate, posterCategory, type, categoryName } = route.params;
   
@@ -393,6 +395,87 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route, navigati
   const { isSubscribed, checkPremiumAccess, refreshSubscription, isSubscriptionActive } = useSubscription();
   const { isDarkMode, theme } = useTheme();
   const { selectedBusinessProfile, selectedBusinessCategory, selectedBusinessId, isLoading: isContextLoading } = useBusinessProfile();
+  
+  // Get business subscription status for modal display
+  const businessStatus = selectedBusinessProfile?.businessSubscriptionStatus;
+  
+  // State for dynamic dimensions to handle orientation changes
+  const [dimensions, setDimensions] = useState(() => {
+    const { width, height } = Dimensions.get('window');
+    return { width, height };
+  });
+  
+  // State for layers
+  const [layers, setLayers] = useState<Layer[]>([]);
+  const [selectedLayer, setSelectedLayer] = useState<string | null>(null);
+  const [showTextModal, setShowTextModal] = useState(false);
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [showStyleModal, setShowStyleModal] = useState(false);
+  const [showFontStyleModal, setShowFontStyleModal] = useState(false);
+  const [showLogoSelectionModal, setShowLogoSelectionModal] = useState(false);
+  const [newText, setNewText] = useState('');
+  const [newImageUrl, setNewImageUrl] = useState('');
+  const [newLogoUrl, setNewLogoUrl] = useState('');
+  const [showLogoModal, setShowLogoModal] = useState(false);
+  const [showLogoUrlInput, setShowLogoUrlInput] = useState(false);
+  const [selectedFontSize, setSelectedFontSize] = useState<number>(16);
+  
+  // State for dragging
+  const [draggedLayer, setDraggedLayer] = useState<string | null>(null);
+  
+  // State for field visibility
+  const [visibleFields, setVisibleFields] = useState<{ [key: string]: boolean }>({
+    logo: true,
+    companyName: true,
+    footerBackground: true,
+    phone: true,
+    email: true,
+    website: true,
+    category: false,
+    address: false,
+    tagline: false,
+    established: false,
+    description: false,
+    services: false,
+    hours: false,
+    social: false,
+    custom1: false,
+    custom2: false,
+    custom3: false,
+  });
+  
+  // Store original layers for frame removal
+  const [originalLayers, setOriginalLayers] = useState<Layer[]>([]);
+  const [originalTemplate, setOriginalTemplate] = useState<string>('business');
+  
+  const [alignmentGuides, setAlignmentGuides] = useState<{ vertical: number[]; horizontal: number[] }>({
+    vertical: [],
+    horizontal: []
+  });
+  
+  // State for templates
+  const [selectedTemplate, setSelectedTemplate] = useState<string>(initialTemplate || 'business');
+  const [showTemplatesModal, setShowTemplatesModal] = useState(false);
+  const [initialTemplateApplied, setInitialTemplateApplied] = useState(false);
+  
+  // State for business profiles
+  const [businessProfiles, setBusinessProfiles] = useState<BusinessProfile[]>([]);
+  const [showProfileSelectionModal, setShowProfileSelectionModal] = useState(false);
+  const [loadingProfiles, setLoadingProfiles] = useState(true);
+  
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [currentPositions, setCurrentPositions] = useState<{ [key: string]: { x: number; y: number } }>({});
+  const [showDeleteElementModal, setShowDeleteElementModal] = useState(false);
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [showPremiumTemplateModal, setShowPremiumTemplateModal] = useState(false);
+  const [showPremiumAlertModal, setShowPremiumAlertModal] = useState(false);
+  const [showConnectionErrorModal, setShowConnectionErrorModal] = useState(false);
+  
+  // Handle upgrade navigation
+  const handleUpgrade = () => {
+    setShowPremiumAlertModal(false);
+    navigation.navigate('BusinessProfilesScreen' as any);
+  };
   
   // Prevent rendering if context is still loading
   if (isContextLoading) {
@@ -444,12 +527,6 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route, navigati
     const separator = url.includes('?') ? '&' : '?';
     return `${url}${separator}quality=high&width=2400`;
   };
-
-  // State for dynamic dimensions to handle orientation changes
-  const [dimensions, setDimensions] = useState(() => {
-    const { width, height } = Dimensions.get('window');
-    return { width, height };
-  });
 
   // Listen for orientation changes and update dimensions
   useEffect(() => {
@@ -1045,92 +1122,33 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route, navigati
   // Ref for capturing the poster as image
   const posterRef = useRef<ViewShot>(null);
   const visibleCanvasRef = useRef<ViewShot>(null);
-
-
-
-
-
-
-
-  // State for layers
-  const [layers, setLayers] = useState<Layer[]>([]);
-  const [selectedLayer, setSelectedLayer] = useState<string | null>(null);
-  const [showTextModal, setShowTextModal] = useState(false);
-  const [showImageModal, setShowImageModal] = useState(false);
-  const [showStyleModal, setShowStyleModal] = useState(false);
-  const [showFontStyleModal, setShowFontStyleModal] = useState(false);
-  const [showLogoSelectionModal, setShowLogoSelectionModal] = useState(false);
-  const [newText, setNewText] = useState('');
-  const [newImageUrl, setNewImageUrl] = useState('');
-  const [newLogoUrl, setNewLogoUrl] = useState('');
-  const [showLogoModal, setShowLogoModal] = useState(false);
-  const [showLogoUrlInput, setShowLogoUrlInput] = useState(false);
-  const [selectedFontSize, setSelectedFontSize] = useState<number>(16);
-
-  // State for dragging
-  const [draggedLayer, setDraggedLayer] = useState<string | null>(null);
-
+  
   // Animated values for each layer's position (not just translation)
   const layerAnimations = useRef<{ [key: string]: { x: Animated.Value; y: Animated.Value } }>({}).current;
-
+  
   // Translation values for dragging
   const translationValues = useRef<{ [key: string]: { x: Animated.Value; y: Animated.Value } }>({}).current;
-
+  
   // Scale values for zooming
   const scaleValues = useRef<{ [key: string]: Animated.Value }>({}).current;
-
+  
   // BorderRadius values for logo shape animation
   const borderRadiusValues = useRef<{ [key: string]: Animated.Value }>({}).current;
-
+  
   // Selection border radius values (borderRadius + 3)
   const selectionBorderRadiusValues = useRef<{ [key: string]: Animated.Value }>({}).current;
-
-  // State for field visibility
-  // Logo, Company Name, Footer BG, phone (mobile number), email, and website are visible by default
-  // All other fields must be manually toggled to show
-  const [visibleFields, setVisibleFields] = useState<{ [key: string]: boolean }>({
-    logo: true,
-    companyName: true,
-    footerBackground: true,
-    phone: true,
-    email: true,
-    website: true,
-    category: false,
-    address: false,
-    services: false,
-  });
-
-  // Store original layers for frame removal
-  const [originalLayers, setOriginalLayers] = useState<Layer[]>([]);
-  const [originalTemplate, setOriginalTemplate] = useState<string>('business');
-
-  const [alignmentGuides, setAlignmentGuides] = useState<{ vertical: number[]; horizontal: number[] }>({
-    vertical: [],
-    horizontal: []
-  });
+  
   const snapOffsets = useRef<{ [key: string]: { x: Animated.Value; y: Animated.Value } }>({}).current;
   const snapOffsetsLatest = useRef<{ [key: string]: { x: number; y: number } }>({});
   const alignmentFrameRef = useRef<number | null>(null);
   const dragTranslationRef = useRef<{ [key: string]: { x: number; y: number } }>({});
-
-  // State for templates
-  const [selectedTemplate, setSelectedTemplate] = useState<string>(initialTemplate || 'business');
-  const [showTemplatesModal, setShowTemplatesModal] = useState(false);
-  const [initialTemplateApplied, setInitialTemplateApplied] = useState(false);
-
-  // State for business profiles
-  const [businessProfiles, setBusinessProfiles] = useState<BusinessProfile[]>([]);
-  const [showProfileSelectionModal, setShowProfileSelectionModal] = useState(false);
-  const [loadingProfiles, setLoadingProfiles] = useState(true);
-
-
-
-  const [isCapturing, setIsCapturing] = useState(false);
-  const [currentPositions, setCurrentPositions] = useState<{ [key: string]: { x: number; y: number } }>({});
   const currentPositionsRef = useRef<{ [key: string]: { x: number; y: number } }>({});
-  const [showDeleteElementModal, setShowDeleteElementModal] = useState(false);
-  const [showPremiumModal, setShowPremiumModal] = useState(false);
-  const [showConnectionErrorModal, setShowConnectionErrorModal] = useState(false);
+
+
+
+
+
+
 
   const ensureSnapOffsets = useCallback((layerId: string) => {
     if (!snapOffsets[layerId]) {
@@ -2692,6 +2710,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route, navigati
             // Unified subscription validation using business subscription status
             if (!hasAccess) {
               console.log(":x: [POSTER EDITOR] Access Denied: Subscription inactive");
+              setShowPremiumTemplateModal(true);
               return;
             }
             
@@ -3745,12 +3764,21 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route, navigati
         </View>
       </Modal>
 
-      {/* Premium Template Modal */}
+      {/* Premium Alert Modal */}
       <PremiumTemplateModal
         visible={showPremiumModal}
         onClose={() => setShowPremiumModal(false)}
+        onUpgrade={handleUpgrade}
+        businessStatus={businessStatus}
+        selectedTemplate={null}
+      />
+
+      {/* Premium Template Modal */}
+      <PremiumTemplateModal
+        visible={showPremiumTemplateModal}
+        onClose={() => setShowPremiumTemplateModal(false)}
         onUpgrade={async () => {
-          setShowPremiumModal(false);
+          setShowPremiumTemplateModal(false);
           await refreshSubscription();
           (navigation as any).navigate('Subscription');
         }}

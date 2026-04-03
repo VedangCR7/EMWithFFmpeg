@@ -1,0 +1,255 @@
+================================================================================
+                    NAVIGATION DATA FLOW ANALYSIS REPORT
+================================================================================
+
+PROBLEM: selectedTemplateId is NOT available in PosterEditorScreen when navigating
+from HomeScreen → PosterPlayerScreen → PosterEditorScreen via Next button.
+
+================================================================================
+1. FLOW OVERVIEW
+================================================================================
+
+Step 1: HomeScreen → PosterPlayerScreen
+- User clicks on General Category
+- HomeScreen navigates to PosterPlayerScreen with:
+  * selectedPoster: cachedTemplates[0] (Template object)
+  * relatedPosters: cachedTemplates.slice(1)
+  * templateSource: 'professional'
+  * type: 'business'
+  * categoryName: category.name
+
+Step 2: PosterPlayerScreen loads
+- Receives selectedPoster as initialPoster
+- Sets currentPoster state from initialPoster
+- User can swipe/click to change currentPoster
+
+Step 3: PosterPlayerScreen → PosterEditorScreen
+- User clicks Next button
+- Calls navigateToPosterEditor()
+- Passes selectedTemplateId: currentPoster.id
+
+================================================================================
+2. DATA FLOW TRACE
+================================================================================
+
+HomeScreen.tsx (Line 4175-4184):
+---------------------------------
+navigationParams = {
+  selectedPoster: cachedTemplates[0],        // ✅ Template with valid id
+  relatedPosters: cachedTemplates.slice(1),
+  templateSource: 'professional',
+  type: 'business',
+  categoryName: category.name
+}
+navigation.navigate('PosterPlayer', navigationParams)
+
+PosterPlayerScreen.tsx (Line 419-429):
+-----------------------------------
+const {
+  selectedPoster: initialPoster,              // ✅ Receives from HomeScreen
+  // ... other params
+} = route.params;
+
+PosterPlayerScreen.tsx (Line 511):
+-----------------------------------
+const [currentPoster, setCurrentPoster] = useState<Template>(convertedInitialPoster);
+// ✅ currentPoster initialized with initialPoster
+
+PosterPlayerScreen.tsx (Line 3137-3153):
+-----------------------------------
+const navigateToPosterEditor = useCallback(() => {
+  navigation.navigate('PosterEditor', {
+    selectedImage: { ... },
+    selectedLanguage: selectedLanguage,
+    selectedTemplateId: currentPoster.id,     // ❌ POTENTIAL ISSUE HERE
+    selectedTemplate: JSON.stringify(currentPoster),
+    posterCategory: currentPoster.category,
+    type: type,
+    categoryName: categoryName
+  });
+}, [navigation, currentPoster, selectedLanguage, getHighQualityImageUrl, type, categoryName]);
+
+PosterEditorScreen.tsx (Line 387):
+-----------------------------------
+const { selectedImage, selectedLanguage, selectedTemplateId, selectedTemplate: initialTemplate, posterCategory, type, categoryName } = route.params;
+// ✅ Should receive selectedTemplateId
+
+================================================================================
+3. ROOT CAUSE IDENTIFIED
+================================================================================
+
+PRIMARY ISSUE: Race condition between currentPoster initialization and Next button press
+
+LOCATION: PosterPlayerScreen.tsx, Line 3147
+FILE: d:\RSL Solutions\Market_Brand2\src\screens\PosterPlayerScreen.tsx
+
+ROOT CAUSE:
+1. currentPoster is initialized with convertedInitialPoster (Line 511)
+2. convertedInitialPoster depends on initialPoster (Line 500-509)
+3. Multiple useEffect hooks update currentPoster asynchronously (Lines 1099-1115, 2399-2408)
+4. If user presses Next button before all useEffect hooks complete:
+   - currentPoster might still be the initial loading placeholder
+   - OR currentPoster.id might be 'loading' or undefined
+   - Result: selectedTemplateId becomes 'loading' or undefined
+
+EVIDENCE:
+- Line 2511: Code checks for currentPoster.id === 'loading'
+- Line 1101: Code updates currentPoster when id === 'loading'
+- Multiple setCurrentPoster calls indicate async state updates
+
+================================================================================
+4. CODE SNIPPET OF ISSUE
+================================================================================
+
+PROBLEMATIC CODE (PosterPlayerScreen.tsx Line 3147):
+```typescript
+selectedTemplateId: currentPoster.id,
+```
+
+CURRENT POSTER INITIALIZATION (Line 511):
+```typescript
+const [currentPoster, setCurrentPoster] = useState<Template>(convertedInitialPoster);
+```
+
+ASYNC UPDATES THAT CAN RACE (Lines 1099-1115):
+```typescript
+if (currentPoster.id === 'loading' ||
+    currentPoster.id !== initialPosterId ||
+    (!currentPoster.thumbnail && !(currentPoster as any).content?.background)) {
+  // ... updates currentPoster asynchronously
+  setCurrentPoster(newPoster);
+}
+```
+
+================================================================================
+5. WHY IT BREAKS
+================================================================================
+
+1. TIMING ISSUE: Next button can be pressed before currentPoster is fully resolved
+2. LOADING STATE: currentPoster.id might be 'loading' when navigateToPosterEditor is called
+3. ASYNC STATE UPDATES: Multiple useEffect hooks modify currentPoster after initial render
+4. MISSING VALIDATION: No check if currentPoster.id is valid before navigation
+
+SCENARIO:
+1. User clicks category → HomeScreen navigates to PosterPlayerScreen
+2. PosterPlayerScreen renders with initialPoster (might have id: 'loading')
+3. User immediately clicks Next button
+4. navigateToPosterEditor uses currentPoster.id which is still 'loading'
+5. PosterEditorScreen receives selectedTemplateId: 'loading'
+
+================================================================================
+6. IMPACT ANALYSIS
+================================================================================
+
+AFFECTED FUNCTIONALITY:
+- PosterEditorScreen receives invalid selectedTemplateId
+- Template tracking and analytics break
+- Potential crashes if code expects valid template ID
+- User experience: Next button appears to work but data is corrupted
+
+SCOPE:
+- Affects all business category navigation flows
+- Impacts template selection tracking
+- May affect download attribution and analytics
+
+================================================================================
+7. FIX RECOMMENDATION
+================================================================================
+
+MINIMAL FIX: Add validation in navigateToPosterEditor
+
+LOCATION: PosterPlayerScreen.tsx, Line 3137-3153
+
+REPLACE:
+```typescript
+const navigateToPosterEditor = useCallback(() => {
+  console.log("➡️ Navigating to PosterEditorScreen with type:", type);
+
+  navigation.navigate('PosterEditor', {
+    selectedImage: {
+      uri: getHighQualityImageUrl(currentPoster),
+      title: currentPoster.name,
+      description: currentPoster.category,
+    },
+    selectedLanguage: selectedLanguage,
+    selectedTemplateId: currentPoster.id,
+    selectedTemplate: JSON.stringify(currentPoster),
+    posterCategory: currentPoster.category,
+    type: type,
+    categoryName: categoryName
+  });
+}, [navigation, currentPoster, selectedLanguage, getHighQualityImageUrl, type, categoryName]);
+```
+
+WITH:
+```typescript
+const navigateToPosterEditor = useCallback(() => {
+  console.log("➡️ Navigating to PosterEditorScreen with type:", type);
+
+  // Validate currentPoster before navigation
+  if (!currentPoster || currentPoster.id === 'loading' || !currentPoster.id) {
+    console.warn("⚠️ Cannot navigate - currentPoster is not valid:", {
+      hasCurrentPoster: !!currentPoster,
+      posterId: currentPoster?.id,
+      posterName: currentPoster?.name
+    });
+    return; // Prevent navigation with invalid data
+  }
+
+  navigation.navigate('PosterEditor', {
+    selectedImage: {
+      uri: getHighQualityImageUrl(currentPoster),
+      title: currentPoster.name,
+      description: currentPoster.category,
+    },
+    selectedLanguage: selectedLanguage,
+    selectedTemplateId: currentPoster.id,
+    selectedTemplate: JSON.stringify(currentPoster),
+    posterCategory: currentPoster.category,
+    type: type,
+    categoryName: categoryName
+  });
+}, [navigation, currentPoster, selectedLanguage, getHighQualityImageUrl, type, categoryName]);
+```
+
+================================================================================
+8. OPTIONAL IMPROVEMENTS
+================================================================================
+
+1. DISABLE NEXT BUTTON DURING LOADING:
+   - Add loading state check to Next button disabled prop
+   - Show loading indicator while currentPoster resolves
+
+2. ADD DEFERRED NAVIGATION:
+   - Wait for currentPoster to be valid before allowing navigation
+   - Use useEffect to enable Next button when ready
+
+3. IMPROVED LOGGING:
+   - Add console.log in PosterEditorScreen to log received selectedTemplateId
+   - Add validation logs in navigateToPosterEditor
+
+4. TYPE SAFETY:
+   - Add TypeScript check for currentPoster.id
+   - Use optional chaining for safer access
+
+5. USER FEEDBACK:
+   - Show toast or alert if Next button pressed during loading
+   - Provide visual feedback for loading state
+
+================================================================================
+9. VERIFICATION STEPS
+================================================================================
+
+1. Apply the fix above
+2. Test navigation flow: HomeScreen → PosterPlayerScreen → PosterEditorScreen
+3. Verify selectedTemplateId is valid in PosterEditorScreen console logs
+4. Test rapid Next button press after category selection
+5. Verify no 'loading' IDs reach PosterEditorScreen
+
+================================================================================
+CONCLUSION
+================================================================================
+
+The root cause is a race condition where the Next button can be pressed before currentPoster is fully resolved from its initial loading state. The fix adds validation to prevent navigation with invalid template IDs, ensuring data integrity throughout the navigation flow.
+
+This is a minimal, production-ready fix that addresses the immediate issue while maintaining all existing functionality.

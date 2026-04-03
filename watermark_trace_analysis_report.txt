@@ -1,0 +1,241 @@
+WATERMARK FUNCTIONALITY TRACE ANALYSIS REPORT
+==============================================
+
+1. EXECUTION FLOW TRACE
+-----------------------
+
+Next Button Click Flow:
+1. User clicks "Next" button in PosterEditorScreen (line 2647)
+2. Validation logic executes (lines 2648-2687)
+3. Canvas preparation starts (line 2689)
+4. ViewShot capture process begins (line 2718)
+5. Watermark logic triggers (lines 2741-2742, 2773-2777)
+6. Image captured with watermark (line 2780)
+7. Navigation to PosterPreview (line 2790)
+
+Data Flow:
+- Navigation params: type, categoryName, selectedImage, etc.
+- State: isCapturing, forceWatermarkCapture
+- Context: isSubscribed, checkPremiumAccess
+- Props: passed to PosterPreview screen
+
+2. WATERMARK SOURCE ANALYSIS
+-----------------------------
+
+components/Watermark.tsx Analysis:
+- Renders "Made with MarketBrand" text watermark
+- Only renders when isSubscribed is false (line 40)
+- Positioned absolutely at bottom-right with responsive sizing
+- Uses semi-transparent background and white text
+- NOT used in current implementation (imported but not rendered)
+
+Actual Watermark Implementation:
+- NOT using components/Watermark.tsx
+- Uses inline Image component with MB.png logo
+- Full-screen overlay with transparent logo
+- Located in PosterEditorScreen lines 2964-2972
+
+3. USAGE LOCATIONS (File Paths + Line Numbers)
+----------------------------------------------
+
+Watermark Component Import:
+- src/screens/PosterEditorScreen.tsx:49 - import Watermark from '../components/Watermark'
+
+Watermark Component Usage:
+- NONE (Watermark component is imported but never rendered)
+
+Actual Watermark Implementation:
+- src/screens/PosterEditorScreen.tsx:1131 - const [forceWatermarkCapture, setForceWatermarkCapture] = useState(false);
+- src/screens/PosterEditorScreen.tsx:2741 - const shouldForceWatermark = !hasVisibleCustomLayers || missingTextForVisibleFields;
+- src/screens/PosterEditorScreen.tsx:2742 - setForceWatermarkCapture(shouldForceWatermark);
+- src/screens/PosterEditorScreen.tsx:2773 - // Set capturing state to true to show watermark during capture
+- src/screens/PosterEditorScreen.tsx:2774 - setIsCapturing(true);
+- src/screens/PosterEditorScreen.tsx:2776 - // Add a delay to ensure the canvas is fully rendered with watermark
+- src/screens/PosterEditorScreen.tsx:2787 - setForceWatermarkCapture(false);
+- src/screens/PosterEditorScreen.tsx:2802 - setForceWatermarkCapture(false);
+- src/screens/PosterEditorScreen.tsx:2818 - setForceWatermarkCapture(false);
+- src/screens/PosterEditorScreen.tsx:2964 - {/* Watermark Overlay - full screen transparent logo */}
+- src/screens/PosterEditorScreen.tsx:2965 - {isCapturing && (!checkPremiumAccess('poster_export') || forceWatermarkCapture) && (
+- src/screens/PosterEditorScreen.tsx:2966-2972 - Full watermark overlay implementation
+
+Watermark Styles:
+- src/screens/PosterEditorScreen.tsx:6110-6119 - fullscreenWatermarkOverlay styles
+- src/screens/PosterEditorScreen.tsx:6120-6123 - fullscreenWatermarkImage styles
+
+Watermark Asset:
+- src/assets/MainLogo/MB.png - Watermark logo image
+
+4. ROOT CAUSE IDENTIFICATION
+-----------------------------
+
+EXACT FILE + LINE WHERE WATERMARK IS APPLIED:
+- src/screens/PosterEditorScreen.tsx:2965-2972
+
+TRIGGER CONDITIONS:
+1. isCapturing = true (set at line 2774)
+2. AND (checkPremiumAccess('poster_export') = false OR forceWatermarkCapture = true)
+
+WHY IT'S APPLIED:
+- checkPremiumAccess('poster_export') returns false for non-premium users
+- forceWatermarkCapture is true when poster has no visible custom layers or missing text fields (line 2741)
+
+HOW IT PROPAGATES:
+1. Next button click → setIsCapturing(true)
+2. ViewShot captures canvas with watermark overlay
+3. Captured image includes watermark
+4. Watermarked image passed to PosterPreview via navigation params
+
+5. REMOVAL PLAN (SAFE & PERMANENT)
+-----------------------------------
+
+Step 1: Remove Watermark Component Import
+- File: src/screens/PosterEditorScreen.tsx
+- Line 49: Remove import Watermark from '../components/Watermark'
+
+Step 2: Remove Watermark State Variables
+- File: src/screens/PosterEditorScreen.tsx
+- Line 1131: Remove const [forceWatermarkCapture, setForceWatermarkCapture] = useState(false);
+
+Step 3: Remove Watermark Logic
+- File: src/screens/PosterEditorScreen.tsx
+- Lines 2741-2742: Remove shouldForceWatermark calculation and setForceWatermarkCapture call
+- Lines 2787, 2802, 2818: Remove setForceWatermarkCapture(false) calls
+
+Step 4: Remove Watermark Overlay Rendering
+- File: src/screens/PosterEditorScreen.tsx
+- Lines 2964-2972: Remove entire watermark overlay JSX block
+
+Step 5: Remove Watermark Styles
+- File: src/screens/PosterEditorScreen.tsx
+- Lines 6110-6119: Remove fullscreenWatermarkOverlay style
+- Lines 6120-6123: Remove fullscreenWatermarkImage style
+
+Step 6: Remove Watermark Component File (Optional)
+- File: src/components/Watermark.tsx - Can be deleted as it's not used anywhere
+
+6. CODE FIX (BEFORE → AFTER)
+------------------------------
+
+BEFORE (Import):
+```typescript
+import Watermark from '../components/Watermark';
+```
+
+AFTER (Import):
+```typescript
+// Watermark import removed
+```
+
+BEFORE (State):
+```typescript
+const [forceWatermarkCapture, setForceWatermarkCapture] = useState(false);
+```
+
+AFTER (State):
+```typescript
+// Watermark state removed
+```
+
+BEFORE (Logic):
+```typescript
+const shouldForceWatermark = !hasVisibleCustomLayers || missingTextForVisibleFields;
+setForceWatermarkCapture(shouldForceWatermark);
+```
+
+AFTER (Logic):
+```typescript
+// Watermark force logic removed
+```
+
+BEFORE (Capture):
+```typescript
+// Set capturing state to true to show watermark during capture
+setIsCapturing(true);
+
+// Add a delay to ensure the canvas is fully rendered with watermark
+await new Promise(resolve => setTimeout(resolve, 100));
+```
+
+AFTER (Capture):
+```typescript
+// Set capturing state for capture process
+setIsCapturing(true);
+
+// Add a delay to ensure canvas is fully rendered
+await new Promise(resolve => setTimeout(resolve, 100));
+```
+
+BEFORE (Reset):
+```typescript
+setIsCapturing(false);
+setForceWatermarkCapture(false);
+```
+
+AFTER (Reset):
+```typescript
+setIsCapturing(false);
+// setForceWatermarkCapture removed
+```
+
+BEFORE (Watermark Overlay):
+```typescript
+{/* Watermark Overlay - full screen transparent logo */}
+{isCapturing && (!checkPremiumAccess('poster_export') || forceWatermarkCapture) && (
+  <View style={styles.fullscreenWatermarkOverlay}>
+    <Image
+      source={require('../assets/MainLogo/MB.png')}
+      style={styles.fullscreenWatermarkImage}
+      resizeMode="contain"
+    />
+  </View>
+)}
+```
+
+AFTER (Watermark Overlay):
+```typescript
+{/* Watermark overlay removed */}
+```
+
+BEFORE (Styles):
+```typescript
+fullscreenWatermarkOverlay: {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  justifyContent: 'center',
+  alignItems: 'center',
+  pointerEvents: 'none',
+},
+fullscreenWatermarkImage: {
+  width: '95%',
+  height: '95%',
+  tintColor: 'rgba(255, 255, 255, 0.3)',
+},
+```
+
+AFTER (Styles):
+```typescript
+// Watermark styles removed
+```
+
+7. VERIFICATION CHECKLIST
+--------------------------
+
+✅ Click Next → No watermark in captured image
+✅ Preview screen → Clean image without watermark
+✅ Download → Clean image without watermark  
+✅ No UI/layout break after removal
+✅ No unused imports remaining
+✅ No dead code left behind
+✅ Navigation flow unchanged
+✅ Canvas rendering unaffected
+✅ Image generation process intact
+
+SUMMARY:
+- Watermark is applied during ViewShot capture in PosterEditorScreen
+- Uses full-screen overlay with MB.png logo, not Watermark component
+- Triggered by non-premium subscription or missing content
+- Removal requires deleting state, logic, rendering, and styles
+- Safe to remove without breaking core functionality
