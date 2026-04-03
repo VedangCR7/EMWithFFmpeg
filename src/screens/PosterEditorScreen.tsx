@@ -3780,7 +3780,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
         onUpgrade={async () => {
           setShowPremiumTemplateModal(false);
           await refreshSubscription();
-          (navigation as any).navigate('Subscription');
+          navigation.navigate('BusinessProfiles' as any);
         }}
         selectedTemplate={null}
       />
