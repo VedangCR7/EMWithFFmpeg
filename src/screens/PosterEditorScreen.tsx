@@ -2644,7 +2644,35 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route, navigati
           onPress={async () => {
             console.log(":dart: [POSTER EDITOR] Next button clicked");
             
-            // Validation based on type parameter
+            // CRITICAL: Business Profile Debug Logging
+            console.log("===== BUSINESS PROFILE DEBUG =====");
+            console.log("Selected Business Profile:", selectedBusinessProfile);
+            console.log("Business Subscription Status:", selectedBusinessProfile?.businessSubscriptionStatus);
+            console.log("User Subscription Status:", selectedBusinessProfile?.subscriptionStatus);
+            console.log("==================================");
+            
+            // Helper function for safe business subscription validation
+            const getEffectiveBusinessSubscription = () => {
+              const businessStatus = selectedBusinessProfile?.businessSubscriptionStatus;
+              
+              if (businessStatus) {
+                return businessStatus.toLowerCase() === "active";
+              }
+              
+              // Fallback for safety
+              return (
+                selectedBusinessProfile?.subscriptionStatus?.toUpperCase() === "ACTIVE" ||
+                isSubscriptionActive
+              );
+            };
+            
+            const hasAccess = getEffectiveBusinessSubscription();
+            
+            console.log("===== SUBSCRIPTION DECISION =====");
+            console.log("Final Access:", hasAccess);
+            console.log("================================");
+            
+            // Validate business category if business type
             if (type === "business") {
               console.log(":mag: [POSTER EDITOR] Validating business category", {
                 categoryName,
@@ -2659,26 +2687,12 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route, navigati
                 });
                 return;
               }
-              
-              console.log(":mag: [POSTER EDITOR] Checking business subscription", {
-                businessSubscriptionStatus: selectedBusinessProfile?.businessSubscriptionStatus
-              });
-              
-              // Business subscription validation
-              if (!selectedBusinessProfile?.businessSubscriptionStatus || selectedBusinessProfile.businessSubscriptionStatus !== "Active") {
-                console.log(":x: [POSTER EDITOR] Validation failed - Business subscription not Active");
-                return;
-              }
-            } else {
-              console.log(":mag: [POSTER EDITOR] Checking normal subscription", {
-                subscriptionStatus: selectedBusinessProfile?.subscriptionStatus
-              });
-              
-              // Non-business poster: check normal subscription status
-              if (!selectedBusinessProfile?.subscriptionStatus || selectedBusinessProfile.subscriptionStatus.toUpperCase() !== "ACTIVE") {
-                console.log(":x: [POSTER EDITOR] Validation failed - Normal subscription not Active");
-                return;
-              }
+            }
+            
+            // Unified subscription validation using business subscription status
+            if (!hasAccess) {
+              console.log(":x: [POSTER EDITOR] Access Denied: Subscription inactive");
+              return;
             }
             
             console.log(":white_check_mark: [POSTER EDITOR] Validation passed");

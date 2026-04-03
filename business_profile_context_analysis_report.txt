@@ -1,0 +1,224 @@
+BUSINESS PROFILE CONTEXT END-TO-END ANALYSIS REPORT
+====================================================
+
+## 1. CONTEXT STRUCTURE OVERVIEW
+
+### BusinessProfileContext.tsx Architecture
+
+**State Variables:**
+- `selectedBusinessProfile: BusinessProfile | null` (line 31)
+- `selectedBusinessCategory: string | null` (line 32)
+- `isLoading: boolean` (line 33)
+
+**Key Functions:**
+- `loadSelectedProfile()` - Loads from AsyncStorage (line 51)
+- `refreshSelectedProfileFromApi()` - API refresh (line 93)
+- `setSelectedBusinessProfile()` - Updates state + storage (line 190)
+- `initializeSelectedProfile()` - Auto-selects first profile (line 246)
+
+**Data Flow:**
+1. App starts → Auth state change → `loadSelectedProfile()`
+2. Loads cached profile from AsyncStorage
+3. Triggers `refreshSelectedProfileFromApi()` for fresh data
+4. Updates context state with fresh API data
+
+## 2. API SOURCE(S) IDENTIFIED
+
+### Primary API Endpoint
+
+**Function:** `getUserBusinessProfiles(userId)` (businessProfile.ts line 65)
+**Endpoint:** `/api/mobile/business-profile/${userId}` (line 78)
+**Response Structure:** `response.data.data.profiles[]`
+
+### Secondary API Endpoints
+
+1. **All Profiles:** `/api/mobile/business-profile` (line 172)
+2. **Single Profile:** `/api/mobile/business-profile/${id}` (line 220)
+3. **By Category:** `/api/mobile/business-profile?category=${category}` (line 677)
+
+### Deprecated Subscription APIs
+
+**Comments indicate migration to subscriptionApi:**
+- Line 761: "use subscriptionApi.getBusinessProfileSubscriptionStatus for status checks"
+- Line 854: "Use subscriptionApi.getBusinessProfileSubscriptionStatus instead"
+
+## 3. DATA FLOW TRACE (API → CONTEXT → SCREEN)
+
+### Step-by-Step Flow:
+
+```
+API: /api/mobile/business-profile/{userId}
+   ↓ (businessProfile.ts lines 78-129)
+Mapping Function: profiles.map() 
+   ↓ (lines 126-128)
+subscriptionStatus: profile.subscriptionStatus
+isSubscriptionActive: profile.isSubscriptionActive
+   ↓ (Missing: businessSubscriptionStatus)
+Context: selectedBusinessProfile state
+   ↓ (BusinessProfileContext.tsx line 31)
+Screen: PosterEditorScreen useBusinessProfile()
+```
+
+### Critical Gap Identified:
+
+**businessSubscriptionStatus is NOT mapped from API response!**
+
+**Lines 126-128 in businessProfile.ts:**
+```typescript
+// Include subscription status fields from API response
+subscriptionStatus: profile.subscriptionStatus,
+isSubscriptionActive: profile.isSubscriptionActive,
+// MISSING: businessSubscriptionStatus: profile.businessSubscriptionStatus
+```
+
+## 4. businessSubscriptionStatus AVAILABILITY
+
+### Interface Definition (line 32):
+```typescript
+businessSubscriptionStatus?: string; // "Active", "Inactive", "Expired"
+```
+
+### API Mapping Status:
+❌ **NOT MAPPED** - Field exists in interface but not in mapping functions
+
+### Mapping Functions Missing Field:
+1. `getUserBusinessProfiles()` - Lines 126-128
+2. `getBusinessProfiles()` - Lines 194-195  
+3. `getBusinessProfileById()` - Lines 242-244
+
+## 5. INTERFACE/TYPE ISSUES
+
+### BusinessProfile Interface (businessProfile.ts lines 30-32):
+```typescript
+subscriptionStatus?: string; // "ACTIVE", "NONE", "PENDING", "EXPIRED", etc.
+isSubscriptionActive?: boolean; // true/false for quick checking
+businessSubscriptionStatus?: string; // "Active", "Inactive", "Expired" - Business-specific subscription
+```
+
+### Issue:
+✅ Interface defines `businessSubscriptionStatus`
+❌ Mapping functions don't include it
+❌ No validation if API provides this field
+
+## 6. SELECTEDBUSINESSPROFILE ANALYSIS
+
+### How it's Set:
+
+1. **Initial Load:** `loadSelectedProfile()` from AsyncStorage (line 51)
+2. **API Refresh:** `refreshSelectedProfileFromApi()` calls `getUserBusinessProfiles()` (line 103)
+3. **User Selection:** `setSelectedBusinessProfile()` (line 190)
+4. **Auto-Selection:** `initializeSelectedProfile()` selects first profile (line 246)
+
+### Data Completeness:
+❌ `selectedBusinessProfile` lacks `businessSubscriptionStatus` due to mapping gap
+
+## 7. MULTIPLE SOURCE CONFLICT
+
+### Current Subscription Sources:
+
+1. **businessProfile API:** Provides `subscriptionStatus` ✅
+2. **subscriptionApi:** Provides `businessSubscriptionStatus` ❌ (not used)
+3. **Auth Service:** Provides user-level `subscriptionStatus` (auth.ts line 451)
+
+### Conflict Identified:
+
+**businessSubscriptionStatus exists in subscriptionApi but is NOT integrated into businessProfile context**
+
+**Evidence:**
+- Deprecated comments point to subscriptionApi (lines 761, 854)
+- BusinessProfileContext doesn't import or use subscriptionApi
+- Only businessProfile API is used for profile data
+
+## 8. ROOT CAUSE
+
+### Primary Issue:
+
+**businessSubscriptionStatus field is defined in frontend interface but never mapped from API response**
+
+### Why it's undefined in current system:
+
+1. **API Response:** May or may not include `businessSubscriptionStatus`
+2. **Mapping Functions:** Do NOT include the field (3 locations missing mapping)
+3. **Context Integration:** No separate call to subscriptionApi for business subscription data
+4. **Data Flow:** Complete gap between API and context state
+
+### Critical Finding:
+
+The system has **two separate subscription APIs**:
+1. `businessProfile API` - provides `subscriptionStatus`
+2. `subscriptionApi` - provides `businessSubscriptionStatus` (not integrated)
+
+## 9. GAP ANALYSIS
+
+### Missing Components:
+
+1. **API Field Mapping:** 3 mapping functions missing `businessSubscriptionStatus`
+2. **API Integration:** No usage of `subscriptionApi.getBusinessProfileSubscriptionStatus()`
+3. **Data Merging:** No logic to merge subscription data into business profiles
+4. **Type Validation:** No runtime validation of API response structure
+
+### Interface vs Reality Mismatch:
+
+**Interface:** `businessSubscriptionStatus?: string` ✅  
+**Reality:** Field never populated from API ❌
+
+### Timing Issues:
+
+- Context refreshes profile data but only from businessProfile API
+- No separate subscription data fetching
+- Potential race condition if subscription data needed separately
+
+## 10. RECOMMENDED DIRECTION (ANALYSIS ONLY)
+
+### Option 1: Extend Existing API (Recommended)
+**Pros:** Single source of truth, simpler architecture  
+**Cons:** Requires backend changes
+
+**Implementation:**
+1. Add `businessSubscriptionStatus` to businessProfile API response
+2. Update mapping functions (lines 126-128, 194-195, 242-244)
+3. Test with debug logs to confirm field availability
+
+### Option 2: Use Separate Subscription API
+**Pros:** May already exist in subscriptionApi  
+**Cons:** More complex, multiple data sources
+
+**Implementation:**
+1. Import subscriptionApi in BusinessProfileContext
+2. Call `getBusinessProfileSubscriptionStatus()` after profile load
+3. Merge subscription data into profile state
+4. Handle async loading and error states
+
+### Option 3: Data Normalization Layer
+**Pros:** Clean separation of concerns  
+**Cons:** Additional complexity
+
+**Implementation:**
+1. Create data merger service
+2. Combine business profile + subscription data
+3. Provide unified profile object to context
+
+### Immediate Action Required:
+
+**Add debug logging to mapping functions** to verify if `businessSubscriptionStatus` exists in API response:
+
+```typescript
+console.log('🔍 API Response Fields:', Object.keys(profile));
+console.log('🔍 businessSubscriptionStatus:', profile.businessSubscriptionStatus);
+```
+
+### Critical Decision Point:
+
+The debug logs added to PosterEditorScreen will reveal:
+- ✅ If API provides `businessSubscriptionStatus` → Option 1 viable
+- ❌ If API doesn't provide it → Option 2 or 3 required
+
+### Risk Assessment:
+
+**High Risk:** Current system assumes field exists but never validates  
+**Medium Risk:** Multiple subscription APIs create confusion  
+**Low Risk:** Interface definition exists but unused
+
+### Conclusion:
+
+The `businessSubscriptionStatus` field is **completely disconnected** from the data flow. The system needs either API extension or subscription API integration to make this field functional.
