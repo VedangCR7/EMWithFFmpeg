@@ -24,6 +24,7 @@ import PaymentErrorModal from '../components/PaymentErrorModal';
 import PlanCard from '../components/PlanCard';
 import { useTheme } from '../context/ThemeContext';
 import { useSubscription } from '../contexts/SubscriptionContext';
+import { useBusinessProfile } from '../context/BusinessProfileContext';
 import subscriptionApi, { SubscriptionPlan, SubscriptionStatus } from '../services/subscriptionApi';
 import authService from '../services/auth';
 import api from '../services/api';
@@ -79,10 +80,14 @@ const SubscriptionScreen: React.FC = () => {
   console.log('🔍 SUBSCRIPTION SCREEN - Screen title:', screenTitle);
   
   const { isSubscribed, subscriptionStatus: contextSubscriptionStatus, plans: contextPlans, refreshSubscription, refreshPlans, addTransaction, setIsSubscribed, transactionStats, isLoading, autopayState, enableAutopay, disableAutopay, refreshAutopayStatus, setPaymentInProgress } = useSubscription();
+  const { setActivationPending, clearActivationPending, isActivationPending: isProfileActivationPending } = useBusinessProfile();
   
   // Business profile subscription state
   const [businessSubscriptionStatus, setBusinessSubscriptionStatus] = useState<SubscriptionStatus | null>(null);
   const [isBusinessSubscriptionLoading, setIsBusinessSubscriptionLoading] = useState(false);
+  
+  // FRONTEND-ONLY: Remove local activation pending state - use only context
+  // const [isActivationPending, setIsActivationPending] = useState(false); // REMOVED
   
   // Determine if we're in business profile mode
   const isBusinessProfileMode = !!businessProfileId;
@@ -97,11 +102,13 @@ const SubscriptionScreen: React.FC = () => {
 
   // BUSINESS PROFILE SUBSCRIPTION LOGIC: Use business profile when available
   const isBusinessActive = businessSubscriptionStatus?.status?.toUpperCase() === 'ACTIVE';
+  const isActivationPending = isProfileActivationPending(businessProfileId || '');
   console.log('🏢 BUSINESS SUBSCRIPTION LOGIC: isBusinessActive =', isBusinessActive, 'for profile:', effectiveBusinessProfile?.name);
   console.log('🏢 BUSINESS SUBSCRIPTION STATUS:', businessSubscriptionStatus);
+  console.log('🏢 ACTIVATION PENDING STATE:', isActivationPending, 'for profile:', businessProfileId);
   
   // Effective subscription state based on mode
-  const effectiveIsSubscribed = isBusinessProfileMode ? isBusinessActive : isSubscribed;
+  const effectiveIsSubscribed = isBusinessProfileMode ? (isBusinessActive && !isActivationPending) : isSubscribed;
   const effectiveSubscriptionStatus = isBusinessProfileMode ? businessSubscriptionStatus : contextSubscriptionStatus;
   const effectiveIsLoading = isBusinessProfileMode ? isBusinessSubscriptionLoading : isLoading;
 
@@ -615,6 +622,16 @@ const SubscriptionScreen: React.FC = () => {
             const currency = 'INR';
 
             // Step 1: Verify payment first
+            console.log('🔍 DEBUG: About to verify payment with params:', {
+              orderId: response.razorpay_order_id,
+              paymentId: response.razorpay_payment_id,
+              amountInRupees,
+              amountInPaise,
+              planId: selectedPlan.id,
+              isBusinessProfileMode,
+              businessProfileId
+            });
+            
             const verifyResult = await subscriptionApi.verifyPayment({
               orderId: response.razorpay_order_id,
               paymentId: response.razorpay_payment_id,
@@ -628,6 +645,7 @@ const SubscriptionScreen: React.FC = () => {
               ...(isBusinessProfileMode && businessProfileId && { businessProfileId }),
             });
             console.log('✅ PAYMENT_SUCCESS - Payment verified:', verifyResult);
+            console.log('🔍 DEBUG: verifyResult.success =', verifyResult?.success);
 
             // Step 2: Clear subscription cache immediately
             const currentUserForCache = authService.getCurrentUser();
@@ -639,40 +657,74 @@ const SubscriptionScreen: React.FC = () => {
 
             // Step 3: Start polling for subscription activation instead of immediate check
             if (verifyResult?.success) {
-              console.log('[APP] ✅ Payment verified, starting polling for activation (5m window)');
+              console.log('[APP] ✅ Payment verified, setting activation pending state (24-hour window)');
+              console.log('🔍 DEBUG: isBusinessProfileMode:', isBusinessProfileMode);
+              console.log('🔍 DEBUG: businessProfileId:', businessProfileId);
+              console.log('🔍 DEBUG: verifyResult:', verifyResult);
               
-              // Use the new modular polling helper
-              pollingCleanupRef.current = startSubscriptionPolling(
-                () => {
-                  // onActive: Subscription is now active!
-                  console.log('✅ Subscription activated via polling!');
-                  setIsSubscribed(true);
-                  setIsTransactionPending(false);
-                  updatePaymentInProgress(false);
-                  
-                  if (Platform.OS === 'android') {
-                    ToastAndroid.show('🎉 Subscription activated! Welcome to Pro!', ToastAndroid.LONG);
-                  }
-                  
-                  // Final refresh of context to ensure everything is updated
-                  refreshSubscription(true);
-                  
-                  // Close screen once active
+              // CRITICAL FIX: Set activation pending instead of immediate activation
+              if (isBusinessProfileMode && businessProfileId) {
+                // Use only context state - remove local state
+                console.log('🔍 DEBUG: About to set activation pending for:', businessProfileId);
+                setActivationPending(businessProfileId, true);
+                console.log('🏢 Business profile activation pending for 24 hours:', businessProfileId);
+                
+                // Show appropriate message for business profile
+                Alert.alert(
+                  'Payment Successful',
+                  'Your business profile will be activated within 24 hours.',
+                  [{ text: 'OK', onPress: () => {} }] // Remove immediate navigation
+                );
+                
+                // Clear payment states
+                setIsTransactionPending(false);
+                updatePaymentInProgress(false);
+                
+                // CRITICAL FIX: Add delay to ensure context state propagates before navigation
+                setTimeout(() => {
+                  console.log('🔍 DEBUG: Navigation after delay, checking activation pending state...');
+                  const isStillPending = isProfileActivationPending(businessProfileId);
+                  console.log('🔍 DEBUG: Activation pending state before navigation:', isStillPending);
                   navigation.goBack();
-                },
-                () => {
-                  // onTimeout: 5 minutes passed
-                  console.warn('⚠️ Polling timed out - subscription not yet activated');
-                  setIsTransactionPending(false);
-                  updatePaymentInProgress(false);
-                  
-                  Alert.alert(
-                    'Processing Payment',
-                    'Your payment was successful! Subscription activation may take a few moments. Please check your status after a short while.',
-                    [{ text: 'OK', onPress: () => navigation.goBack() }]
-                  );
-                }
-              );
+                }, 300); // Increased delay for better reliability
+              } else {
+                console.log('🔍 DEBUG: Not in business profile mode or missing businessProfileId');
+                console.log('🔍 DEBUG: isBusinessProfileMode =', isBusinessProfileMode);
+                console.log('🔍 DEBUG: businessProfileId =', businessProfileId);
+                
+                // User subscription: Use existing polling logic
+                pollingCleanupRef.current = startSubscriptionPolling(
+                  () => {
+                    // onActive: Subscription is now active!
+                    console.log('✅ User subscription activated via polling!');
+                    setIsSubscribed(true);
+                    setIsTransactionPending(false);
+                    updatePaymentInProgress(false);
+                    
+                    if (Platform.OS === 'android') {
+                      ToastAndroid.show('🎉 Subscription activated! Welcome to Pro!', ToastAndroid.LONG);
+                    }
+                    
+                    // Final refresh of context to ensure everything is updated
+                    refreshSubscription(true);
+                    
+                    // Close screen once active
+                    navigation.goBack();
+                  },
+                  () => {
+                    // onTimeout: 5 minutes passed
+                    console.warn('⚠️ Polling timed out - subscription not yet activated');
+                    setIsTransactionPending(false);
+                    updatePaymentInProgress(false);
+                    
+                    Alert.alert(
+                      'Processing Payment',
+                      'Your payment was successful! Subscription activation may take a few moments. Please check your status after a short while.',
+                      [{ text: 'OK', onPress: () => navigation.goBack() }]
+                    );
+                  }
+                );
+              }
             } else {
               console.warn('[APP] ⚠️ Payment verification failed');
               setIsTransactionPending(false);
@@ -689,6 +741,10 @@ const SubscriptionScreen: React.FC = () => {
           ondismiss: () => {
             setIsProcessing(false);
             updatePaymentInProgress(false);
+            // CRITICAL FIX: Clear activation pending state on modal dismiss
+            if (isBusinessProfileMode) {
+              clearActivationPending(businessProfileId);
+            }
           },
         },
       };
@@ -736,12 +792,28 @@ const SubscriptionScreen: React.FC = () => {
       }
 
       if (error.code === 'PAYMENT_CANCELLED') {
+        // CRITICAL FIX: Clear activation pending state on payment cancellation
+        if (isBusinessProfileMode) {
+          clearActivationPending(businessProfileId);
+        }
         showErrorModal('Payment Cancelled', 'Payment was cancelled by user.');
       } else if (error.code === 'NETWORK_ERROR') {
+        // CRITICAL FIX: Clear activation pending state on network error
+        if (isBusinessProfileMode) {
+          clearActivationPending(businessProfileId);
+        }
         showErrorModal('Network Error', 'Please check your internet connection and try again.');
       } else if (error.code === 'INVALID_OPTIONS') {
+        // CRITICAL FIX: Clear activation pending state on configuration error
+        if (isBusinessProfileMode) {
+          clearActivationPending(businessProfileId);
+        }
         showErrorModal('Configuration Error', 'Payment configuration is invalid. Please contact support.');
       } else {
+        // CRITICAL FIX: Clear activation pending state on general payment failure
+        if (isBusinessProfileMode) {
+          clearActivationPending(businessProfileId);
+        }
         showErrorModal('Payment Failed', 'Something went wrong with the payment. Please try again.');
       }
     } finally {
@@ -940,11 +1012,42 @@ const SubscriptionScreen: React.FC = () => {
 
               // Step 3: Start polling for subscription activation instead of immediate check
               if (verifyResult?.success) {
-                console.log('[APP] ✅ Autopay payment verified, starting polling for activation');
+                console.log('[APP] ✅ Autopay payment verified, setting activation pending for business profiles');
+                console.log('🔍 DEBUG: isBusinessProfileMode:', isBusinessProfileMode);
+                console.log('🔍 DEBUG: businessProfileId:', businessProfileId);
                 
-                // Use the new modular polling helper
-                pollingCleanupRef.current = startSubscriptionPolling(
-                  () => {
+                // CRITICAL FIX: Set activation pending for business profiles instead of immediate activation
+                if (isBusinessProfileMode && businessProfileId) {
+                  console.log('🔍 DEBUG: About to set activation pending for autopay:', businessProfileId);
+                  setActivationPending(businessProfileId, true);
+                  console.log('🏢 Business profile activation pending for 24 hours (autopay):', businessProfileId);
+                  
+                  // Show appropriate message for business profile
+                  Alert.alert(
+                    'Payment Successful',
+                    'Your business profile will be activated within 24 hours.',
+                    [{ text: 'OK', onPress: () => {} }] // Remove immediate navigation
+                  );
+                  
+                  // Clear payment states
+                  setIsTransactionPending(false);
+                  updatePaymentInProgress(false);
+                  
+                  // CRITICAL FIX: Add delay to ensure context state propagates before navigation
+                  setTimeout(() => {
+                    console.log('🔍 DEBUG: Navigation after delay (autopay), checking activation pending state...');
+                    const isStillPending = isProfileActivationPending(businessProfileId);
+                    console.log('🔍 DEBUG: Activation pending state before navigation (autopay):', isStillPending);
+                    navigation.goBack();
+                  }, 300); // Increased delay for better reliability
+                } else {
+                  console.log('🔍 DEBUG: Not in business profile mode or missing businessProfileId for autopay');
+                  console.log('🔍 DEBUG: isBusinessProfileMode =', isBusinessProfileMode);
+                  console.log('🔍 DEBUG: businessProfileId =', businessProfileId);
+                  
+                  // User subscription: Use existing polling logic
+                  pollingCleanupRef.current = startSubscriptionPolling(
+                    () => {
                     // onActive: Subscription is now active!
                     console.log('✅ Autopay subscription activated!');
                     if (isBusinessProfileMode) {
@@ -984,6 +1087,7 @@ const SubscriptionScreen: React.FC = () => {
                     );
                   }
                 );
+                }
               } else {
                 console.warn('[APP] ⚠️ Payment verification failed');
                 setIsTransactionPending(false);
@@ -992,11 +1096,19 @@ const SubscriptionScreen: React.FC = () => {
               }
             } else {
               console.warn('⚠️ Autopay response missing razorpay_subscription_id');
+              // CRITICAL FIX: Clear activation pending state on autopay failure
+              if (isBusinessProfileMode) {
+                clearActivationPending(businessProfileId);
+              }
               updatePaymentInProgress(false);
               showErrorModal('Subscription Activation Failed', 'Payment was successful but subscription could not be activated. Please contact support.');
             }
           } catch (error) {
             console.error('❌ Error processing Autopay response:', error);
+            // CRITICAL FIX: Clear activation pending state on autopay error
+            if (isBusinessProfileMode) {
+              clearActivationPending(businessProfileId);
+            }
             updatePaymentInProgress(false);
             showErrorModal('Payment Processing Error', 'Payment was successful but there was an error activating your subscription. Please contact support or refresh the app.');
           }
@@ -1006,6 +1118,10 @@ const SubscriptionScreen: React.FC = () => {
             console.log('🚪 Razorpay modal dismissed');
             setIsProcessing(false);
             updatePaymentInProgress(false);
+            // CRITICAL FIX: Clear activation pending state on modal dismiss
+            if (isBusinessProfileMode) {
+              clearActivationPending(businessProfileId);
+            }
           },
         },
       };

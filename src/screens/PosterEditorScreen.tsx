@@ -483,7 +483,8 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
   }
   
   // Check if the selected business profile has an active subscription
-  const isActive = selectedBusinessProfile?.subscriptionStatus?.toUpperCase() === "ACTIVE" || isSubscriptionActive;
+  // CRITICAL FIX: Remove mixed subscription logic - use ONLY business profile subscription status
+  const isActive = selectedBusinessProfile?.subscriptionStatus?.toUpperCase() === "ACTIVE";
 
   const activeBusinessProfile = selectedBusinessProfile;
 
@@ -2665,52 +2666,66 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
             // CRITICAL: Business Profile Debug Logging
             console.log("===== BUSINESS PROFILE DEBUG =====");
             console.log("Selected Business Profile:", selectedBusinessProfile);
-            console.log("Business Subscription Status:", selectedBusinessProfile?.businessSubscriptionStatus);
-            console.log("User Subscription Status:", selectedBusinessProfile?.subscriptionStatus);
+            console.log("Subscription Status:", selectedBusinessProfile?.subscriptionStatus);
             console.log("==================================");
             
-            // Helper function for safe business subscription validation
-            const getEffectiveBusinessSubscription = () => {
-              const businessStatus = selectedBusinessProfile?.businessSubscriptionStatus;
-              
-              if (businessStatus) {
-                return businessStatus.toLowerCase() === "active";
-              }
-              
-              // Fallback for safety
-              return (
-                selectedBusinessProfile?.subscriptionStatus?.toUpperCase() === "ACTIVE" ||
-                isSubscriptionActive
-              );
-            };
+            // Safe guards - ensure business profile exists
+            if (!selectedBusinessProfile) {
+              console.log(":x: [POSTER EDITOR] Validation failed - No business profile selected");
+              setShowPremiumTemplateModal(true);
+              return;
+            }
             
-            const hasAccess = getEffectiveBusinessSubscription();
-            
-            console.log("===== SUBSCRIPTION DECISION =====");
-            console.log("Final Access:", hasAccess);
-            console.log("================================");
+            if (!selectedBusinessProfile.subscriptionStatus) {
+              console.log(":x: [POSTER EDITOR] Validation failed - No subscription status available");
+              setShowPremiumTemplateModal(true);
+              return;
+            }
             
             // Validate business category if business type
             if (type === "business") {
               console.log(":mag: [POSTER EDITOR] Validating business category", {
-                categoryName,
-                selectedBusinessCategory
+                businessProfileCategory: selectedBusinessProfile.category,
+                selectedTemplate: selectedTemplate
               });
               
-              // Business category validation
-              if (!categoryName || !selectedBusinessCategory || categoryName.toLowerCase() !== selectedBusinessCategory.toLowerCase()) {
+              // Parse template object to get actual category
+              let templateCategory = null;
+              try {
+                const templateObj = typeof selectedTemplate === 'string' ? JSON.parse(selectedTemplate) : selectedTemplate;
+                templateCategory = templateObj?.category || templateObj;
+              } catch (e) {
+                templateCategory = selectedTemplate; // fallback to string value
+              }
+              
+              // Business category validation - compare profile category with template category
+              if (!selectedBusinessProfile.category || !templateCategory || selectedBusinessProfile.category.toLowerCase() !== templateCategory.toLowerCase()) {
                 console.log(":x: [POSTER EDITOR] Validation failed - Business category mismatch", {
-                  categoryName,
-                  selectedBusinessCategory
+                  businessProfileCategory: selectedBusinessProfile.category,
+                  templateCategory: templateCategory
                 });
+                Alert.alert(
+                  "Category Mismatch",
+                  `This template belongs to '${templateCategory}' category but your business profile is registered under '${selectedBusinessProfile.category}'. Please select a matching template or update your business profile.`,
+                  [{ text: "OK" }]
+                );
                 return;
               }
             }
             
-            // Unified subscription validation using business subscription status
-            if (!hasAccess) {
-              console.log(":x: [POSTER EDITOR] Access Denied: Subscription inactive");
-              setShowPremiumTemplateModal(true);
+            // Strict subscription validation using only business profile subscription status
+            if (selectedBusinessProfile.subscriptionStatus !== "ACTIVE") {
+              console.log(":x: [POSTER EDITOR] Access Denied: Subscription inactive", {
+                subscriptionStatus: selectedBusinessProfile.subscriptionStatus
+              });
+              Alert.alert(
+                "Subscription Required",
+                `Your business profile subscription is ${selectedBusinessProfile.subscriptionStatus}. Please activate your subscription to access this feature.`,
+                [
+                  { text: "Cancel", style: "cancel" },
+                  { text: "Upgrade", onPress: () => navigation.navigate('BusinessProfiles' as any) }
+                ]
+              );
               return;
             }
             
