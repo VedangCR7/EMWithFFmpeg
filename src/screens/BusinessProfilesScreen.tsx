@@ -80,6 +80,7 @@ const BusinessProfilesScreen: React.FC = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [pendingProfileData, setPendingProfileData] = useState<any>(null); // Store form data while user pays
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [processingProfiles, setProcessingProfiles] = useState<Set<string>>(new Set());
   const navigation = useNavigation();
   const pendingProfileDataRef = useRef<any>(null);
   const pollingCleanupRef = useRef<(() => void) | null>(null);
@@ -311,7 +312,37 @@ const BusinessProfilesScreen: React.FC = () => {
       
       // Check if payment was completed and create profile if needed
       checkPaymentAndCreateProfile();
-    }, [loadBusinessProfiles, checkPaymentAndCreateProfile])
+      
+      // Start polling if any profile has PENDING or PROCESSING status
+      const hasPendingOrProcessing = profiles.some(profile => {
+        const status = profile?.subscriptionStatus?.toUpperCase();
+        return status === 'PENDING' || status === 'PROCESSING';
+      });
+      
+      if (hasPendingOrProcessing && !pollingCleanupRef.current) {
+        console.log('🔄 Starting subscription polling for PENDING/PROCESSING profiles');
+        pollingCleanupRef.current = startSubscriptionPolling(
+          () => {
+            console.log('✅ Subscription status updated via polling');
+            loadBusinessProfiles();
+            
+            // Clear processing profiles set when profiles are refreshed
+            setProcessingProfiles(new Set());
+          },
+          () => {
+            console.log('⏰ Subscription polling timed out');
+            setProcessingProfiles(new Set());
+          }
+        );
+      }
+      
+      return () => {
+        if (pollingCleanupRef.current) {
+          pollingCleanupRef.current();
+          pollingCleanupRef.current = null;
+        }
+      };
+    }, [loadBusinessProfiles, checkPaymentAndCreateProfile, profiles])
   );
 
   const onRefresh = useCallback(async () => {
@@ -397,10 +428,17 @@ const BusinessProfilesScreen: React.FC = () => {
   }, [getBusinessProfileSubscription, setSelectedBusinessProfile]);
 
   const initiatePaymentForProfile = useCallback((profile: any) => {
+    // Prevent multiple payment attempts
+    if (processingProfiles.has(profile.id)) {
+      console.log('🔍 Payment already in progress for profile:', profile.id);
+      return;
+    }
+    
+    setProcessingProfiles(prev => new Set(prev).add(profile.id));
     setPendingProfileData(profile);
     pendingProfileDataRef.current = profile;
     handlePayNow();
-  }, [handlePayNow]);
+  }, [processingProfiles, handlePayNow]);
 
   const handleDeleteProfile = useCallback((profileId: string) => {
     setProfileToDelete(profileId);
@@ -438,6 +476,8 @@ const BusinessProfilesScreen: React.FC = () => {
   const handlePaymentModalClose = useCallback(() => {
     setShowPaymentModal(false);
     setIsProcessingPayment(false);
+    // Clear processing state when modal is closed
+    setProcessingProfiles(new Set());
   }, []);
 
   const reportPaymentFailure = useCallback(async (orderId: string, status: string) => {
@@ -560,6 +600,7 @@ const BusinessProfilesScreen: React.FC = () => {
     });
     
     const isActive = item?.subscriptionStatus?.toUpperCase() === "ACTIVE";
+    const isProcessing = item?.subscriptionStatus?.toUpperCase() === "PROCESSING";
     
     console.log('🔍 [DEBUG] Final isActive result:', isActive);
     
@@ -575,19 +616,39 @@ const BusinessProfilesScreen: React.FC = () => {
           isSelected && { borderColor: theme.colors.primary, borderWidth: 2 }
         ]}
         onPress={() => onSelect(item)}
-        activeOpacity={isLocked ? 0.9 : 0.7}
+        disabled={isLocked}
+        activeOpacity={isLocked ? 1 : 0.7}
       >
         {isLocked && (
           <View style={styles.lockOverlay}>
             <View style={[styles.lockBadge, { backgroundColor: theme.colors.surface }]}>
-              <Icon name="lock" size={24} color={theme.colors.error} />
-              <Text style={[styles.lockText, { color: theme.colors.text }]}>Subscription Required</Text>
-              <TouchableOpacity 
-                style={[styles.activateButton, { backgroundColor: theme.colors.primary }]}
-                onPress={() => onPay(item)}
-              >
-                <Text style={styles.activateButtonText}>Activate Now</Text>
-              </TouchableOpacity>
+              {isProcessing ? (
+                <>
+                  <Icon name="hourglass-empty" size={24} color={theme.colors.warning} />
+                  <Text style={[styles.lockText, { color: theme.colors.text }]}>
+                    Payment is processing
+                  </Text>
+                  <Text style={[styles.lockSubText, { color: theme.colors.textSecondary }]}>
+                    It will be processed within 24 hours
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Icon name="lock" size={24} color={theme.colors.error} />
+                  <Text style={[styles.lockText, { color: theme.colors.text }]}>Subscription Required</Text>
+                  <TouchableOpacity 
+                    style={[styles.activateButton, { backgroundColor: theme.colors.primary }]}
+                    onPress={() => onPay(item)}
+                    disabled={processingProfiles.has(item.id)}
+                  >
+                    {processingProfiles.has(item.id) ? (
+                      <ActivityIndicator size="small" color="#ffffff" />
+                    ) : (
+                      <Text style={styles.activateButtonText}>Activate Now</Text>
+                    )}
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
           </View>
         )}
@@ -655,11 +716,19 @@ const BusinessProfilesScreen: React.FC = () => {
             </View>
           </View>
           <View style={styles.cardActions}>
-            <TouchableOpacity style={[styles.actionButton, { backgroundColor: `${theme.colors.primary}20` }]} onPress={() => onEdit(item)}>
-              <Icon name="edit" size={16} color={theme.colors.primary} />
+            <TouchableOpacity 
+              style={[styles.actionButton, { backgroundColor: `${theme.colors.primary}20` }]} 
+              onPress={() => onEdit(item)}
+              disabled={isLocked}
+            >
+              <Icon name="edit" size={16} color={isLocked ? theme.colors.textSecondary : theme.colors.primary} />
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.actionButton, { backgroundColor: `${theme.colors.error}20` }]} onPress={() => onDelete(item.id)}>
-              <Icon name="delete" size={16} color={theme.colors.error} />
+            <TouchableOpacity 
+              style={[styles.actionButton, { backgroundColor: `${theme.colors.error}20` }]} 
+              onPress={() => onDelete(item.id)}
+              disabled={isLocked}
+            >
+              <Icon name="delete" size={16} color={isLocked ? theme.colors.textSecondary : theme.colors.error} />
             </TouchableOpacity>
           </View>
         </View>
@@ -1731,8 +1800,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     marginTop: 10,
-    marginBottom: 15,
+    marginBottom: 8,
     textAlign: 'center',
+  },
+  lockSubText: {
+    fontSize: 12,
+    fontWeight: '500',
+    textAlign: 'center',
+    marginBottom: 15,
+    paddingHorizontal: 10,
   },
   activateButton: {
     paddingHorizontal: 20,
