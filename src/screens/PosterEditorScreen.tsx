@@ -46,7 +46,6 @@ import authService from '../services/auth';
 import { GOOGLE_FONTS, getFontsByCategory, SYSTEM_FONTS, getFontFamily } from '../services/fontService';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { useBusinessProfile } from '../context/BusinessProfileContext';
-import Watermark from '../components/Watermark';
 import { useTheme } from '../context/ThemeContext';
 import PremiumTemplateModal from '../components/PremiumTemplateModal';
 
@@ -125,7 +124,6 @@ const TEMPLATE_FOOTER_STYLES: Record<string, { backgroundColor: string; gradient
   'ombre-rose': { backgroundColor: 'rgba(190, 18, 60, 0.9)', gradient: ['#be123c', '#f472b6', '#fda4af'] },
   'ombre-galaxy': { backgroundColor: 'rgba(99, 102, 241, 0.9)', gradient: ['#6366f1', '#8b5cf6', '#06b6d4'] },
 };
-const TEXT_FIELD_KEYS = ['companyName', 'phone', 'email', 'website', 'category', 'address', 'services'];
 const TEMPLATE_OPTIONS = [
   { id: 'business', label: 'Business' },
   { id: 'event', label: 'Event' },
@@ -1128,7 +1126,6 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route, navigati
 
 
   const [isCapturing, setIsCapturing] = useState(false);
-  const [forceWatermarkCapture, setForceWatermarkCapture] = useState(false);
   const [currentPositions, setCurrentPositions] = useState<{ [key: string]: { x: number; y: number } }>({});
   const currentPositionsRef = useRef<{ [key: string]: { x: number; y: number } }>({});
   const [showDeleteElementModal, setShowDeleteElementModal] = useState(false);
@@ -2645,41 +2642,46 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route, navigati
           style={styles.nextButton}
           activeOpacity={0.85}
           onPress={async () => {
-            console.log('🎯 [POSTER EDITOR] Next button clicked');
-            console.log('📊 [POSTER EDITOR] Checking subscription status...');
-            console.log('📊 [POSTER EDITOR] Subscription checks:', {
-              isSubscribed,
-              isSubscriptionActive,
-              selectedBusinessProfile: selectedBusinessProfile?.name,
-              profileSubscriptionStatus: selectedBusinessProfile?.subscriptionStatus
-            });
+            console.log(":dart: [POSTER EDITOR] Next button clicked");
             
             // Validation based on type parameter
             if (type === "business") {
-              console.log("🔍 [POSTER EDITOR] Business category validation", {
+              console.log(":mag: [POSTER EDITOR] Validating business category", {
                 categoryName,
                 selectedBusinessCategory
               });
               
               // Business category validation
               if (!categoryName || !selectedBusinessCategory || categoryName.toLowerCase() !== selectedBusinessCategory.toLowerCase()) {
-                console.log("❌ [POSTER EDITOR] Business category mismatch", {
+                console.log(":x: [POSTER EDITOR] Validation failed - Business category mismatch", {
                   categoryName,
                   selectedBusinessCategory
                 });
                 return;
               }
-            } else {
-              console.log("🔍 [POSTER EDITOR] Non-business poster → checking subscription");
               
-              // Non-business poster: check subscription status
+              console.log(":mag: [POSTER EDITOR] Checking business subscription", {
+                businessSubscriptionStatus: selectedBusinessProfile?.businessSubscriptionStatus
+              });
+              
+              // Business subscription validation
+              if (!selectedBusinessProfile?.businessSubscriptionStatus || selectedBusinessProfile.businessSubscriptionStatus !== "Active") {
+                console.log(":x: [POSTER EDITOR] Validation failed - Business subscription not Active");
+                return;
+              }
+            } else {
+              console.log(":mag: [POSTER EDITOR] Checking normal subscription", {
+                subscriptionStatus: selectedBusinessProfile?.subscriptionStatus
+              });
+              
+              // Non-business poster: check normal subscription status
               if (!selectedBusinessProfile?.subscriptionStatus || selectedBusinessProfile.subscriptionStatus.toUpperCase() !== "ACTIVE") {
-                console.log("❌ [POSTER EDITOR] Subscription inactive");
+                console.log(":x: [POSTER EDITOR] Validation failed - Normal subscription not Active");
                 return;
               }
             }
             
-            console.log("✅ [POSTER EDITOR] Validation passed → continuing");
+            console.log(":white_check_mark: [POSTER EDITOR] Validation passed");
 
             console.log('🎨 [POSTER EDITOR] Preparing for capture - deselecting layers...');
             // Deselect any selected or dragged layers so borders don't appear in preview
@@ -2718,23 +2720,6 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route, navigati
             console.log('  - Poster ref available:', !!posterRef.current);
             console.log('  - Capture method available:', !!posterRef.current?.capture);
             console.log('  - Visible fields:', visibleFields);
-            const hasVisibleCustomLayers = layers.some(layer => {
-              if (layer.fieldType === 'footerBackground') return false;
-              if (layer.fieldType && visibleFields[layer.fieldType] === false) return false;
-              return true;
-            });
-            const visibleTextFields = TEXT_FIELD_KEYS.filter(key => visibleFields[key] !== false);
-            const missingTextForVisibleFields = visibleTextFields.length > 0 && visibleTextFields.every(fieldKey => {
-              const textLayer = layers.find(layer =>
-                layer.type === 'text' &&
-                layer.fieldType === fieldKey &&
-                visibleFields[fieldKey] !== false &&
-                !!layer.content?.trim()
-              );
-              return !textLayer;
-            });
-            const shouldForceWatermark = !hasVisibleCustomLayers || missingTextForVisibleFields;
-            setForceWatermarkCapture(shouldForceWatermark);
 
             // Capture current animated positions before taking ViewShot
             const newCurrentPositions: { [key: string]: { x: number; y: number } } = {};
@@ -2779,7 +2764,6 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route, navigati
 
                 // Set capturing state back to false
                 setIsCapturing(false);
-                setForceWatermarkCapture(false);
 
                 // Navigate to preview with the captured image and subscription status
                 (navigation as any).navigate('PosterPreview', {
@@ -2794,7 +2778,6 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route, navigati
                 console.log('Poster ref not available, using fallback');
                 // Set capturing state back to false
                 setIsCapturing(false);
-                setForceWatermarkCapture(false);
                 // Fallback to original image if capture fails
                 (navigation as any).navigate('PosterPreview', {
                   capturedImageUri: selectedImage.uri,
@@ -2810,7 +2793,6 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route, navigati
               console.error('Error details:', error instanceof Error ? error.message : 'Unknown error');
               // Set capturing state back to false
               setIsCapturing(false);
-              setForceWatermarkCapture(false);
               // Fallback to original image if capture fails
               (navigation as any).navigate('PosterPreview', {
                 capturedImageUri: selectedImage.uri,
@@ -2956,16 +2938,6 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route, navigati
                 />
               ))}
 
-              {/* Watermark Overlay - full screen transparent logo */}
-              {isCapturing && (!checkPremiumAccess('poster_export') || forceWatermarkCapture) && (
-                <View style={styles.fullscreenWatermarkOverlay}>
-                  <Image
-                    source={require('../assets/MainLogo/MB.png')}
-                    style={styles.fullscreenWatermarkImage}
-                    resizeMode="contain"
-                  />
-                </View>
-              )}
             </View>
           </TouchableWithoutFeedback>
         </ViewShot>
@@ -6101,21 +6073,6 @@ const styles = StyleSheet.create({
     lineHeight: isLandscape
       ? (isTablet ? moderateScale(9) : moderateScale(8))
       : (isUltraSmallScreen ? moderateScale(8) : isSmallScreen ? moderateScale(8) : isTablet ? moderateScale(9.5) : moderateScale(9)),
-  },
-  fullscreenWatermarkOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    pointerEvents: 'none',
-  },
-  fullscreenWatermarkImage: {
-    width: '95%',
-    height: '95%',
-    tintColor: 'rgba(255, 255, 255, 0.3)',
   },
 
 });
