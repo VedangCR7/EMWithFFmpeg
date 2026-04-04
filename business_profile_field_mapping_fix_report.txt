@@ -1,0 +1,235 @@
+BUSINESS PROFILE FIELD MAPPING FIX - IMPLEMENTATION REPORT
+=========================================================
+
+1. FILE MODIFIED
+---------------
+src/services/businessProfile.ts
+
+2. OLD CODE
+-----------
+```typescript
+// CreateBusinessProfileData interface
+export interface CreateBusinessProfileData {
+  name: string;
+  description?: string;
+  category: string;
+  subCategory?: string;            // User's selected subcategory during registration
+  subcategory?: string;            // Alternative field name for consistency
+  address: string;
+  phone: string;
+  alternatePhone?: string;
+  email: string;
+  website?: string;
+  companyLogo?: string;
+  logo?: string;
+}
+
+// createBusinessProfile function payload mapping
+const backendData = {
+  businessName,
+  ownerName,
+  email,
+  phone,
+  address,
+  category,
+  subCategory: data.subCategory || data.subcategory,  // ← PROBLEM
+  logo: logoUrl,
+  companyLogo: logoUrl,
+  description: data.description || '',
+  website: data.website || ''
+};
+
+// updateBusinessProfile function payload mapping
+if (data.subCategory !== undefined) backendData.subCategory = data.subCategory;
+if (data.subcategory !== undefined) backendData.subCategory = data.subcategory;
+```
+
+3. NEW CODE
+----------
+```typescript
+// CreateBusinessProfileData interface
+export interface CreateBusinessProfileData {
+  name: string;
+  description?: string;
+  category: string;
+  businessSubcategory?: string;    // User's selected subcategory during registration (NEW FIELD)
+  subCategory?: string;            // User's selected subcategory during registration (LEGACY)
+  subcategory?: string;            // Alternative field name for consistency (LEGACY)
+  address: string;
+  phone: string;
+  alternatePhone?: string;
+  email: string;
+  website?: string;
+  companyLogo?: string;
+  logo?: string;
+}
+
+// createBusinessProfile function payload mapping
+const resolvedSubcategory =
+  data.businessSubcategory ||
+  data.subCategory ||
+  data.subcategory ||
+  '';
+
+const backendData = {
+  businessName,
+  ownerName,
+  email,
+  phone,
+  address,
+  category,
+  businessSubcategory: resolvedSubcategory,  // ← FIXED
+  logo: logoUrl,
+  companyLogo: logoUrl,
+  description: data.description || '',
+  website: data.website || ''
+};
+
+console.log("Final Backend Payload:", backendData);
+
+// updateBusinessProfile function payload mapping
+// Handle subcategory field with backward compatibility
+if (data.businessSubcategory !== undefined) backendData.businessSubcategory = data.businessSubcategory;
+else if (data.subCategory !== undefined) backendData.businessSubcategory = data.subCategory;
+else if (data.subcategory !== undefined) backendData.businessSubcategory = data.subcategory;
+```
+
+4. COMPATIBILITY HANDLING
+------------------------
+✅ Full backward compatibility maintained:
+- New field: `businessSubcategory` (primary)
+- Legacy field 1: `subCategory` (fallback)
+- Legacy field 2: `subcategory` (fallback)
+- Empty string as final fallback
+
+✅ Resolution order:
+1. `data.businessSubcategory` (new preferred field)
+2. `data.subCategory` (legacy fallback)
+3. `data.subcategory` (legacy fallback)
+4. `''` (empty string fallback)
+
+5. PAYLOAD BEFORE FIX
+---------------------
+```json
+{
+  "businessName": "John's Photography",
+  "ownerName": "John Doe",
+  "email": "john@example.com",
+  "phone": "9876543210",
+  "address": "123 Main St",
+  "category": "Events & Wedding",
+  "subCategory": "Wedding Photography",
+  "logo": "https://example.com/logo.jpg",
+  "companyLogo": "https://example.com/logo.jpg",
+  "description": "Professional photography services",
+  "website": "https://johnphotography.com"
+}
+```
+
+6. PAYLOAD AFTER FIX
+--------------------
+```json
+{
+  "businessName": "John's Photography",
+  "ownerName": "John Doe",
+  "email": "john@example.com",
+  "phone": "9876543210",
+  "address": "123 Main St",
+  "category": "Events & Wedding",
+  "businessSubcategory": "Wedding Photography",
+  "logo": "https://example.com/logo.jpg",
+  "companyLogo": "https://example.com/logo.jpg",
+  "description": "Professional photography services",
+  "website": "https://johnphotography.com"
+}
+```
+
+7. TEST RESULT
+--------------
+✅ PASS
+
+Test Case:
+- Category: Events & Wedding
+- Subcategory: Wedding Photography
+
+Expected Payload:
+```json
+{
+  "category": "Events & Wedding",
+  "businessSubcategory": "Wedding Photography"
+}
+```
+
+Actual Payload:
+```json
+{
+  "category": "Events & Wedding",
+  "businessSubcategory": "Wedding Photography"
+}
+```
+
+Result: MATCH - Backend now receives correct field name
+
+8. ANY SIDE EFFECTS
+------------------
+✅ NO SIDE EFFECTS IDENTIFIED
+
+UI Layer:
+- BusinessProfileForm.tsx: UNCHANGED (continues to use formData.subcategory)
+- Form validation: UNCHANGED
+- User experience: UNCHANGED
+
+API Layer:
+- Request payload: FIXED (now sends businessSubcategory)
+- Response handling: UNCHANGED (still handles legacy subCategory responses)
+- Error handling: UNCHANGED
+
+Data Flow:
+- Form state: UNCHANGED (subcategory)
+- Service mapping: FIXED (businessSubcategory)
+- Backend integration: FIXED (correct field name)
+
+9. VERIFICATION CHECKLIST
+------------------------
+✅ Form still submits - YES
+✅ Edit profile still works - YES  
+✅ No UI break - YES
+✅ No TypeScript errors - YES
+✅ Backward compatibility maintained - YES
+✅ Debug logging added - YES
+✅ No duplicate incorrect mappings - YES
+
+10. DEBUG LOGGING ADDED
+----------------------
+```typescript
+console.log("Final Backend Payload:", backendData);
+```
+
+This allows verification that the correct field name is being sent to the backend.
+
+11. FUNCTIONS MODIFIED
+---------------------
+✅ createBusinessProfile() - Fixed payload mapping
+✅ updateBusinessProfile() - Fixed payload mapping  
+✅ CreateBusinessProfileData interface - Added businessSubcategory field
+
+12. COMPATIBILITY MATRIX
+-----------------------
+| Input Field | Output Field | Status |
+|-------------|--------------|---------|
+| businessSubcategory | businessSubcategory | ✅ NEW (Preferred) |
+| subCategory | businessSubcategory | ✅ LEGACY (Supported) |
+| subcategory | businessSubcategory | ✅ LEGACY (Supported) |
+| none/empty | businessSubcategory: '' | ✅ FALLBACK (Safe) |
+
+13. FINAL CONCLUSION
+--------------------
+✅ SUCCESSFULLY IMPLEMENTED
+
+The fix has been successfully implemented with full backward compatibility. The backend now receives the correct field name "businessSubcategory" while supporting all legacy field names. No UI changes were required, and no existing functionality was broken.
+
+Key Achievement:
+- Backend receives: businessSubcategory ✅
+- UI unchanged: formData.subcategory ✅  
+- Legacy support: subCategory/subcategory ✅
+- No breaking changes: ✅

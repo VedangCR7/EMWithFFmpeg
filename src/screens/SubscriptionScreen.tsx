@@ -112,6 +112,30 @@ const SubscriptionScreen: React.FC = () => {
   const effectiveSubscriptionStatus = isBusinessProfileMode ? businessSubscriptionStatus : contextSubscriptionStatus;
   const effectiveIsLoading = isBusinessProfileMode ? isBusinessSubscriptionLoading : isLoading;
 
+  // Detect payment success from route params
+  const isPaymentSuccess = (route.params as any)?.paymentSuccess === true;
+
+  // Validate with backend - show processing message only when both conditions are met
+  useEffect(() => {
+    if (!isPaymentSuccess) return;
+
+    console.log('🔍 Checking payment success and subscription status:', {
+      isPaymentSuccess,
+      subscriptionStatus: effectiveSubscriptionStatus?.status,
+      businessProfileId
+    });
+
+    if (effectiveSubscriptionStatus?.status?.toUpperCase() === "PROCESSING") {
+      setShowProcessingMessage(true);
+      setDisableSubscribeButton(true);
+      console.log('✅ Showing processing message and disabling button - payment success confirmed with backend');
+    } else {
+      setShowProcessingMessage(false);
+      setDisableSubscribeButton(false);
+      console.log('❌ Not showing processing message - subscription status not PROCESSING:', effectiveSubscriptionStatus?.status);
+    }
+  }, [effectiveSubscriptionStatus?.status, isPaymentSuccess, businessProfileId]);
+
   // Dynamic dimensions for responsive layout (matching HomeScreen)
   const [dimensions, setDimensions] = useState(() => {
     const { width, height } = Dimensions.get('window');
@@ -169,6 +193,10 @@ const SubscriptionScreen: React.FC = () => {
   const [isAuthenticating, setIsAuthenticating] = useState(false); // During Razorpay checkout
   const [isTransactionPending, setIsTransactionPending] = useState(false); // Post-payment, pre-activation
   const [pollingAttempts, setPollingAttempts] = useState(0);
+  
+  // State for showing processing message after successful payment
+  const [showProcessingMessage, setShowProcessingMessage] = useState(false);
+  const [disableSubscribeButton, setDisableSubscribeButton] = useState(false);
 
   // Cleanup polling on unmount
   useEffect(() => {
@@ -844,6 +872,12 @@ const SubscriptionScreen: React.FC = () => {
 
   // Handle Autopay payment
   const handleAutopayPayment = async () => {
+    // Double safety check - prevent action if button is disabled
+    if (disableSubscribeButton) {
+      console.log('🚫 Button disabled due to processing state, ignoring click');
+      return;
+    }
+    
     console.log('🚀 UPGRADE TO PRO BUTTON CLICKED - Starting subscription process');
     console.log('📊 Selected Plan:', selectedPlan);
     console.log('👤 Current User:', authService.getCurrentUser()?.id);
@@ -1368,6 +1402,34 @@ const SubscriptionScreen: React.FC = () => {
         }]}
       >
 
+        {/* Processing Message - Show only when payment success confirmed AND backend confirms PROCESSING status */}
+        {showProcessingMessage && (
+          <View style={{
+            backgroundColor: "#E8F5E9",
+            padding: dynamicModerateScale(12),
+            margin: dynamicModerateScale(10),
+            borderRadius: dynamicModerateScale(8),
+            borderWidth: 1,
+            borderColor: "#4CAF50",
+          }}>
+            <Text style={{ 
+              fontWeight: "bold", 
+              color: "#2E7D32",
+              fontSize: dynamicModerateScale(11),
+              marginBottom: dynamicModerateScale(4),
+            }}>
+              Payment Successful
+            </Text>
+            <Text style={{ 
+              color: "#2E7D32",
+              fontSize: dynamicModerateScale(9),
+              lineHeight: dynamicModerateScale(12),
+            }}>
+              Your business profile will be activated within 24 hours
+            </Text>
+          </View>
+        )}
+
         {/* Current Subscription Status (if subscribed) */}
         {effectiveSubscriptionStatus?.status?.toUpperCase() === 'ACTIVE' && (
           <View style={[styles.currentSubscriptionCard, {
@@ -1651,9 +1713,10 @@ const SubscriptionScreen: React.FC = () => {
           style={[styles.upgradeButton, {
             borderRadius: dynamicModerateScale(10),
             marginBottom: isTabletDevice ? dynamicModerateScale(8) : dynamicModerateScale(6),
+            opacity: disableSubscribeButton ? 0.6 : 1,
           }]}
           onPress={handleAutopayPayment}
-          disabled={isProcessing || effectiveSubscriptionStatus?.status?.toUpperCase() === 'ACTIVE' || paymentInProgress || isAuthenticating || isTransactionPending}
+          disabled={disableSubscribeButton || isProcessing || effectiveSubscriptionStatus?.status?.toUpperCase() === 'ACTIVE' || paymentInProgress || isAuthenticating || isTransactionPending}
         >
           <LinearGradient
             colors={effectiveSubscriptionStatus?.status?.toUpperCase() === 'ACTIVE'
@@ -1676,15 +1739,17 @@ const SubscriptionScreen: React.FC = () => {
             }]}>
               {effectiveSubscriptionStatus?.status?.toUpperCase() === 'ACTIVE'
                 ? 'Already Pro'
-                : isAuthenticating
-                  ? 'Authenticating...'
-                  : isTransactionPending
-                    ? `Transaction Pending...${pollingAttempts > 0 ? ` (${pollingAttempts}/5)` : ''}`
-                    : isProcessing || paymentInProgress
-                      ? 'Processing...'
-                      : selectedPlan
-                        ? `Subscribe - ₹${selectedPlan.price || selectedPlan.amount || 99}`
-                        : 'Select a Plan'
+                : disableSubscribeButton
+                  ? 'Processing...'
+                  : isAuthenticating
+                    ? 'Authenticating...'
+                    : isTransactionPending
+                      ? `Transaction Pending...${pollingAttempts > 0 ? ` (${pollingAttempts}/5)` : ''}`
+                      : isProcessing || paymentInProgress
+                        ? 'Processing...'
+                        : selectedPlan
+                          ? `Subscribe - ₹${selectedPlan.price || selectedPlan.amount || 99}`
+                          : 'Select a Plan'
               }
             </Text>
           </LinearGradient>

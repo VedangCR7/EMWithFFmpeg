@@ -36,8 +36,9 @@ export interface CreateBusinessProfileData {
   name: string;                    // Company Name (required)
   description?: string;            // Company Description (optional)
   category: string;                // Business Category (required) - Event Planners, Decorators, Sound Suppliers, Light Suppliers, Video Services
-  subCategory?: string;            // User's selected subcategory during registration
-  subcategory?: string;            // Alternative field name for consistency
+  businessSubcategory?: string;    // User's selected subcategory during registration (NEW FIELD)
+  subCategory?: string;            // User's selected subcategory during registration (LEGACY)
+  subcategory?: string;            // Alternative field name for consistency (LEGACY)
   address: string;                 // Company Address (required)
   phone: string;                   // Mobile Number (required)
   alternatePhone?: string;         // Alternative Mobile Number (optional)
@@ -298,6 +299,12 @@ class BusinessProfileService {
       }
       
       // Map frontend data to backend format
+      const resolvedSubcategory =
+        data.businessSubcategory ||
+        data.subCategory ||
+        data.subcategory ||
+        '';
+      
       const backendData = {
         businessName,
         ownerName,
@@ -305,13 +312,15 @@ class BusinessProfileService {
         phone,
         address,
         category,
-        subCategory: data.subCategory || data.subcategory,
+        businessSubcategory: resolvedSubcategory,
         // Send both logo and companyLogo to ensure backend receives the logo
         logo: logoUrl,
         companyLogo: logoUrl,
         description: data.description || '',
         website: data.website || ''
       };
+      
+      console.log("Final Backend Payload:", backendData);
       
       console.log('📤 Sending business profile data:', JSON.stringify(backendData, null, 2));
       console.log('🖼️ Logo URL being sent:', logoUrl || '(empty)');
@@ -396,8 +405,12 @@ class BusinessProfileService {
       if (data.phone !== undefined) backendData.phone = data.phone;
       if (data.address !== undefined) backendData.address = data.address;
       if (data.category !== undefined) backendData.category = data.category;
-      if (data.subCategory !== undefined) backendData.subCategory = data.subCategory;
-      if (data.subcategory !== undefined) backendData.subCategory = data.subcategory;
+      
+      // Handle subcategory field with backward compatibility
+      if (data.businessSubcategory !== undefined) backendData.businessSubcategory = data.businessSubcategory;
+      else if (data.subCategory !== undefined) backendData.businessSubcategory = data.subCategory;
+      else if (data.subcategory !== undefined) backendData.businessSubcategory = data.subcategory;
+      
       // Use 'logo' field if provided, otherwise use 'companyLogo'
       if (data.logo !== undefined) backendData.logo = data.logo;
       else if (data.companyLogo !== undefined) backendData.logo = data.companyLogo;
