@@ -2676,8 +2676,10 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
               return;
             }
             
-            if (!selectedBusinessProfile.subscriptionStatus) {
-              console.log(":x: [POSTER EDITOR] Validation failed - No subscription status available");
+            if (selectedBusinessProfile.subscriptionStatus !== "ACTIVE") {
+              console.log(":x: [POSTER EDITOR] Validation failed - Subscription not active", {
+                subscriptionStatus: selectedBusinessProfile.subscriptionStatus
+              });
               setShowPremiumTemplateModal(true);
               return;
             }

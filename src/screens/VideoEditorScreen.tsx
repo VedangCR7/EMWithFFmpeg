@@ -31,7 +31,9 @@ import { PanGestureHandler, State, PinchGestureHandler } from 'react-native-gest
 import businessProfileService, { BusinessProfile } from '../services/businessProfile';
 import authService from '../services/auth';
 import { GOOGLE_FONTS, getFontsByCategory, SYSTEM_FONTS, getFontFamily } from '../services/fontService';
+import { getAccessState, isAccessGranted, getAccessStateMessage, isTransitionalState } from '../utils/subscriptionAccess';
 import { useSubscription } from '../contexts/SubscriptionContext';
+import { useBusinessProfile } from '../context/BusinessProfileContext';
 import { useTheme } from '../context/ThemeContext';
 import ViewShot from 'react-native-view-shot';
 import { convertCanvasToVideoFormat, createSampleVideoCanvas } from '../utils/videoCanvasConverter';
@@ -280,7 +282,15 @@ const VideoEditorScreen: React.FC<VideoEditorScreenProps> = ({ route }) => {
   const { selectedLanguage: initialLanguage, selectedTemplateId, selectedVideo } = route.params;
   
   const { isSubscribed, checkPremiumAccess, refreshSubscription } = useSubscription();
+  const { selectedBusinessProfile } = useBusinessProfile();
   const { isDarkMode, theme } = useTheme();
+
+  // Unified access state based on business profile or global subscription
+  const accessState = getAccessState({
+    businessProfile: selectedBusinessProfile,
+    isSubscribed,
+  });
+  const hasAccess = isAccessGranted(accessState);
 
   // Video refs
   const videoRef = useRef<any>(null);
@@ -2103,8 +2113,13 @@ const [videoDimensions, setVideoDimensions] = useState<{ width: number; height: 
   };
 
   const handleNext = useCallback(async () => {
-    if (!isSubscribed) {
-      setShowPremiumModal(true);
+    // Use unified access state instead of global isSubscribed
+    if (!hasAccess) {
+      if (isTransitionalState(accessState)) {
+        Alert.alert('Processing', getAccessStateMessage(accessState));
+      } else {
+        setShowPremiumModal(true);
+      }
       return;
     }
 
@@ -2131,6 +2146,7 @@ const [videoDimensions, setVideoDimensions] = useState<{ width: number; height: 
         selectedTemplateId: selectedTemplateId || 'custom',
         layers,
         selectedProfile,
+        businessProfile: selectedBusinessProfile,
         processedVideoPath: undefined,
         canvasData: {
           width: currentCanvasWidth,
@@ -2210,11 +2226,13 @@ const [videoDimensions, setVideoDimensions] = useState<{ width: number; height: 
     ensureLocalVideoUri,
     layers,
     navigation,
+    selectedBusinessProfile,
     selectedProfile,
     selectedTemplateId,
     selectedVideo?.uri,
     validateBusinessContent,
-    isSubscribed,
+    accessState,
+    hasAccess,
   ]);
 
   // Render functions

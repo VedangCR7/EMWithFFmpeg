@@ -20,7 +20,9 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { MainStackParamList } from '../navigation/types';
+import { getAccessState, isAccessGranted, getAccessStateMessage, isTransitionalState } from '../utils/subscriptionAccess';
 import { useSubscription } from '../contexts/SubscriptionContext';
+import { useBusinessProfile } from '../context/BusinessProfileContext';
 import VideoComposer from '../services/VideoComposer';
 import { CameraRoll } from '@react-native-camera-roll/camera-roll';
 import RNFS from 'react-native-fs';
@@ -144,6 +146,14 @@ const VideoPreviewScreen: React.FC<VideoPreviewScreenProps> = ({ route }) => {
   const { videoWidth, videoHeight, availableWidth, availableHeight } = getResponsiveDimensions(insets);
   const { selectedVideo, selectedLanguage, selectedTemplateId, layers, selectedProfile, processedVideoPath: initialProcessedVideoPath, canvasData } = route.params;
   const { isSubscribed } = useSubscription();
+  const { selectedBusinessProfile } = useBusinessProfile();
+
+  // Unified access state based on business profile or global subscription
+  const accessState = getAccessState({
+    businessProfile: selectedBusinessProfile,
+    isSubscribed,
+  });
+  const hasAccess = isAccessGranted(accessState);
 
   // Video state
   const [isVideoPlaying, setIsVideoPlaying] = useState(true);
