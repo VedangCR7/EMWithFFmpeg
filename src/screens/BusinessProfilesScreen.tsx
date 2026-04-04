@@ -928,6 +928,19 @@ const BusinessProfilesScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
+        {/* Informational Message */}
+        <View style={[styles.infoMessageContainer, { 
+          backgroundColor: isDarkMode ? '#2d4a2b' : '#f8f9e8',
+          borderColor: isDarkMode ? '#4a7c47' : '#e6e9d4'
+        }]}>
+          <Icon name="info" size={16} color={isDarkMode ? '#8bc34a' : '#66bb6a'} />
+          <Text style={[styles.infoMessageText, { 
+            color: isDarkMode ? '#e8f5e9' : '#2e7d32'
+          }]}>
+            After successful payment, your business profile will be activated within 24 hours. We're currently processing your request.
+          </Text>
+        </View>
+
         {/* Search Bar */}
         <View style={styles.searchContainer}>
           <View style={[styles.searchBar, { backgroundColor: theme.colors.cardBackground }]}>
@@ -1321,6 +1334,24 @@ const styles = StyleSheet.create({
   searchContainer: {
     paddingHorizontal: Math.max(12, responsiveLayout.containerPaddingHorizontal * 0.7),
     marginBottom: Math.max(6, screenHeight * 0.01),
+  },
+  infoMessageContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Math.max(12, responsiveLayout.containerPaddingHorizontal * 0.7),
+    paddingVertical: Math.max(8, screenHeight * 0.01),
+    marginHorizontal: Math.max(12, responsiveLayout.containerPaddingHorizontal * 0.7),
+    marginBottom: Math.max(8, screenHeight * 0.01),
+    borderRadius: Math.max(8, screenWidth * 0.02),
+    borderWidth: 1,
+    ...responsiveShadow.small,
+  },
+  infoMessageText: {
+    fontSize: Math.min(responsiveText.body * 0.85, 12),
+    lineHeight: Math.min(responsiveText.body * 1.2, 16),
+    marginLeft: Math.max(8, screenWidth * 0.02),
+    flex: 1,
+    fontWeight: '500',
   },
   searchBar: {
     flexDirection: 'row',

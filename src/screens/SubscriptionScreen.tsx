@@ -112,29 +112,64 @@ const SubscriptionScreen: React.FC = () => {
   const effectiveSubscriptionStatus = isBusinessProfileMode ? businessSubscriptionStatus : contextSubscriptionStatus;
   const effectiveIsLoading = isBusinessProfileMode ? isBusinessSubscriptionLoading : isLoading;
 
-  // Detect payment success from route params
+  // Detect payment success from multiple sources
   const isPaymentSuccess = (route.params as any)?.paymentSuccess === true;
+  const isActivationPendingState = isProfileActivationPending(businessProfileId);
+  
+  // Strong trigger: Show message if any payment completion indicator is true
+  const shouldShowProcessingMessage = isPaymentSuccess || isActivationPendingState;
+  
+  // ULTIMATE TRIGGER: Also show if screen loads with PENDING status (strong payment indicator)
+  const [hasLoadedWithPending, setHasLoadedWithPending] = useState(false);
 
-  // Validate with backend - show processing message only when both conditions are met
+  // Detect when screen loads with PENDING status
   useEffect(() => {
-    if (!isPaymentSuccess) return;
+    if (effectiveSubscriptionStatus?.status?.toUpperCase() === "PENDING") {
+      console.log('🚀 ULTIMATE TRIGGER: Screen loaded with PENDING status - showing message');
+      setHasLoadedWithPending(true);
+    } else {
+      setHasLoadedWithPending(false);
+    }
+  }, [effectiveSubscriptionStatus?.status]);
 
-    console.log('🔍 Checking payment success and subscription status:', {
+  // Final trigger: Show message if ANY trigger condition is met
+  const finalTrigger = shouldShowProcessingMessage || hasLoadedWithPending;
+  
+  // FAILSAFE: Force show for business profiles with PENDING status
+  const isBusinessProfileWithPending = isBusinessProfileMode && effectiveSubscriptionStatus?.status?.toUpperCase() === "PENDING";
+  const ultimateTrigger = finalTrigger || isBusinessProfileWithPending;
+
+  // Validate with backend - show processing message when payment completion detected and status is PENDING
+  useEffect(() => {
+    console.log('🔍 ULTIMATE TRIGGER CHECK:', {
       isPaymentSuccess,
+      isActivationPendingState,
+      shouldShowProcessingMessage,
+      hasLoadedWithPending,
+      finalTrigger,
+      isBusinessProfileWithPending,
+      ultimateTrigger,
       subscriptionStatus: effectiveSubscriptionStatus?.status,
       businessProfileId
     });
 
-    if (effectiveSubscriptionStatus?.status?.toUpperCase() === "PROCESSING") {
+    if (!ultimateTrigger) {
+      setShowProcessingMessage(false);
+      setDisableSubscribeButton(false);
+      console.log('❌ No payment completion detected, hiding message');
+      return;
+    }
+
+    if (effectiveSubscriptionStatus?.status?.toUpperCase() === "PENDING") {
       setShowProcessingMessage(true);
       setDisableSubscribeButton(true);
-      console.log('✅ Showing processing message and disabling button - payment success confirmed with backend');
+      console.log('✅ ULTIMATE TRIGGER: Showing processing message - payment completion confirmed');
     } else {
       setShowProcessingMessage(false);
       setDisableSubscribeButton(false);
-      console.log('❌ Not showing processing message - subscription status not PROCESSING:', effectiveSubscriptionStatus?.status);
+      console.log('❌ Status not PENDING, hiding message:', effectiveSubscriptionStatus?.status);
     }
-  }, [effectiveSubscriptionStatus?.status, isPaymentSuccess, businessProfileId]);
+  }, [effectiveSubscriptionStatus?.status, ultimateTrigger, businessProfileId, isPaymentSuccess, isActivationPendingState, hasLoadedWithPending, shouldShowProcessingMessage, finalTrigger, isBusinessProfileWithPending]);
 
   // Dynamic dimensions for responsive layout (matching HomeScreen)
   const [dimensions, setDimensions] = useState(() => {
@@ -194,6 +229,9 @@ const SubscriptionScreen: React.FC = () => {
   const [isTransactionPending, setIsTransactionPending] = useState(false); // Post-payment, pre-activation
   const [pollingAttempts, setPollingAttempts] = useState(0);
   
+  // TEMPORARY DEBUG: Force show message for testing
+  const [debugForceShow, setDebugForceShow] = useState(false);
+
   // State for showing processing message after successful payment
   const [showProcessingMessage, setShowProcessingMessage] = useState(false);
   const [disableSubscribeButton, setDisableSubscribeButton] = useState(false);
@@ -733,7 +771,7 @@ const SubscriptionScreen: React.FC = () => {
                   console.log('🔍 DEBUG: Navigation after delay, checking activation pending state...');
                   const isStillPending = isProfileActivationPending(businessProfileId);
                   console.log('🔍 DEBUG: Activation pending state before navigation:', isStillPending);
-                  navigation.goBack();
+                  (navigation as any).navigate('SubscriptionScreen', { paymentSuccess: true });
                 }, 300); // Increased delay for better reliability
               } else {
                 console.log('🔍 DEBUG: Not in business profile mode or missing businessProfileId');
@@ -1093,7 +1131,7 @@ const SubscriptionScreen: React.FC = () => {
                     console.log('🔍 DEBUG: Navigation after delay (autopay), checking activation pending state...');
                     const isStillPending = isProfileActivationPending(businessProfileId);
                     console.log('🔍 DEBUG: Activation pending state before navigation (autopay):', isStillPending);
-                    navigation.goBack();
+                    (navigation as any).navigate('SubscriptionScreen', { paymentSuccess: true });
                   }, 300); // Increased delay for better reliability
                 } else {
                   console.log('🔍 DEBUG: Not in business profile mode or missing businessProfileId for autopay');
@@ -1403,7 +1441,21 @@ const SubscriptionScreen: React.FC = () => {
       >
 
         {/* Processing Message - Show only when payment success confirmed AND backend confirms PROCESSING status */}
-        {showProcessingMessage && (
+        {(() => {
+          console.log('🔍 UI RENDER DEBUG:', {
+            showProcessingMessage,
+            debugForceShow,
+            ultimateTrigger,
+            isPaymentSuccess,
+            isActivationPendingState,
+            hasLoadedWithPending,
+            isBusinessProfileWithPending,
+            subscriptionStatus: effectiveSubscriptionStatus?.status?.toUpperCase(),
+            businessProfileId,
+            isBusinessProfileMode
+          });
+          return showProcessingMessage || debugForceShow;
+        })() && (
           <View style={{
             backgroundColor: "#E8F5E9",
             padding: dynamicModerateScale(12),
@@ -1418,17 +1470,32 @@ const SubscriptionScreen: React.FC = () => {
               fontSize: dynamicModerateScale(11),
               marginBottom: dynamicModerateScale(4),
             }}>
-              Payment Successful
+              {debugForceShow ? 'DEBUG: Test Message' : 'Payment Successful'}
             </Text>
             <Text style={{ 
               color: "#2E7D32",
               fontSize: dynamicModerateScale(9),
               lineHeight: dynamicModerateScale(12),
             }}>
-              Your business profile will be activated within 24 hours
+              {debugForceShow ? 'This is a test message to verify UI works' : 'Your business profile will be activated within 24 hours'}
             </Text>
           </View>
         )}
+
+        {/* TEMPORARY DEBUG BUTTON */}
+        <TouchableOpacity 
+          style={{
+            backgroundColor: "#FF5722",
+            padding: 10,
+            margin: 10,
+            borderRadius: 5,
+          }}
+          onPress={() => setDebugForceShow(!debugForceShow)}
+        >
+          <Text style={{ color: "white", textAlign: "center" }}>
+            {debugForceShow ? 'HIDE DEBUG MESSAGE' : 'SHOW DEBUG MESSAGE'}
+          </Text>
+        </TouchableOpacity>
 
         {/* Current Subscription Status (if subscribed) */}
         {effectiveSubscriptionStatus?.status?.toUpperCase() === 'ACTIVE' && (
