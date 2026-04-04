@@ -30,6 +30,7 @@ import authService from '../services/auth';
 import api from '../services/api';
 import cacheService from '../services/cacheService';
 import { startSubscriptionPolling } from '../utils/subscriptionPolling';
+import { getAccessState, isAccessGranted, getAccessStateMessage, isTransitionalState } from '../utils/subscriptionAccess';
 
 // Compact spacing multiplier to reduce all spacing (matching HomeScreen)
 const COMPACT_MULTIPLIER = 0.5;
@@ -100,15 +101,14 @@ const SubscriptionScreen: React.FC = () => {
   
   const { theme } = useTheme();
 
-  // BUSINESS PROFILE SUBSCRIPTION LOGIC: Use business profile when available
-  const isBusinessActive = businessSubscriptionStatus?.status?.toUpperCase() === 'ACTIVE';
-  const isActivationPending = isProfileActivationPending(businessProfileId || '');
-  console.log('🏢 BUSINESS SUBSCRIPTION LOGIC: isBusinessActive =', isBusinessActive, 'for profile:', effectiveBusinessProfile?.name);
-  console.log('🏢 BUSINESS SUBSCRIPTION STATUS:', businessSubscriptionStatus);
-  console.log('🏢 ACTIVATION PENDING STATE:', isActivationPending, 'for profile:', businessProfileId);
-  
-  // Effective subscription state based on mode
-  const effectiveIsSubscribed = isBusinessProfileMode ? (isBusinessActive && !isActivationPending) : isSubscribed;
+  // BUSINESS PROFILE SUBSCRIPTION LOGIC: Use unified access state
+  const accessState = getAccessState({
+    businessProfile: effectiveBusinessProfile,
+    isSubscribed,
+  });
+  const hasAccess = isAccessGranted(accessState);
+  console.log('🏢 UNIFIED ACCESS STATE:', accessState, 'for profile:', effectiveBusinessProfile?.name);
+  console.log('🏢 ACCESS GRANTED:', hasAccess);
   const effectiveSubscriptionStatus = isBusinessProfileMode ? businessSubscriptionStatus : contextSubscriptionStatus;
   const effectiveIsLoading = isBusinessProfileMode ? isBusinessSubscriptionLoading : isLoading;
 
@@ -288,6 +288,12 @@ const SubscriptionScreen: React.FC = () => {
         // Business profile mode: fetch business subscription status
         console.log('🔄 BUSINESS_PROFILE_MODE - Fetching business subscription status');
         fetchBusinessSubscriptionStatus();
+        
+        // Ensure plans are loaded for business profile mode
+        if (contextPlans.length === 0) {
+          console.log('🔄 BUSINESS_PROFILE_MODE - Plans empty, loading plans');
+          refreshPlans();
+        }
       } else {
         // User subscription mode: use existing logic
         console.log('🔄 USER_MODE - Refreshing user subscription');
@@ -655,6 +661,20 @@ const SubscriptionScreen: React.FC = () => {
               console.log('🗑️ Subscription cache cleared for user:', userId);
             }
 
+            // Step 2.5: Refresh business profile after payment success
+            if (isBusinessProfileMode && businessProfileId) {
+              console.log('🔄 Refreshing business profile after payment success:', businessProfileId);
+              try {
+                // Use business profile service to refresh the specific profile
+                const refreshedProfile = await businessProfileService.getBusinessProfileById(businessProfileId);
+                if (refreshedProfile) {
+                  console.log('✅ Business profile refreshed with new status:', refreshedProfile.subscriptionStatus);
+                }
+              } catch (error) {
+                console.error('❌ Error refreshing business profile after payment:', error);
+              }
+            }
+
             // Step 3: Start polling for subscription activation instead of immediate check
             if (verifyResult?.success) {
               console.log('[APP] ✅ Payment verified, setting activation pending state (24-hour window)');
@@ -827,11 +847,12 @@ const SubscriptionScreen: React.FC = () => {
     console.log('🚀 UPGRADE TO PRO BUTTON CLICKED - Starting subscription process');
     console.log('📊 Selected Plan:', selectedPlan);
     console.log('👤 Current User:', authService.getCurrentUser()?.id);
-    console.log('💰 Payment Status:', { paymentInProgress, effectiveIsSubscribed, isAuthenticating, isTransactionPending });
+    console.log('💰 Payment Status:', { paymentInProgress, hasAccess, isAuthenticating, isTransactionPending });
     console.log('🏢 Business Profile Mode:', isBusinessProfileMode);
     console.log('🏢 Business Profile ID:', businessProfileId);
     console.log('🔍 Subscription Context State:', {
-      effectiveIsSubscribed,
+      hasAccess,
+      accessState,
       subscriptionStatus: effectiveSubscriptionStatus,
       businessSubscriptionStatus,
       authServiceStatus: authService.getCurrentUser()?.subscriptionStatus,
@@ -843,7 +864,7 @@ const SubscriptionScreen: React.FC = () => {
       return;
     }
 
-    if (effectiveIsSubscribed) {
+    if (hasAccess) {
       const errorMessage = isBusinessProfileMode 
         ? 'This business profile already has an active subscription!'
         : 'You are already a Pro subscriber!';
@@ -1726,6 +1747,8 @@ const styles = StyleSheet.create({
   },
   backButton: {
     backgroundColor: 'rgba(0, 0, 0, 0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerContent: {
     flex: 1,
