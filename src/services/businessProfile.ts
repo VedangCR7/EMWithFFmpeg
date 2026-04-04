@@ -37,7 +37,9 @@ export interface CreateBusinessProfileData {
   description?: string;            // Company Description (optional)
   category: string;                // Business Category (required) - Event Planners, Decorators, Sound Suppliers, Light Suppliers, Video Services
   businessSubcategory?: string;    // User's selected subcategory during registration (NEW FIELD)
+  // ⚠️ DEPRECATED: Use businessSubcategory instead
   subCategory?: string;            // User's selected subcategory during registration (LEGACY)
+  // ⚠️ DEPRECATED: Use businessSubcategory instead  
   subcategory?: string;            // Alternative field name for consistency (LEGACY)
   address: string;                 // Company Address (required)
   phone: string;                   // Mobile Number (required)
@@ -300,19 +302,17 @@ class BusinessProfileService {
       
       // Map frontend data to backend format
       const resolvedSubcategory =
-        data.businessSubcategory ||
-        data.subCategory ||
-        data.subcategory ||
-        '';
+        data.businessSubcategory ??
+        data.subCategory ??
+        data.subcategory;
       
-      const backendData = {
+      const backendData: any = {
         businessName,
         ownerName,
         email,
         phone,
         address,
         category,
-        businessSubcategory: resolvedSubcategory,
         // Send both logo and companyLogo to ensure backend receives the logo
         logo: logoUrl,
         companyLogo: logoUrl,
@@ -320,7 +320,14 @@ class BusinessProfileService {
         website: data.website || ''
       };
       
-      console.log("Final Backend Payload:", backendData);
+      // Only include businessSubcategory if it has a value (prevent silent data loss)
+      if (resolvedSubcategory !== undefined) {
+        backendData.businessSubcategory = resolvedSubcategory;
+      }
+      
+      if (__DEV__) {
+        console.log("Final Backend Payload:", backendData);
+      }
       
       console.log('📤 Sending business profile data:', JSON.stringify(backendData, null, 2));
       console.log('🖼️ Logo URL being sent:', logoUrl || '(empty)');
@@ -406,10 +413,15 @@ class BusinessProfileService {
       if (data.address !== undefined) backendData.address = data.address;
       if (data.category !== undefined) backendData.category = data.category;
       
-      // Handle subcategory field with backward compatibility
-      if (data.businessSubcategory !== undefined) backendData.businessSubcategory = data.businessSubcategory;
-      else if (data.subCategory !== undefined) backendData.businessSubcategory = data.subCategory;
-      else if (data.subcategory !== undefined) backendData.businessSubcategory = data.subcategory;
+      // Handle subcategory field with backward compatibility (prevent silent data loss)
+      const resolvedSubcategory =
+        data.businessSubcategory ??
+        data.subCategory ??
+        data.subcategory;
+      
+      if (resolvedSubcategory !== undefined) {
+        backendData.businessSubcategory = resolvedSubcategory;
+      }
       
       // Use 'logo' field if provided, otherwise use 'companyLogo'
       if (data.logo !== undefined) backendData.logo = data.logo;
@@ -417,8 +429,10 @@ class BusinessProfileService {
       if (data.description !== undefined) backendData.description = data.description;
       if (data.website !== undefined) backendData.website = data.website;
       
-      console.log('🔍 Making PUT request to:', `/api/mobile/business-profile/${id}`);
-      console.log('📤 Request data (partial update):', backendData);
+      if (__DEV__) {
+        console.log('🔍 Making PUT request to:', `/api/mobile/business-profile/${id}`);
+        console.log('📤 Request data (partial update):', backendData);
+      }
       
       const response = await api.put(`/api/mobile/business-profile/${id}`, backendData);
       

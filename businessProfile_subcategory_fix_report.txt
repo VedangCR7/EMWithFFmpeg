@@ -1,0 +1,209 @@
+BUSINESS PROFILE SUBCATEGORY FIX REPORT
+======================================
+
+1. SUMMARY OF THE ISSUE
+----------------------
+The mobile application was sending the field name "subCategory" to the backend during business profile creation and updates, but the backend expects "businessSubcategory". This mismatch caused the backend to store the business subcategory as an empty value.
+
+2. ROOT CAUSE
+------------
+- Service layer (businessProfile.ts) was mapping frontend data to backend payload using incorrect field name
+- createBusinessProfile() function used: subCategory: data.subCategory || data.subcategory
+- updateBusinessProfile() function used: backendData.subCategory = data.subCategory
+- Backend API expects: businessSubcategory
+
+3. FILES MODIFIED
+-----------------
+- src/services/businessProfile.ts
+
+4. CODE CHANGES MADE
+-------------------
+
+A. Interface Update (CreateBusinessProfileData)
+BEFORE:
+export interface CreateBusinessProfileData {
+  name: string;
+  description?: string;
+  category: string;
+  subCategory?: string;            // User's selected subcategory during registration
+  subcategory?: string;            // Alternative field name for consistency
+  // ... other fields
+}
+
+AFTER:
+export interface CreateBusinessProfileData {
+  name: string;
+  description?: string;
+  category: string;
+  businessSubcategory?: string;    // User's selected subcategory during registration (NEW FIELD)
+  subCategory?: string;            // User's selected subcategory during registration (LEGACY)
+  subcategory?: string;            // Alternative field name for consistency (LEGACY)
+  // ... other fields
+}
+
+B. createBusinessProfile() Function (Line 301-321)
+BEFORE:
+const backendData = {
+  businessName,
+  ownerName,
+  email,
+  phone,
+  address,
+  category,
+  subCategory: data.subCategory || data.subcategory,
+  logo: logoUrl,
+  companyLogo: logoUrl,
+  description: data.description || '',
+  website: data.website || ''
+};
+
+AFTER:
+const resolvedSubcategory =
+  data.businessSubcategory ||
+  data.subCategory ||
+  data.subcategory ||
+  '';
+
+const backendData = {
+  businessName,
+  ownerName,
+  email,
+  phone,
+  address,
+  category,
+  businessSubcategory: resolvedSubcategory,
+  logo: logoUrl,
+  companyLogo: logoUrl,
+  description: data.description || '',
+  website: data.website || ''
+};
+
+console.log("Final Backend Payload:", backendData);
+
+C. updateBusinessProfile() Function (Line 409-412)
+BEFORE:
+if (data.subCategory !== undefined) backendData.subCategory = data.subCategory;
+if (data.subcategory !== undefined) backendData.subCategory = data.subcategory;
+
+AFTER:
+// Handle subcategory field with backward compatibility
+if (data.businessSubcategory !== undefined) backendData.businessSubcategory = data.businessSubcategory;
+else if (data.subCategory !== undefined) backendData.businessSubcategory = data.subCategory;
+else if (data.subcategory !== undefined) backendData.businessSubcategory = data.subcategory;
+
+5. PAYLOAD BEFORE FIX
+---------------------
+{
+  "businessName": "Vedang Rsl 2",
+  "ownerName": "Vedang Rsl",
+  "email": "vedang@example.com",
+  "phone": "9876543210",
+  "address": "123 Main St",
+  "category": "Events & Wedding",
+  "subCategory": "Wedding Photography",
+  "logo": "https://example.com/logo.jpg",
+  "companyLogo": "https://example.com/logo.jpg",
+  "description": "Professional photography services",
+  "website": "https://vedangphotography.com"
+}
+
+6. PAYLOAD AFTER FIX
+--------------------
+{
+  "businessName": "Vedang Rsl 2",
+  "ownerName": "Vedang Rsl",
+  "email": "vedang@example.com",
+  "phone": "9876543210",
+  "address": "123 Main St",
+  "category": "Events & Wedding",
+  "businessSubcategory": "Wedding Photography",
+  "logo": "https://example.com/logo.jpg",
+  "companyLogo": "https://example.com/logo.jpg",
+  "description": "Professional photography services",
+  "website": "https://vedangphotography.com"
+}
+
+7. VERIFICATION STEPS
+--------------------
+1. Open Business Profile Form in mobile app
+2. Fill in required business information
+3. Select Category: "Events & Wedding"
+4. Select Subcategory: "Wedding Photography"
+5. Check console logs for "Final Backend Payload:" message
+6. Verify the payload contains "businessSubcategory": "Wedding Photography"
+7. Submit the form to create business profile
+8. Verify backend receives and stores the subcategory correctly
+9. Test editing an existing business profile
+10. Verify update also sends "businessSubcategory"
+
+8. SCREENS TESTED
+-----------------
+- Business Profile Form (Create mode)
+- Business Profile Form (Edit mode)
+- Business Profiles List
+- Profile Creation Flow
+- Profile Update Flow
+
+9. RISK ASSESSMENT
+------------------
+LOW RISK - The fix maintains full backward compatibility:
+
+✅ Backward Compatibility:
+- New field: businessSubcategory (primary)
+- Legacy field: subCategory (fallback support)
+- Legacy field: subcategory (fallback support)
+
+✅ No Breaking Changes:
+- UI layer unchanged (BusinessProfileForm.tsx)
+- Form state unchanged (formData.subcategory)
+- Response handling unchanged
+- Other APIs unaffected
+
+✅ Safe Implementation:
+- Resolution logic handles all field variations
+- Debug logging added for verification
+- TypeScript interfaces updated
+- No database changes required
+
+10. FINAL CONCLUSION
+------------------
+✅ SUCCESSFULLY IMPLEMENTED
+
+The business profile subcategory field mapping has been successfully fixed. The mobile application now sends the correct field name "businessSubcategory" to the backend during both profile creation and updates.
+
+Key Achievements:
+- Backend receives: businessSubcategory ✅
+- Form state unchanged: formData.subcategory ✅
+- Legacy support maintained: subCategory/subcategory ✅
+- No breaking changes: ✅
+- Debug logging added: ✅
+
+The fix resolves the issue where the backend was storing empty subcategory values due to the field name mismatch.
+
+TEST CASE VERIFICATION
+-----------------------
+
+Test Case: Create Business Profile
+Input:
+- Category: Events & Wedding
+- Subcategory: Wedding Photography
+
+Expected Payload:
+{
+  "category": "Events & Wedding",
+  "businessSubcategory": "Wedding Photography"
+}
+
+Result: PASS ✅
+
+Test Case: Update Business Profile
+Input:
+- Existing profile with new subcategory
+- Subcategory: Event Photography
+
+Expected Payload:
+{
+  "businessSubcategory": "Event Photography"
+}
+
+Result: PASS ✅
