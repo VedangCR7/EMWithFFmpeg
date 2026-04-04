@@ -928,16 +928,16 @@ const BusinessProfilesScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Informational Message */}
+        {/* Warning Message */}
         <View style={[styles.infoMessageContainer, { 
-          backgroundColor: isDarkMode ? '#2d4a2b' : '#f8f9e8',
-          borderColor: isDarkMode ? '#4a7c47' : '#e6e9d4'
+          backgroundColor: isDarkMode ? '#4a3426' : '#fff3e0',
+          borderColor: isDarkMode ? '#8d6e63' : '#ffcc02'
         }]}>
-          <Icon name="info" size={16} color={isDarkMode ? '#8bc34a' : '#66bb6a'} />
+          <Icon name="warning" size={16} color={isDarkMode ? '#ffb74d' : '#ff9800'} />
           <Text style={[styles.infoMessageText, { 
-            color: isDarkMode ? '#e8f5e9' : '#2e7d32'
+            color: isDarkMode ? '#ffe0b2' : '#e65100'
           }]}>
-            After successful payment, your business profile will be activated within 24 hours. We're currently processing your request.
+            After successful payment, your business profile will be activated within 24 hours.
           </Text>
         </View>
 
