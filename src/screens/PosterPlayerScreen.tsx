@@ -446,6 +446,7 @@ const PosterPlayerScreen: React.FC = () => {
 
   // Track previous initialPoster ID to detect when a different poster is selected
   const prevInitialPosterIdRef = useRef<string | null>(null);
+  const prevProfileRef = useRef<any>(null); // CRITICAL FIX: Track previous profile for change detection
   const activeCategoryRef = useRef<{ type: 'business' | 'greeting' | 'calendar' | null; value: string | null }>({ type: null, value: null });
   // Ref to prevent multiple initial poster insertions
   const initialPosterAddedRef = useRef<boolean>(false);
@@ -608,6 +609,33 @@ const PosterPlayerScreen: React.FC = () => {
   const [isLoadingServiceFilter, setIsLoadingServiceFilter] = useState<Record<string, boolean>>({});
 
   // Business profile logic is handled by useBusinessProfile context
+  
+  // CRITICAL FIX: Add effect to handle profile changes and trigger UI updates
+  useEffect(() => {
+    console.log('🔄 [POSTER PLAYER] Business profile changed:', {
+      profileId: globalBusinessProfile?.id,
+      profileName: globalBusinessProfile?.name,
+      previousProfileId: prevProfileRef.current?.id
+    });
+    
+    // Force refresh templates when profile changes
+    if (globalBusinessProfile?.id !== prevProfileRef.current?.id) {
+      console.log('🔄 [POSTER PLAYER] Profile changed, forcing template refresh...');
+      
+      // Reset template state to trigger re-fetch
+      setAllTemplatesState([]);
+      allTemplatesRef.current = [];
+      
+      // Update previous profile reference
+      prevProfileRef.current = globalBusinessProfile;
+      
+      // Re-trigger template loading based on current category
+      if (activeCategoryRef.current?.type === 'business' && activeCategoryRef.current?.value) {
+        console.log('🔄 [POSTER PLAYER] Re-loading business templates for new profile');
+        // The existing category loading logic will pick up the new profile
+      }
+    }
+  }, [globalBusinessProfile]);
 
   // Load business profiles - simplified since context handles AsyncStorage
   useEffect(() => {

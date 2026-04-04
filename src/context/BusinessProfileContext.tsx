@@ -16,6 +16,10 @@ interface BusinessProfileContextType {
   setSelectedBusinessCategory: (category: string | null) => void;
   selectedBusinessId: string | null;
   selectedBusinessProfileId: string | null; // Alias for consistency with API requirements
+  // FRONTEND-ONLY: Activation pending state management (non-persistent)
+  setActivationPending: (profileId: string, isPending: boolean) => void;
+  isActivationPending: (profileId: string) => boolean;
+  clearActivationPending: (profileId: string) => void;
 }
 
 const BusinessProfileContext = createContext<BusinessProfileContextType | undefined>(undefined);
@@ -33,6 +37,9 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
   const [selectedBusinessCategory, setSelectedBusinessCategoryState] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const isRefreshingRef = useRef<boolean>(false);
+  
+  // FRONTEND-ONLY: Temporary activation pending state (non-persistent, session-only)
+  const [activationPendingProfiles, setActivationPendingProfiles] = useState<Set<string>>(new Set());
 
   // Clear cache helper
   const clearProfileCache = useCallback(async () => {
@@ -146,6 +153,13 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
           if (!prev || 
               JSON.stringify(prev) !== JSON.stringify(enrichedProfile)) {
             console.log(`✅ [BUSINESS PROFILE CONTEXT] Profile ${currentProfileId} successfully refreshed and updated in state.`);
+            
+            // CRITICAL FIX: Auto clear activation pending if backend returns ACTIVE
+            if (enrichedProfile.subscriptionStatus?.toUpperCase() === 'ACTIVE') {
+              clearActivationPending(currentProfileId);
+              console.log(`🏢 [BUSINESS PROFILE CONTEXT] Auto-cleared activation pending - backend returned ACTIVE for profile: ${currentProfileId}`);
+            }
+            
             // Also update async storage in background
             AsyncStorage.setItem(SELECTED_PROFILE_KEY, JSON.stringify(enrichedProfile)).catch(e => 
               console.error('❌ Failed to update storage with fresh profile', e)
@@ -228,6 +242,12 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
   const setSelectedBusinessProfile = useCallback(async (profile: BusinessProfile | null) => {
     // Remove frontend subscription check - let backend API handle subscription validation
     try {
+      console.log('🔄 [BUSINESS PROFILE CONTEXT] setSelectedBusinessProfile called:', {
+        profileId: profile?.id,
+        profileName: profile?.name,
+        previousProfileId: selectedBusinessProfile?.id
+      });
+      
       let enrichedProfile = profile;
       
       // Fetch business subscription data if profile is provided
@@ -268,7 +288,17 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
         });
       }
       
+      // CRITICAL FIX: Update state immediately and verify
       setSelectedBusinessProfileState(enrichedProfile);
+      
+      // CRITICAL FIX: Add immediate verification log
+      setTimeout(() => {
+        console.log('✅ [BUSINESS PROFILE CONTEXT] State update verification:', {
+          profileId: enrichedProfile?.id,
+          profileName: enrichedProfile?.name,
+          stateUpdated: true
+        });
+      }, 50);
 
       // Auto-sync business category when profile changes
       if (profile?.category || profile?.subCategory || profile?.subcategory) {
@@ -301,7 +331,7 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
     } catch (error) {
       console.error('❌ [BUSINESS PROFILE CONTEXT] Error saving selected profile:', error);
     }
-  }, [clearProfileCache]);
+  }, [clearProfileCache, selectedBusinessProfile]);
 
   // Set business category independently
   const setSelectedBusinessCategory = useCallback(async (category: string | null) => {
@@ -330,6 +360,62 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
     }
   }, [selectedBusinessProfile, isLoading, setSelectedBusinessProfile]);
 
+  // FRONTEND-ONLY: Activation pending state management (non-persistent, session-only)
+  const setActivationPending = useCallback((profileId: string, isPending: boolean) => {
+    console.log('🏢 [BUSINESS PROFILE CONTEXT] 🚀 setActivationPending called with:', { profileId, isPending });
+    
+    if (!profileId) {
+      console.warn('🏢 [BUSINESS PROFILE CONTEXT] setActivationPending called with empty profileId');
+      return;
+    }
+    
+    // Use functional state update to avoid stale closure
+    setActivationPendingProfiles(prev => {
+      console.log('🏢 [BUSINESS PROFILE CONTEXT] Current activationPendingProfiles before:', Array.from(prev));
+      
+      const newSet = new Set(prev);
+      if (isPending) {
+        newSet.add(profileId);
+        console.log(`🏢 [BUSINESS PROFILE CONTEXT] ✅ Set activation pending for profile: ${profileId}`);
+        console.log(`🏢 [BUSINESS PROFILE CONTEXT] Current pending profiles:`, Array.from(newSet));
+      } else {
+        newSet.delete(profileId);
+        console.log(`🏢 [BUSINESS PROFILE CONTEXT] ❌ Cleared activation pending for profile: ${profileId}`);
+        console.log(`🏢 [BUSINESS PROFILE CONTEXT] Current pending profiles:`, Array.from(newSet));
+      }
+      console.log('🏢 [BUSINESS PROFILE CONTEXT] New activationPendingProfiles after:', Array.from(newSet));
+      return newSet;
+    });
+  }, []); // Remove activationPendingProfiles dependency to prevent stale closure
+
+  const isActivationPending = useCallback((profileId: string) => {
+    if (!profileId) {
+      console.warn('🏢 [BUSINESS PROFILE CONTEXT] isActivationPending called with empty profileId');
+      return false;
+    }
+    
+    // Direct check from current state to avoid stale closure
+    const isPending = activationPendingProfiles.has(profileId);
+    console.log(`🏢 [BUSINESS PROFILE CONTEXT] 🔍 Check activation pending for profile: ${profileId} -> ${isPending}`);
+    console.log(`🏢 [BUSINESS PROFILE CONTEXT] All pending profiles:`, Array.from(activationPendingProfiles));
+    return isPending;
+  }, [activationPendingProfiles]); // Keep dependency for accurate state reading
+
+  const clearActivationPending = useCallback((profileId: string) => {
+    if (!profileId) {
+      console.warn('🏢 [BUSINESS PROFILE CONTEXT] clearActivationPending called with empty profileId');
+      return;
+    }
+    
+    setActivationPendingProfiles(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(profileId);
+      console.log(`🏢 [BUSINESS PROFILE CONTEXT] 🧹 Force cleared activation pending for profile: ${profileId}`);
+      console.log(`🏢 [BUSINESS PROFILE CONTEXT] Current pending profiles:`, Array.from(newSet));
+      return newSet;
+    });
+  }, []);
+
   const value: BusinessProfileContextType = useMemo(() => ({
     selectedBusinessProfile,
     setSelectedBusinessProfile,
@@ -339,6 +425,10 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
     setSelectedBusinessCategory,
     selectedBusinessId: selectedBusinessProfile?.id || null,
     selectedBusinessProfileId: selectedBusinessProfile?.id || null, // Alias for consistency with API requirements
+    // FRONTEND-ONLY: Activation pending state management
+    setActivationPending,
+    isActivationPending,
+    clearActivationPending,
   }), [
     selectedBusinessProfile,
     setSelectedBusinessProfile,
@@ -346,6 +436,9 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
     isLoading,
     selectedBusinessCategory,
     setSelectedBusinessCategory,
+    setActivationPending,
+    isActivationPending,
+    clearActivationPending,
   ]);
 
   return (

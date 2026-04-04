@@ -192,6 +192,11 @@ afterEvaluate {
             }
         }
     }
+    
+    // Fix vector icons task dependency for lint
+    if (tasks.findByName('generateReleaseLintVitalReportModel')) {
+        tasks.findByName('generateReleaseLintVitalReportModel').mustRunAfter(tasks.findByName('copyReactNativeVectorIconFonts'))
+    }
 }
 
 dependencies {

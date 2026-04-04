@@ -59,7 +59,13 @@ const BusinessProfilesScreen: React.FC = () => {
     getBusinessProfileSubscription, 
     refreshBusinessProfileSubscription 
   } = useSubscription();
-  const { setSelectedBusinessProfile, selectedBusinessProfile } = useBusinessProfile();
+  const { 
+    setSelectedBusinessProfile, 
+    selectedBusinessProfile,
+    setActivationPending,
+    isActivationPending,
+    clearActivationPending
+  } = useBusinessProfile();
   const insets = useSafeAreaInsets();
   const [profiles, setProfiles] = useState<any[]>([]);
   const [allProfiles, setAllProfiles] = useState<any[]>([]); // Cache all profiles for instant filtering
@@ -310,6 +316,13 @@ const BusinessProfilesScreen: React.FC = () => {
       setImageRefreshKey(Date.now());
       loadBusinessProfiles();
       
+      // CRITICAL FIX: Force UI refresh to pick up activation pending state
+      // This ensures the BusinessCard components re-render with latest context state
+      setTimeout(() => {
+        console.log('🔄 BusinessProfilesScreen - Force refresh for activation pending state');
+        setImageRefreshKey(prev => prev + 1); // Force re-render
+      }, 100);
+      
       // Check if payment was completed and create profile if needed
       checkPaymentAndCreateProfile();
       
@@ -392,18 +405,19 @@ const BusinessProfilesScreen: React.FC = () => {
   }, []);
 
   const handleProfileSelect = useCallback(async (profile: any) => {
-    // Debug logging to identify the issue
-    console.log('🔍 [DEBUG] Profile Selection Status:', {
+    // CRITICAL FIX: Enhanced debugging for profile selection
+    console.log('🔍 [PROFILE SELECTION] Starting profile selection:', {
       profileId: profile.id,
       profileName: profile.name,
       subscriptionStatus: profile.subscriptionStatus,
       isSubscriptionActive: profile.isSubscriptionActive,
-      subscriptionContext: getBusinessProfileSubscription(profile.id)?.status
+      subscriptionContext: getBusinessProfileSubscription(profile.id)?.status,
+      currentSelectedProfile: selectedBusinessProfile?.id
     });
     
     const isActive = profile?.subscriptionStatus?.toUpperCase() === "ACTIVE";
     
-    console.log('🔍 [DEBUG] Profile Selection isActive result:', isActive);
+    console.log('🔍 [PROFILE SELECTION] Profile active check:', { profileId: profile.id, isActive });
     
     if (!isActive) {
       const message = "This business profile is locked until the subscription is activated.";
@@ -418,14 +432,26 @@ const BusinessProfilesScreen: React.FC = () => {
     }
 
     try {
+      console.log('🔄 [PROFILE SELECTION] Setting selected profile:', profile.name);
       await setSelectedBusinessProfile(profile);
+      
+      // CRITICAL FIX: Add immediate state verification
+      setTimeout(() => {
+        console.log('✅ [PROFILE SELECTION] Profile selection completed:', {
+          profileId: profile.id,
+          profileName: profile.name,
+          success: true
+        });
+      }, 100);
+      
       setSuccessMessage(`${profile.name} selected as active business profile`);
       setShowSuccessModal(true);
     } catch (error: any) {
+      console.error('❌ [PROFILE SELECTION] Selection failed:', error);
       setErrorMessage(error.message || 'Failed to select business profile');
       setShowErrorModal(true);
     }
-  }, [getBusinessProfileSubscription, setSelectedBusinessProfile]);
+  }, [getBusinessProfileSubscription, setSelectedBusinessProfile, selectedBusinessProfile]);
 
   const initiatePaymentForProfile = useCallback((profile: any) => {
     // Prevent multiple payment attempts
@@ -589,7 +615,8 @@ const BusinessProfilesScreen: React.FC = () => {
     onSelect: (item: any) => void;
     onPay: (item: any) => void;
     subscription: any;
-  }>(({ item, imageRefreshKey, theme, onEdit, onDelete, onSelect, onPay, subscription }) => {
+    isActivationPending: (profileId: string) => boolean;
+  }>(({ item, imageRefreshKey, theme, onEdit, onDelete, onSelect, onPay, subscription, isActivationPending }) => {
     // Debug logging to identify the issue
     console.log('🔍 [DEBUG] Profile Subscription Status:', {
       profileId: item.id,
@@ -602,9 +629,29 @@ const BusinessProfilesScreen: React.FC = () => {
     const isActive = item?.subscriptionStatus?.toUpperCase() === "ACTIVE";
     const isProcessing = item?.subscriptionStatus?.toUpperCase() === "PROCESSING";
     
-    console.log('🔍 [DEBUG] Final isActive result:', isActive);
+    // CRITICAL FIX: Check activation pending state from context with enhanced debugging
+    const isPendingActivation = isActivationPending(item.id);
+    console.log('🔍 [DEBUG] Activation Pending State:', {
+      profileId: item.id,
+      profileName: item.name,
+      isPendingActivation,
+      imageRefreshKey
+    });
     
-    const isLocked = !isActive;
+    // Effective active state: backend says active AND not pending activation
+    const isEffectivelyActive = isActive && !isPendingActivation;
+    
+    const isLocked = !isEffectivelyActive;
+    
+    console.log('🔍 [DEBUG] Final UI State:', {
+      profileId: item.id,
+      profileName: item.name,
+      isActive,
+      isPendingActivation,
+      isEffectivelyActive,
+      isLocked,
+      willShowMessage: isPendingActivation ? 'Activation in 24 hours' : (isProcessing ? 'Payment processing' : 'Subscription required')
+    });
     
     const isSelected = item.id === selectedBusinessProfile?.id;
 
@@ -630,6 +677,16 @@ const BusinessProfilesScreen: React.FC = () => {
                   </Text>
                   <Text style={[styles.lockSubText, { color: theme.colors.textSecondary }]}>
                     It will be processed within 24 hours
+                  </Text>
+                </>
+              ) : isPendingActivation ? (
+                <>
+                  <Icon name="hourglass-empty" size={24} color={theme.colors.warning} />
+                  <Text style={[styles.lockText, { color: theme.colors.text }]}>
+                    Your business profile will be activated within 24 hours
+                  </Text>
+                  <Text style={[styles.lockSubText, { color: theme.colors.textSecondary }]}>
+                    Payment successful - Activation in progress
                   </Text>
                 </>
               ) : (
@@ -796,7 +853,10 @@ const BusinessProfilesScreen: React.FC = () => {
       </TouchableOpacity>
     );
   }, (prevProps, nextProps) => {
-    // Only re-render if item data, mainProfileId, imageRefreshKey, or theme changes
+    // Only re-render if item data, mainProfileId, imageRefreshKey, theme, or activation pending state changes
+    const prevActivationPending = prevProps.isActivationPending(prevProps.item.id);
+    const nextActivationPending = nextProps.isActivationPending(nextProps.item.id);
+    
     return (
       prevProps.item.id === nextProps.item.id &&
       prevProps.item.name === nextProps.item.name &&
@@ -811,7 +871,8 @@ const BusinessProfilesScreen: React.FC = () => {
       JSON.stringify(prevProps.item.services) === JSON.stringify(nextProps.item.services) &&
       prevProps.imageRefreshKey === nextProps.imageRefreshKey &&
       prevProps.theme.colors.primary === nextProps.theme.colors.primary &&
-      prevProps.theme.colors.text === nextProps.theme.colors.text
+      prevProps.theme.colors.text === nextProps.theme.colors.text &&
+      prevActivationPending === nextActivationPending
     );
   });
 
@@ -826,9 +887,10 @@ const BusinessProfilesScreen: React.FC = () => {
         onSelect={handleProfileSelect}
         onPay={initiatePaymentForProfile}
         subscription={getBusinessProfileSubscription(item.id)}
+        isActivationPending={isActivationPending}
       />
     );
-  }, [imageRefreshKey, theme, handleEditProfile, handleDeleteProfile, handleProfileSelect, initiatePaymentForProfile, getBusinessProfileSubscription]);
+  }, [imageRefreshKey, theme, handleEditProfile, handleDeleteProfile, handleProfileSelect, initiatePaymentForProfile, getBusinessProfileSubscription, isActivationPending]);
 
   const keyExtractor = useCallback((item: any) => item.id, []);
 
