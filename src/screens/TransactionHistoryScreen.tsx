@@ -57,7 +57,7 @@ const responsiveFontSize = {
   xxxl: moderateScale(isSmallScreen ? 14 : isMediumScreen ? 16 : 18),
 };
 
-type FilterType = 'all' | 'success' | 'failed' | 'pending' | 'business_profile' | 'subscription';
+type FilterType = 'all' | 'success' | 'failed' | 'pending';
 
 const TransactionHistoryScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -169,8 +169,6 @@ const TransactionHistoryScreen: React.FC = () => {
   // Filter transactions based on selected filter
   const filteredTransactions = transactions.filter(transaction => {
     if (filter === 'all') return true;
-    if (filter === 'business_profile') return transaction.type === 'business_profile';
-    if (filter === 'subscription') return transaction.type === 'subscription';
     return transaction.status === filter;
   });
 
@@ -352,7 +350,7 @@ const TransactionHistoryScreen: React.FC = () => {
       marginBottom: dynamicModerateScale(8),
     }]}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        {(['all', 'success', 'failed', 'pending', 'business_profile', 'subscription'] as FilterType[]).map((filterType) => (
+        {(['all', 'success', 'failed', 'pending'] as FilterType[]).map((filterType) => (
           <TouchableOpacity
             key={filterType}
             style={[
@@ -375,7 +373,7 @@ const TransactionHistoryScreen: React.FC = () => {
                 fontSize: isTabletDevice ? dynamicModerateScale(9) : dynamicModerateScale(8),
               }
             ]}>
-              {filterType === 'business_profile' ? 'Business Profile' : filterType === 'subscription' ? 'Subscription' : filterType.charAt(0).toUpperCase() + filterType.slice(1)}
+              {filterType.charAt(0).toUpperCase() + filterType.slice(1)}
             </Text>
           </TouchableOpacity>
         ))}
@@ -484,45 +482,7 @@ const TransactionHistoryScreen: React.FC = () => {
               fontSize: isTabletDevice ? dynamicModerateScale(7) : dynamicModerateScale(6.5),
             }]}>Pending</Text>
           </View>
-          <View style={[styles.statItem, { 
-            width: getStatItemWidth(),
-            backgroundColor: theme.colors.inputBackground,
-            padding: isTabletDevice ? dynamicModerateScale(10) : dynamicModerateScale(8),
-            borderRadius: dynamicModerateScale(8),
-            minHeight: isTabletDevice ? dynamicModerateScale(60) : dynamicModerateScale(55),
-            justifyContent: 'center',
-          }]}>
-            <Text style={[styles.statValue, { 
-              color: '#667eea',
-              fontSize: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(11),
-              marginBottom: dynamicModerateScale(2),
-            }]}>₹{transactionStats.totalAmount}</Text>
-            <Text style={[styles.statLabel, { 
-              color: theme.colors.textSecondary,
-              fontSize: isTabletDevice ? dynamicModerateScale(7) : dynamicModerateScale(6.5),
-            }]}>Total Amount</Text>
-          </View>
-          <View style={[styles.statItem, { 
-            width: getStatItemWidth(),
-            backgroundColor: theme.colors.inputBackground,
-            padding: isTabletDevice ? dynamicModerateScale(10) : dynamicModerateScale(8),
-            borderRadius: dynamicModerateScale(8),
-            minHeight: isTabletDevice ? dynamicModerateScale(60) : dynamicModerateScale(55),
-            justifyContent: 'center',
-          }]}>
-            <Text style={[styles.statValue, { 
-              color: theme.colors.text,
-              fontSize: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(11),
-              marginBottom: dynamicModerateScale(2),
-            }]}>
-              {(transactionStats.quarterlySubscriptions || 0) + (transactionStats.yearlySubscriptions || 0)}
-            </Text>
-            <Text style={[styles.statLabel, { 
-              color: theme.colors.textSecondary,
-              fontSize: isTabletDevice ? dynamicModerateScale(7) : dynamicModerateScale(6.5),
-            }]}>Active Subscriptions</Text>
-          </View>
-        </View>
+                            </View>
       )}
     </View>
   );
@@ -629,11 +589,7 @@ const TransactionHistoryScreen: React.FC = () => {
               }]}>
                 {filter === 'all' 
                   ? 'You haven\'t made any payments yet.' 
-                  : filter === 'business_profile'
-                    ? 'No business profile transactions found.'
-                    : filter === 'subscription'
-                      ? 'No subscription transactions found.'
-                      : `No ${filter} transactions found.`
+                  : `No ${filter} transactions found.`
                 }
               </Text>
             </View>

@@ -15,6 +15,7 @@ import {
   Share,
   RefreshControl,
   Keyboard,
+  ActivityIndicator,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -296,6 +297,7 @@ const ProfileScreen: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [showSignOutModal, setShowSignOutModal] = useState(false);
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [showComingSoonModal, setShowComingSoonModal] = useState(false);
   const [comingSoonTitle, setComingSoonTitle] = useState('');
   const [comingSoonSubtitle, setComingSoonSubtitle] = useState('');
@@ -934,8 +936,6 @@ const ProfileScreen: React.FC = () => {
 
   const confirmDeleteAccount = async () => {
     try {
-      setShowDeleteAccountModal(false);
-      
       const currentUser = authService.getCurrentUser();
       const userId = currentUser?.id;
       
@@ -944,13 +944,8 @@ const ProfileScreen: React.FC = () => {
         return;
       }
       
-      // Show loading indicator
-      Alert.alert(
-        'Deleting Account',
-        'Please wait while we delete your account...',
-        [{ text: 'OK', onPress: () => {} }],
-        { cancelable: false }
-      );
+      // Set loading state instead of showing Alert
+      setIsDeletingAccount(true);
       
       // Delete user account
       await authApi.deleteUser(userId);
@@ -959,16 +954,15 @@ const ProfileScreen: React.FC = () => {
       clearSubscriptionData();
       await authService.signOut();
       
-      Alert.alert(
-        'Account Deleted',
-        'Your account has been successfully deleted.',
-        [{ text: 'OK' }]
-      );
-      
-      // Navigation will be handled by auth state change listener
+      // Close modal - navigation will be handled by auth state change listener
+      setIsDeletingAccount(false);
+      setShowDeleteAccountModal(false);
       
     } catch (error: any) {
       console.error('Delete account error:', error);
+      setIsDeletingAccount(false);
+      setShowDeleteAccountModal(false);
+      
       Alert.alert(
         'Delete Account Error',
         error.response?.data?.message || 'Failed to delete account. Please try again.',
@@ -2722,52 +2716,92 @@ const ProfileScreen: React.FC = () => {
               <View style={[styles.signOutModalContent, {
                 marginBottom: dynamicModerateScale(12),
               }]}>
-                <Text style={[styles.signOutModalMessage, { 
-                  color: theme.colors.text,
-                  fontSize: getFontSize(10),
-                  lineHeight: dynamicModerateScale(16),
-                }]}>
-                  ⚠️ This action cannot be undone!
-                </Text>
-                <Text style={[styles.signOutModalSubMessage, { 
-                  color: theme.colors.textSecondary,
-                  fontSize: getFontSize(9),
-                  textAlign: 'center',
-                  lineHeight: dynamicModerateScale(14),
-                  marginTop: dynamicModerateScale(8),
-                }]}>
-                  Deleting your account will permanently remove all your data, including posters, business profiles, and subscription information.
-                </Text>
+                {isDeletingAccount ? (
+                  <View style={{ alignItems: 'center', paddingVertical: dynamicModerateScale(8) }}>
+                    <Text style={{ 
+                      color: theme.colors.text,
+                      fontSize: getFontSize(12),
+                      fontWeight: '600',
+                      textAlign: 'center',
+                      marginBottom: dynamicModerateScale(8)
+                    }}>
+                      Deleting Account
+                    </Text>
+                    <Text style={{ 
+                      color: theme.colors.textSecondary,
+                      fontSize: getFontSize(10),
+                      textAlign: 'center',
+                      lineHeight: dynamicModerateScale(16)
+                    }}>
+                      Please wait while we delete your account...
+                    </Text>
+                    <View style={{ marginTop: dynamicModerateScale(12) }}>
+                      <ActivityIndicator size="small" color={theme.colors.primary} />
+                    </View>
+                  </View>
+                ) : (
+                  <>
+                    <Text style={[styles.signOutModalMessage, { 
+                      color: theme.colors.text,
+                      fontSize: getFontSize(10),
+                      lineHeight: dynamicModerateScale(16),
+                    }]}>
+                      ⚠️ This action cannot be undone!
+                    </Text>
+                    <Text style={[styles.signOutModalSubMessage, { 
+                      color: theme.colors.textSecondary,
+                      fontSize: getFontSize(9),
+                      textAlign: 'center',
+                      lineHeight: dynamicModerateScale(14),
+                      marginTop: dynamicModerateScale(8),
+                    }]}>
+                      Deleting your account will permanently remove all your data, including posters, business profiles, and subscription information.
+                    </Text>
+                  </>
+                )}
               </View>
               
               <View style={[styles.signOutModalButtons, {
                 gap: dynamicModerateScale(8),
               }]}>
-                <TouchableOpacity 
-                  style={[styles.signOutCancelButton, { 
-                    backgroundColor: theme.colors.inputBackground,
-                    paddingVertical: dynamicModerateScale(9),
-                    borderRadius: dynamicModerateScale(10),
-                  }]}
-                  onPress={() => setShowDeleteAccountModal(false)}
-                >
-                  <Text style={[styles.signOutCancelButtonText, { 
-                    color: theme.colors.text,
-                    fontSize: getFontSize(10),
-                  }]}>Cancel</Text>
-                </TouchableOpacity>
+                {!isDeletingAccount && (
+                  <TouchableOpacity 
+                    style={[styles.signOutCancelButton, { 
+                      backgroundColor: theme.colors.inputBackground,
+                      paddingVertical: dynamicModerateScale(9),
+                      borderRadius: dynamicModerateScale(10),
+                    }]}
+                    onPress={() => setShowDeleteAccountModal(false)}
+                  >
+                    <Text style={[styles.signOutCancelButtonText, { 
+                      color: theme.colors.text,
+                      fontSize: getFontSize(10),
+                    }]}>Cancel</Text>
+                  </TouchableOpacity>
+                )}
                 
                 <TouchableOpacity 
                   style={[styles.signOutConfirmButton, { 
-                    backgroundColor: '#cc0000',
+                    backgroundColor: isDeletingAccount ? '#cccccc' : '#cc0000',
                     paddingVertical: dynamicModerateScale(9),
                     borderRadius: dynamicModerateScale(10),
+                    opacity: isDeletingAccount ? 0.6 : 1,
                   }]}
-                  onPress={confirmDeleteAccount}
+                  onPress={isDeletingAccount ? undefined : confirmDeleteAccount}
+                  disabled={isDeletingAccount}
                 >
-                  <Text style={[styles.signOutConfirmButtonText, {
-                    fontSize: getFontSize(10),
-                  }]}>Delete Forever</Text>
+                  {isDeletingAccount ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                      <ActivityIndicator size="small" color="#ffffff" style={{ marginRight: dynamicModerateScale(6) }} />
+                      <Text style={[styles.signOutConfirmButtonText, {
+                        fontSize: getFontSize(10),
+                      }]}>Deleting...</Text>
+                    </View>
+                  ) : (
+                    <Text style={[styles.signOutConfirmButtonText, {
+                      fontSize: getFontSize(10),
+                    }]}>Delete Forever</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>

@@ -390,16 +390,27 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
   const validatePhoneNumber = (phone: string): boolean => {
     // Remove all non-digit characters and check if exactly 10 digits remain
     const phoneDigits = phone.replace(/\D/g, '');
-    return phoneDigits.length === 10;
+    if (phoneDigits.length !== 10) return false;
+    
+    // Check if first digit is 6, 7, 8, or 9
+    const firstDigit = phoneDigits.charAt(0);
+    return ['6', '7', '8', '9'].includes(firstDigit);
   };
 
-  // Validate phone with real-time digit count feedback (exactly 10 digits)
+  // Validate phone with real-time digit count feedback (exactly 10 digits, starting with 6,7,8,9)
   const validatePhone = (phone: string): string => {
     if (!phone || !phone.trim()) return ''; // Empty is OK for optional fields
     const digits = phone.trim().replace(/\D/g, ''); // Remove non-digits
     if (digits.length === 0) return '';
     if (digits.length < 10) return `Phone must be 10 digits (currently ${digits.length})`;
     if (digits.length > 10) return `Phone must be 10 digits (currently ${digits.length})`;
+    
+    // Check if first digit is 6, 7, 8, or 9
+    const firstDigit = digits.charAt(0);
+    if (!['6', '7', '8', '9'].includes(firstDigit)) {
+      return 'Phone number must start with 6, 7, 8, or 9';
+    }
+    
     return ''; // Valid
   };
 
@@ -430,13 +441,13 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
     if (!formData.phone.trim()) {
       errors.push('Phone number is required');
     } else if (!validatePhoneNumber(formData.phone.trim())) {
-      errors.push('Phone number must be exactly 10 digits');
+      errors.push('Phone number must be exactly 10 digits starting with 6, 7, 8, or 9');
     }
 
     // Alternate phone number validation (if provided)
     if (formData.alternatePhone && formData.alternatePhone.trim()) {
       if (!validatePhoneNumber(formData.alternatePhone.trim())) {
-        errors.push('Alternate phone number must be exactly 10 digits');
+        errors.push('Alternate phone number must be exactly 10 digits starting with 6, 7, 8, or 9');
       }
     }
 
