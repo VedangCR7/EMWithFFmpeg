@@ -320,6 +320,9 @@ const BusinessProfilesScreen: React.FC = () => {
 
       await AsyncStorage.removeItem('pending_business_profile_data');
       setPendingProfileData(null);
+      
+      // CRITICAL FIX: Clear activation pending state after successful profile creation
+      clearActivationPending(newProfile.id);
 
       setSuccessMessage('Business profile created successfully');
       setShowSuccessModal(true);
@@ -333,7 +336,7 @@ const BusinessProfilesScreen: React.FC = () => {
       setErrorMessage('Failed to create business profile. Please try again.');
       setShowErrorModal(true);
     }
-  }, [pendingProfileData, loadBusinessProfiles, startPolling]);
+  }, [pendingProfileData, loadBusinessProfiles, startPolling, clearActivationPending]);
 
   // Consolidated useFocusEffect for refreshing profiles
   useFocusEffect(
@@ -342,8 +345,12 @@ const BusinessProfilesScreen: React.FC = () => {
       setImageRefreshKey(Date.now());
       loadBusinessProfiles();
       
+      // CRITICAL FIX: Clear processing state when returning from subscription screen
+      // This prevents loader on "Activate Now" button after navigation
+      setProcessingProfiles(new Set());
+      
       // CRITICAL FIX: Force UI refresh to pick up activation pending state
-      // This ensures the BusinessCard components re-render with latest context state
+      // This ensures BusinessCard components re-render with latest context state
       setTimeout(() => {
         console.log('🔄 BusinessProfilesScreen - Force refresh for activation pending state');
         setImageRefreshKey(prev => prev + 1); // Force re-render

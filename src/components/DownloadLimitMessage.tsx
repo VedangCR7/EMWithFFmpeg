@@ -31,7 +31,7 @@ const DownloadLimitMessage: React.FC<DownloadLimitMessageProps> = ({
           <Text style={styles.title}>Download Limit Reached</Text>
           
           <Text style={styles.message}>
-            You've reached today's download limit. You can download more posters tomorrow.
+            You've reached today's download limit. Retry tomorrow.
           </Text>
           
           <TouchableOpacity
