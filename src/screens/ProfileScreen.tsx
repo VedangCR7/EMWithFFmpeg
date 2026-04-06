@@ -2003,13 +2003,6 @@ const ProfileScreen: React.FC = () => {
                     }]}>
                       Downloaded Posters
                     </Text>
-                    <Text style={[styles.myPostersSubtitle, { 
-                      color: theme.colors.textSecondary,
-                      fontSize: getFontSize(8),
-                      marginTop: dynamicModerateScale(0.5),
-                    }]}>
-                      {posterStats.total} posters • {posterStats.recentCount} recent
-                    </Text>
                   </View>
                 </View>
                 <Icon name="chevron-right" size={getIconSize(20)} color={theme.colors.textSecondary} />

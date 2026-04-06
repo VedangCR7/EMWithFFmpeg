@@ -45,7 +45,6 @@ import responsiveUtils, {
   isLandscape 
 } from '../utils/responsiveUtils';
 import logger from '../utils/logger';
-import { startSubscriptionPolling } from '../utils/subscriptionPolling';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -90,12 +89,25 @@ const BusinessProfilesScreen: React.FC = () => {
   const navigation = useNavigation();
   const pendingProfileDataRef = useRef<any>(null);
   const pollingCleanupRef = useRef<(() => void) | null>(null);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Stop polling function
+  const stopPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current as any);
+      pollingRef.current = null;
+    }
+  }, []);
 
   // Cleanup polling on unmount
   useEffect(() => {
     return () => {
       if (pollingCleanupRef.current) {
         pollingCleanupRef.current();
+      }
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
       }
     };
   }, []);
@@ -204,6 +216,41 @@ const BusinessProfilesScreen: React.FC = () => {
     }
   }, []);
 
+  // 5-minute polling logic for business profile subscription status
+  const startPolling = useCallback(() => {
+    if (pollingRef.current) {
+      return; // prevent duplicate polling
+    }
+
+    pollingRef.current = setInterval(async () => {
+      console.log("Checking business profile subscription status...");
+
+      try {
+        // Refresh profiles to get latest status
+        await loadBusinessProfiles();
+        
+        // Check if any profile has ACTIVE status
+        const hasActiveProfile = profiles.some(profile => 
+          profile?.subscriptionStatus?.toUpperCase() === "ACTIVE"
+        );
+        
+        if (hasActiveProfile) {
+          console.log("Business profile subscription activated");
+          
+          if (pollingRef.current) {
+            clearInterval(pollingRef.current as any);
+            pollingRef.current = null;
+          }
+          
+          // Clear processing profiles set when profiles are refreshed
+          setProcessingProfiles(new Set());
+        }
+      } catch (error) {
+        console.error("Error checking business profile status:", error);
+      }
+    }, 300000); // 5 minutes
+  }, [loadBusinessProfiles, profiles]);
+
   // Initial load of business profiles
   useEffect(() => {
     loadBusinessProfiles();
@@ -258,30 +305,9 @@ const BusinessProfilesScreen: React.FC = () => {
       const paymentStatus = await businessProfileService.checkBusinessProfilePaymentStatus();
 
       if (!paymentStatus.hasPaid) {
-        console.log('Payment not verified yet. Starting polling...');
+        console.log('Payment not verified yet. Starting 5-minute polling...');
 
-        if (!pollingCleanupRef.current) {
-          pollingCleanupRef.current = startSubscriptionPolling(
-            () => {
-              console.log('Payment verified via polling');
-
-              loadBusinessProfiles();
-
-              if (pollingCleanupRef.current) {
-                pollingCleanupRef.current();
-                pollingCleanupRef.current = null;
-              }
-            },
-            () => {
-              console.log('Polling timed out');
-
-              if (pollingCleanupRef.current) {
-                pollingCleanupRef.current();
-                pollingCleanupRef.current = null;
-              }
-            }
-          );
-        }
+        startPolling();
 
         return;
       }
@@ -307,7 +333,7 @@ const BusinessProfilesScreen: React.FC = () => {
       setErrorMessage('Failed to create business profile. Please try again.');
       setShowErrorModal(true);
     }
-  }, [pendingProfileData, loadBusinessProfiles]);
+  }, [pendingProfileData, loadBusinessProfiles, startPolling]);
 
   // Consolidated useFocusEffect for refreshing profiles
   useFocusEffect(
@@ -332,21 +358,9 @@ const BusinessProfilesScreen: React.FC = () => {
         return status === 'PENDING' || status === 'PROCESSING';
       });
       
-      if (hasPendingOrProcessing && !pollingCleanupRef.current) {
-        console.log('🔄 Starting subscription polling for PENDING/PROCESSING profiles');
-        pollingCleanupRef.current = startSubscriptionPolling(
-          () => {
-            console.log('✅ Subscription status updated via polling');
-            loadBusinessProfiles();
-            
-            // Clear processing profiles set when profiles are refreshed
-            setProcessingProfiles(new Set());
-          },
-          () => {
-            console.log('⏰ Subscription polling timed out');
-            setProcessingProfiles(new Set());
-          }
-        );
+      if (hasPendingOrProcessing && !pollingRef.current) {
+        console.log('🔄 Starting 5-minute subscription polling for PENDING/PROCESSING profiles');
+        startPolling();
       }
       
       return () => {
@@ -355,7 +369,7 @@ const BusinessProfilesScreen: React.FC = () => {
           pollingCleanupRef.current = null;
         }
       };
-    }, [loadBusinessProfiles, checkPaymentAndCreateProfile, profiles])
+    }, [loadBusinessProfiles, checkPaymentAndCreateProfile, profiles, startPolling])
   );
 
   const onRefresh = useCallback(async () => {
@@ -402,7 +416,7 @@ const BusinessProfilesScreen: React.FC = () => {
       source: 'BUSINESS_PROFILE_REQUIRED',
       businessProfileId: businessProfileId
     });
-  }, []);
+  }, [navigation]);
 
   const handleProfileSelect = useCallback(async (profile: any) => {
     // CRITICAL FIX: Enhanced debugging for profile selection
@@ -926,19 +940,6 @@ const BusinessProfilesScreen: React.FC = () => {
           >
             <Icon name="add" size={20} color={theme.colors.primary} />
           </TouchableOpacity>
-        </View>
-
-        {/* Warning Message */}
-        <View style={[styles.infoMessageContainer, { 
-          backgroundColor: isDarkMode ? '#4a3426' : '#fff3e0',
-          borderColor: isDarkMode ? '#8d6e63' : '#ffcc02'
-        }]}>
-          <Icon name="warning" size={16} color={isDarkMode ? '#ffb74d' : '#ff9800'} />
-          <Text style={[styles.infoMessageText, { 
-            color: isDarkMode ? '#ffe0b2' : '#e65100'
-          }]}>
-            After successful payment, your business profile will be activated within 24 hours.
-          </Text>
         </View>
 
         {/* Search Bar */}

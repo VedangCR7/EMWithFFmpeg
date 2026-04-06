@@ -24,6 +24,8 @@ import downloadedPostersService from '../services/downloadedPosters';
 import { useTheme } from '../context/ThemeContext';
 import { useBusinessProfile } from '../context/BusinessProfileContext';
 import { useCentralizedDownload } from '../hooks/useCentralizedDownload';
+import { subscribeToShowDownloadLimitModal } from '../utils/downloadLimitEvents';
+import DownloadLimitMessage from '../components/DownloadLimitMessage';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -165,6 +167,15 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
     
     return () => subscription?.remove();
   }, []);
+
+  // Listen for global download limit modal events
+  useEffect(() => {
+    const subscription = subscribeToShowDownloadLimitModal(() => {
+      setShowDownloadLimitModal(true);
+    });
+
+    return () => subscription.remove();
+  }, []);
   
   const currentScreenWidth = dimensions.width;
   const currentScreenHeight = dimensions.height;
@@ -202,6 +213,7 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
   const [imageLoading, setImageLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [showDownloadLimitModal, setShowDownloadLimitModal] = useState(false);
 
   // Debug safe area values
   console.log('Safe area insets:', {
@@ -365,10 +377,7 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
 
      // Frontend guard: Check if limit is reached
      if (isLimitReached) {
-       Alert.alert(
-         'Download Limit Reached',
-         'You have reached your daily download limit. Please try again tomorrow.'
-       );
+       setShowDownloadLimitModal(true);
        return;
      }
 
@@ -705,6 +714,10 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
         </TouchableOpacity>
       </View>
       
+      <DownloadLimitMessage
+        visible={showDownloadLimitModal}
+        onClose={() => setShowDownloadLimitModal(false)}
+      />
              
     </View>
   );

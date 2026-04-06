@@ -33,6 +33,7 @@ import {
 } from 'react-native';
 import ViewShot from 'react-native-view-shot';
 import PosterCanvas from '../components/PosterCanvas';
+import CategoryAccessMessage from '../components/CategoryAccessMessage';
 
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -470,6 +471,11 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
   const [showPremiumTemplateModal, setShowPremiumTemplateModal] = useState(false);
   const [showPremiumAlertModal, setShowPremiumAlertModal] = useState(false);
   const [showConnectionErrorModal, setShowConnectionErrorModal] = useState(false);
+  const [showCategoryAccessModal, setShowCategoryAccessModal] = useState(false);
+  const [categoryData, setCategoryData] = useState({
+    templateCategory: "",
+    businessCategory: ""
+  });
   
   // Handle upgrade navigation
   const handleUpgrade = () => {
@@ -2706,11 +2712,11 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                   businessProfileCategory: selectedBusinessProfile.category,
                   templateCategory: templateCategory
                 });
-                Alert.alert(
-                  "Category Mismatch",
-                  `This template belongs to '${templateCategory}' category but your business profile is registered under '${selectedBusinessProfile.category}'. Please select a matching template or update your business profile.`,
-                  [{ text: "OK" }]
-                );
+                setCategoryData({
+                  templateCategory,
+                  businessCategory: selectedBusinessProfile.category
+                });
+                setShowCategoryAccessModal(true);
                 return;
               }
             }
@@ -3927,6 +3933,17 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
           </View>
         </View>
       </Modal>
+
+      <CategoryAccessMessage
+        visible={showCategoryAccessModal}
+        _templateCategory={categoryData.templateCategory}
+        _businessCategory={categoryData.businessCategory}
+        onAddBusiness={() => {
+          setShowCategoryAccessModal(false);
+          navigation.navigate("BusinessProfiles");
+        }}
+        onClose={() => setShowCategoryAccessModal(false)}
+      />
 
     </Animated.View>
   );

@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Alert } from 'react-native';
-import { subscribeToDownloadLimitReached, DownloadLimitEventData, DOWNLOAD_LIMIT_REACHED_EVENT } from '../utils/downloadLimitEvents';
+import { subscribeToDownloadLimitReached, emitShowDownloadLimitModal, DownloadLimitEventData, DOWNLOAD_LIMIT_REACHED_EVENT } from '../utils/downloadLimitEvents';
 
 export interface UseDownloadLimitHandlerOptions {
   onLimitReached?: (data: DownloadLimitEventData) => void;
@@ -30,14 +29,7 @@ export const useDownloadLimitHandler = (options: UseDownloadLimitHandlerOptions 
       
       // Show alert by default
       if (showAlert) {
-        const message = customAlertMessage || data.message || 
-          'You have reached your daily download limit. Please try again tomorrow.';
-        
-        Alert.alert(
-          'Download Limit Reached',
-          message,
-          [{ text: 'OK', style: 'default' }]
-        );
+        emitShowDownloadLimitModal();
       }
     });
 

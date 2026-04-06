@@ -3,6 +3,7 @@ import { Alert } from 'react-native';
 import { useBusinessProfile } from '../context/BusinessProfileContext';
 import { downloadService, DownloadContentParams } from '../services/downloadService';
 import { isDailyDownloadLimitError } from '../utils/errorHandler';
+import { emitShowDownloadLimitModal } from '../utils/downloadLimitEvents';
 
 interface UseCentralizedDownloadReturn {
   downloadContent: (
@@ -40,10 +41,7 @@ export const useCentralizedDownload = (): UseCentralizedDownloadReturn => {
 
     // Frontend guard: Check if limit is already reached
     if (isLimitReached) {
-      Alert.alert(
-        'Download Limit Reached',
-        'You have reached your daily download limit. Please try again tomorrow.'
-      );
+      emitShowDownloadLimitModal();
       return false;
     }
 
@@ -84,10 +82,7 @@ export const useCentralizedDownload = (): UseCentralizedDownloadReturn => {
         console.log('🚫 [CENTRALIZED DOWNLOAD] Daily download limit reached');
         setIsLimitReached(true);
         
-        Alert.alert(
-          'Download Limit Reached',
-          'You have reached your daily download limit. Please try again tomorrow.'
-        );
+        emitShowDownloadLimitModal();
         
         return false;
       }
