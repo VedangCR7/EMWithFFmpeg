@@ -9,7 +9,6 @@ import {
   Alert,
   StatusBar,
   Dimensions,
-  TextInput,
   ActivityIndicator,
   RefreshControl,
   ScrollView,
@@ -79,7 +78,6 @@ const MyPostersScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [categories, setCategories] = useState<string[]>([]);
   const [previewModalVisible, setPreviewModalVisible] = useState(false);
@@ -196,10 +194,43 @@ const MyPostersScreen: React.FC = () => {
     }, [])
   );
 
-  // Filter posters when search query or category changes
+  const filterPosters = useCallback(() => {
+    let filtered = [...posters];
+
+    // Debug: Log filtering process for calendar items
+    const calendarItems = posters.filter(p => 
+      (p.category || '').toLowerCase() === 'festival' || 
+      (p.category || '').toLowerCase() === 'calendar'
+    );
+    console.log("🔍 [FILTER] Calendar items before filtering:", calendarItems.length);
+    console.log("🔍 [FILTER] Selected category:", selectedCategory);
+    
+    if (calendarItems.length > 0) {
+      console.log("🔍 [FILTER] Sample calendar item before filtering:", JSON.stringify(calendarItems[0], null, 2));
+    }
+
+    // Filter by category (case-insensitive)
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter(poster => 
+        (poster.category || 'Uncategorized').toLowerCase() === selectedCategory.toLowerCase()
+      );
+    }
+
+    // Debug: Log filtered calendar items
+    const filteredCalendarItems = filtered.filter(p => 
+      (p.category || '').toLowerCase() === 'festival' || 
+      (p.category || '').toLowerCase() === 'calendar'
+    );
+    console.log("🔍 [FILTER] Calendar items after filtering:", filteredCalendarItems.length);
+    console.log("🔍 [FILTER] FILTERED DATA =>", JSON.stringify(filtered, null, 2));
+
+    setFilteredPosters(filtered);
+  }, [posters, selectedCategory]);
+
+  // Filter posters when category changes
   useEffect(() => {
     filterPosters();
-  }, [posters, searchQuery, selectedCategory]);
+  }, [filterPosters]);
 
   const loadPosters = useCallback(async () => {
     try {
@@ -453,48 +484,6 @@ const MyPostersScreen: React.FC = () => {
       setCategories(uniqueCategories);
   };
 
-  const filterPosters = () => {
-    let filtered = [...posters];
-
-    // Debug: Log filtering process for calendar items
-    const calendarItems = posters.filter(p => 
-      (p.category || '').toLowerCase() === 'festival' || 
-      (p.category || '').toLowerCase() === 'calendar'
-    );
-    console.log("🔍 [FILTER] Calendar items before filtering:", calendarItems.length);
-    console.log("🔍 [FILTER] Selected category:", selectedCategory);
-    
-    if (calendarItems.length > 0) {
-      console.log("🔍 [FILTER] Sample calendar item before filtering:", JSON.stringify(calendarItems[0], null, 2));
-    }
-
-    // Filter by category (case-insensitive)
-    if (selectedCategory !== 'all') {
-      filtered = filtered.filter(poster => 
-        (poster.category || 'Uncategorized').toLowerCase() === selectedCategory.toLowerCase()
-      );
-    }
-
-    // Debug: Log filtered calendar items
-    const filteredCalendarItems = filtered.filter(p => 
-      (p.category || '').toLowerCase() === 'festival' || 
-      (p.category || '').toLowerCase() === 'calendar'
-    );
-    console.log("🔍 [FILTER] Calendar items after filtering:", filteredCalendarItems.length);
-    console.log("🔍 [FILTER] FILTERED DATA =>", JSON.stringify(filtered, null, 2));
-
-    // Filter by search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(poster =>
-        poster.title.toLowerCase().includes(query) ||
-        (poster.description && poster.description.toLowerCase().includes(query)) ||
-        (poster.tags && poster.tags.some(tag => tag.toLowerCase().includes(query)))
-      );
-    }
-
-    setFilteredPosters(filtered);
-  };
 
   const onRefresh = useCallback(async () => {
     try {
@@ -758,23 +747,7 @@ const MyPostersScreen: React.FC = () => {
           <View style={styles.headerRight} />
         </View>
 
-        {/* Search Bar */}
-        <View style={[styles.searchContainer, { backgroundColor: theme.colors.cardBackground }]}>
-          <Icon name="search" size={20} color={theme.colors.textSecondary} />
-          <TextInput
-            style={[styles.searchInput, { color: theme.colors.text }]}
-            placeholder="Search posters..."
-            placeholderTextColor={theme.colors.textSecondary}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Icon name="clear" size={20} color={theme.colors.textSecondary} />
-            </TouchableOpacity>
-          )}
-        </View>
-
+        
         {/* Category Filter */}
         {categories.length > 0 && renderCategoryFilter()}
 
