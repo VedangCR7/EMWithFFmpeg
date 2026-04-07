@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -36,15 +36,46 @@ const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
 
-  const isFormValid =
-    newPassword.length >= 6 &&
-    confirmPassword.length >= 6 &&
-    newPassword === confirmPassword;
+  // Password validation regex: 8+ chars, uppercase, lowercase, number, special char
+  const validatePassword = useCallback((password: string): boolean => {
+    const trimmed = password.trim();
+    if (!trimmed) return false;
+    return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$/.test(trimmed);
+  }, []);
+
+  const getPasswordErrorMessage = useCallback((password: string): string => {
+    const trimmed = password.trim();
+    if (!trimmed) return '';
+    if (trimmed.length < 8) return 'Password must be at least 8 characters long';
+    if (!/[A-Z]/.test(trimmed)) return 'Password must include at least one uppercase letter';
+    if (!/[a-z]/.test(trimmed)) return 'Password must include at least one lowercase letter';
+    if (!/\d/.test(trimmed)) return 'Password must include at least one numeric digit';
+    if (!/[@$!%*?&]/.test(trimmed)) return 'Password must include at least one special character (@$!%*?&)';
+    return '';
+  }, []);
+
+  const handlePasswordChange = useCallback((text: string) => {
+    setNewPassword(text);
+    setPasswordError(getPasswordErrorMessage(text));
+  }, [getPasswordErrorMessage]);
+
+  const isFormValid = useMemo(() => {
+    const isPasswordValid = validatePassword(newPassword);
+    const isConfirmValid = confirmPassword.trim() === newPassword.trim() && confirmPassword.trim().length > 0;
+    return isPasswordValid && isConfirmValid;
+  }, [newPassword, confirmPassword, validatePassword]);
 
   const handleReset = useCallback(async () => {
-    if (!isFormValid) {
-      Alert.alert('Invalid Input', 'Passwords must match and be at least 6 characters long.');
+    if (!validatePassword(newPassword)) {
+      const errorMsg = getPasswordErrorMessage(newPassword);
+      Alert.alert('Invalid Password', errorMsg || 'Please enter a valid password.');
+      return;
+    }
+
+    if (newPassword.trim() !== confirmPassword.trim()) {
+      Alert.alert('Password Mismatch', 'Passwords do not match.');
       return;
     }
 
@@ -68,7 +99,7 @@ const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
     } finally {
       setIsSubmitting(false);
     }
-  }, [code, confirmPassword, email, isFormValid, navigation, newPassword]);
+  }, [code, confirmPassword, email, getPasswordErrorMessage, navigation, newPassword, validatePassword]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -91,14 +122,14 @@ const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
                   style={[
                     styles.input,
                     {
-                      borderColor: newPassword ? theme.colors.primary : theme.colors.border,
+                      borderColor: passwordError ? theme.colors.error || '#ff4444' : newPassword ? theme.colors.primary : theme.colors.border,
                       backgroundColor: theme.colors.inputBackground,
                       color: theme.colors.text,
                     },
                   ]}
                   secureTextEntry={!showPassword}
                   value={newPassword}
-                  onChangeText={setNewPassword}
+                  onChangeText={handlePasswordChange}
                   autoCapitalize="none"
                   placeholder="Enter new password"
                   placeholderTextColor={theme.colors.textSecondary}
@@ -114,6 +145,11 @@ const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
                   />
                 </TouchableOpacity>
               </View>
+              {passwordError ? (
+                <Text style={[styles.errorText, { color: theme.colors.error || '#ff4444' }]}>
+                  {passwordError}
+                </Text>
+              ) : null}
             </View>
 
             <View style={styles.inputContainer}>
@@ -226,6 +262,12 @@ const styles = StyleSheet.create({
     right: 12,
     top: 14,
     padding: 4,
+  },
+  errorText: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 6,
+    marginLeft: 4,
   },
   button: {
     borderRadius: 12,

@@ -38,8 +38,28 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
   const [isLoading, setIsLoading] = useState(true);
   const isRefreshingRef = useRef<boolean>(false);
   
+  // CRITICAL: Track user selection to prevent background refresh overwrites
+  const userSelectionTimeRef = useRef<number>(0);
+  const lastSelectedProfileIdRef = useRef<string | null>(null);
+  
   // FRONTEND-ONLY: Temporary activation pending state (non-persistent, session-only)
   const [activationPendingProfiles, setActivationPendingProfiles] = useState<Set<string>>(new Set());
+
+  // FRONTEND-ONLY: Activation pending state management functions
+  const clearActivationPending = useCallback((profileId: string) => {
+    if (!profileId) {
+      console.warn(' [BUSINESS PROFILE CONTEXT] clearActivationPending called with empty profileId');
+      return;
+    }
+    
+    setActivationPendingProfiles(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(profileId);
+      console.log(` [BUSINESS PROFILE CONTEXT] Force cleared activation pending for profile: ${profileId}`);
+      console.log(` [BUSINESS PROFILE CONTEXT] Current pending profiles:`, Array.from(newSet));
+      return newSet;
+    });
+  }, []);
 
   // Clear cache helper
   const clearProfileCache = useCallback(async () => {
@@ -49,9 +69,9 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
       await AsyncStorage.removeItem(SELECTED_PROFILE_KEY);
       await AsyncStorage.removeItem(SELECTED_PROFILE_UID_KEY);
       await AsyncStorage.removeItem(SELECTED_BUSINESS_CATEGORY_KEY);
-      console.log('✅ [BUSINESS PROFILE CONTEXT] Cleared selected profile cache');
+      console.log(' [BUSINESS PROFILE CONTEXT] Cleared selected profile cache');
     } catch (e) {
-      console.error('❌ [BUSINESS PROFILE CONTEXT] Error clearing cache:', e);
+      console.error(' [BUSINESS PROFILE CONTEXT] Error clearing cache:', e);
     }
   }, []);
 
@@ -75,9 +95,9 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
         if (storedUid === currentUserId) {
           const profile = JSON.parse(storedProfile);
           setSelectedBusinessProfileState(profile);
-          console.log('✅ [BUSINESS PROFILE CONTEXT] Loaded selected profile from storage:', profile.name);
+          console.log(' [BUSINESS PROFILE CONTEXT] Loaded selected profile from storage:', profile.name);
         } else {
-          console.log('⚠️ [BUSINESS PROFILE CONTEXT] Cache mismatch or missing UID. Clearing stale cache.');
+          console.log(' [BUSINESS PROFILE CONTEXT] Cache mismatch or missing UID. Clearing stale cache.');
           await clearProfileCache();
         }
       } else {
@@ -87,10 +107,10 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
       // Load business category (no user-specific validation needed)
       if (storedCategory) {
         setSelectedBusinessCategoryState(storedCategory);
-        console.log('✅ [BUSINESS PROFILE CONTEXT] Loaded selected business category from storage:', storedCategory);
+        console.log(' [BUSINESS PROFILE CONTEXT] Loaded selected business category from storage:', storedCategory);
       }
     } catch (error) {
-      console.error('❌ [BUSINESS PROFILE CONTEXT] Error loading selected profile:', error);
+      console.error(' [BUSINESS PROFILE CONTEXT] Error loading selected profile:', error);
       await clearProfileCache();
     } finally {
       setIsLoading(false);
@@ -101,9 +121,19 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
   const refreshSelectedProfileFromApi = useCallback(async (userId: string, currentProfileId: string) => {
     if (isRefreshingRef.current) return;
     
+    // CRITICAL: Do not overwrite if user recently selected this profile (within 5 seconds)
+    const now = Date.now();
+    const timeSinceSelection = now - userSelectionTimeRef.current;
+    const isUserRecentlySelected = timeSinceSelection < 5000 && lastSelectedProfileIdRef.current === currentProfileId;
+    
+    if (isUserRecentlySelected) {
+      console.log(`[BUSINESS PROFILE CONTEXT] Skipping background refresh - user recently selected profile ${currentProfileId}`);
+      return;
+    }
+    
     try {
       isRefreshingRef.current = true;
-      console.log(`🔄 [BUSINESS PROFILE CONTEXT] Silently refreshing profile ${currentProfileId} from API...`);
+      console.log(`[BUSINESS PROFILE CONTEXT] Silently refreshing profile ${currentProfileId} from API...`);
       
       // Clear the cache for this user so we bypass the 5 min local cache and hit the API
       businessProfileService.clearCache(userId);
@@ -116,7 +146,7 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
         let businessSubscriptionStatus: string | null = null;
         
         try {
-          console.log(`🔍 [BUSINESS PROFILE CONTEXT] Fetching business subscription status for profile ${currentProfileId}...`);
+          console.log(`[BUSINESS PROFILE CONTEXT] Fetching business subscription status for profile ${currentProfileId}...`);
           const subscriptionResponse = await subscriptionApi.getBusinessProfileSubscriptionStatus(currentProfileId);
           
           if (subscriptionResponse.success && subscriptionResponse.data) {
@@ -125,58 +155,55 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
                                        subscriptionResponse.data.status === 'cancelled' ? 'Cancelled' : 
                                        subscriptionResponse.data.status === 'pending' ? 'Pending' : 'Inactive';
             
-            console.log(`✅ [BUSINESS PROFILE CONTEXT] Business subscription status: ${businessSubscriptionStatus}`);
+            console.log(`[BUSINESS PROFILE CONTEXT] Business subscription status: ${businessSubscriptionStatus}`);
           } else {
-            console.log(`⚠️ [BUSINESS PROFILE CONTEXT] No business subscription data found for profile ${currentProfileId}`);
+            console.log(`[BUSINESS PROFILE CONTEXT] No business subscription data found for profile ${currentProfileId}`);
           }
         } catch (subscriptionError: any) {
-          console.error(`❌ [BUSINESS PROFILE CONTEXT] Failed to fetch business subscription status:`, subscriptionError.message);
+          console.error(`[BUSINESS PROFILE CONTEXT] Failed to fetch business subscription status:`, subscriptionError.message);
           businessSubscriptionStatus = null;
         }
         
-        // Create enriched profile with business subscription data
-        const enrichedProfile = {
-          ...freshProfile,
-          businessSubscriptionStatus,
-        };
-        
-        // STEP 5: ADD DEBUG LOGGING
-        console.log("✅ [BUSINESS PROFILE CONTEXT] Enriched Business Profile:", {
-          id: enrichedProfile.id,
-          name: enrichedProfile.name,
-          subscriptionStatus: enrichedProfile.subscriptionStatus,
-          businessSubscriptionStatus: enrichedProfile.businessSubscriptionStatus,
-        });
-        
-        // Only update if something actual changed (like subscriptionStatus or businessSubscriptionStatus) to avoid unnecessary re-renders
+        // CRITICAL: Only merge subscription status, do NOT overwrite entire profile
         setSelectedBusinessProfileState(prev => {
-          if (!prev || 
-              JSON.stringify(prev) !== JSON.stringify(enrichedProfile)) {
-            console.log(`✅ [BUSINESS PROFILE CONTEXT] Profile ${currentProfileId} successfully refreshed and updated in state.`);
+          if (!prev || prev.id !== currentProfileId) {
+            return prev; // Don't update if profile changed
+          }
+          
+          // Functional update - only merge subscription fields
+          const updatedProfile: BusinessProfile = {
+            ...prev,
+            businessSubscriptionStatus: businessSubscriptionStatus || undefined,
+          };
+          
+          // Only update if subscription status actually changed
+          if (prev.businessSubscriptionStatus !== businessSubscriptionStatus) {
+            console.log(`[BUSINESS PROFILE CONTEXT] Updated subscription status for profile ${currentProfileId}`);
             
-            // CRITICAL FIX: Auto clear activation pending if backend returns ACTIVE
-            if (enrichedProfile.subscriptionStatus?.toUpperCase() === 'ACTIVE') {
+            // CRITICAL: Auto clear activation pending if backend returns ACTIVE
+            if (freshProfile.subscriptionStatus?.toUpperCase() === 'ACTIVE') {
               clearActivationPending(currentProfileId);
-              console.log(`🏢 [BUSINESS PROFILE CONTEXT] Auto-cleared activation pending - backend returned ACTIVE for profile: ${currentProfileId}`);
+              console.log(`[BUSINESS PROFILE CONTEXT] Auto-cleared activation pending - backend returned ACTIVE for profile: ${currentProfileId}`);
             }
             
-            // Also update async storage in background
-            AsyncStorage.setItem(SELECTED_PROFILE_KEY, JSON.stringify(enrichedProfile)).catch(e => 
-              console.error('❌ Failed to update storage with fresh profile', e)
+            // Also update async storage in background with merged profile
+            AsyncStorage.setItem(SELECTED_PROFILE_KEY, JSON.stringify(updatedProfile)).catch(e => 
+              console.error('Failed to update storage with subscription status', e)
             );
-            return enrichedProfile;
+            return updatedProfile;
           }
-          return prev;
+          
+          return prev; // No change needed
         });
       } else {
-        console.warn(`⚠️ [BUSINESS PROFILE CONTEXT] Profile ${currentProfileId} not found in fresh API data.`);
+        console.warn(`[BUSINESS PROFILE CONTEXT] Profile ${currentProfileId} not found in fresh API data.`);
       }
     } catch (e) {
-      console.error('❌ [BUSINESS PROFILE CONTEXT] Silent refresh failed:', e);
+      console.error('[BUSINESS PROFILE CONTEXT] Silent refresh failed:', e);
     } finally {
       isRefreshingRef.current = false;
     }
-  }, []);
+  }, [clearActivationPending]);
 
   // Listen to auth changes
   useEffect(() => {
@@ -198,7 +225,7 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
 
     // Subscribe to auth state changes
     const unsubscribe = authService.onAuthStateChanged((user) => {
-      console.log('🔄 [BUSINESS PROFILE CONTEXT] Auth state changed. User:', user?.id || 'null');
+      console.log(' [BUSINESS PROFILE CONTEXT] Auth state changed. User:', user?.id || 'null');
       if (!user) {
         clearProfileCache();
       } else {
@@ -240,14 +267,14 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
 
   // Update AsyncStorage when selected profile changes
   const setSelectedBusinessProfile = useCallback(async (profile: BusinessProfile | null) => {
-    // Remove frontend subscription check - let backend API handle subscription validation
     try {
-      console.log('🔄 [BUSINESS PROFILE CONTEXT] setSelectedBusinessProfile called:', {
-        profileId: profile?.id,
-        profileName: profile?.name,
-        previousProfileId: selectedBusinessProfile?.id
-      });
-      
+      // CRITICAL: Track user selection to prevent background refresh overwrites
+      if (profile?.id) {
+        userSelectionTimeRef.current = Date.now();
+        lastSelectedProfileIdRef.current = profile.id;
+        console.log(`[BUSINESS PROFILE CONTEXT] User selected profile ${profile.id} at ${userSelectionTimeRef.current}`);
+      }
+
       let enrichedProfile = profile;
       
       // Fetch business subscription data if profile is provided
@@ -255,7 +282,7 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
         let businessSubscriptionStatus: string | null = null;
         
         try {
-          console.log(`🔍 [BUSINESS PROFILE CONTEXT] Fetching business subscription status for manually selected profile ${profile.id}...`);
+          console.log(`[BUSINESS PROFILE CONTEXT] Fetching business subscription status for manually selected profile ${profile.id}...`);
           const subscriptionResponse = await subscriptionApi.getBusinessProfileSubscriptionStatus(profile.id);
           
           if (subscriptionResponse.success && subscriptionResponse.data) {
@@ -264,12 +291,12 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
                                        subscriptionResponse.data.status === 'cancelled' ? 'Cancelled' : 
                                        subscriptionResponse.data.status === 'pending' ? 'Pending' : 'Inactive';
             
-            console.log(`✅ [BUSINESS PROFILE CONTEXT] Manual selection - Business subscription status: ${businessSubscriptionStatus}`);
+            console.log(`[BUSINESS PROFILE CONTEXT] Manual selection - Business subscription status: ${businessSubscriptionStatus}`);
           } else {
-            console.log(`⚠️ [BUSINESS PROFILE CONTEXT] No business subscription data found for manual selection profile ${profile.id}`);
+            console.log(`[BUSINESS PROFILE CONTEXT] No business subscription data found for manual selection profile ${profile.id}`);
           }
         } catch (subscriptionError: any) {
-          console.error(`❌ [BUSINESS PROFILE CONTEXT] Failed to fetch business subscription status for manual selection:`, subscriptionError.message);
+          console.error(`[BUSINESS PROFILE CONTEXT] Failed to fetch business subscription status for manual selection:`, subscriptionError.message);
           businessSubscriptionStatus = null;
         }
         
@@ -279,8 +306,7 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
           businessSubscriptionStatus: businessSubscriptionStatus || undefined,
         };
         
-        // STEP 5: ADD DEBUG LOGGING
-        console.log("✅ [BUSINESS PROFILE CONTEXT] Enriched Manual Selection Profile:", {
+        console.log("[BUSINESS PROFILE CONTEXT] Enriched Manual Selection Profile:", {
           id: enrichedProfile?.id,
           name: enrichedProfile?.name,
           subscriptionStatus: enrichedProfile?.subscriptionStatus,
@@ -288,17 +314,17 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
         });
       }
       
-      // CRITICAL FIX: Update state immediately and verify
-      setSelectedBusinessProfileState(enrichedProfile);
-      
-      // CRITICAL FIX: Add immediate verification log
-      setTimeout(() => {
-        console.log('✅ [BUSINESS PROFILE CONTEXT] State update verification:', {
-          profileId: enrichedProfile?.id,
-          profileName: enrichedProfile?.name,
-          stateUpdated: true
-        });
-      }, 50);
+      // CRITICAL: Use functional update to prevent race conditions
+      setSelectedBusinessProfileState(prev => {
+        // Only update if profile actually changed
+        if (!prev && !enrichedProfile) return prev;
+        if (!prev && enrichedProfile) return enrichedProfile;
+        if (!enrichedProfile) return null;
+        if (prev.id === enrichedProfile.id && JSON.stringify(prev) === JSON.stringify(enrichedProfile)) {
+          return prev; // No change needed
+        }
+        return enrichedProfile;
+      });
 
       // Auto-sync business category when profile changes
       if (profile?.category || profile?.subCategory || profile?.subcategory) {
@@ -308,14 +334,14 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
             profile.category;
 
         // Add detailed logging for category selection
-        console.log("🏷️ [BUSINESS PROFILE CONTEXT] category:", profile.category);
-        console.log("🏷️ [BUSINESS PROFILE CONTEXT] subCategory:", profile.subCategory);
-        console.log("🏷️ [BUSINESS PROFILE CONTEXT] subcategory:", profile.subcategory);
-        console.log("✅ [BUSINESS PROFILE CONTEXT] Final category used:", displayCategory);
+        console.log(" [BUSINESS PROFILE CONTEXT] category:", profile.category);
+        console.log(" [BUSINESS PROFILE CONTEXT] subCategory:", profile.subCategory);
+        console.log(" [BUSINESS PROFILE CONTEXT] subcategory:", profile.subcategory);
+        console.log(" [BUSINESS PROFILE CONTEXT] Final category used:", displayCategory);
 
         setSelectedBusinessCategoryState(displayCategory);
         await AsyncStorage.setItem(SELECTED_BUSINESS_CATEGORY_KEY, displayCategory);
-        console.log('✅ [BUSINESS PROFILE CONTEXT] Auto-synced business category from profile:', displayCategory);
+        console.log(' [BUSINESS PROFILE CONTEXT] Auto-synced business category from profile:', displayCategory);
       }
 
       if (enrichedProfile) {
@@ -324,14 +350,14 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
         if (currentUser?.id) {
           await AsyncStorage.setItem(SELECTED_PROFILE_UID_KEY, currentUser.id);
         }
-        console.log('✅ [BUSINESS PROFILE CONTEXT] Saved enriched selected profile to storage:', enrichedProfile.name);
+        console.log(' [BUSINESS PROFILE CONTEXT] Saved enriched selected profile to storage:', enrichedProfile.name);
       } else {
         await clearProfileCache();
       }
     } catch (error) {
-      console.error('❌ [BUSINESS PROFILE CONTEXT] Error saving selected profile:', error);
+      console.error(' [BUSINESS PROFILE CONTEXT] Error saving selected profile:', error);
     }
-  }, [clearProfileCache, selectedBusinessProfile]);
+  }, [clearProfileCache]);
 
   // Set business category independently
   const setSelectedBusinessCategory = useCallback(async (category: string | null) => {
@@ -340,13 +366,13 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
       
       if (category) {
         await AsyncStorage.setItem(SELECTED_BUSINESS_CATEGORY_KEY, category);
-        console.log('✅ [BUSINESS PROFILE CONTEXT] Saved selected business category to storage:', category);
+        console.log(' [BUSINESS PROFILE CONTEXT] Saved selected business category to storage:', category);
       } else {
         await AsyncStorage.removeItem(SELECTED_BUSINESS_CATEGORY_KEY);
-        console.log('✅ [BUSINESS PROFILE CONTEXT] Cleared selected business category from storage');
+        console.log(' [BUSINESS PROFILE CONTEXT] Cleared selected business category from storage');
       }
     } catch (error) {
-      console.error('❌ [BUSINESS PROFILE CONTEXT] Error saving selected business category:', error);
+      console.error(' [BUSINESS PROFILE CONTEXT] Error saving selected business category:', error);
     }
   }, []);
 
@@ -355,66 +381,49 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
     if (profiles.length > 0 && !selectedBusinessProfile && !isLoading) {
       // Initialize with first profile - let backend API handle subscription validation
       const firstProfile = profiles[0];
-      console.log('🏁 [BUSINESS PROFILE CONTEXT] Initializing first profile:', firstProfile.name);
+      console.log(' [BUSINESS PROFILE CONTEXT] Initializing first profile:', firstProfile.name);
       await setSelectedBusinessProfile(firstProfile);
     }
   }, [selectedBusinessProfile, isLoading, setSelectedBusinessProfile]);
 
   // FRONTEND-ONLY: Activation pending state management (non-persistent, session-only)
   const setActivationPending = useCallback((profileId: string, isPending: boolean) => {
-    console.log('🏢 [BUSINESS PROFILE CONTEXT] 🚀 setActivationPending called with:', { profileId, isPending });
+    console.log(' [BUSINESS PROFILE CONTEXT]  setActivationPending called with:', { profileId, isPending });
     
     if (!profileId) {
-      console.warn('🏢 [BUSINESS PROFILE CONTEXT] setActivationPending called with empty profileId');
+      console.warn(' [BUSINESS PROFILE CONTEXT] setActivationPending called with empty profileId');
       return;
     }
     
-    // Use functional state update to avoid stale closure
+    console.log(' [BUSINESS PROFILE CONTEXT] Current activationPendingProfiles before:', Array.from(activationPendingProfiles));
+    
     setActivationPendingProfiles(prev => {
-      console.log('🏢 [BUSINESS PROFILE CONTEXT] Current activationPendingProfiles before:', Array.from(prev));
-      
       const newSet = new Set(prev);
       if (isPending) {
         newSet.add(profileId);
-        console.log(`🏢 [BUSINESS PROFILE CONTEXT] ✅ Set activation pending for profile: ${profileId}`);
-        console.log(`🏢 [BUSINESS PROFILE CONTEXT] Current pending profiles:`, Array.from(newSet));
+        console.log(` [BUSINESS PROFILE CONTEXT]  Set activation pending for profile: ${profileId}`);
+        console.log(` [BUSINESS PROFILE CONTEXT] Current pending profiles:`, Array.from(newSet));
       } else {
         newSet.delete(profileId);
-        console.log(`🏢 [BUSINESS PROFILE CONTEXT] ❌ Cleared activation pending for profile: ${profileId}`);
-        console.log(`🏢 [BUSINESS PROFILE CONTEXT] Current pending profiles:`, Array.from(newSet));
+        console.log(` [BUSINESS PROFILE CONTEXT]  Cleared activation pending for profile: ${profileId}`);
+        console.log(` [BUSINESS PROFILE CONTEXT] Current pending profiles:`, Array.from(newSet));
       }
-      console.log('🏢 [BUSINESS PROFILE CONTEXT] New activationPendingProfiles after:', Array.from(newSet));
+      console.log(' [BUSINESS PROFILE CONTEXT] New activationPendingProfiles after:', Array.from(newSet));
       return newSet;
     });
-  }, []); // Remove activationPendingProfiles dependency to prevent stale closure
+  }, [activationPendingProfiles]);
 
   const isActivationPending = useCallback((profileId: string) => {
     if (!profileId) {
-      console.warn('🏢 [BUSINESS PROFILE CONTEXT] isActivationPending called with empty profileId');
+      console.warn(' [BUSINESS PROFILE CONTEXT] isActivationPending called with empty profileId');
       return false;
     }
     
-    // Direct check from current state to avoid stale closure
     const isPending = activationPendingProfiles.has(profileId);
-    console.log(`🏢 [BUSINESS PROFILE CONTEXT] 🔍 Check activation pending for profile: ${profileId} -> ${isPending}`);
-    console.log(`🏢 [BUSINESS PROFILE CONTEXT] All pending profiles:`, Array.from(activationPendingProfiles));
+    console.log(` [BUSINESS PROFILE CONTEXT] Check activation pending for profile: ${profileId} -> ${isPending}`);
+    console.log(` [BUSINESS PROFILE CONTEXT] All pending profiles:`, Array.from(activationPendingProfiles));
     return isPending;
-  }, [activationPendingProfiles]); // Keep dependency for accurate state reading
-
-  const clearActivationPending = useCallback((profileId: string) => {
-    if (!profileId) {
-      console.warn('🏢 [BUSINESS PROFILE CONTEXT] clearActivationPending called with empty profileId');
-      return;
-    }
-    
-    setActivationPendingProfiles(prev => {
-      const newSet = new Set(prev);
-      newSet.delete(profileId);
-      console.log(`🏢 [BUSINESS PROFILE CONTEXT] 🧹 Force cleared activation pending for profile: ${profileId}`);
-      console.log(`🏢 [BUSINESS PROFILE CONTEXT] Current pending profiles:`, Array.from(newSet));
-      return newSet;
-    });
-  }, []);
+  }, [activationPendingProfiles]);
 
   const value: BusinessProfileContextType = useMemo(() => ({
     selectedBusinessProfile,

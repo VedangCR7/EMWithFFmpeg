@@ -420,7 +420,7 @@ const BusinessProfilesScreen: React.FC = () => {
     console.log('🔍 BUSINESS PROFILES - Navigating to Subscription screen for profile:', businessProfileId);
     
     navigation.navigate('Subscription' as any, {
-      source: 'BUSINESS_PROFILE_REQUIRED',
+      source: 'BUSINESS_PROFILE',
       businessProfileId: businessProfileId
     });
   }, [navigation]);

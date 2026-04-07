@@ -789,7 +789,24 @@ const SubscriptionScreen: React.FC = () => {
                   console.log('🔍 DEBUG: Navigation after delay, checking activation pending state...');
                   const isStillPending = isProfileActivationPending(businessProfileId);
                   console.log('🔍 DEBUG: Activation pending state before navigation:', isStillPending);
-                  (navigation as any).navigate('SubscriptionScreen', { paymentSuccess: true });
+                  console.log('[NAVIGATION FLOW]', {
+                    source: (route.params as any)?.source,
+                    action: 'POST_PAYMENT_REDIRECT',
+                    isBusinessProfileMode,
+                    businessProfileId
+                  });
+
+                  // Navigate based on source
+                  if ((route.params as any)?.source === 'BUSINESS_PROFILE') {
+                    console.log('✅ [NAVIGATION FLOW] Redirecting to BusinessProfilesScreen after payment success');
+                    navigation.reset({
+                      index: 0,
+                      routes: [{ name: 'BusinessProfiles' as any }],
+                    });
+                  } else {
+                    console.log('✅ [NAVIGATION FLOW] Staying on SubscriptionScreen for regular subscription');
+                    (navigation as any).navigate('SubscriptionScreen', { paymentSuccess: true });
+                  }
                 }, 300); // Increased delay for better reliability
               } else {
                 console.log('🔍 DEBUG: Not in business profile mode or missing businessProfileId');
@@ -997,7 +1014,24 @@ const SubscriptionScreen: React.FC = () => {
               // NON-BLOCKING: Navigate after delay
               setTimeout(() => {
                 setIsReturningFromPayment(true); // Set flag to prevent duplicate API calls
-                (navigation as any).navigate('SubscriptionScreen', { paymentSuccess: true });
+                console.log('[NAVIGATION FLOW]', {
+                  source: (route.params as any)?.source,
+                  action: 'POST_PAYMENT_REDIRECT',
+                  isBusinessProfileMode,
+                  businessProfileId
+                });
+
+                // Navigate based on source
+                if ((route.params as any)?.source === 'BUSINESS_PROFILE') {
+                  console.log('✅ [NAVIGATION FLOW] Redirecting to BusinessProfilesScreen after autopay success');
+                  navigation.reset({
+                    index: 0,
+                    routes: [{ name: 'BusinessProfiles' as any }],
+                  });
+                } else {
+                  console.log('✅ [NAVIGATION FLOW] Staying on SubscriptionScreen for autopay');
+                  (navigation as any).navigate('SubscriptionScreen', { paymentSuccess: true });
+                }
               }, 300);
             } else {
               // User subscription: Use optimized polling
