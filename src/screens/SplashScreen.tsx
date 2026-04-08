@@ -1,16 +1,17 @@
 import React, { useEffect, useRef, useMemo, useState } from 'react';
 import {
-  View,
-  Text,
+  // View,
+  // Text,
   StyleSheet,
   StatusBar,
   Dimensions,
   Animated,
-  Image,
+  // Image,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+// import LinearGradient from 'react-native-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
+import Video from 'react-native-video';
 
 // Get responsive dimensions function
 const getResponsiveDimensions = () => {
@@ -66,10 +67,13 @@ const getResponsiveDimensions = () => {
 };
 
 const SplashScreen: React.FC = () => {
-  const { isDarkMode, theme } = useTheme();
+  const { /* isDarkMode, */ theme } = useTheme();
   
   // Responsive dimensions state
-  const [dimensions, setDimensions] = useState(getResponsiveDimensions());
+  const [_dimensions, setDimensions] = useState(getResponsiveDimensions());
+  
+  // Video loading state
+  const [_isVideoLoaded, setIsVideoLoaded] = useState(false);
 
   // Listen for orientation changes
   useEffect(() => {
@@ -89,18 +93,18 @@ const SplashScreen: React.FC = () => {
   const progressAnim = useRef(new Animated.Value(0)).current;
   const backgroundPulse = useRef(new Animated.Value(0)).current;
 
-  const logoSize = useMemo(() => {
-    const minDimension = Math.min(dimensions.screenWidth, dimensions.screenHeight);
-    if (dimensions.isTablet) {
-      return minDimension * 0.25;
-    }
-    return minDimension * 0.22;
-  }, [dimensions]);
+  // const logoSize = useMemo(() => {
+  //   const minDimension = Math.min(dimensions.screenWidth, dimensions.screenHeight);
+  //   if (dimensions.isTablet) {
+  //     return minDimension * 0.25;
+  //   }
+  //   return minDimension * 0.22;
+  // }, [dimensions]);
 
-  const progressWidth = useMemo(() => progressAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, dimensions.screenWidth * 0.45],
-  }), [progressAnim, dimensions.screenWidth]);
+  // const progressWidth = useMemo(() => progressAnim.interpolate({
+  //   inputRange: [0, 1],
+  //   outputRange: [0, dimensions.screenWidth * 0.45],
+  // }), [progressAnim, dimensions.screenWidth]);
 
   // Memoized animation sequence
   const startAnimations = useMemo(() => () => {
@@ -178,20 +182,20 @@ const SplashScreen: React.FC = () => {
     startAnimations();
   }, [startAnimations]);
 
-  const spin = rotateAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
+  // const spin = rotateAnim.interpolate({
+  //   inputRange: [0, 1],
+  //   outputRange: ['0deg', '360deg'],
+  // });
 
-  const haloScale = backgroundPulse.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.95, 1.1],
-  });
+  // const haloScale = backgroundPulse.interpolate({
+  //   inputRange: [0, 1],
+  //   outputRange: [0.95, 1.1],
+  // });
 
-  const haloOpacity = backgroundPulse.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.28, 0.08],
-  });
+  // const haloOpacity = backgroundPulse.interpolate({
+  //   inputRange: [0, 1],
+  //   outputRange: [0.28, 0.08],
+  // });
 
   return (
     <SafeAreaView 
@@ -204,6 +208,34 @@ const SplashScreen: React.FC = () => {
         translucent={true}
       />
       
+      {/* Video-based splash screen */}
+      <Video
+        source={require('../assets/intro/onboading.mp4')}
+        style={styles.video}
+        resizeMode="cover"
+        repeat={true}
+        muted={true}
+        controls={false}
+        paused={false}
+        playInBackground={false}
+        playWhenInactive={false}
+        volume={0}
+        onLoad={() => {
+          setIsVideoLoaded(true);
+        }}
+        onError={(error) => {
+          console.warn('Video error:', error);
+        }}
+        onBuffer={({isBuffering: _isBuffering}) => {
+          // Handle buffering state if needed
+        }}
+        onReadyForDisplay={() => {
+          // Video is ready for smooth playback
+        }}
+      />
+      
+      {/* Original splash screen commented out */}
+      {/*
       <LinearGradient
         colors={theme.colors.gradient}
         style={styles.gradientBackground}
@@ -308,6 +340,7 @@ const SplashScreen: React.FC = () => {
           </Animated.View>
         </View>
       </LinearGradient>
+      */}
     </SafeAreaView>
   );
 };
@@ -315,6 +348,12 @@ const SplashScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  video: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#000',
   },
   gradientBackground: {
     flex: 1,

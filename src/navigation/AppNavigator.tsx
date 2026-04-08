@@ -28,7 +28,7 @@ const AppNavigator = () => {
     let authStateReceived = false;
     let authUser: any = null;
     const startTime = Date.now();
-    const MIN_SPLASH_TIME = 2000;
+    const MIN_SPLASH_TIME = 4000;
 
     const timeout = setTimeout(() => {
       if (!authStateReceived) {
