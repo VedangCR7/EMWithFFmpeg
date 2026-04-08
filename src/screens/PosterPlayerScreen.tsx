@@ -557,6 +557,7 @@ const PosterPlayerScreen: React.FC = () => {
   const userManuallySelectedLanguageRef = useRef<boolean>(false); // Track if user manually selected a language (including "All")
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const [selectedServiceFilter, setSelectedServiceFilter] = useState<string | null>(null);
+  const [selectedSoftwareCategory, setSelectedSoftwareCategory] = useState<string | null>(null);
 
   // Auto-set language to "All" when navigating from MyBusiness tab
   useEffect(() => {
@@ -779,6 +780,16 @@ const PosterPlayerScreen: React.FC = () => {
     mandap: ['mandap']
   }), []);
 
+  // Software Company category buttons configuration
+  const softwareCategoryButtons = useMemo(() => [
+    { id: 'website-dev', name: 'Website Development', tags: ['website', 'web', 'development', 'design'] },
+    { id: 'mobile-app-dev', name: 'Mobile App Development', tags: ['mobile', 'app', 'android', 'ios'] },
+    { id: 'custom-software', name: 'Custom Software Solutions', tags: ['software', 'custom', 'solution', 'application'] },
+    { id: 'ai-automation', name: 'AI & Automation', tags: ['ai', 'automation', 'machine learning', 'ml'] },
+    { id: 'it-consulting', name: 'IT Consulting & Support', tags: ['it', 'consulting', 'support', 'technical'] },
+    { id: 'software-dev', name: 'Software Development', tags: ['software', 'development', 'programming', 'coding'] },
+  ], []);
+
   const isEventPlannerCategory = useMemo(() => {
     const category = (currentPoster?.category || initialPoster?.category || '').trim().toLowerCase();
     if (!category) return false;
@@ -802,6 +813,35 @@ const PosterPlayerScreen: React.FC = () => {
       normalizedCategory: category,
       isEventPlanner: result,
       variations: eventPlannerVariations
+    });
+
+    return result;
+  }, [currentPoster, initialPoster]);
+
+  // Check if current category is Software Company
+  const isSoftwareCompanyCategory = useMemo(() => {
+    const category = (currentPoster?.category || initialPoster?.category || '').trim().toLowerCase();
+    if (!category) return false;
+
+    // Check for multiple variations of "software company"
+    const softwareCompanyVariations = [
+      'software companies',
+      'software company',
+      'software-companies',
+      'software-company',
+      'softwarecompanies',
+      'softwarecompany'
+    ];
+
+    const result = softwareCompanyVariations.some(variation => category.includes(variation));
+
+    // Debug logging for category detection
+    console.log('🔍 [SOFTWARE COMPANY DETECTION]', {
+      currentPosterCategory: currentPoster?.category,
+      initialPosterCategory: initialPoster?.category,
+      normalizedCategory: category,
+      isSoftwareCompany: result,
+      variations: softwareCompanyVariations
     });
 
     return result;
@@ -940,6 +980,53 @@ const PosterPlayerScreen: React.FC = () => {
       return languageFiltered;
     }
 
+    // If we have Software Company category and a category selected, filter by tags
+    if (isSoftwareCompanyCategory && selectedSoftwareCategory) {
+      const selectedCategoryButton = softwareCategoryButtons.find(btn => btn.id === selectedSoftwareCategory);
+      if (selectedCategoryButton && selectedCategoryButton.tags.length > 0) {
+        const templatesWithLanguages = allTemplates.map(t => mergeTemplateLanguages(t));
+        
+        const filteredByCategory = templatesWithLanguages.filter(template => {
+          const templateTags = Array.isArray(template.tags)
+            ? template.tags.map(tag => tag.toLowerCase())
+            : [];
+          const templateName = (template.name || '').toLowerCase();
+          const templateDescription = (template.description || '').toLowerCase();
+          
+          return selectedCategoryButton.tags.some(tag => 
+            templateTags.some(posterTag => posterTag.includes(tag.toLowerCase())) ||
+            templateName.includes(tag.toLowerCase()) ||
+            templateDescription.includes(tag.toLowerCase())
+          );
+        });
+
+        console.log(`[SOFTWARE COMPANY] Filtered ${filteredByCategory.length} templates for category: ${selectedSoftwareCategory}`);
+
+        // If "All" is selected, return ALL filtered templates without language filtering (max 6)
+        if (selectedLanguage === 'all') {
+          const result = filteredByCategory.slice(0, 6);
+          console.log(`[SOFTWARE COMPANY] Returning ${result.length} templates (All language)`);
+          return result;
+        }
+
+        // Filter by language for software company category templates
+        const languageFilteredForSoftware = filteredByCategory.filter(template => {
+          const matches = templateContainsLanguage(template, selectedLanguage);
+          return matches;
+        });
+
+        if (languageFilteredForSoftware.length === 0) {
+          console.log(`[SOFTWARE COMPANY] No templates found for language: ${selectedLanguage}`);
+          return [];
+        }
+
+        // Limit to 6 images after language filtering
+        const result = languageFilteredForSoftware.slice(0, 6);
+        console.log(`[SOFTWARE COMPANY] Returning ${result.length} templates (language: ${selectedLanguage})`);
+        return result;
+      }
+    }
+
     // Ensure all templates have languages merged before filtering
     const templatesWithLanguages = allTemplates.map(t => mergeTemplateLanguages(t));
 
@@ -966,7 +1053,7 @@ const PosterPlayerScreen: React.FC = () => {
 
     // Return service-filtered results (even if empty, don't fallback to all templates)
     return serviceFiltered;
-  }, [allTemplates, selectedLanguage, templateMatchesServiceFilter, calendarDate, greetingCategory, globalBusinessCategory, selectedServiceFilter, serviceFilterTemplates]);
+  }, [allTemplates, selectedLanguage, templateMatchesServiceFilter, calendarDate, greetingCategory, globalBusinessCategory, selectedServiceFilter, serviceFilterTemplates, isSoftwareCompanyCategory, selectedSoftwareCategory, softwareCategoryButtons]);
 
   // Preload images for better scrolling performance
   const preloadImages = useCallback((posters: Template[], startIndex: number = 0, count: number = 20) => {
@@ -2789,6 +2876,36 @@ const PosterPlayerScreen: React.FC = () => {
     }
   }, [isEventPlannerCategory, selectedServiceFilter]);
 
+  // Reset software category when not Software Company category
+  useEffect(() => {
+    if (!isSoftwareCompanyCategory && selectedSoftwareCategory) {
+      setSelectedSoftwareCategory(null);
+    }
+  }, [isSoftwareCompanyCategory, selectedSoftwareCategory]);
+
+  // Auto-select first filtered image for Software Company category
+  useEffect(() => {
+    if (
+      isSoftwareCompanyCategory &&
+      filteredPosters &&
+      filteredPosters.length > 0
+    ) {
+      const firstFilteredPoster = filteredPosters[0];
+      
+      // Only update if the first filtered poster is different from current selection
+      if (currentPoster?.id !== firstFilteredPoster?.id) {
+        console.log('[SOFTWARE COMPANY] Auto-selecting first filtered image:', {
+          firstPosterId: firstFilteredPoster.id,
+          firstPosterName: firstFilteredPoster.name,
+          currentPosterId: currentPoster?.id,
+          selectedSoftwareCategory
+        });
+        
+        handlePosterSelect(firstFilteredPoster);
+      }
+    }
+  }, [filteredPosters, isSoftwareCompanyCategory, selectedSoftwareCategory, currentPoster?.id, handlePosterSelect]);
+
   useEffect(() => {
     console.log('🔍 [SERVICE FILTER RENDER CHECK]', { isEventPlannerCategory });
   }, [isEventPlannerCategory]);
@@ -3500,6 +3617,59 @@ const PosterPlayerScreen: React.FC = () => {
           </View>
         )}
 
+        {/* Category buttons for Software Company */}
+        {isSoftwareCompanyCategory && (
+          <View style={styles.serviceFilterContainer}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoryButtonsScrollContent}
+              nestedScrollEnabled={true}
+            >
+              {softwareCategoryButtons.map((category) => {
+                const isCategoryActive = selectedSoftwareCategory === category.id;
+                
+                return (
+                  <TouchableOpacity
+                    key={category.id}
+                    style={[
+                      styles.softwareCategoryButton,
+                      isCategoryActive && styles.serviceFilterButtonActive
+                    ]}
+                    onPress={() => {
+                      const newCategory = selectedSoftwareCategory === category.id ? null : category.id;
+                      setSelectedSoftwareCategory(newCategory);
+                      
+                      if (newCategory) {
+                        console.log(`[SOFTWARE COMPANY] Category selected: ${newCategory}`);
+                      }
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <LinearGradient
+                      colors={[theme.colors.secondary, theme.colors.primary]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={[
+                        styles.serviceFilterButtonGradient,
+                        !isCategoryActive && styles.serviceFilterButtonGradientInactive
+                      ]}
+                    >
+                      <Text style={[
+                        styles.serviceFilterButtonText,
+                        isCategoryActive && styles.serviceFilterButtonTextActive,
+                        !isCategoryActive && styles.serviceFilterButtonTextInactive
+                      ]} numberOfLines={2} ellipsizeMode="tail">
+                        {category.name}
+                      </Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+
         {/* Service filter buttons for Event Planners */}
         {isEventPlannerCategory && (
           <View style={styles.serviceFilterContainer}>
@@ -4076,6 +4246,11 @@ const styles = StyleSheet.create({
     borderRadius: moderateScale(8),
     overflow: 'hidden',
   },
+  softwareCategoryButton: {
+    alignSelf: 'flex-start',
+    borderRadius: moderateScale(8),
+    overflow: 'hidden',
+  },
   serviceFilterButtonActive: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -4085,6 +4260,7 @@ const styles = StyleSheet.create({
   },
   serviceFilterButtonGradient: {
     paddingVertical: moderateScale(6),
+    paddingHorizontal: moderateScale(12),
     borderRadius: moderateScale(8),
     justifyContent: 'center',
     alignItems: 'center',
@@ -4100,6 +4276,17 @@ const styles = StyleSheet.create({
   },
   serviceFilterButtonTextActive: {
     color: '#ffffff',
+  },
+  serviceFilterButtonTextInactive: {
+    color: 'rgba(255,255,255,0.7)',
+  },
+  categoryButtonsScrollContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: moderateScale(8),
+    paddingVertical: moderateScale(4),
+    gap: moderateScale(10),
+    flexGrow: 1,
   },
   noPostersContainer: {
     justifyContent: 'center',
