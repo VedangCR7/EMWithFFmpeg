@@ -19,6 +19,7 @@ import MyPostersScreen from '../screens/MyPostersScreen';
 import AboutUsScreen from '../screens/AboutUsScreen';
 import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 import HelpSupportScreen from '../screens/HelpSupportScreen';
+import FeedbackScreen from '../screens/FeedbackScreen';
 import TodaysPickScreen from '../screens/TodaysPickScreen';
 
 const MainStack = createStackNavigator<MainStackParamList>();
@@ -48,6 +49,7 @@ const TabNavigator = () => {
       <MainStack.Screen name="AboutUs" component={AboutUsScreen} options={{ headerShown: false }} />
       <MainStack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} options={{ headerShown: false }} />
       <MainStack.Screen name="HelpSupport" component={HelpSupportScreen} options={{ headerShown: false }} />
+      <MainStack.Screen name="FeedbackScreen" component={FeedbackScreen} options={{ headerShown: false }} />
       <MainStack.Screen name="TodaysPick" component={TodaysPickScreen} options={{ headerShown: false }} />
     </MainStack.Navigator>
   );

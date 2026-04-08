@@ -91,6 +91,7 @@ export type MainStackParamList = {
   };
   MyPosters: undefined;
   HelpSupport: { scrollToFAQ?: boolean } | undefined;
+  FeedbackScreen: undefined;
   TodaysPick: undefined;
   Templates: undefined;
   Greetings: undefined;

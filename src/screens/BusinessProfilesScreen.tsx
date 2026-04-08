@@ -67,12 +67,10 @@ const BusinessProfilesScreen: React.FC = () => {
   } = useBusinessProfile();
   const insets = useSafeAreaInsets();
   const [profiles, setProfiles] = useState<any[]>([]);
-  const [allProfiles, setAllProfiles] = useState<any[]>([]); // Cache all profiles for instant filtering
-  const [imageRefreshKey, setImageRefreshKey] = useState(Date.now()); // Key to force image refresh
+    const [imageRefreshKey, setImageRefreshKey] = useState(Date.now()); // Key to force image refresh
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showForm, setShowForm] = useState(false);
+    const [showForm, setShowForm] = useState(false);
   const [showBottomSheet, setShowBottomSheet] = useState(false);
   const [editingProfile, setEditingProfile] = useState<any>(null);
   const [formLoading, setFormLoading] = useState(false);
@@ -188,8 +186,6 @@ const BusinessProfilesScreen: React.FC = () => {
           new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
         );
         
-        // Cache all profiles for instant search filtering
-        setAllProfiles(sortedProfiles);
         setProfiles(sortedProfiles);
         
         console.log('✅ Loaded user-specific business profiles from API:', sortedProfiles.length);
@@ -203,7 +199,6 @@ const BusinessProfilesScreen: React.FC = () => {
         });
       } else {
         // No profiles found from API
-        setAllProfiles([]);
         setProfiles([]);
         console.log('📋 No business profiles found for user');
       }
@@ -316,7 +311,6 @@ const BusinessProfilesScreen: React.FC = () => {
       const newProfile = await businessProfileService.createBusinessProfile(pendingData);
 
       setProfiles(prev => [...prev, newProfile]);
-      setAllProfiles(prev => [...prev, newProfile]);
 
       await AsyncStorage.removeItem('pending_business_profile_data');
       setPendingProfileData(null);
@@ -386,28 +380,7 @@ const BusinessProfilesScreen: React.FC = () => {
     setRefreshing(false);
   }, [loadBusinessProfiles]);
 
-  const filterProfiles = useCallback((query: string) => {
-    if (!query || query.trim() === '') {
-      setProfiles(allProfiles);
-      return;
-    }
-    const lowercaseQuery = query.toLowerCase().trim();
-    const filtered = allProfiles.filter(profile => {
-      const matchesName = profile.name?.toLowerCase().includes(lowercaseQuery);
-      const matchesSubcategory = (profile.subcategory || profile.subCategory)?.toLowerCase().includes(lowercaseQuery);
-      const matchesPhone = profile.phone?.toLowerCase().includes(lowercaseQuery);
-      return matchesName || matchesSubcategory || matchesPhone;
-    });
-    setProfiles(filtered);
-  }, [allProfiles]);
-
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      filterProfiles(searchQuery);
-    }, 300);
-    return () => clearTimeout(timeoutId);
-  }, [searchQuery, filterProfiles]);
-
+  
   const handlePayNow = useCallback(async () => {
     if (!pendingProfileDataRef.current) {
       setErrorMessage('No business profile data found.');
@@ -497,7 +470,6 @@ const BusinessProfilesScreen: React.FC = () => {
     try {
       await businessProfileService.deleteBusinessProfile(profileToDelete);
       setProfiles(prev => prev.filter(p => p.id !== profileToDelete));
-      setAllProfiles(prev => prev.filter(p => p.id !== profileToDelete));
       setSuccessMessage('Business profile deleted successfully');
       setShowSuccessModal(true);
     } catch (error) {
@@ -606,7 +578,6 @@ const BusinessProfilesScreen: React.FC = () => {
       const updatedProfile = await businessProfileService.updateBusinessProfile(editingProfile.id, formData);
       const updateFn = (prev: any[]) => prev.map(p => p.id === editingProfile.id ? updatedProfile : p);
       setProfiles(updateFn);
-      setAllProfiles(updateFn);
       setSuccessMessage('Business profile updated successfully');
       setShowSuccessModal(true);
       setShowForm(false);
@@ -949,29 +920,38 @@ const BusinessProfilesScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <View style={[styles.searchBar, { backgroundColor: theme.colors.cardBackground }]}>
-            <Icon name="search" size={20} color={theme.colors.textSecondary} />
-            <TextInput
-              style={[styles.searchInput, { color: theme.colors.text }]}
-              placeholder="Search business profiles..."
-              placeholderTextColor={theme.colors.textSecondary}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              autoCorrect={false}
-              autoCapitalize="none"
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <Icon name="clear" size={20} color={theme.colors.textSecondary} />
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
+        
+        {/* Business Profiles Container */}
+        <View>
+          {/* Skeleton Loading */}
+          {loading && (
+            <View style={styles.skeletonContainer}>
+              {[1, 2, 3].map((index) => (
+                <View key={index} style={[styles.skeletonCard, { backgroundColor: theme.colors.cardBackground }]}>
+                  {/* Profile Image Skeleton */}
+                  <View style={[styles.skeletonImage, { backgroundColor: theme.colors.border }]} />
+                  
+                  {/* Profile Content Skeleton */}
+                  <View style={styles.skeletonContent}>
+                    {/* Title Skeleton */}
+                    <View style={[styles.skeletonTitle, { backgroundColor: theme.colors.border }]} />
+                    
+                    {/* Subtitle Skeleton */}
+                    <View style={[styles.skeletonSubtitle, { backgroundColor: theme.colors.border }]} />
+                    
+                    {/* Action Buttons Skeleton */}
+                    <View style={styles.skeletonActions}>
+                      <View style={[styles.skeletonButton, { backgroundColor: theme.colors.border }]} />
+                      <View style={[styles.skeletonButton, { backgroundColor: theme.colors.border, marginLeft: 8 }]} />
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
 
-        {/* Business Profiles List */}
-        <FlatList
+          {/* Business Profiles List */}
+          {!loading && <FlatList
           data={profiles}
           renderItem={renderBusinessCard}
           keyExtractor={keyExtractor}
@@ -994,28 +974,23 @@ const BusinessProfilesScreen: React.FC = () => {
               <View style={styles.emptyStateContainer}>
                 <Icon name="business-center" size={80} color={theme.colors.primary} style={styles.emptyStateIcon} />
                 <Text style={[styles.emptyStateTitle, { color: theme.colors.text }]}>
-                  {searchQuery ? 'No Profiles Found' : 'No Business Profiles'}
+                  No Business Profiles
                 </Text>
                 <Text style={[styles.emptyStateSubtitle, { color: theme.colors.text }]}>
-                  {searchQuery 
-                    ? `No profiles match "${searchQuery}". Try a different search term.`
-                    : 'You haven\'t created any business profiles yet. Tap the + button to create your first profile.'
-                  }
+                  You haven't created any business profiles yet. Tap the + button to create your first profile.
                 </Text>
-                {!searchQuery && (
-                  <TouchableOpacity
-                    style={[styles.emptyStateButton, { backgroundColor: theme.colors.primary }]}
-                    onPress={handleAddProfile}
-                  >
-                    <Icon name="add" size={20} color="#ffffff" />
-                    <Text style={styles.emptyStateButtonText}>Create Profile</Text>
-                  </TouchableOpacity>
-                )}
+                <TouchableOpacity
+                  style={[styles.emptyStateButton, { backgroundColor: theme.colors.primary }]}
+                  onPress={handleAddProfile}
+                >
+                  <Icon name="add" size={20} color="#ffffff" />
+                  <Text style={styles.emptyStateButtonText}>Create Profile</Text>
+                </TouchableOpacity>
               </View>
             ) : null
           }
-        />
-
+        />}
+        
         {/* Business Profile Form Modal */}
         <BusinessProfileForm
           visible={showForm}
@@ -1295,6 +1270,7 @@ const BusinessProfilesScreen: React.FC = () => {
             </View>
           </View>
         </Modal>
+        </View>
       </LinearGradient>
     </SafeAreaView>
   );
@@ -1303,6 +1279,47 @@ const BusinessProfilesScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  // Skeleton Loading Styles
+  skeletonContainer: {
+    padding: Math.max(12, responsiveLayout.containerPaddingHorizontal * 0.7),
+  },
+  skeletonCard: {
+    flexDirection: 'row',
+    padding: Math.max(12, responsiveLayout.containerPaddingHorizontal * 0.7),
+    marginBottom: Math.max(8, screenHeight * 0.015),
+    borderRadius: Math.max(12, screenWidth * 0.03),
+    ...responsiveShadow.medium,
+  },
+  skeletonImage: {
+    width: Math.max(48, screenWidth * 0.12),
+    height: Math.max(48, screenWidth * 0.12),
+    borderRadius: Math.max(8, screenWidth * 0.02),
+  },
+  skeletonContent: {
+    flex: 1,
+    marginLeft: Math.max(12, screenWidth * 0.03),
+  },
+  skeletonTitle: {
+    width: '60%',
+    height: Math.max(12, screenWidth * 0.03),
+    borderRadius: Math.max(4, screenWidth * 0.01),
+    marginBottom: Math.max(4, screenHeight * 0.008),
+  },
+  skeletonSubtitle: {
+    width: '40%',
+    height: Math.max(10, screenWidth * 0.025),
+    borderRadius: Math.max(4, screenWidth * 0.01),
+    marginBottom: Math.max(8, screenHeight * 0.015),
+  },
+  skeletonActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  skeletonButton: {
+    width: Math.max(60, screenWidth * 0.15),
+    height: Math.max(24, screenHeight * 0.03),
+    borderRadius: Math.max(4, screenWidth * 0.01),
   },
   gradientBackground: {
     flex: 1,

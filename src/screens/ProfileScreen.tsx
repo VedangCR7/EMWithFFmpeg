@@ -1889,40 +1889,6 @@ const ProfileScreen: React.FC = () => {
                 }]}>
                   {currentUser?.email || 'eventmarketer@example.com'}
                 </Text>
-                <View style={styles.profileStats}>
-                  <View style={[styles.statItem, {
-                    paddingHorizontal: dynamicModerateScale(8),
-                  }]}>
-                    <Text style={[styles.statNumber, { 
-                      color: theme.colors.primary,
-                      fontSize: getFontSize(12),
-                    }]}>{posterStats.total}</Text>
-                    <Text style={[styles.statLabel, { 
-                      color: theme.colors.textSecondary,
-                      fontSize: getFontSize(7),
-                      marginTop: dynamicModerateScale(0.5),
-                    }]}>Downloads</Text>
-                  </View>
-                  <View style={[styles.statDivider, { 
-                    backgroundColor: theme.colors.border,
-                    width: 1,
-                    height: dynamicModerateScale(16),
-                    marginHorizontal: dynamicModerateScale(5),
-                  }]} />
-                  <View style={[styles.statItem, {
-                    paddingHorizontal: dynamicModerateScale(8),
-                  }]}>
-                    <Text style={[styles.statNumber, { 
-                      color: theme.colors.primary,
-                      fontSize: getFontSize(12),
-                    }]}>{businessProfileStats.total}</Text>
-                    <Text style={[styles.statLabel, { 
-                      color: theme.colors.textSecondary,
-                      fontSize: getFontSize(7),
-                      marginTop: dynamicModerateScale(0.5),
-                    }]}>Business</Text>
-                  </View>
-                </View>
               </View>
             </View>
             <TouchableOpacity 
@@ -1953,13 +1919,13 @@ const ProfileScreen: React.FC = () => {
               paddingHorizontal: dynamicModerateScale(8),
               color: theme.colors.text,
             }]}>Account Settings</Text>
-            {renderMenuItem('business', 'Business Profiles', `${businessProfileStats.total} profiles • ${businessProfileStats.recentCount} recent`, handleBusinessProfiles)}
+            {renderMenuItem('business', 'Business Profiles', `${businessProfileStats.total} Profiles`, handleBusinessProfiles)}
             {/* Notifications temporarily hidden */}
             {/* {renderMenuItem('notifications', 'Notifications', 'Manage notification preferences', undefined, true, notificationsEnabled, handleNotificationToggle, notificationsAnimation)} */}
           </View>
 
-          {/* My Posters Section */}
-          <View style={[styles.section, {
+          {/* My Posters Section - Hidden */}
+          {/* <View style={[styles.section, {
             marginBottom: dynamicModerateScale(12),
           }]}>
             <Text style={[styles.sectionTitle, {
@@ -2002,11 +1968,11 @@ const ProfileScreen: React.FC = () => {
                 <Icon name="chevron-right" size={getIconSize(20)} color={theme.colors.textSecondary} />
               </View>
             </TouchableOpacity>
-          </View>
+          </View> */}
 
 
-          {/* Transaction History */}
-          <View style={[styles.section, {
+          {/* Transaction History - Hidden */}
+          {/* <View style={[styles.section, {
             marginBottom: dynamicModerateScale(12),
           }]}>
             <Text style={[styles.sectionTitle, {
@@ -2049,14 +2015,14 @@ const ProfileScreen: React.FC = () => {
                       fontSize: getFontSize(8),
                       marginTop: dynamicModerateScale(0.5),
                     }]}>
-                      {transactionStats.total} transactions • View payment history
+                      {transactionStats.total} transactions · View payment history
                     </Text>
                   </View>
                 </View>
                 <Icon name="chevron-right" size={getIconSize(20)} color={theme.colors.textSecondary} />
               </View>
             </TouchableOpacity>
-          </View>
+          </View> */}
 
           {/* App Settings */}
            <View style={[styles.section, {
@@ -2081,6 +2047,7 @@ const ProfileScreen: React.FC = () => {
               paddingHorizontal: dynamicModerateScale(8),
               color: theme.colors.text,
             }]}>Support & Legal</Text>
+            {renderMenuItem('feedback', 'Feedback', 'Share your feedback and suggestions', () => navigation.navigate('FeedbackScreen' as never))}
             {renderMenuItem('help', 'Help & Support', 'Get help and contact support', () => navigation.navigate('HelpSupport' as never))}
             {renderMenuItem('privacy-tip', 'Privacy Policy', 'Read our privacy policy', () => navigation.navigate('PrivacyPolicy' as never))}
             {renderMenuItem('info', 'About App', 'Version 1.0.0', () => navigation.navigate('AboutUs'))}
