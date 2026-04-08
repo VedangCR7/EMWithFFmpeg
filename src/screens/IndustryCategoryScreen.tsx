@@ -10,24 +10,20 @@ import {
   Animated,
   Image,
   PanResponder,
+  ScrollView,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { MainStackParamList } from '../navigation/types';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
-// Import existing components and services
 import LazyFullImage from '../components/LazyFullImage';
 import { useTheme } from '../context/ThemeContext';
-import { useBusinessProfile } from '../context/BusinessProfileContext';
 import businessCategoryPostersApi from '../services/businessCategoryPostersApi';
 import { Template } from '../services/dashboard';
-import IndustryCategoryScreen from '../screens/IndustryCategoryScreen';
 
-// Import the RelatedPosterItem component from PosterPlayerScreen
-// We'll recreate it here to avoid importing from a screen file
 interface RelatedPosterItemProps {
   item: Template;
   cardWidth: number;
@@ -64,12 +60,10 @@ const RelatedPosterItem: React.FC<RelatedPosterItemProps> = React.memo(({
       ]}
       onPress={handlePress}
     >
-      {/* Selected Glow Effect */}
       {isSelected && (
         <View style={styles.selectedPosterGlow} />
       )}
       
-      {/* Poster Image */}
       <LazyFullImage
         thumbnailUri={imageUrl}
         fullImageUri={imageUrl}
@@ -82,7 +76,6 @@ const RelatedPosterItem: React.FC<RelatedPosterItemProps> = React.memo(({
         showLoader={false}
       />
       
-      {/* Selected Overlay */}
       {isSelected && (
         <LinearGradient
           colors={overlayColors}
@@ -102,15 +95,13 @@ const RelatedPosterItem: React.FC<RelatedPosterItemProps> = React.memo(({
 
 RelatedPosterItem.displayName = 'RelatedPosterItem';
 
-type MyBusinessPosterPlayerScreenNavigationProp = StackNavigationProp<MainStackParamList, 'PosterPlayer'>;
+type IndustryCategoryScreenNavigationProp = StackNavigationProp<MainStackParamList, 'PosterPlayer'>;
 
-const MyBusinessPosterPlayerScreen: React.FC = () => {
-  const navigation = useNavigation<MyBusinessPosterPlayerScreenNavigationProp>();
+const IndustryCategoryScreen: React.FC = () => {
+  const navigation = useNavigation<IndustryCategoryScreenNavigationProp>();
   const { theme } = useTheme();
-  const { selectedBusinessProfile } = useBusinessProfile();
   const insets = useSafeAreaInsets();
 
-  // Screen dimensions
   const [dimensions, setDimensions] = useState(() => {
     const { width, height } = Dimensions.get('window');
     return { width, height };
@@ -118,60 +109,20 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
 
   const { width: screenWidth, height: screenHeight } = dimensions;
 
-
-  // Responsive design helpers
   const isTabletDevice = screenWidth >= 768;
   const isFoldPhoneUnfolded = screenWidth >= 900;
   const moderateScale = useCallback((size: number, factor = 0.5) => size + (size * (screenWidth / 375 - 1) * factor), [screenWidth]);
 
-  // Get business category from selected profile
-  const businessCategory = useMemo(() => {
-    if (!selectedBusinessProfile) {
-      return null;
-    }
-    // Use subcategory if available, otherwise use main category
-    return selectedBusinessProfile.subCategory || selectedBusinessProfile.subcategory || selectedBusinessProfile.category;
-  }, [selectedBusinessProfile]);
+  const [posters, setPosters] = useState<Template[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedPoster, setSelectedPoster] = useState<Template | null>(null);
+  const [selectedIndustry, _setSelectedIndustry] = useState<string>('Software Company');
+  const [selectedLanguage, setSelectedLanguage] = useState<'all' | 'english' | 'hindi'>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string>('website-dev');
+  const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
 
-  // Check if current category is Event Planner
-  const isEventPlannerCategory = useMemo(() => {
-    const category = (businessCategory || '').trim().toLowerCase();
-    if (!category) return false;
-
-    // Check for multiple variations of "event planner"
-    const eventPlannerVariations = [
-      'event planners',
-      'event planner',
-      'event-planners',
-      'event-planner',
-      'eventplanners',
-      'eventplanner'
-    ];
-
-    const result = eventPlannerVariations.some(variation => category.includes(variation));
-
-    console.log('🔍 [EVENT PLANNER DETECTION]', {
-      businessCategory,
-      normalizedCategory: category,
-      isEventPlanner: result,
-      variations: eventPlannerVariations
-    });
-
-    return result;
-  }, [businessCategory]);
-
-  // Service filter keywords for Event Planner category
-  const serviceFilterKeywords: Record<string, string[]> = useMemo(() => ({
-    generator: ['generator'],
-    decorators: ['decor', 'decorator', 'stage'],
-    sound: ['sound', 'audio', 'dj'],
-    mandap: ['mandap']
-  }), []);
-
-  // Skeleton shimmer animation
   const shimmerAnim = useRef(new Animated.Value(0)).current;
   
-  // Start shimmer animation when loading
   useEffect(() => {
     const shimmerAnimation = Animated.loop(
       Animated.sequence([
@@ -193,9 +144,8 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
     return () => {
       shimmerAnimation.stop();
     };
-  }, []);
+  }, [shimmerAnim]);
 
-  // Helper function to convert hex to rgba
   const hexToRgba = (hexColor: string, alpha: number): string => {
     if (!hexColor || typeof hexColor !== 'string') {
       return `rgba(0,0,0,${alpha})`;
@@ -217,41 +167,34 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
     return `rgba(${r},${g},${b},${alpha})`;
   };
 
-  // Get high quality image URL for preview (full quality, maximum resolution)
   const getHighQualityImageUrl = useCallback((poster: Template | null): string => {
     if (!poster) return '';
 
-    // Check if poster has a previewUrl property (cast to any to access)
     const previewUrl = (poster as any).previewUrl;
     if (previewUrl) {
       return previewUrl;
     }
 
-    // Check for content.background (used in greeting templates for full quality image)
     const contentBackground = (poster as any).content?.background;
     if (contentBackground) {
       return contentBackground;
     }
 
-    // Otherwise, enhance the thumbnail URL for maximum quality
     let url = poster.thumbnail || poster.thumbnailUrl || '';
 
     if (!url) {
       return '';
     }
 
-    // For Cloudinary URLs, get maximum quality image
     if (url.includes('res.cloudinary.com') && url.includes('/upload/')) {
       try {
         const [prefix, remainder] = url.split('/upload/');
         if (!remainder) {
-          return url; // Can't parse, return original
+          return url;
         }
 
-        // Split the remainder into parts
         const parts = remainder.split('/');
 
-        // Find the version number (starts with 'v' followed by digits)
         let versionIndex = -1;
         for (let i = 0; i < parts.length; i++) {
           if (/^v\d+/.test(parts[i])) {
@@ -261,11 +204,8 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
         }
 
         if (versionIndex >= 0) {
-          // Extract everything from version onwards (this is the actual image path)
           const versionAndPath = parts.slice(versionIndex).join('/');
-
-          // Get maximum quality image for preview
-          const maxWidth = Math.max(Math.round(screenWidth * 2.5), 2400); // 2.5x for very high quality
+          const maxWidth = Math.max(Math.round(screenWidth * 2.5), 2400);
           const highQualityTransform = `q_100,c_limit,w_${maxWidth}`;
           const highQualityUrl = `${prefix}/upload/${highQualityTransform}/${versionAndPath}`;
 
@@ -276,18 +216,15 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
       }
     }
 
-    // If URL already contains 'thumbnailUrl' or 'thumbnail' in path, try to get full URL
     if (url.includes('/thumbnailUrl/') || url.includes('/thumbnail/')) {
       const fullUrl = url.replace(/\/thumbnailUrl\//g, '/url/').replace(/\/thumbnail\//g, '/images/');
       url = fullUrl;
     }
 
-    // For non-Cloudinary URLs, try to enhance quality
     const urlWithoutParams = url.split('?')[0];
     const existingParams = url.includes('?') ? url.split('?')[1] : '';
     const params = new URLSearchParams(existingParams);
 
-    // Remove low-quality parameters
     params.delete('quality');
     params.delete('width');
     params.delete('height');
@@ -295,7 +232,6 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
     params.delete('h');
     params.delete('size');
 
-    // Add high quality parameters
     params.set('quality', '100');
     params.set('width', '2400');
 
@@ -303,12 +239,10 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
     return paramString ? `${urlWithoutParams}?${paramString}` : urlWithoutParams;
   }, [screenWidth]);
 
-  // Extract theme colors for gradient overlay
   const themeColors = theme.colors || {};
   const primaryColor = themeColors.primary || '#764ba2';
   const secondaryColor = themeColors.secondary || themeColors.primary || '#667eea';
 
-  // Calculate preview overlay colors
   const previewOverlayColors = useMemo(() => {
     const startColor = secondaryColor || primaryColor;
     const endColor = primaryColor;
@@ -318,43 +252,41 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
     ];
   }, [primaryColor, secondaryColor]);
 
-  // State management
-  const [posters, setPosters] = useState<Template[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedPoster, setSelectedPoster] = useState<Template | null>(null);
-  const [selectedLanguage, setSelectedLanguage] = useState<'all' | 'english' | 'hindi'>('all');
-  const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
-  const [selectedServiceFilter, setSelectedServiceFilter] = useState<string | null>(null);
-  const [serviceFilterTemplates, setServiceFilterTemplates] = useState<Record<string, Template[]>>({});
-  const [isLoadingServiceFilter, setIsLoadingServiceFilter] = useState<Record<string, boolean>>({});
 
+  const categoryButtons = useMemo(() => [
+    // { id: 'all', name: 'All', tags: [] },
+    { id: 'website-dev', name: 'Website Development', tags: ['website', 'web', 'development', 'design'] },
+    { id: 'mobile-app-dev', name: 'Mobile App Development', tags: ['mobile', 'app', 'android', 'ios'] },
+    { id: 'custom-software', name: 'Custom S/W Solutions', tags: ['software', 'custom', 'solution', 'application'] },
+    { id: 'ai-automation', name: 'AI & Automation', tags: ['ai', 'automation', 'machine learning', 'ml'] },
+    { id: 'it-consulting', name: 'IT Consulting & Support', tags: ['it', 'consulting', 'support', 'technical'] },
+    { id: 'software-dev', name: 'Software Development', tags: ['software', 'development', 'programming', 'coding'] },
+  ], []);
 
-  // Fetch posters for business category
   const fetchPosters = useCallback(async () => {
-    if (!businessCategory) {
-      console.log('📋 [MY BUSINESS] No business category available');
+    if (!selectedIndustry) {
+      console.log('📋 [INDUSTRY] No industry available');
       setPosters([]);
       setLoading(false);
       return;
     }
 
-    console.log('📋 [MY BUSINESS] Fetching posters for category:', businessCategory);
+    console.log('📋 [SOFTWARE COMPANY] Fetching posters for category: software company');
     setLoading(true);
 
     try {
-      const response = await businessCategoryPostersApi.getPostersByCategory(businessCategory, 200);
+      const response = await businessCategoryPostersApi.getPostersByCategory('software company', 200);
 
       if (response?.success && Array.isArray(response.data?.posters)) {
         const businessPosters = response.data.posters;
 
-        // Convert BusinessCategoryPoster to Template format
         const templates: Template[] = businessPosters
           .map(poster => ({
             id: poster.id,
-            name: poster.title || 'Business Poster',
+            name: poster.title || 'Industry Poster',
             thumbnail: poster.thumbnail || poster.imageUrl,
             thumbnailUrl: poster.thumbnail || poster.imageUrl,
-            category: poster.category || businessCategory,
+            category: poster.category || selectedIndustry,
             downloads: poster.downloads || 0,
             isDownloaded: false,
             languages: poster.tags || [],
@@ -363,127 +295,36 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
           }))
           .filter(template => template.thumbnail);
 
-        console.log(`✅ [MY BUSINESS] Loaded ${templates.length} posters for category: ${businessCategory}`);
+        console.log(`✅ [SOFTWARE COMPANY] Loaded ${templates.length} posters for category: software company`);
         setPosters(templates);
 
-        // Set first poster as selected if none selected
-        if (templates.length > 0 && !selectedPoster) {
+        if (templates.length > 0) {
           setSelectedPoster(templates[0]);
         }
       } else {
-        console.warn('⚠️ [MY BUSINESS] No posters found for category:', businessCategory);
+        console.warn('⚠️ [SOFTWARE COMPANY] No posters found for category: software company');
         setPosters([]);
         setSelectedPoster(null);
       }
     } catch (error) {
-      console.error('❌ [MY BUSINESS] Error fetching posters:', error);
+      console.error('❌ [SOFTWARE COMPANY] Error fetching posters:', error);
       setPosters([]);
       setSelectedPoster(null);
     } finally {
       setLoading(false);
     }
-  }, [businessCategory]);
+  }, [selectedIndustry]);
 
-  // Function to fetch Event Planner templates
-  const fetchEventPlannerTemplates = useCallback(async () => {
-    if (!isEventPlannerCategory) return;
-
-    // Check if we already have cached EventPlanner templates
-    if (serviceFilterTemplates['eventplanner'] && serviceFilterTemplates['eventplanner'].length > 0) {
-      console.log('📦 [EVENT PLANNER] Using cached EventPlanner templates');
-      return;
-    }
-
-    console.log('📡 [EVENT PLANNER] Fetching all EventPlanner templates');
-    setIsLoadingServiceFilter(prev => ({ ...prev, eventplanner: true }));
-
-    try {
-      const response = await businessCategoryPostersApi.getPostersByCategory('eventplanner', 500);
-
-      console.log('🔍 [EVENT PLANNER] API Response:', {
-        success: response.success,
-        message: response.message,
-        posterCount: response.data?.posters?.length || 0
-      });
-
-      if (response?.success && Array.isArray(response.data?.posters)) {
-        const businessPosters = response.data.posters;
-
-        // Convert BusinessCategoryPoster to Template format
-        const templates: Template[] = businessPosters
-          .map(poster => ({
-            id: poster.id,
-            name: poster.title || 'Event Planner Poster',
-            thumbnail: poster.thumbnail || poster.imageUrl,
-            thumbnailUrl: poster.thumbnail || poster.imageUrl,
-            category: poster.category || 'eventplanner',
-            downloads: poster.downloads || 0,
-            isDownloaded: false,
-            languages: poster.tags || [],
-            tags: poster.tags || [],
-            description: poster.description,
-            previewUrl: poster.imageUrl || poster.downloadUrl,
-          }))
-          .filter(template => template.thumbnail);
-
-        // Cache all EventPlanner templates
-        setServiceFilterTemplates(prev => ({
-          ...prev,
-          eventplanner: templates
-        }));
-
-        console.log(`✅ [EVENT PLANNER] Successfully fetched ${templates.length} EventPlanner templates`);
-
-        // Log template tags for debugging
-        const allTags = templates.flatMap(t => t.tags || []);
-        const uniqueTags = [...new Set(allTags)];
-        console.log(`🏷️ [EVENT PLANNER] All unique tags found:`, uniqueTags);
-      } else {
-        console.warn('⚠️ [EVENT PLANNER] No templates found for EventPlanner category');
-        setServiceFilterTemplates(prev => ({
-          ...prev,
-          eventplanner: []
-        }));
-      }
-    } catch (error) {
-      console.error('❌ [EVENT PLANNER] Error fetching templates:', error);
-      setServiceFilterTemplates(prev => ({
-        ...prev,
-        eventplanner: []
-      }));
-    } finally {
-      setIsLoadingServiceFilter(prev => ({ ...prev, eventplanner: false }));
-    }
-  }, [isEventPlannerCategory, serviceFilterTemplates]);
-
-  // Fetch EventPlanner templates when EventPlanner category is detected
-  useEffect(() => {
-    if (isEventPlannerCategory && !serviceFilterTemplates['eventplanner']) {
-      console.log('🎯 [EVENT PLANNER] EventPlanner category detected, fetching templates...');
-      fetchEventPlannerTemplates();
-    }
-  }, [isEventPlannerCategory, fetchEventPlannerTemplates, serviceFilterTemplates]);
-
-  // Reset service filter when not Event Planner category
-  useEffect(() => {
-    if (!isEventPlannerCategory && selectedServiceFilter) {
-      setSelectedServiceFilter(null);
-    }
-  }, [isEventPlannerCategory, selectedServiceFilter]);
-
-  // Fetch posters when category changes
   useEffect(() => {
     fetchPosters();
-  }, [fetchPosters]);
+  }, []);
 
-  // Update selected poster when posters array changes
   useEffect(() => {
-    if (posters && posters.length > 0) {
+    if (posters && posters.length > 0 && !selectedPoster) {
       setSelectedPoster(posters[0]);
     }
-  }, [posters]);
+  }, [posters, selectedPoster]);
 
-  // Update dimensions on change
   useEffect(() => {
     const subscription = Dimensions.addEventListener('change', ({ window }) => {
       setDimensions({ width: window.width, height: window.height });
@@ -492,7 +333,6 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
     return () => subscription?.remove();
   }, []);
 
-  // Load image dimensions when poster changes
   useEffect(() => {
     if (!selectedPoster) {
       setImageDimensions(null);
@@ -512,7 +352,6 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
     );
   }, [selectedPoster]);
 
-  // Calculate card dimensions
   const numColumns = useMemo(() => {
     return (isTabletDevice || isFoldPhoneUnfolded) ? 4 : 3;
   }, [isTabletDevice, isFoldPhoneUnfolded]);
@@ -531,34 +370,24 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
     return optimalWidth > 0 ? optimalWidth : 100;
   }, [screenWidth, numColumns, moderateScale]);
 
-  const cardHeight = cardWidth; // Square cards
+  const cardHeight = cardWidth;
 
-  // Calculate poster preview height
   const computedPreviewHeight = useMemo(() => {
     if (imageDimensions && imageDimensions.width > 0 && imageDimensions.height > 0) {
       const aspectHeight = screenWidth * (imageDimensions.height / imageDimensions.width);
-      
-      const headerHeight = moderateScale(80);
-      const topSpacing = insets.top + moderateScale(12);
-      const gridMinHeight = moderateScale(150);
-      const bottomSpacing = insets.bottom;
-      const reservedSpace = headerHeight + topSpacing + gridMinHeight + bottomSpacing + moderateScale(30);
 
       const baseMaxPercentage = isFoldPhoneUnfolded ? 0.50 : 0.60;
       const maxPosterHeightByPercentage = screenHeight * baseMaxPercentage;
-      const maxPosterHeightBySpace = screenHeight - reservedSpace;
 
       return Math.min(aspectHeight, maxPosterHeightByPercentage);
     }
     return screenHeight * 0.30;
-  }, [imageDimensions, screenWidth, screenHeight, isFoldPhoneUnfolded, insets]);
+  }, [imageDimensions, screenWidth, screenHeight, isFoldPhoneUnfolded]);
 
-  // Handle poster selection
   const handlePosterSelect = useCallback((poster: Template) => {
     setSelectedPoster(poster);
   }, []);
 
-  // Handle back navigation
   const handleBackPress = useCallback(() => {
     if (navigation.canGoBack()) {
       navigation.goBack();
@@ -567,7 +396,6 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
     }
   }, [navigation]);
 
-  // Navigate to poster editor
   const navigateToPosterEditor = useCallback(() => {
     if (!selectedPoster) return;
 
@@ -579,33 +407,34 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
       },
       selectedLanguage: selectedLanguage,
       selectedTemplateId: selectedPoster.id,
-      selectedBusinessProfile: selectedBusinessProfile,
     });
-  }, [navigation, selectedPoster, selectedLanguage, selectedBusinessProfile, getHighQualityImageUrl]);
+  }, [navigation, selectedPoster, selectedLanguage, getHighQualityImageUrl]);
 
-  // Language options
   const languages = [
     { id: 'all', name: 'All' },
     { id: 'english', name: 'English' },
     { id: 'hindi', name: 'Hindi' },
   ];
 
-  // Filter posters by language and service filter
   const filteredPosters = useMemo(() => {
     let basePosters = posters;
 
-    // If we have EventPlanner templates and a service filter selected, filter by tags
-    if (isEventPlannerCategory && selectedServiceFilter && serviceFilterTemplates['eventplanner']) {
-      const eventPlannerTemplates = serviceFilterTemplates['eventplanner'];
-      
-      // Filter by service keywords (tags)
-      const keywords = serviceFilterKeywords[selectedServiceFilter] || [];
-      basePosters = eventPlannerTemplates.filter(template => {
-        const templateTags = Array.isArray(template.tags)
-          ? template.tags.map(tag => tag.toLowerCase())
-          : [];
-        return keywords.some(keyword => templateTags.some(tag => tag.includes(keyword)));
-      });
+    // Apply category filtering first
+    if (selectedCategory !== 'all') {
+      const selectedCategoryButton = categoryButtons.find(btn => btn.id === selectedCategory);
+      if (selectedCategoryButton && selectedCategoryButton.tags.length > 0) {
+        basePosters = basePosters.filter(poster => {
+          const posterTags = poster.tags || [];
+          const posterName = poster.name.toLowerCase();
+          const posterDescription = (poster.description || '').toLowerCase();
+          
+          return selectedCategoryButton.tags.some(tag => 
+            posterTags.some(posterTag => posterTag.toLowerCase().includes(tag.toLowerCase())) ||
+            posterName.includes(tag.toLowerCase()) ||
+            posterDescription.includes(tag.toLowerCase())
+          );
+        });
+      }
     }
 
     // Apply language filtering
@@ -629,9 +458,14 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
       
       return false;
     });
-  }, [posters, selectedLanguage, isEventPlannerCategory, selectedServiceFilter, serviceFilterTemplates, serviceFilterKeywords]);
+  }, [posters, selectedCategory, selectedLanguage, categoryButtons]);
 
-  // Calculate current poster index in filtered posters
+  useEffect(() => {
+    if (filteredPosters.length > 0 && (!selectedPoster || !filteredPosters.find(p => p.id === selectedPoster.id))) {
+      setSelectedPoster(filteredPosters[0]);
+    }
+  }, [filteredPosters, selectedPoster]);
+
   const currentPosterIndex = useMemo(() => {
     if (!selectedPoster || !filteredPosters.length) {
       return -1;
@@ -639,7 +473,6 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
     return filteredPosters.findIndex(poster => poster.id === selectedPoster.id);
   }, [filteredPosters, selectedPoster]);
 
-  // Show poster at specific index
   const showPosterAtIndex = useCallback((index: number) => {
     if (!filteredPosters.length) {
       return;
@@ -652,10 +485,8 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
     }
   }, [filteredPosters]);
 
-  // Navigate to next poster
   const goToNextPoster = useCallback(() => {
     if (currentPosterIndex === -1) {
-      // If current poster not found in filteredPosters, check if it matches the first poster
       if (selectedPoster && filteredPosters.length > 0 && filteredPosters[0].id === selectedPoster.id) {
         if (filteredPosters.length > 1) {
           showPosterAtIndex(1);
@@ -669,14 +500,12 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
     if (nextIndex < filteredPosters.length) {
       showPosterAtIndex(nextIndex);
     }
-  }, [currentPosterIndex, filteredPosters.length, showPosterAtIndex, selectedPoster, filteredPosters]);
+  }, [currentPosterIndex, showPosterAtIndex, selectedPoster, filteredPosters]);
 
-  // Navigate to previous poster
   const goToPreviousPoster = useCallback(() => {
     if (currentPosterIndex === -1) {
-      // If current poster not found in filteredPosters, check if it matches the first poster
       if (selectedPoster && filteredPosters.length > 0 && filteredPosters[0].id === selectedPoster.id) {
-        return; // Already at first poster
+        return;
       }
       showPosterAtIndex(0);
       return;
@@ -687,7 +516,6 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
     }
   }, [currentPosterIndex, showPosterAtIndex, selectedPoster, filteredPosters]);
 
-  // Swipe gesture configuration
   const swipeThreshold = 50;
   const swipeResponder = useMemo(
     () =>
@@ -695,18 +523,14 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
         onStartShouldSetPanResponder: () => false,
         onMoveShouldSetPanResponder: (_, gestureState) => {
           const { dx, dy } = gestureState;
-          // Only capture horizontal swipes (left/right)
           return Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 15;
         },
         onPanResponderGrant: () => {
-          // Gesture started
         },
         onPanResponderMove: () => {
-          // Gesture in progress
         },
         onPanResponderRelease: (_, gestureState) => {
           const { dx, vx } = gestureState;
-          // Check both distance and velocity for better gesture recognition
           if (dx < -swipeThreshold || vx < -0.5) {
             goToNextPoster();
           } else if (dx > swipeThreshold || vx > 0.5) {
@@ -714,13 +538,11 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
           }
         },
         onPanResponderTerminate: () => {
-          // Gesture cancelled
         },
       }),
     [goToNextPoster, goToPreviousPoster, swipeThreshold],
   );
 
-  // Render functions
   const renderRelatedPoster = useCallback(({ item }: { item: Template }) => {
     const imageUrl = item.thumbnailUrl || item.thumbnail || '';
     const isSelected = selectedPoster?.id === item.id;
@@ -750,7 +572,6 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
           },
         ]}
       >
-        {/* Shimmer Effect */}
         <Animated.View
           style={[
             styles.skeletonShimmer,
@@ -771,14 +592,11 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
             }
           ]}
         />
-        {/* Skeleton Content Structure */}
         <View style={styles.skeletonContent}>
-          {/* Main image area */}
           <View style={[
             styles.skeletonImage,
             { backgroundColor: theme.colors.border + '40' || 'rgba(0,0,0,0.1)' }
           ]} />
-          {/* Text placeholder */}
           <View style={styles.skeletonTextContainer}>
             <View style={[
               styles.skeletonTextLine,
@@ -800,25 +618,7 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
     return Math.round(baseSize * scale);
   }, [screenWidth]);
 
-
-  if (!businessCategory) {
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.gradient[0] || '#e8e8e8' }]}>
-        <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
-        <View style={styles.noPostersContainer}>
-          <Text style={styles.noPostersText}>No Business Category Selected</Text>
-          <Text style={styles.noPostersSubtext}>Please select a business profile to view posters</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  // Check if business subcategory is software company and render IndustryCategory
-  const businessSubCategory = selectedBusinessProfile?.subCategory || selectedBusinessProfile?.subcategory || '';
-  if (businessSubCategory.toLowerCase() === 'software company') {
-    return <IndustryCategoryScreen />;
-  }
-
+  
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.gradient[0] || '#e8e8e8' }]}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
@@ -829,10 +629,8 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       >
-        {/* Safe Area Top Spacing */}
-        <View style={{ height: insets.top + moderateScale(12) }} />
+        <View style={{ height: (insets?.top || 0) + moderateScale(12) }} />
 
-        {/* Header */}
         <View style={styles.topHeader}>
           <TouchableOpacity
             onPress={handleBackPress}
@@ -857,7 +655,7 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
               style={styles.headerTitleGradient}
             >
               <Text style={styles.headerCategoryTitle} numberOfLines={1} ellipsizeMode="tail">
-                {businessCategory}
+                {selectedIndustry}
               </Text>
             </LinearGradient>
           </View>
@@ -878,9 +676,8 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Poster Preview */}
         <View
-          style={[styles.posterContainer, { height: computedPreviewHeight, width: '100%' }]}
+          style={[styles.posterContainer, { height: computedPreviewHeight }]}
           {...swipeResponder.panHandlers}
           collapsable={false}
         >
@@ -903,7 +700,6 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
           )}
         </View>
 
-        {/* Language Filter */}
         <View style={styles.languageFilterContainer}>
           {languages.map((language) => {
             const isSelected = selectedLanguage === language.id;
@@ -938,59 +734,49 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
           })}
         </View>
 
-        {/* Service filter buttons for Event Planners */}
-        {isEventPlannerCategory && (
-          <View style={styles.serviceFilterContainer}>
-            {['generator', 'decorators', 'sound', 'mandap'].map(filterKey => {
-              const isFilterActive = selectedServiceFilter === filterKey;
-              const labelMap: Record<string, string> = {
-                generator: 'Generator',
-                decorators: 'Decorators',
-                sound: 'Sound',
-                mandap: 'Mandap'
-              };
-              
+        {/* Category Buttons - Horizontal Scroll */}
+        <View style={styles.categoryButtonsContainer}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoryButtonsScrollContent}
+            nestedScrollEnabled={true}
+          >
+            {categoryButtons.map((category) => {
+              const isSelected = selectedCategory === category.id;
               return (
                 <TouchableOpacity
-                  key={filterKey}
+                  key={category.id}
                   style={[
-                    styles.serviceFilterButton,
-                    isFilterActive && styles.serviceFilterButtonActive
+                    styles.headerTextButton, 
+                    { maxWidth: moderateScale(140) },
+                    isSelected && styles.languageFilterButtonSelected
                   ]}
-                  onPress={() => {
-                    const newFilter = selectedServiceFilter === filterKey ? null : filterKey;
-                    setSelectedServiceFilter(newFilter);
-                    
-                    if (newFilter) {
-                      console.log(`🎯 [EVENT PLANNER] Service filter selected: ${newFilter}`);
-                    }
-                  }}
-                  activeOpacity={0.9}
+                  onPress={() => setSelectedCategory(category.id)}
+                  activeOpacity={0.85}
                 >
                   <LinearGradient
-                    colors={[theme.colors.secondary, theme.colors.primary]}
+                    colors={isSelected
+                      ? [theme.colors.secondary, theme.colors.primary]
+                      : ['rgba(0,0,0,0.05)', 'rgba(0,0,0,0.05)']
+                    }
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
-                    style={[
-                      styles.serviceFilterButtonGradient,
-                      !isFilterActive && styles.serviceFilterButtonGradientInactive
-                    ]}
+                    style={styles.languageFilterButtonGradient}
                   >
                     <Text style={[
-                      styles.serviceFilterButtonText,
-                      isFilterActive && styles.serviceFilterButtonTextActive,
-                      !isFilterActive && styles.serviceFilterButtonTextInactive
-                    ]}>
-                      {isLoadingServiceFilter[filterKey] ? 'Loading...' : labelMap[filterKey]}
+                      styles.languageFilterButtonText,
+                      isSelected && styles.languageFilterButtonTextSelected
+                    ]} numberOfLines={2} ellipsizeMode="tail">
+                      {category.name}
                     </Text>
                   </LinearGradient>
                 </TouchableOpacity>
               );
             })}
-          </View>
-        )}
+          </ScrollView>
+        </View>
 
-        {/* Related Posters Grid */}
         <View style={styles.relatedSection}>
           {loading ? (
             <FlatList
@@ -1029,23 +815,20 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
                 {selectedLanguage === 'all' ? 'No posters available' : `No posters in ${languages.find(lang => lang.id === selectedLanguage)?.name}`}
               </Text>
               <Text style={styles.noPostersSubtext}>
-                {selectedLanguage === 'all' ? 'Try refreshing or changing your business category' : 'Try selecting "All" or a different language'}
+                {selectedLanguage === 'all' ? 'Try refreshing or changing your industry' : 'Try selecting "All" or a different language'}
               </Text>
             </View>
           )}
         </View>
 
-        {/* Safe Area Bottom Spacing */}
         <View style={{ height: insets.bottom }} />
       </LinearGradient>
     </View>
   );
 };
 
-// Responsive helper functions
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const scale = (size: number) => (SCREEN_WIDTH / 375) * size;
-const verticalScale = (size: number) => (SCREEN_HEIGHT / 667) * size;
 const moderateScale = (size: number, factor = 0.5) => size + (scale(size) - size) * factor;
 
 const styles = StyleSheet.create({
@@ -1105,11 +888,25 @@ const styles = StyleSheet.create({
     borderRadius: moderateScale(6),
     justifyContent: 'center',
     alignItems: 'center',
+    minHeight: moderateScale(36),
   },
   headerButtonText: {
     color: '#ffffff',
     fontSize: moderateScale(11),
     fontWeight: '600',
+    textAlign: 'center',
+  },
+  categoryButtonsContainer: {
+    marginVertical: moderateScale(6),
+    paddingHorizontal: moderateScale(12),
+  },
+  categoryButtonsScrollContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: moderateScale(8),
+    paddingVertical: moderateScale(4),
+    gap: moderateScale(10),
+    flexGrow: 1,
   },
   posterContainer: {
     position: 'relative',
@@ -1148,10 +945,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: moderateScale(8),
+    paddingHorizontal: moderateScale(16),
     paddingVertical: moderateScale(8),
-    gap: moderateScale(6),
+    gap: moderateScale(8),
     marginBottom: moderateScale(4),
+    alignSelf: 'center',
   },
   languageFilterButton: {
     borderRadius: moderateScale(8),
@@ -1283,47 +1081,6 @@ const styles = StyleSheet.create({
     color: 'rgba(102,102,102,0.8)',
     textAlign: 'center',
   },
-  serviceFilterContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: moderateScale(8),
-    marginBottom: moderateScale(12),
-    gap: moderateScale(6),
-  },
-  serviceFilterButton: {
-    flex: 1,
-    borderRadius: moderateScale(8),
-    overflow: 'hidden',
-  },
-  serviceFilterButtonActive: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  serviceFilterButtonGradient: {
-    paddingVertical: moderateScale(6),
-    borderRadius: moderateScale(8),
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  serviceFilterButtonGradientInactive: {
-    opacity: 0.75,
-  },
-  serviceFilterButtonText: {
-    textAlign: 'center',
-    color: '#ffffff',
-    fontSize: moderateScale(9),
-    fontWeight: '600',
-  },
-  serviceFilterButtonTextActive: {
-    color: '#ffffff',
-  },
-  serviceFilterButtonTextInactive: {
-    color: 'rgba(255,255,255,0.7)',
-  },
-  // Skeleton Loading Styles
   skeletonShimmer: {
     position: 'absolute',
     top: 0,
@@ -1355,4 +1112,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default MyBusinessPosterPlayerScreen;
+export default IndustryCategoryScreen;
