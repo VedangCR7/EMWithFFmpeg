@@ -661,9 +661,19 @@ const BusinessProfilesScreen: React.FC = () => {
         {isLocked && (
           <View style={styles.lockOverlay}>
             <View style={[styles.lockBadge, { backgroundColor: theme.colors.surface }]}>
+              {/* Delete button top-right inside lock badge */}
+              <TouchableOpacity 
+                style={[styles.lockBadgeTopDeleteButton, { backgroundColor: 'rgba(255, 80, 80, 0.35)', opacity: 0.85 }]}
+                onPress={() => onDelete(item.id)}
+              >
+                <Icon name="delete" size={10} color="#ff4444" />
+              </TouchableOpacity>
               {isProcessing ? (
                 <>
-                  <Icon name="hourglass-empty" size={24} color={theme.colors.warning} />
+                  <Text style={[styles.lockBusinessInfo, { color: theme.colors.text }]} numberOfLines={1}>
+                    {item.businessName || item.name || 'Business'} • {item.businessSubcategory || item.subcategory || 'Subcategory'}
+                  </Text>
+                  <Icon name="hourglass-empty" size={20} color={theme.colors.warning} />
                   <Text style={[styles.lockText, { color: theme.colors.text }]}>
                     Payment is processing
                   </Text>
@@ -673,7 +683,10 @@ const BusinessProfilesScreen: React.FC = () => {
                 </>
               ) : isPendingActivation ? (
                 <>
-                  <Icon name="hourglass-empty" size={24} color={theme.colors.warning} />
+                  <Text style={[styles.lockBusinessInfo, { color: theme.colors.text }]} numberOfLines={1}>
+                    {item.businessName || item.name || 'Business'} • {item.businessSubcategory || item.subcategory || 'Subcategory'}
+                  </Text>
+                  <Icon name="hourglass-empty" size={20} color={theme.colors.warning} />
                   <Text style={[styles.lockText, { color: theme.colors.text }]}>
                     Your business profile will be activated within 24 hours
                   </Text>
@@ -683,10 +696,13 @@ const BusinessProfilesScreen: React.FC = () => {
                 </>
               ) : (
                 <>
-                  <Icon name="lock" size={24} color={theme.colors.error} />
+                  <Text style={[styles.lockBusinessInfo, { color: theme.colors.text }]} numberOfLines={1}>
+                    {item.businessName || item.name || 'Business'} • {item.businessSubcategory || item.subcategory || 'Subcategory'}
+                  </Text>
+                  <Icon name="lock" size={20} color={theme.colors.error} />
                   <Text style={[styles.lockText, { color: theme.colors.text }]}>Subscription Required</Text>
                   <TouchableOpacity 
-                    style={[styles.activateButton, { backgroundColor: theme.colors.primary }]}
+                    style={[styles.activateButton, { backgroundColor: theme.colors.primary, opacity: 0.9 }]}
                     onPress={() => onPay(item)}
                     disabled={processingProfiles.has(item.id)}
                   >
@@ -1903,43 +1919,79 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   lockBadge: {
-    padding: 20,
-    borderRadius: 15,
+    padding: 16,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 10,
-    width: '80%',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 6,
+    width: '90%',
+    height: '100%',
   },
-  lockText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginTop: 10,
+  lockBusinessInfo: {
+    fontSize: 14,
+    fontWeight: '600',
     marginBottom: 8,
     textAlign: 'center',
+    color: '#ffffff',
+  },
+  lockText: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginTop: 8,
+    marginBottom: 6,
+    textAlign: 'center',
+    color: '#ffffff',
   },
   lockSubText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
     textAlign: 'center',
-    marginBottom: 15,
-    paddingHorizontal: 10,
+    marginBottom: 10,
+    paddingHorizontal: 8,
+    color: 'rgba(255,255,255,0.85)',
   },
   activateButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-    minWidth: 120,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+    minWidth: 100,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
   activateButtonText: {
     color: '#ffffff',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '700',
+  },
+  lockBadgeTopDeleteButton: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 80, 80, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 80, 80, 0.4)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
   },
 });
 
-export default BusinessProfilesScreen; 
+export default BusinessProfilesScreen;

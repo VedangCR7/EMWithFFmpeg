@@ -39,11 +39,12 @@ export const useCentralizedDownload = (): UseCentralizedDownloadReturn => {
       return false;
     }
 
+    // FRONTEND VALIDATION DISABLED - Now fully dependent on backend
     // Frontend guard: Check if limit is already reached
-    if (isLimitReached) {
-      emitShowDownloadLimitModal();
-      return false;
-    }
+    // if (isLimitReached) {
+    //   emitShowDownloadLimitModal();
+    //   return false;
+    // }
 
     // Prevent multiple simultaneous downloads
     if (isDownloading) {
@@ -61,16 +62,25 @@ export const useCentralizedDownload = (): UseCentralizedDownloadReturn => {
         businessProfileId: selectedBusinessProfileId
       });
 
+      // Check if backend returned daily limit reached response
+      if (!response.success && response.message === 'Daily download limit reached') {
+        console.log('🚫 [CENTRALIZED DOWNLOAD] Backend daily limit reached');
+        setIsLimitReached(true);
+        emitShowDownloadLimitModal();
+        return false;
+      }
+
       console.log('✅ [CENTRALIZED DOWNLOAD] Download successful:', response);
 
-      // Update download count
+      // Update download count (for tracking purposes only)
       setDownloadCount(prev => prev + 1);
 
+      // FRONTEND LIMIT CHECK DISABLED - Backend now handles limit validation
       // Check if we've reached the limit after this download
-      if (downloadCount + 1 >= 5) {
-        setIsLimitReached(true);
-        console.log('🚫 [CENTRALIZED DOWNLOAD] Download limit reached (5 downloads)');
-      }
+      // if (downloadCount + 1 >= 5) {
+      //   setIsLimitReached(true);
+      //   console.log('🚫 [CENTRALIZED DOWNLOAD] Download limit reached (5 downloads)');
+      // }
 
       return true;
 
@@ -96,7 +106,7 @@ export const useCentralizedDownload = (): UseCentralizedDownloadReturn => {
     } finally {
       setIsDownloading(false);
     }
-  }, [selectedBusinessProfileId, isDownloading, isLimitReached, downloadCount]);
+  }, [selectedBusinessProfileId, isDownloading]);
 
   // Reset download count when business profile changes
   const resetDownloadCount = useCallback(() => {

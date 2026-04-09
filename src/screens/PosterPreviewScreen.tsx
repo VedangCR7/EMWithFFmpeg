@@ -375,7 +375,7 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
        return;
      }
 
-     // Frontend guard: Check if limit is reached
+     // Backend-dependent validation: Check if limit is reached from backend response
      if (isLimitReached) {
        setShowDownloadLimitModal(true);
        return;
@@ -405,7 +405,56 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
        // We must use selectedTemplateId as the correct resource ID
        const correctResourceId = selectedTemplateId;
        
-       // 🔍 DEBUG: Try different resource types if POSTER fails
+       // � CRITICAL FIX: Handle uploaded templates without resourceId
+       if (!correctResourceId) {
+         console.log('📱 [UPLOADED TEMPLATE] No resourceId found - saving directly to gallery');
+         
+         // Save directly to gallery without calling download API
+         await CameraRoll.save(capturedImageUri, {
+           type: 'photo',
+           album: 'EventMarketers'
+         });
+         
+         console.log('✅ [UPLOADED TEMPLATE] Image saved to gallery directly');
+         
+         // Save poster information to local storage
+         try {
+           const currentUser = authService.getCurrentUser();
+           const userId = currentUser?.id;
+           
+           await downloadedPostersService.savePosterInfo({
+             title: selectedImage.title || 'Custom Poster',
+             description: selectedImage.description || 'Event poster created with EventMarketers',
+             imageUri: capturedImageUri,
+             templateId: 'uploaded_template', // Special ID for uploaded templates
+             category: selectedImage.title?.toLowerCase().includes('event') ? 'Events' : 'General',
+             tags: ['poster', 'event', 'marketing', 'uploaded'],
+           }, userId);
+           
+           console.log('✅ [UPLOADED TEMPLATE] Poster info saved locally');
+         } catch (error) {
+           console.error('Error saving poster information:', error);
+           // Don't fail the download if poster info saving fails
+         }
+         
+         // Show success message and return
+         if (Platform.OS === 'android') {
+           ToastAndroid.show(
+             '✅ Poster saved to gallery!', 
+             ToastAndroid.LONG
+           );
+         } else {
+           Alert.alert(
+             'Success!', 
+             'Your poster has been saved to your Photos app.',
+             [{ text: 'OK' }]
+           );
+         }
+         
+         return; // Exit early for uploaded templates
+       }
+       
+       // �🔍 DEBUG: Try different resource types if POSTER fails
        console.log('🚀 [RESOURCE TYPE DEBUG]: Trying POSTER resource type');
        
        console.log('🚀 [FINAL DOWNLOAD PAYLOAD]:', {
@@ -415,7 +464,7 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
          debugInfo: 'Template ID: ' + correctResourceId + ' | Type: POSTER'
        });
        
-       // 🔥 CRITICAL: Call backend download API FIRST
+       // 🔥 CRITICAL: Call backend download API FIRST (only for server templates)
        const downloadSuccess = await downloadContent({
          resourceId: correctResourceId,
          resourceType: 'POSTER'

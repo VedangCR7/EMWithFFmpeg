@@ -966,9 +966,11 @@ const PosterPlayerScreen: React.FC = () => {
         return keywords.some(keyword => templateTags.some(tag => tag.includes(keyword)));
       });
 
-      // If "All" is selected, return ALL filtered templates without language filtering
+      // If "All" is selected, return filtered templates with 6-image limit
       if (selectedLanguage === 'all') {
-        return filteredByTags;
+        const limitedTemplates = filteredByTags.slice(0, 6);
+        console.log(`[EVENT PLANNER] Total: ${filteredByTags.length}, Showing: ${Math.min(filteredByTags.length, 6)} templates (All language)`);
+        return limitedTemplates;
       }
 
       // Filter by language for service filter templates
@@ -977,7 +979,9 @@ const PosterPlayerScreen: React.FC = () => {
         return matches;
       });
 
-      return languageFiltered;
+      const limitedTemplates = languageFiltered.slice(0, 6);
+      console.log(`[EVENT PLANNER] After language filter: ${languageFiltered.length}, Showing: ${Math.min(languageFiltered.length, 6)} templates (language: ${selectedLanguage})`);
+      return limitedTemplates;
     }
 
     // If we have Software Company category and a category selected, filter by tags

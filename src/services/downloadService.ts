@@ -71,7 +71,17 @@ class DownloadService {
       });
       
       const response = await api.post('/api/mobile/download', payload);
-      console.log('✅ [DOWNLOAD SERVICE] Download API success:', response.status, response.data);
+      console.log('✅ [DOWNLOAD SERVICE] Download API response:', response.status, response.data);
+
+      // Check if backend returned daily limit reached response
+      if (response.data?.success === false && response.data?.message === 'Daily download limit reached') {
+        console.log('🚫 [DOWNLOAD SERVICE] Backend daily limit reached');
+        // Return failure response to trigger limit handling
+        return {
+          success: false,
+          message: 'Daily download limit reached'
+        };
+      }
 
       // Return downloadUrl from response
       return {

@@ -1919,7 +1919,7 @@ const ProfileScreen: React.FC = () => {
               paddingHorizontal: dynamicModerateScale(8),
               color: theme.colors.text,
             }]}>Account Settings</Text>
-            {renderMenuItem('business', 'Business Profiles', `${businessProfileStats.total} Profiles`, handleBusinessProfiles)}
+            {renderMenuItem('business', 'My Businesses', `${businessProfileStats.total} Profiles`, handleBusinessProfiles)}
             {/* Notifications temporarily hidden */}
             {/* {renderMenuItem('notifications', 'Notifications', 'Manage notification preferences', undefined, true, notificationsEnabled, handleNotificationToggle, notificationsAnimation)} */}
           </View>
