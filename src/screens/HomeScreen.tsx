@@ -4806,22 +4806,12 @@ const HomeScreen: React.FC = React.memo(() => {
         greetingCategory: category.name,
       });
     } else {
-      // ❌ REMOVE: Fallback to loading placeholder
-      // ✅ NEW: Always pass a valid ID, never 'loading'
-      
-      // Generate a deterministic ID based on category for navigation
-      const categoryId = `category_${category.id}`;
+      // ✅ FIXED: Pass null for selectedPoster when no cached templates exist
+      // Let PosterPlayerScreen handle the loading state properly
       
       navigation.navigate('PosterPlayer', {
-        selectedTemplateId: categoryId,  // ✅ VALID ID - never 'loading'
-        selectedPoster: {                // ✅ OPTIONAL - UI only
-          id: categoryId,
-          name: category.name,
-          thumbnail: categoryImage || '',
-          category: category.name,
-          downloads: 0,
-          isDownloaded: false,
-        },
+        selectedTemplateId: null,  // ✅ NO PLACEHOLDER - let API fetch determine the poster
+        selectedPoster: null,     // ✅ NO PLACEHOLDER - PosterPlayerScreen will handle loading
         relatedPosters: [],
         searchQuery: '',
         templateSource: 'greeting',

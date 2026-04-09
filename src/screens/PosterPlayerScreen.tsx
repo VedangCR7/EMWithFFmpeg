@@ -510,8 +510,11 @@ const PosterPlayerScreen: React.FC = () => {
     return initialPoster;
   }, [initialPoster]);
 
-  const [currentPoster, setCurrentPoster] = useState<Template>(convertedInitialPoster);
-  const [currentId, setCurrentId] = useState<string>(initialTemplateId || initialPoster?.id || '');  // ✅ PRIMARY DATA - ID as source of truth
+  // ✅ SINGLE SOURCE OF TRUTH: Controlled poster state
+  const [currentPoster, setCurrentPoster] = useState<Template | null>(null);
+  const [currentId, setCurrentId] = useState<string>(initialTemplateId || initialPoster?.id || '');
+  const [isPosterLoading, setIsPosterLoading] = useState<boolean>(true);
+  const userSelectedPosterRef = useRef<boolean>(false); // Protect user selection from API overwrites
   const [allTemplates, setAllTemplatesState] = useState<Template[]>([]);
   const allTemplatesRef = useRef<Template[]>([]);
 
@@ -549,11 +552,7 @@ const PosterPlayerScreen: React.FC = () => {
   const [selectedLanguage, setSelectedLanguage] = useState<string>('all');
   const [isBusinessCategoryLoading, setIsBusinessCategoryLoading] = useState(false);
   const [isGreetingCategoryLoading, setIsGreetingCategoryLoading] = useState(false);
-  const [isTemplateLoading, setIsTemplateLoading] = useState<boolean>(
-    convertedInitialPoster?.id === 'loading'
-  );
   const lastAutoDetectedPosterIdRef = useRef<string | null>(null); // Track which poster triggered auto-detection to prevent duplicate detection
-  const userSelectedPosterRef = useRef<string | null>(null); // Track user-selected poster (via swipe or click) to prevent reset
   const userManuallySelectedLanguageRef = useRef<boolean>(false); // Track if user manually selected a language (including "All")
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const [selectedServiceFilter, setSelectedServiceFilter] = useState<string | null>(null);
@@ -574,10 +573,164 @@ const PosterPlayerScreen: React.FC = () => {
     }
   }, [originScreen]);
 
-  // Update loading state when poster changes
+  // Helper to detect placeholder posters
+  const isPlaceholderPoster = useCallback((poster: any): boolean => {
+    return !poster || 
+           poster.id === 'loading' || 
+           (typeof poster.id === 'string' && poster.id.startsWith('category_'));
+  }, []);
+
+  // ✅ SAFE INITIALIZATION: Initialize poster state from route params
   useEffect(() => {
-    setIsTemplateLoading(currentPoster?.id === 'loading' || !currentPoster?.thumbnail);
-  }, [currentPoster]);
+    const initializePoster = () => {
+      if (route.params?.selectedPoster && !isPlaceholderPoster(route.params.selectedPoster)) {
+        // Real poster from route params
+        setCurrentPoster(route.params.selectedPoster);
+        setIsPosterLoading(false);
+        console.log('[POSTER STATE UPDATE]', {
+          source: 'INIT',
+          posterId: route.params.selectedPoster.id,
+          timestamp: Date.now()
+        });
+      } else {
+        // No valid poster - set loading state
+        setCurrentPoster(null);
+        setIsPosterLoading(true);
+        console.log('[POSTER STATE UPDATE]', {
+          source: 'INIT',
+          posterId: null,
+          timestamp: Date.now(),
+          note: 'No valid poster in route params'
+        });
+      }
+    };
+
+    initializePoster();
+  }, [route.params?.selectedPoster, isPlaceholderPoster]);
+
+  // ✅ NORMALIZE POSTER STRUCTURE: Ensure consistent poster shape across all data sources
+  const normalizePoster = useCallback((poster: any): Template | null => {
+    if (!poster) return null;
+
+    // If it's already a valid Template, return as-is
+    if (poster.id && poster.name && (poster.thumbnail || poster.content?.background)) {
+      return {
+        id: poster.id,
+        name: poster.name || 'Untitled Poster',
+        thumbnail: poster.thumbnail || poster.content?.background || '',
+        downloads: poster.downloads || 0,
+        isDownloaded: poster.isDownloaded || false,
+        category: poster.category || '',
+        tags: Array.isArray(poster.tags) ? poster.tags : [],
+        languages: Array.isArray(poster.languages) ? poster.languages : [],
+        content: poster.content || {},
+        // Add any other required Template fields with defaults
+      } as Template;
+    }
+
+    return null;
+  }, []);
+
+  // ✅ HANDLE POSTER SELECT: User selection handler with protection
+  const handlePosterSelect = useCallback((poster: Template) => {
+    // ✅ PROTECT USER SELECTION: Mark as user interaction BEFORE any state updates
+    userSelectedPosterRef.current = true;
+
+    // Merge template languages to ensure we have all language info
+    const posterWithLanguages = mergeTemplateLanguages(poster);
+
+    console.log('[POSTER STATE UPDATE]', {
+      source: 'USER',
+      posterId: posterWithLanguages.id,
+      timestamp: Date.now(),
+      posterName: posterWithLanguages.name,
+      posterTags: posterWithLanguages.tags,
+      category: posterWithLanguages.category,
+      globalBusinessCategory,
+      greetingCategory,
+      calendarDate
+    });
+
+    // Skip update if it's the same poster to prevent unnecessary re-renders
+    setCurrentPoster(prevPoster => {
+      if (prevPoster?.id === posterWithLanguages.id) {
+        return prevPoster;
+      }
+
+      return posterWithLanguages;
+    });
+
+    // Update currentId to match selected poster
+    setCurrentId(posterWithLanguages.id);
+
+    // Always detect language from the selected poster and update filter to show matching posters in grid
+    // This ensures the preview grid shows posters matching the selected poster's language
+    // Detect the primary language from the poster
+    const posterLanguages = Array.isArray(posterWithLanguages.languages)
+      ? posterWithLanguages.languages.map((lang: string) => lang.toLowerCase())
+      : [];
+
+    const posterTags = Array.isArray(posterWithLanguages.tags) ? posterWithLanguages.tags : [];
+    const languagesFromTags = extractLanguagesFromTags(posterTags);
+    const allPosterLanguages = Array.from(new Set([...posterLanguages, ...languagesFromTags.map(l => l.toLowerCase())]));
+
+    console.log('🔍 [HANDLE POSTER SELECT] Language detection:', {
+      posterTags,
+      languagesFromTags,
+      posterLanguages,
+      allPosterLanguages
+    });
+
+    // Available language IDs that we support
+    const availableLanguageIds = ['english', 'hindi'];
+
+    // Find the first matching language from available languages
+    const detectedLanguage = availableLanguageIds.find(langId => {
+      const normalizedLangId = langId.toLowerCase();
+      // Check if the poster's languages include this language
+      if (allPosterLanguages.includes(normalizedLangId)) {
+        return true;
+      }
+      // Check if tags contain keywords for this language
+      const keywords = LANGUAGE_KEYWORDS[normalizedLangId] || [normalizedLangId];
+      return keywords.some(keyword =>
+        allPosterLanguages.some(posterLang => posterLang.includes(keyword)) ||
+        posterTags.some((tag: unknown) =>
+          typeof tag === 'string' && tag.toLowerCase().includes(keyword)
+        )
+      );
+    });
+
+    console.log('🔍 [HANDLE POSTER SELECT] Detection result:', {
+      detectedLanguage,
+      currentLanguage: selectedLanguage,
+      willUpdate: detectedLanguage && detectedLanguage !== selectedLanguage
+    });
+
+    // Update filter to show posters matching the detected language only if user hasn't manually selected
+    // This ensures the grid shows posters matching the selected poster's language
+    if (detectedLanguage) {
+      if (detectedLanguage !== selectedLanguage && !userManuallySelectedLanguageRef.current && selectedLanguage !== 'all') {
+        console.log('✅ [HANDLE POSTER SELECT] Setting language to:', detectedLanguage);
+        setSelectedLanguage(detectedLanguage);
+      } else if (userManuallySelectedLanguageRef.current) {
+        console.log('ℹ️ [HANDLE POSTER SELECT] User manually selected language, keeping:', selectedLanguage);
+      } else {
+        console.log('ℹ️ [HANDLE POSTER SELECT] Language already set to:', detectedLanguage);
+      }
+      lastAutoDetectedPosterIdRef.current = posterWithLanguages?.id || null;
+      // Only reset manual language selection if user hasn't manually selected a language
+      // This preserves user's language choice when switching between posters
+      if (!userManuallySelectedLanguageRef.current) {
+        userManuallySelectedLanguageRef.current = false;
+      }
+    } else {
+      // No language detected in poster - keep current filter
+      // If "All" is selected, keep it; otherwise keep current language filter
+      console.log('❌ [HANDLE POSTER SELECT] No language detected - keeping current:', selectedLanguage);
+      lastAutoDetectedPosterIdRef.current = posterWithLanguages?.id || null;
+    }
+  }, [selectedLanguage, globalBusinessCategory, greetingCategory, calendarDate]);
 
   // Reset language to "All" whenever PosterPlayerScreen becomes active
   useFocusEffect(
@@ -660,7 +813,11 @@ const PosterPlayerScreen: React.FC = () => {
   }, []);
 
   // Get high quality image URL for preview (full quality, maximum resolution)
-  const getHighQualityImageUrl = (poster: Template): string => {
+  const getHighQualityImageUrl = useCallback((poster: Template | null): string => {
+    if (!poster) {
+      return '';
+    }
+
     // Check if poster has a previewUrl property (cast to any to access)
     const previewUrl = (poster as any).previewUrl;
     if (previewUrl) {
@@ -668,14 +825,12 @@ const PosterPlayerScreen: React.FC = () => {
     }
 
     // Check for content.background (used in greeting templates for full quality image)
-    const contentBackground = (poster as any).content?.background;
-    if (contentBackground) {
-      return contentBackground;
+    if ((poster as any).content?.background) {
+      return (poster as any).content.background;
     }
 
-    // Otherwise, enhance the thumbnail URL for maximum quality
-    let url = poster.thumbnail;
-
+    // Fallback to thumbnail
+    let url = poster.thumbnail || '';
     if (!url) {
       return '';
     }
@@ -763,7 +918,7 @@ const PosterPlayerScreen: React.FC = () => {
 
     const paramString = params.toString();
     return paramString ? `${urlWithoutParams}?${paramString}` : urlWithoutParams;
-  };
+  }, [screenWidth]);
 
   // Language options
   const languages = useMemo(() => [
@@ -1134,19 +1289,19 @@ const PosterPlayerScreen: React.FC = () => {
 
     // CRITICAL: Don't reset if user has manually selected a poster (via swipe or click)
     // Check this FIRST before any other logic that might reset the poster
-    if (userSelectedPosterRef.current !== null) {
+    if (userSelectedPosterRef.current === true) {
       return;
     }
 
     // Skip if we have a loading placeholder with no image
     // BUT allow loading placeholder if it has a thumbnail (for greeting category preview)
-    if (initialPosterToUse.id === 'loading' && !initialPosterImage) {
+    if (initialPosterToUse?.id === 'loading' && !initialPosterImage) {
       return;
     }
 
     // If it's a loading placeholder but has a thumbnail, display it immediately
     // This handles the case when clicking a greeting category - show the category image while templates load
-    if (initialPosterToUse.id === 'loading' && initialPosterImage) {
+    if (initialPosterToUse?.id === 'loading' && initialPosterImage) {
       React.startTransition(() => {
         setCurrentPoster({
           ...initialPosterToUse,
@@ -1166,7 +1321,7 @@ const PosterPlayerScreen: React.FC = () => {
     // Also allow auto-detection again when navigating to a new category/poster
     if (prevId !== null && prevId !== initialPosterId) {
       lastAutoDetectedPosterIdRef.current = null; // Reset auto-detection tracking for new poster
-      userSelectedPosterRef.current = null; // Clear user selection when navigating from different screen
+      userSelectedPosterRef.current = false; // Clear user selection when navigating from different screen
       // Reset the initial poster added flag when navigating to a different poster
       initialPosterAddedRef.current = false;
       // Only reset manual language selection if it's a completely different poster (not just language change)
@@ -1184,7 +1339,7 @@ const PosterPlayerScreen: React.FC = () => {
     if (prevId !== null && prevId !== initialPosterId) {
       // Only update if user hasn't manually selected a poster, OR if navigating from different screen
       // (When navigating from different screen, prevId !== initialPosterId means new navigation)
-      if (userSelectedPosterRef.current !== null && userSelectedPosterRef.current !== initialPosterId) {
+      if (userSelectedPosterRef.current === true && currentPoster?.id !== initialPosterId) {
         return;
       }
 
@@ -1197,10 +1352,11 @@ const PosterPlayerScreen: React.FC = () => {
       if (newPoster.thumbnail || (newPoster as any).content?.background) {
         // Update poster immediately
         setCurrentPoster(newPoster);
+        setCurrentId(initialPosterId);
         setImageDimensions(null); // Reset image dimensions when poster changes
         prevInitialPosterIdRef.current = initialPosterId;
         // Mark this as the new user-selected poster (from navigation)
-        userSelectedPosterRef.current = initialPosterId;
+        userSelectedPosterRef.current = true;
         return;
       }
     }
@@ -1218,7 +1374,7 @@ const PosterPlayerScreen: React.FC = () => {
     // If currentPoster is still the loading placeholder or doesn't match, update it
     // BUT: Don't reset if user manually selected a poster (via swipe or click)
     // Check userSelectedPosterRef directly - don't compare to currentPoster.id which might be stale
-    const hasUserSelection = userSelectedPosterRef.current !== null;
+    const hasUserSelection = userSelectedPosterRef.current === true;
 
     // Don't reset if user has manually selected a poster (check ref directly, not state)
     // This prevents the useEffect from overriding user selections
@@ -1227,7 +1383,8 @@ const PosterPlayerScreen: React.FC = () => {
     }
 
     // Only reset if currentPoster needs updating and user hasn't selected anything
-    if (currentPoster.id === 'loading' ||
+    if (!currentPoster ||
+      currentPoster.id === 'loading' ||
       currentPoster.id !== initialPosterId ||
       (!currentPoster.thumbnail && !(currentPoster as any).content?.background)) {
       // Ensure thumbnail is set from content.background if needed
@@ -1238,11 +1395,12 @@ const PosterPlayerScreen: React.FC = () => {
 
       if (newPoster.thumbnail || (newPoster as any).content?.background) {
         setCurrentPoster(newPoster);
+        setCurrentId(initialPosterId);
         // Clear user selection ref when resetting to initial poster
-        userSelectedPosterRef.current = null;
+        userSelectedPosterRef.current = false;
       }
     }
-  }, [convertedInitialPoster, currentPoster.id, initialPoster]);
+  }, [convertedInitialPoster, currentPoster?.id, initialPoster]);
 
   // Fetch business category posters when global business category is provided
   useEffect(() => {
@@ -1437,11 +1595,15 @@ const PosterPlayerScreen: React.FC = () => {
     activeCategoryRef.current = { type: 'greeting', value: greetingCategory };
 
     const fetchGreetingCategoryTemplates = async () => {
+      // ✅ CONTROLLED API FETCH: Start loading state
+      setIsPosterLoading(true);
+      
       // Use convertedInitialPoster which has thumbnail properly set for GreetingTemplates
       const posterToMatch = convertedInitialPoster;
 
       if (!posterToMatch) {
         console.warn('⚠️ [GREETING FETCH] No poster to match, skipping fetch');
+        setIsPosterLoading(false);
         return;
       }
 
@@ -2242,27 +2404,36 @@ const PosterPlayerScreen: React.FC = () => {
             isLoadingPlaceholder: finalPoster.id === 'loading'
           });
 
-          // Only update if the poster is actually different to avoid unnecessary re-renders
-          setCurrentPoster(prevPoster => {
-            if (prevPoster.id === finalPoster.id &&
-              prevPoster.thumbnail === finalPoster.thumbnail) {
-              return prevPoster; // No change needed
+          // ✅ CONTROLLED API FETCH: Only auto-select if user hasn't interacted
+          if (!userSelectedPosterRef.current) {
+            // Find matching poster in templates
+            const findMatchingPoster = (templates: Template[], currentPoster: Template | null) => {
+              if (!currentPoster?.id || isPlaceholderPoster(currentPoster)) return null;
+              return templates.find(t => t.id === currentPoster.id);
+            };
+
+            const matchedPoster = findMatchingPoster(nextTemplates, currentPoster);
+            const posterToSet = matchedPoster || (nextTemplates.length > 0 ? nextTemplates[0] : null);
+
+            if (posterToSet && !isPlaceholderPoster(posterToSet)) {
+              setCurrentPoster(posterToSet);
+              setCurrentId(posterToSet.id);
+              
+              console.log('[POSTER STATE UPDATE]', {
+                source: 'API',
+                posterId: posterToSet.id,
+                timestamp: Date.now(),
+                note: userSelectedPosterRef.current ? 'User selection protected' : 'Auto-selected from API'
+              });
             }
-            
-            // ✅ CRITICAL: Update currentId to real template ID when available
-            if (finalPoster.id !== 'loading' && !finalPoster.id.startsWith('category_')) {
-              setCurrentId(finalPoster.id);
-              console.log('🔍 [GREETING FETCH] Updated currentId to real template ID:', finalPoster.id);
-            }
-            
-            console.log('🔍 [GREETING FETCH] Setting currentPoster:', {
-              prevPosterId: prevPoster.id,
-              newPosterId: finalPoster.id,
-              newPosterName: finalPoster.name,
-              newPosterThumbnail: finalPoster.thumbnail
+          } else {
+            console.log('[POSTER STATE UPDATE]', {
+              source: 'API',
+              posterId: currentPoster?.id,
+              timestamp: Date.now(),
+              note: 'User selection protected - API update skipped'
             });
-            return finalPoster;
-          });
+          }
 
           // Auto-detect language from the first REAL loaded poster (not the loading placeholder)
           // Use matching poster or first template if finalPoster is still the loading placeholder
@@ -2355,6 +2526,7 @@ const PosterPlayerScreen: React.FC = () => {
       } finally {
         // Hide loading state regardless of success or error
         setIsGreetingCategoryLoading(false);
+        setIsPosterLoading(false);
       }
     };
 
@@ -2831,8 +3003,8 @@ const PosterPlayerScreen: React.FC = () => {
 
     // Language filtering is active (not "All")
     // Skip if user manually selected a poster - don't override their choice
-    if (userSelectedPosterRef.current) {
-      const userSelectedPoster = allTemplates.find(t => t.id === userSelectedPosterRef.current);
+    if (userSelectedPosterRef.current && currentPoster) {
+      const userSelectedPoster = allTemplates.find(t => t.id === currentPoster.id);
       if (userSelectedPoster) {
         const posterWithLanguages = mergeTemplateLanguages(userSelectedPoster);
         // Check if the user-selected poster matches the current language filter
@@ -2841,10 +3013,10 @@ const PosterPlayerScreen: React.FC = () => {
           return;
         }
         // User's selection doesn't match language filter, allow override
-        userSelectedPosterRef.current = null;
+        userSelectedPosterRef.current = false;
       } else {
         // User-selected poster not found in templates, clear ref
-        userSelectedPosterRef.current = null;
+        userSelectedPosterRef.current = false;
       }
     }
 
@@ -2913,101 +3085,6 @@ const PosterPlayerScreen: React.FC = () => {
   useEffect(() => {
     console.log('🔍 [SERVICE FILTER RENDER CHECK]', { isEventPlannerCategory });
   }, [isEventPlannerCategory]);
-
-  const handlePosterSelect = useCallback((poster: Template) => {
-    // Merge template languages to ensure we have all language info
-    const posterWithLanguages = mergeTemplateLanguages(poster);
-
-    console.log('🔍 [HANDLE POSTER SELECT] Poster selected:', {
-      posterId: posterWithLanguages.id,
-      posterName: posterWithLanguages.name,
-      posterTags: posterWithLanguages.tags,
-      category: posterWithLanguages.category,
-      globalBusinessCategory,
-      greetingCategory,
-      calendarDate
-    });
-
-    // Skip update if it's the same poster to prevent unnecessary re-renders
-    setCurrentPoster(prevPoster => {
-      if (prevPoster?.id === posterWithLanguages.id) {
-        return prevPoster;
-      }
-
-      return posterWithLanguages;
-    });
-
-    // Mark this as a user-selected poster (via swipe or click)
-    userSelectedPosterRef.current = posterWithLanguages.id;
-
-    // Always detect language from the selected poster and update filter to show matching posters in grid
-    // This ensures the preview grid shows posters matching the selected poster's language
-    // Detect the primary language from the poster
-    const posterLanguages = Array.isArray(posterWithLanguages.languages)
-      ? posterWithLanguages.languages.map((lang: string) => lang.toLowerCase())
-      : [];
-
-    const posterTags = Array.isArray(posterWithLanguages.tags) ? posterWithLanguages.tags : [];
-    const languagesFromTags = extractLanguagesFromTags(posterTags);
-    const allPosterLanguages = Array.from(new Set([...posterLanguages, ...languagesFromTags.map(l => l.toLowerCase())]));
-
-    console.log('🔍 [HANDLE POSTER SELECT] Language detection:', {
-      posterTags,
-      languagesFromTags,
-      posterLanguages,
-      allPosterLanguages
-    });
-
-    // Available language IDs that we support
-    const availableLanguageIds = ['english', 'hindi'];
-
-    // Find the first matching language from available languages
-    const detectedLanguage = availableLanguageIds.find(langId => {
-      const normalizedLangId = langId.toLowerCase();
-      // Check if the poster's languages include this language
-      if (allPosterLanguages.includes(normalizedLangId)) {
-        return true;
-      }
-      // Check if tags contain keywords for this language
-      const keywords = LANGUAGE_KEYWORDS[normalizedLangId] || [normalizedLangId];
-      return keywords.some(keyword =>
-        allPosterLanguages.some(posterLang => posterLang.includes(keyword)) ||
-        posterTags.some((tag: unknown) =>
-          typeof tag === 'string' && tag.toLowerCase().includes(keyword)
-        )
-      );
-    });
-
-    console.log('🔍 [HANDLE POSTER SELECT] Detection result:', {
-      detectedLanguage,
-      currentLanguage: selectedLanguage,
-      willUpdate: detectedLanguage && detectedLanguage !== selectedLanguage
-    });
-
-    // Update filter to show posters matching the detected language only if user hasn't manually selected
-    // This ensures the grid shows posters matching the selected poster's language
-    if (detectedLanguage) {
-      if (detectedLanguage !== selectedLanguage && !userManuallySelectedLanguageRef.current && selectedLanguage !== 'all') {
-        console.log('✅ [HANDLE POSTER SELECT] Setting language to:', detectedLanguage);
-        setSelectedLanguage(detectedLanguage);
-      } else if (userManuallySelectedLanguageRef.current) {
-        console.log('ℹ️ [HANDLE POSTER SELECT] User manually selected language, keeping:', selectedLanguage);
-      } else {
-        console.log('ℹ️ [HANDLE POSTER SELECT] Language already set to:', detectedLanguage);
-      }
-      lastAutoDetectedPosterIdRef.current = posterWithLanguages?.id || null;
-      // Only reset manual language selection if user hasn't manually selected a language
-      // This preserves user's language choice when switching between posters
-      if (!userManuallySelectedLanguageRef.current) {
-        userManuallySelectedLanguageRef.current = false;
-      }
-    } else {
-      // No language detected in poster - keep current filter
-      // If "All" is selected, keep it; otherwise keep current language filter
-      console.log('❌ [HANDLE POSTER SELECT] No language detected - keeping current:', selectedLanguage);
-      lastAutoDetectedPosterIdRef.current = posterWithLanguages?.id || null;
-    }
-  }, [selectedLanguage, globalBusinessCategory, greetingCategory, calendarDate]);
 
   const currentPosterIndex = useMemo(() => {
     if (!currentPoster || !filteredPosters.length) {
@@ -3350,13 +3427,13 @@ const PosterPlayerScreen: React.FC = () => {
 
   const handleNextPress = useCallback(() => {
     // ✅ SAFETY: Use ID as primary validation
-    if (!currentId || currentId === 'loading' || isTemplateLoading || !currentPoster?.thumbnail) {
+    if (!currentId || currentId === 'loading' || isPosterLoading || !currentPoster?.thumbnail) {
       console.log('❌ Cannot navigate - invalid template ID or still loading');
       return;
     }
     
     navigateToPosterEditor();
-  }, [navigateToPosterEditor, isTemplateLoading, currentPoster, currentId]);
+  }, [navigateToPosterEditor, isPosterLoading, currentPoster, currentId]);
 
   // Compute image props
   const imageProps = useMemo(() => {
@@ -3482,7 +3559,7 @@ const PosterPlayerScreen: React.FC = () => {
     return <SkeletonItem />;
   }, [SkeletonItem]);
 
-  const isNextDisabled = isTemplateLoading || !currentPoster?.thumbnail || !currentId || currentId === 'loading';
+  const isNextDisabled = isPosterLoading || !currentPoster?.thumbnail || !currentId || currentId === 'loading';
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.gradient[0] || '#e8e8e8' }]}>

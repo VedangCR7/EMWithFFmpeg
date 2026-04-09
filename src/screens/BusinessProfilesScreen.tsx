@@ -671,7 +671,13 @@ const BusinessProfilesScreen: React.FC = () => {
               {isProcessing ? (
                 <>
                   <Text style={[styles.lockBusinessInfo, { color: theme.colors.text }]} numberOfLines={1}>
-                    {item.businessName || item.name || 'Business'} • {item.businessSubcategory || item.subcategory || 'Subcategory'}
+                    <Text style={{ color: theme.colors.text }}>{item.businessName || item.name || 'Business'}</Text>
+                    {(item.businessSubcategory || item.subcategory) && (
+                      <>
+                        <Text style={{ color: theme.colors.text }}> • </Text>
+                        <Text style={{ color: theme.colors.primary }}>{item.businessSubcategory || item.subcategory}</Text>
+                      </>
+                    )}
                   </Text>
                   <Icon name="hourglass-empty" size={20} color={theme.colors.warning} />
                   <Text style={[styles.lockText, { color: theme.colors.text }]}>
@@ -684,7 +690,13 @@ const BusinessProfilesScreen: React.FC = () => {
               ) : isPendingActivation ? (
                 <>
                   <Text style={[styles.lockBusinessInfo, { color: theme.colors.text }]} numberOfLines={1}>
-                    {item.businessName || item.name || 'Business'} • {item.businessSubcategory || item.subcategory || 'Subcategory'}
+                    <Text style={{ color: theme.colors.text }}>{item.businessName || item.name || 'Business'}</Text>
+                    {(item.businessSubcategory || item.subcategory) && (
+                      <>
+                        <Text style={{ color: theme.colors.text }}> • </Text>
+                        <Text style={{ color: theme.colors.primary }}>{item.businessSubcategory || item.subcategory}</Text>
+                      </>
+                    )}
                   </Text>
                   <Icon name="hourglass-empty" size={20} color={theme.colors.warning} />
                   <Text style={[styles.lockText, { color: theme.colors.text }]}>
@@ -697,7 +709,13 @@ const BusinessProfilesScreen: React.FC = () => {
               ) : (
                 <>
                   <Text style={[styles.lockBusinessInfo, { color: theme.colors.text }]} numberOfLines={1}>
-                    {item.businessName || item.name || 'Business'} • {item.businessSubcategory || item.subcategory || 'Subcategory'}
+                    <Text style={{ color: theme.colors.text }}>{item.businessName || item.name || 'Business'}</Text>
+                    {(item.businessSubcategory || item.subcategory) && (
+                      <>
+                        <Text style={{ color: theme.colors.text }}> • </Text>
+                        <Text style={{ color: theme.colors.primary }}>{item.businessSubcategory || item.subcategory}</Text>
+                      </>
+                    )}
                   </Text>
                   <Icon name="lock" size={20} color={theme.colors.error} />
                   <Text style={[styles.lockText, { color: theme.colors.text }]}>Subscription Required</Text>
@@ -1939,7 +1957,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 8,
     textAlign: 'center',
-    color: '#ffffff',
   },
   lockText: {
     fontSize: 14,
