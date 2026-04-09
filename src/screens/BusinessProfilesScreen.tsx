@@ -181,10 +181,19 @@ const BusinessProfilesScreen: React.FC = () => {
       
       // All profiles loaded successfully - no special auto-sync needed
       if (apiProfiles.length > 0) {
-        // Sort profiles by creation date - OLDEST first (so first profile created stays at index 0)
-        const sortedProfiles = apiProfiles.sort((a, b) => 
-          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-        );
+        // Sort profiles by subscription status (ACTIVE first), then by creation date - OLDEST first within each group
+        const sortedProfiles = apiProfiles.sort((a, b) => {
+          const aActive = a.subscriptionStatus?.toUpperCase() === "ACTIVE";
+          const bActive = b.subscriptionStatus?.toUpperCase() === "ACTIVE";
+
+          // If both have same subscription status, sort by creation date
+          if (aActive === bActive) {
+            return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+          }
+
+          // Active profiles come first
+          return aActive ? -1 : 1;
+        });
         
         setProfiles(sortedProfiles);
         

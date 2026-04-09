@@ -58,39 +58,55 @@ const FloatingInput = React.memo(({
   returnKeyType?: ReturnKeyTypeOptions;
   onSubmitEditing?: () => void;
   blurOnSubmit?: boolean;
-}) => (
-  <View style={styles.inputContainer}>
-    <TextInput
-      ref={inputRef}
-      style={[
-        styles.input,
-        {
-          backgroundColor: theme.colors.inputBackground,
-          color: theme.colors.text,
-          borderColor: theme.colors.border
-        },
-        focusedField === field && [styles.inputFocused, { borderColor: theme.colors.primary }],
-        multiline && styles.multilineInput
-      ]}
-      value={value}
-      onChangeText={onChangeText}
-      onFocus={() => setFocusedField(field)}
-      onBlur={() => setFocusedField(null)}
-      placeholder={placeholder}
-      placeholderTextColor={theme.colors.textSecondary}
-      multiline={multiline}
-      numberOfLines={numberOfLines}
-      keyboardType={keyboardType}
-      autoCapitalize={field === 'email' ? 'none' : 'words'}
-      blurOnSubmit={blurOnSubmit}
-      returnKeyType={returnKeyType}
-      autoCorrect={false}
-      spellCheck={false}
-      textContentType="none"
-      onSubmitEditing={onSubmitEditing}
-    />
-  </View>
-));
+}) => {
+  // Check if placeholder contains asterisk
+  const hasAsterisk = placeholder.includes('*');
+  const placeholderWithoutAsterisk = hasAsterisk ? placeholder.replace('*', '') : placeholder;
+  
+  return (
+    <View style={styles.inputContainer}>
+      <TextInput
+        ref={inputRef}
+        style={[
+          styles.input,
+          {
+            backgroundColor: theme.colors.inputBackground,
+            color: theme.colors.text,
+            borderColor: theme.colors.border
+          },
+          focusedField === field && [styles.inputFocused, { borderColor: theme.colors.primary }],
+          multiline && styles.multilineInput
+        ]}
+        value={value}
+        onChangeText={onChangeText}
+        onFocus={() => setFocusedField(field)}
+        onBlur={() => setFocusedField(null)}
+        placeholder="" // Remove placeholder completely
+        multiline={multiline}
+        numberOfLines={numberOfLines}
+        keyboardType={keyboardType}
+        autoCapitalize={field === 'email' ? 'none' : 'words'}
+        blurOnSubmit={blurOnSubmit}
+        returnKeyType={returnKeyType}
+        autoCorrect={false}
+        spellCheck={false}
+        textContentType="none"
+        onSubmitEditing={onSubmitEditing}
+      />
+      {/* Custom placeholder with red asterisk */}
+      {!value && focusedField !== field && (
+        <View style={styles.customPlaceholderContainer}>
+          <Text style={[styles.customPlaceholderText, { color: theme.colors.textSecondary }]}>
+            {placeholderWithoutAsterisk}
+          </Text>
+          {hasAsterisk && (
+            <Text style={styles.redAsterisk}>*</Text>
+          )}
+        </View>
+      )}
+    </View>
+  );
+});
 
 interface BusinessProfileFormProps {
   visible: boolean;
@@ -556,7 +572,7 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
             >
               {/* Company Information */}
               <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: isDarkMode ? '#ffffff' : '#1a1a1a' }]}>Company Information *</Text>
+                <Text style={[styles.sectionTitle, { color: isDarkMode ? '#ffffff' : '#1a1a1a' }]}>Company Information <Text style={styles.redAsteriskText}>*</Text></Text>
 
                 <FloatingInput
                   value={formData.name}
@@ -638,7 +654,7 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
 
                 <View style={styles.inputContainer}>
                   <Text style={[styles.sectionTitle, { color: isDarkMode ? '#ffffff' : '#1a1a1a' }]}>
-                    Business Category {profile ? '' : '*'}
+                    Business Category {profile ? '' : <Text style={styles.redAsteriskText}>*</Text>}
                   </Text>
                   {profile ? (
                     // Edit mode: Show category as read-only
@@ -671,7 +687,7 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
                             }
                           ]}
                           value={formData.category}
-                          placeholder="Select your business category *"
+                          placeholder="Select your business category"
                           placeholderTextColor={theme.colors.textSecondary}
                           editable={false}
                           pointerEvents="none"
@@ -751,7 +767,7 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
               {!profile && formData.category && subcategories.length > 0 && (
                 <View style={styles.inputContainer}>
                   <Text style={[styles.sectionTitle, { color: isDarkMode ? '#ffffff' : '#1a1a1a' }]}>
-                    Business Subcategory *
+                    Business Subcategory <Text style={styles.redAsteriskText}>*</Text>
                   </Text>
 
                   {/* Selected Subcategory Display */}
@@ -833,33 +849,43 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
 
                 {/* Phone Number with Validation */}
                 <View style={styles.inputContainer}>
-                  <TextInput
-                    ref={registerInputRef('phone')}
-                    style={[
-                      styles.input,
-                      {
-                        backgroundColor: theme.colors.inputBackground,
-                        color: theme.colors.text,
-                        borderColor: phoneValidationError ? '#ff4444' : theme.colors.border
-                      },
-                      focusedField === 'phone' && [styles.inputFocused, { borderColor: phoneValidationError ? '#ff4444' : theme.colors.primary }]
-                    ]}
-                    value={formData.phone}
-                    onChangeText={(value) => handleInputChange('phone', value)}
-                    onFocus={() => setFocusedField('phone')}
-                    onBlur={() => setFocusedField(null)}
-                    placeholder="Enter 10 digit phone number *"
-                    placeholderTextColor={theme.colors.textSecondary}
-                    keyboardType="phone-pad"
-                    maxLength={10}
-                    autoCapitalize="none"
-                    blurOnSubmit={false}
-                    returnKeyType="next"
-                    autoCorrect={false}
-                    spellCheck={false}
-                    textContentType="none"
-                    onSubmitEditing={handleSubmitEditing('alternatePhone')}
-                  />
+                  <View style={styles.inputWrapper}>
+                    <TextInput
+                      ref={registerInputRef('phone')}
+                      style={[
+                        styles.input,
+                        {
+                          backgroundColor: theme.colors.inputBackground,
+                          color: theme.colors.text,
+                          borderColor: phoneValidationError ? '#ff4444' : theme.colors.border
+                        },
+                        focusedField === 'phone' && [styles.inputFocused, { borderColor: phoneValidationError ? '#ff4444' : theme.colors.primary }]
+                      ]}
+                      value={formData.phone}
+                      onChangeText={(value) => handleInputChange('phone', value)}
+                      onFocus={() => setFocusedField('phone')}
+                      onBlur={() => setFocusedField(null)}
+                      placeholder=""
+                      keyboardType="phone-pad"
+                      maxLength={10}
+                      autoCapitalize="none"
+                      blurOnSubmit={false}
+                      returnKeyType="next"
+                      autoCorrect={false}
+                      spellCheck={false}
+                      textContentType="none"
+                      onSubmitEditing={handleSubmitEditing('alternatePhone')}
+                    />
+                    {/* Custom placeholder with red asterisk */}
+                    {!formData.phone && focusedField !== 'phone' && (
+                      <View style={styles.customPlaceholderContainer}>
+                        <Text style={[styles.customPlaceholderText, { color: theme.colors.textSecondary }]}>
+                          Enter 10 digit phone number
+                        </Text>
+                        <Text style={styles.redAsterisk}>*</Text>
+                      </View>
+                    )}
+                  </View>
                   {phoneValidationError ? (
                     <Text style={[styles.validationError, { color: '#ff4444' }]}>
                       {phoneValidationError}
@@ -867,7 +893,7 @@ const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({
                   ) : null}
                   {!phoneValidationError && formData.phone.trim() && formData.phone.replace(/\D/g, '').length === 10 ? (
                     <Text style={[styles.validationSuccess, { color: '#4CAF50' }]}>
-                      ✓ Valid phone number
+                      Valid phone number
                     </Text>
                   ) : null}
                 </View>
@@ -1172,6 +1198,31 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     marginBottom: Math.max(12, screenHeight * 0.015),
+  },
+
+  inputWrapper: {
+    position: 'relative',
+  },
+
+  customPlaceholderContainer: {
+    position: 'absolute',
+    left: Math.max(16, screenWidth * 0.035),
+    top: Math.max(14, screenHeight * 0.017),
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  customPlaceholderText: {
+    fontSize: Math.min(screenWidth * 0.035, 14),
+  },
+  redAsterisk: {
+    color: '#ff4444',
+    fontSize: Math.min(screenWidth * 0.035, 14),
+    fontWeight: 'bold',
+    marginLeft: 2,
+  },
+  redAsteriskText: {
+    color: '#ff4444',
+    fontWeight: 'bold',
   },
 
   input: {

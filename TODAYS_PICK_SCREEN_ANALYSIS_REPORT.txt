@@ -1,0 +1,287 @@
+TODAY'S PICK SCREEN ANALYSIS REPORT
+=====================================
+
+Date: April 9, 2026
+Analyst: Senior React Native & Backend Architecture Expert
+File Analyzed: src/screens/TodaysPickScreen.tsx
+
+=====================================
+1. FILE ANALYSIS
+=====================================
+
+Primary File: src/screens/TodaysPickScreen.tsx
+- Size: 3,556 lines
+- Architecture: React Native functional component with hooks
+- Main Dependencies: AsyncStorage, greetingTemplatesService, businessCategoryPostersApi, calendarApi
+
+Key Components:
+- loadTodayPosters(): Main function responsible for fetching and processing daily images
+- getRecentDaysBatch(): Retrieves previously shown image IDs from AsyncStorage
+- selectDailyItem(): Seeded random selection based on daily seed
+- getDailySeed(): Generates consistent daily seed for randomization
+
+=====================================
+2. IMAGE FETCHING FLOW
+=====================================
+
+The Today's Pick screen fetches images from 4 different categories:
+
+A. Motivational Quotes
+   - API: greetingTemplatesService.searchTemplates('motivational')
+   - Endpoint: Backend search API for motivational templates
+
+B. Business Category Posters
+   - API: businessCategoryPostersApi.getUserCategoryPosters()
+   - Endpoint: /api/mobile/posters/category/{category}?limit={limit}
+
+C. Business Marketing Tips
+   - API: greetingTemplatesService.getTemplatesByCategory('Business Marketing Tips', 200)
+   - Endpoint: Backend category-specific API
+
+D. Festive Alerts (Calendar)
+   - API: calendarApi.getPostersByDate(dateString)
+   - Endpoint: /api/mobile/calendar/posters/{date}
+
+Flow Process:
+1. Check AsyncStorage cache for current date first
+2. If cache valid and complete, use cached data
+3. If no cache, make parallel API calls to all 4 endpoints
+4. Process each category through filtering and selection logic
+5. Store selected image IDs in AsyncStorage for current date
+6. Cache final results for the day
+
+=====================================
+3. CURRENT 24-HOUR LOGIC
+=====================================
+
+Date-Based Seed System:
+- getDailySeed() creates hash from current date (YYYY-MM-DD)
+- Ensures same image selection for entire day
+- Different date = different seed = different image selection
+
+Daily Storage Pattern:
+- Storage keys follow pattern: `daily_{category}_{date}`
+- Examples: 
+  - daily_motivational_2026-04-09
+  - daily_business_2026-04-09
+  - daily_marketing_tips_2026-04-09
+  - daily_calendar_2026-04-09
+
+Cache System:
+- Main cache key: `todays_pick_{date}` (stores complete day's selection)
+- Individual daily keys store specific category selections
+- Cache validation checks for all 4 categories before using cached data
+
+=====================================
+4. IDENTIFIED ISSUES
+=====================================
+
+CRITICAL ISSUE: 7-Day Exclusion Instead of 30-Day Exclusion
+
+Root Cause Found in getRecentDaysBatch() function (Lines 663-675):
+
+```javascript
+const getRecentDaysBatch = useCallback(async (today: Date, categoryPrefix: string): Promise<string[]> => {
+  const keys: string[] = [];
+  for (let i = 0; i < 7; i++) {  // ← PROBLEM: Only 7 days
+    const pastDate = new Date(today);
+    pastDate.setDate(today.getDate() - i);
+    const pastDateString = `${pastDate.getFullYear()}-${String(pastDate.getMonth() + 1).padStart(2, '0')}-${String(pastDate.getDate()).padStart(2, '0')}`;
+    keys.push(`daily_${categoryPrefix}_${pastDateString}`);
+  }
+  
+  const values = await Promise.all(keys.map(key => AsyncStorage.getItem(key)));
+  return values.filter((v): v is string => v !== null);
+}, []);
+```
+
+Current Behavior:
+- Only excludes images shown in the last 7 days
+- After 7 days, images become available for selection again
+- This explains why same images reappear after 1-2 days (incomplete exclusion)
+
+Additional Issues:
+1. No backend-level filtering - all exclusion logic is frontend-only
+2. Pool exhaustion handling falls back to all templates when no available images
+3. No persistent tracking across app reinstalls
+4. AsyncStorage can be cleared by user or system
+
+=====================================
+5. ROOT CAUSE ANALYSIS
+=====================================
+
+Primary Root Cause: 
+The `getRecentDaysBatch()` function only checks the last 7 days instead of 30 days.
+
+Secondary Issues:
+A. Frontend-Only Exclusion Logic
+   - Backend APIs return all available images without filtering
+   - No backend awareness of previously shown images
+   - Relies entirely on client-side AsyncStorage
+
+B. Incomplete Date Range Coverage
+   - Loop runs from i=0 to i=6 (7 days total)
+   - Should run from i=0 to i=29 (30 days total)
+
+C. No Fallback Protection
+   - When available pool is exhausted, falls back to all templates
+   - Can cause immediate repetition of recently shown images
+
+D. Cache Invalidation Issues
+   - No cleanup of old daily storage keys
+   - AsyncStorage accumulation over time
+
+=====================================
+6. RISKS IN CURRENT IMPLEMENTATION
+=====================================
+
+High Risk Areas:
+1. User Experience: Images repeat frequently, breaking the "30-day no-repeat" expectation
+2. Performance: AsyncStorage grows indefinitely with daily keys
+3. Data Loss: If user clears app data, all exclusion history is lost
+4. Scalability: As image library grows, 7-day exclusion becomes more noticeable
+
+Medium Risk Areas:
+1. Pool Exhaustion: Limited image pools cause immediate fallback to all templates
+2. Cache Bypass: Force refresh scenarios can skip exclusion logic
+3. Multi-Device: No synchronization across user devices
+
+Low Risk Areas:
+1. API Dependencies: Heavy reliance on external API availability
+2. Date-Based Logic: Timezone issues could affect daily seed generation
+
+=====================================
+7. RECOMMENDED SOLUTION FOR 30-DAY NO-REPEAT RULE
+=====================================
+
+Option A: Minimal Frontend Fix (Recommended)
+- Change getRecentDaysBatch() loop from 7 to 30 days
+- Add cleanup for old storage keys
+- Improve pool exhaustion handling
+- Risk: Still frontend-only, can be bypassed
+
+Option B: Enhanced Frontend Solution
+- Implement Option A changes
+- Add backend exclusion via query parameters
+- Store exclusion history in user profile
+- Risk: Requires backend API modifications
+
+Option C: Backend-Driven Solution (Ideal)
+- Backend tracks user's shown images with timestamps
+- API endpoints filter out images shown in last 30 days
+- Frontend only handles display logic
+- Risk: Highest development effort
+
+Recommended Implementation (Option A):
+
+1. Fix getRecentDaysBatch() to check 30 days:
+```javascript
+for (let i = 0; i < 30; i++) {  // Changed from 7 to 30
+```
+
+2. Add cleanup mechanism for old keys:
+```javascript
+// Clean up keys older than 30 days
+for (let i = 30; i < 90; i++) {
+  const cleanupDate = new Date(today);
+  cleanupDate.setDate(today.getDate() - i);
+  const cleanupKey = `daily_${categoryPrefix}_${cleanupDateString}`;
+  await AsyncStorage.removeItem(cleanupKey);
+}
+```
+
+3. Improve pool exhaustion handling:
+```javascript
+// Instead of falling back to all templates, extend date range
+if (availableTemplates.length === 0 && allTemplates.length > 0) {
+  // Try excluding only last 15 days instead of 30
+  const recentDays = await getRecentDaysBatch(today, categoryPrefix, 15);
+  // ... retry selection logic
+}
+```
+
+=====================================
+8. FILES THAT WOULD NEED MODIFICATION
+=====================================
+
+Primary Files:
+1. src/screens/TodaysPickScreen.tsx
+   - getRecentDaysBatch() function (Line 663)
+   - Add cleanup mechanism
+   - Improve pool exhaustion handling
+
+Secondary Files (for enhanced solution):
+2. src/services/greetingTemplates.ts
+   - Add exclusion parameters to API calls
+   - Implement backend-aware filtering
+
+3. src/services/businessCategoryPostersApi.ts
+   - Add user-specific filtering
+   - Track shown images in user profile
+
+4. src/services/calendarApi.ts
+   - Add exclusion logic for calendar posters
+
+Backend API Endpoints (for complete solution):
+5. /api/mobile/posters/category/{category}
+   - Add excludeShown=true parameter
+   - Add daysToExclude parameter (default: 30)
+
+6. /api/mobile/greetings/templates
+   - Add exclusion parameters
+   - Track user's viewing history
+
+7. /api/mobile/calendar/posters/{date}
+   - Add exclusion for previously shown calendar posters
+
+=====================================
+9. IMPLEMENTATION PRIORITY
+=====================================
+
+Phase 1 (Immediate Fix - 1-2 hours):
+- Fix getRecentDaysBatch() 7-day to 30-day loop
+- Add basic cleanup for old storage keys
+- Test with existing image pools
+
+Phase 2 (Enhanced Solution - 1-2 days):
+- Improve pool exhaustion handling
+- Add better fallback mechanisms
+- Implement comprehensive logging
+
+Phase 3 (Backend Integration - 1-2 weeks):
+- Modify backend APIs to support exclusion
+- Implement server-side tracking
+- Add user profile synchronization
+
+=====================================
+10. TESTING REQUIREMENTS
+=====================================
+
+Unit Tests:
+- getRecentDaysBatch() with different date ranges
+- selectDailyItem() seed consistency
+- Cache validation logic
+
+Integration Tests:
+- Full 30-day exclusion cycle
+- Pool exhaustion scenarios
+- Cache invalidation and refresh
+
+User Acceptance Tests:
+- No image repetition within 30 days
+- Different images each day
+- Performance with large image pools
+
+=====================================
+CONCLUSION
+=====================================
+
+The root cause of images reappearing after 1-2 days is a simple configuration error in the getRecentDaysBatch() function, which only checks the last 7 days instead of the required 30 days. This is a frontend-only issue that can be resolved with a minimal code change.
+
+However, the current architecture has inherent limitations due to its reliance on client-side storage. For a robust, long-term solution, backend-level filtering should be implemented to ensure exclusion rules persist across devices and app reinstalls.
+
+The recommended approach is to implement the immediate fix (Phase 1) to resolve the user experience issue, then plan for enhanced backend integration (Phase 3) for a more robust solution.
+
+=====================================
+END OF REPORT
+=====================================

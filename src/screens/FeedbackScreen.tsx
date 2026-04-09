@@ -17,47 +17,151 @@ import { useTheme } from '../context/ThemeContext';
 import api from '../services/api';
 import FeedbackModal from '../components/FeedbackModal';
 
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
-
-// Responsive design helpers
-const isSmallScreen = screenWidth < 375;
-const isMediumScreen = screenWidth >= 375 && screenWidth < 414;
-const isLargeScreen = screenWidth >= 414;
-
-// Responsive helper functions
-const scale = (size: number) => (screenWidth / 375) * size;
-const verticalScale = (size: number) => (screenHeight / 667) * size;
-const moderateScale = (size: number, factor = 0.5) => size + (scale(size) - size) * factor;
-
-// Responsive spacing
-const responsiveSpacing = {
-  xs: isSmallScreen ? 8 : isMediumScreen ? 12 : 16,
-  sm: isSmallScreen ? 12 : isMediumScreen ? 16 : 20,
-  md: isSmallScreen ? 16 : isMediumScreen ? 20 : 24,
-  lg: isSmallScreen ? 20 : isMediumScreen ? 24 : 32,
-  xl: isSmallScreen ? 24 : isMediumScreen ? 32 : 40,
-};
-
-// Responsive font sizes
-const responsiveFontSize = {
-  xs: isSmallScreen ? 10 : isMediumScreen ? 12 : 14,
-  sm: isSmallScreen ? 12 : isMediumScreen ? 14 : 16,
-  md: isSmallScreen ? 14 : isMediumScreen ? 16 : 18,
-  lg: isSmallScreen ? 16 : isMediumScreen ? 18 : 20,
-  xl: isSmallScreen ? 18 : isMediumScreen ? 20 : 22,
-  xxl: isSmallScreen ? 20 : isMediumScreen ? 22 : 24,
-  xxxl: isSmallScreen ? 24 : isMediumScreen ? 28 : 32,
-};
-
-// Feedback categories
+// Feedback categories with icons for card design
 const FEEDBACK_CATEGORIES = [
-  { label: 'Bug Report', value: 'BUG_REPORT' },
-  { label: 'Feature Request', value: 'FEATURE_REQUEST' },
-  { label: 'User Experience', value: 'USER_EXPERIENCE' },
-  { label: 'General Feedback', value: 'GENERAL_FEEDBACK' },
+  { label: 'Report a problem', value: 'BUG_REPORT', icon: '⚠️' },
+  { label: 'Share an idea', value: 'FEATURE_REQUEST', icon: '💡' },
+  { label: 'User Experience', value: 'USER_EXPERIENCE', icon: '📈' },
+  { label: 'General Feedback', value: 'GENERAL_FEEDBACK', icon: '💬' },
 ];
 
 type FeedbackScreenNavigationProp = any;
+
+// Header Section Component
+const HeaderSection: React.FC<{ navigation: any; theme: any }> = ({ navigation, theme }) => (
+  <View style={styles.headerSection}>
+    <TouchableOpacity
+      onPress={() => navigation.goBack()}
+      style={styles.backButton}
+      activeOpacity={0.7}
+    >
+      <Icon name="arrow-back" size={24} color={theme.colors.text} />
+    </TouchableOpacity>
+    <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
+      Help us improve
+    </Text>
+    <View style={styles.headerSpacer} />
+  </View>
+);
+
+// Rating Section Component
+const RatingSection: React.FC<{ rating: number; setRating: (rating: number) => void; theme: any }> = ({ rating, setRating, theme }) => (
+  <View style={styles.ratingSection}>
+    <Text style={[styles.ratingTitle, { color: theme.colors.textSecondary }]}>
+      How was your experience?
+    </Text>
+    <View style={styles.starsContainer}>
+      {[1, 2, 3, 4, 5].map((star) => (
+        <TouchableOpacity
+          key={star}
+          onPress={() => setRating(star)}
+          style={styles.starButton}
+          activeOpacity={0.7}
+        >
+          <Icon
+            name={star <= rating ? 'star' : 'star-border'}
+            size={32}
+            color={star <= rating ? '#FFC107' : '#DDD'}
+          />
+        </TouchableOpacity>
+      ))}
+    </View>
+  </View>
+);
+
+// Category Grid Component
+const CategoryGrid: React.FC<{ 
+  selectedCategory: string; 
+  setSelectedCategory: (category: string) => void; 
+  theme: any 
+}> = ({ selectedCategory, setSelectedCategory, theme }) => (
+  <View style={styles.categorySection}>
+    <Text style={[styles.categoryTitle, { color: theme.colors.text }]}>
+      Choose a category:
+    </Text>
+    <View style={styles.categoryGrid}>
+      {FEEDBACK_CATEGORIES.map((category) => (
+        <TouchableOpacity
+          key={category.value}
+          style={[
+            styles.categoryCard,
+            {
+              backgroundColor: selectedCategory === category.value ? '#E3F2FD' : theme.colors.cardBackground,
+              borderColor: selectedCategory === category.value ? '#2196F3' : 'transparent',
+              borderWidth: selectedCategory === category.value ? 2 : 0,
+            }
+          ]}
+          onPress={() => setSelectedCategory(category.value)}
+          activeOpacity={0.7}
+        >
+          {selectedCategory === category.value && (
+            <View style={styles.checkmarkBadge}>
+              <Icon name="check" size={16} color="#2196F3" />
+            </View>
+          )}
+          <Text style={styles.categoryIcon}>{category.icon}</Text>
+          <Text style={[styles.categoryLabel, { color: theme.colors.text }]}>
+            {category.label}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  </View>
+);
+
+// Feedback Input Component
+const FeedbackInput: React.FC<{ 
+  feedbackText: string; 
+  setFeedbackText: (text: string) => void; 
+  theme: any 
+}> = ({ feedbackText, setFeedbackText, theme }) => (
+  <View style={styles.inputSection}>
+    <TextInput
+      style={[
+        styles.feedbackInput,
+        {
+          backgroundColor: theme.colors.cardBackground,
+          borderColor: theme.colors.border,
+          color: theme.colors.text,
+        }
+      ]}
+      placeholder="Describe the problem..."
+      placeholderTextColor={theme.colors.textSecondary}
+      multiline
+      textAlignVertical="top"
+      value={feedbackText}
+      onChangeText={setFeedbackText}
+      maxLength={2000}
+    />
+    <Text style={[styles.characterCount, { color: theme.colors.textSecondary }]}>
+      {feedbackText.length}/2000 characters
+    </Text>
+  </View>
+);
+
+// Submit Button Component
+const SubmitButton: React.FC<{ 
+  isSubmitting: boolean; 
+  handleSubmitFeedback: () => void 
+}> = ({ isSubmitting, handleSubmitFeedback }) => (
+  <TouchableOpacity
+    style={styles.submitButton}
+    onPress={handleSubmitFeedback}
+    disabled={isSubmitting}
+    activeOpacity={0.8}
+  >
+    <LinearGradient
+      colors={['#2196F3', '#1976D2']}
+      style={styles.submitButtonGradient}
+    >
+      {isSubmitting ? (
+        <ActivityIndicator size="small" color="#FFFFFF" />
+      ) : (
+        <Text style={styles.submitButtonText}>Send Feedback</Text>
+      )}
+    </LinearGradient>
+  </TouchableOpacity>
+);
 
 const FeedbackScreen: React.FC = () => {
   const navigation = useNavigation<FeedbackScreenNavigationProp>();
@@ -69,7 +173,6 @@ const FeedbackScreen: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [feedbackText, setFeedbackText] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [showCategoryDropdown, setShowCategoryDropdown] = useState<boolean>(false);
   
   // Modal state
   const [showModal, setShowModal] = useState<boolean>(false);
@@ -141,162 +244,28 @@ const FeedbackScreen: React.FC = () => {
     }
   };
 
-  // Render star rating
-  const renderStarRating = () => {
-    return (
-      <View style={styles.starRatingContainer}>
-        <Text style={[styles.sectionLabel, { color: theme.colors.text, fontSize: responsiveFontSize.md }]}>
-          Rate Your Experience
-        </Text>
-        <View style={styles.starsContainer}>
-          {[1, 2, 3, 4, 5].map((star) => (
-            <TouchableOpacity
-              key={star}
-              onPress={() => setRating(star)}
-              style={styles.starButton}
-              activeOpacity={0.7}
-            >
-              <Icon
-                name={star <= rating ? 'star' : 'star-border'}
-                size={scale(32)}
-                color={star <= rating ? '#FFD700' : theme.colors.textSecondary}
-              />
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-    );
-  };
-
-  // Render category dropdown
-  const renderCategoryDropdown = () => {
-    const selectedCategoryLabel = FEEDBACK_CATEGORIES.find(cat => cat.value === selectedCategory)?.label || 'Select Category';
-    
-    return (
-      <View style={styles.categoryContainer}>
-        <Text style={[styles.sectionLabel, { color: theme.colors.text, fontSize: responsiveFontSize.md }]}>
-          Feedback Category
-        </Text>
-        <TouchableOpacity
-          style={[styles.dropdownButton, { 
-            backgroundColor: theme.colors.cardBackground,
-            borderColor: theme.colors.border,
-          }]}
-          onPress={() => setShowCategoryDropdown(!showCategoryDropdown)}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.dropdownText, { color: theme.colors.text, fontSize: responsiveFontSize.sm }]}>
-            {selectedCategoryLabel}
-          </Text>
-          <Icon
-            name={showCategoryDropdown ? 'arrow-drop-up' : 'arrow-drop-down'}
-            size={scale(24)}
-            color={theme.colors.textSecondary}
-          />
-        </TouchableOpacity>
-        
-        {showCategoryDropdown && (
-          <View style={[styles.dropdownList, { 
-            backgroundColor: theme.colors.cardBackground,
-            borderColor: theme.colors.border,
-          }]}>
-            {FEEDBACK_CATEGORIES.map((category) => (
-              <TouchableOpacity
-                key={category.value}
-                style={styles.dropdownItem}
-                onPress={() => {
-                  setSelectedCategory(category.value);
-                  setShowCategoryDropdown(false);
-                }}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.dropdownItemText, { 
-                  color: theme.colors.text,
-                  fontSize: responsiveFontSize.sm,
-                }]}>
-                  {category.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-      </View>
-    );
-  };
-
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background, paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-          activeOpacity={0.7}
-        >
-          <Icon name="arrow-back" size={scale(24)} color={theme.colors.text} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.colors.text, fontSize: responsiveFontSize.lg }]}>
-          Submit Feedback
-        </Text>
-        <View style={styles.headerSpacer} />
-      </View>
-
+    <View style={[styles.container, { backgroundColor: '#F8F9FB', paddingTop: insets.top }]}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Star Rating */}
-        {renderStarRating()}
+        {/* Header Section */}
+        <HeaderSection navigation={navigation} theme={theme} />
 
-        {/* Category Dropdown */}
-        {renderCategoryDropdown()}
+        {/* Rating Section */}
+        <RatingSection rating={rating} setRating={setRating} theme={theme} />
 
-        {/* Feedback Text Input */}
-        <View style={styles.textInputContainer}>
-          <Text style={[styles.sectionLabel, { color: theme.colors.text, fontSize: responsiveFontSize.md }]}>
-            Your Feedback
-          </Text>
-          <TextInput
-            style={[styles.textInput, { 
-              backgroundColor: theme.colors.cardBackground,
-              borderColor: theme.colors.border,
-              color: theme.colors.text,
-              fontSize: responsiveFontSize.sm,
-            }]}
-            placeholder="Tell us about your experience..."
-            placeholderTextColor={theme.colors.textSecondary}
-            multiline
-            numberOfLines={6}
-            textAlignVertical="top"
-            value={feedbackText}
-            onChangeText={setFeedbackText}
-            maxLength={2000}
-          />
-          <Text style={[styles.characterCount, { color: theme.colors.textSecondary, fontSize: responsiveFontSize.xs }]}>
-            {feedbackText.length}/2000 characters
-          </Text>
-        </View>
+        {/* Category Grid */}
+        <CategoryGrid selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory} theme={theme} />
+
+        {/* Feedback Input */}
+        <FeedbackInput feedbackText={feedbackText} setFeedbackText={setFeedbackText} theme={theme} />
 
         {/* Submit Button */}
-        <TouchableOpacity
-          style={[styles.submitButton, {
-            backgroundColor: isSubmitting ? theme.colors.border : theme.colors.primary,
-            opacity: isSubmitting ? 0.6 : 1,
-          }]}
-          onPress={handleSubmitFeedback}
-          disabled={isSubmitting}
-          activeOpacity={0.8}
-        >
-          {isSubmitting ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <Text style={[styles.submitButtonText, { fontSize: responsiveFontSize.md }]}>
-              Submit Feedback
-            </Text>
-          )}
-        </TouchableOpacity>
+        <SubmitButton isSubmitting={isSubmitting} handleSubmitFeedback={handleSubmitFeedback} />
       </ScrollView>
 
       {/* Feedback Modal */}
@@ -324,110 +293,134 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: responsiveSpacing.md,
-    paddingVertical: responsiveSpacing.sm,
-    borderBottomWidth: 1,
-  },
-  backButton: {
-    padding: responsiveSpacing.xs,
-  },
-  headerTitle: {
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'center',
-  },
-  headerSpacer: {
-    width: scale(40),
-  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: responsiveSpacing.md,
-    paddingBottom: responsiveSpacing.xxl,
+    paddingHorizontal: 16,
+    paddingBottom: 32,
   },
-  starRatingContainer: {
-    marginBottom: responsiveSpacing.lg,
+  
+  // Header Section
+  headerSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
   },
-  sectionLabel: {
-    fontWeight: '600',
-    marginBottom: responsiveSpacing.sm,
+  backButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    flex: 1,
+    textAlign: 'center',
+  },
+  headerSpacer: {
+    width: 40,
+  },
+  
+  // Rating Section
+  ratingSection: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  ratingTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 10,
+    color: '#555',
   },
   starsContainer: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    gap: responsiveSpacing.sm,
+    gap: 10,
   },
   starButton: {
-    padding: responsiveSpacing.xs,
+    padding: 4,
   },
-  categoryContainer: {
-    marginBottom: responsiveSpacing.lg,
-    position: 'relative',
+  
+  // Category Section
+  categorySection: {
+    marginBottom: 20,
   },
-  dropdownButton: {
+  categoryTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  categoryGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  categoryCard: {
+    width: '48%',
+    borderRadius: 16,
+    padding: 16,
     alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderRadius: scale(8),
-    paddingHorizontal: responsiveSpacing.md,
-    paddingVertical: responsiveSpacing.sm,
-  },
-  dropdownText: {
-    flex: 1,
-  },
-  dropdownList: {
-    position: 'absolute',
-    top: '100%',
-    left: 0,
-    right: 0,
-    borderWidth: 1,
-    borderRadius: scale(8),
-    marginTop: responsiveSpacing.xs,
-    zIndex: 1000,
-    elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    elevation: 3,
+    position: 'relative',
   },
-  dropdownItem: {
-    paddingHorizontal: responsiveSpacing.md,
-    paddingVertical: responsiveSpacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.1)',
+  categoryIcon: {
+    fontSize: 24,
+    marginBottom: 8,
   },
-  dropdownItemText: {
+  categoryLabel: {
+    fontSize: 14,
     fontWeight: '500',
+    textAlign: 'center',
   },
-  textInputContainer: {
-    marginBottom: responsiveSpacing.xl,
+  checkmarkBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  textInput: {
+  
+  // Input Section
+  inputSection: {
+    marginBottom: 20,
+  },
+  feedbackInput: {
     borderWidth: 1,
-    borderRadius: scale(8),
-    paddingHorizontal: responsiveSpacing.md,
-    paddingVertical: responsiveSpacing.sm,
-    minHeight: verticalScale(120),
+    borderRadius: 12,
+    borderColor: '#DDD',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    fontSize: 16,
+    minHeight: 120,
+    textAlignVertical: 'top',
   },
   characterCount: {
     textAlign: 'right',
-    marginTop: responsiveSpacing.xs,
+    marginTop: 8,
+    fontSize: 12,
   },
+  
+  // Submit Button
   submitButton: {
-    borderRadius: scale(8),
-    paddingVertical: responsiveSpacing.md,
-    paddingHorizontal: responsiveSpacing.lg,
+    borderRadius: 12,
+    height: 52,
+    marginTop: 20,
+  },
+  submitButtonGradient: {
+    flex: 1,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: responsiveSpacing.md,
   },
   submitButtonText: {
     color: '#FFFFFF',
+    fontSize: 16,
     fontWeight: '600',
   },
 });

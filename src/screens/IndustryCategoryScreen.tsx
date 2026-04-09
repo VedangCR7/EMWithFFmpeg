@@ -735,7 +735,7 @@ const IndustryCategoryScreen: React.FC = () => {
         </View>
 
         {/* Category Buttons - Horizontal Scroll */}
-        <View style={styles.categoryButtonsContainer}>
+        <View style={styles.serviceFilterContainer}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -743,30 +743,37 @@ const IndustryCategoryScreen: React.FC = () => {
             nestedScrollEnabled={true}
           >
             {categoryButtons.map((category) => {
-              const isSelected = selectedCategory === category.id;
+              const isCategoryActive = selectedCategory === category.id;
               return (
                 <TouchableOpacity
                   key={category.id}
                   style={[
-                    styles.headerTextButton, 
-                    { maxWidth: moderateScale(140) },
-                    isSelected && styles.languageFilterButtonSelected
+                    styles.softwareCategoryButton,
+                    isCategoryActive && styles.serviceFilterButtonActive
                   ]}
-                  onPress={() => setSelectedCategory(category.id)}
+                  onPress={() => {
+                    const newCategory = selectedCategory === category.id ? null : category.id;
+                    setSelectedCategory(newCategory);
+                    
+                    if (newCategory) {
+                      console.log(`[SOFTWARE COMPANY] Category selected: ${newCategory}`);
+                    }
+                  }}
                   activeOpacity={0.85}
                 >
                   <LinearGradient
-                    colors={isSelected
-                      ? [theme.colors.secondary, theme.colors.primary]
-                      : ['rgba(0,0,0,0.05)', 'rgba(0,0,0,0.05)']
-                    }
+                    colors={[theme.colors.secondary, theme.colors.primary]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
-                    style={styles.languageFilterButtonGradient}
+                    style={[
+                      styles.serviceFilterButtonGradient,
+                      !isCategoryActive && styles.serviceFilterButtonGradientInactive
+                    ]}
                   >
                     <Text style={[
-                      styles.languageFilterButtonText,
-                      isSelected && styles.languageFilterButtonTextSelected
+                      styles.serviceFilterButtonText,
+                      isCategoryActive && styles.serviceFilterButtonTextActive,
+                      !isCategoryActive && styles.serviceFilterButtonTextInactive
                     ]} numberOfLines={2} ellipsizeMode="tail">
                       {category.name}
                     </Text>
@@ -896,9 +903,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
-  categoryButtonsContainer: {
-    marginVertical: moderateScale(6),
-    paddingHorizontal: moderateScale(12),
+  serviceFilterContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: moderateScale(8),
+    marginBottom: moderateScale(12),
+    gap: moderateScale(6),
   },
   categoryButtonsScrollContent: {
     flexDirection: 'row',
@@ -907,6 +917,40 @@ const styles = StyleSheet.create({
     paddingVertical: moderateScale(4),
     gap: moderateScale(10),
     flexGrow: 1,
+  },
+  softwareCategoryButton: {
+    alignSelf: 'flex-start',
+    borderRadius: moderateScale(8),
+    overflow: 'hidden',
+  },
+  serviceFilterButtonActive: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  serviceFilterButtonGradient: {
+    paddingVertical: moderateScale(6),
+    paddingHorizontal: moderateScale(12),
+    borderRadius: moderateScale(8),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  serviceFilterButtonGradientInactive: {
+    opacity: 0.75,
+  },
+  serviceFilterButtonText: {
+    textAlign: 'center',
+    color: '#ffffff',
+    fontSize: moderateScale(9),
+    fontWeight: '600',
+  },
+  serviceFilterButtonTextActive: {
+    color: '#ffffff',
+  },
+  serviceFilterButtonTextInactive: {
+    color: 'rgba(255,255,255,0.7)',
   },
   posterContainer: {
     position: 'relative',

@@ -92,37 +92,53 @@ const FloatingInput = React.memo(({
   blurOnSubmit?: boolean;
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
   autoCorrect?: boolean;
-}) => (
-  <View style={styles.inputContainer}>
-    <TextInput
-      ref={inputRef}
-      style={[
-        styles.input,
-        {
-          color: theme.colors.text,
-          borderColor: hasError ? theme.colors.error : (focusedField === field ? theme.colors.primary : theme.colors.border),
-          backgroundColor: theme.colors.inputBackground,
-        },
-        multiline && styles.multilineInput
-      ]}
-      value={value}
-      onChangeText={onChangeText}
-      onFocus={() => setFocusedField(field)}
-      onBlur={() => setFocusedField(null)}
-      placeholder={placeholder}
-      placeholderTextColor={theme.colors.textSecondary}
-      multiline={multiline}
-      numberOfLines={numberOfLines}
-      keyboardType={keyboardType}
-      secureTextEntry={secureTextEntry}
-      returnKeyType={returnKeyType}
-      onSubmitEditing={onSubmitEditing}
-      blurOnSubmit={blurOnSubmit}
-      autoCapitalize={autoCapitalize}
-      autoCorrect={autoCorrect}
-    />
-  </View>
-));
+}) => {
+  // Check if placeholder contains asterisk
+  const hasAsterisk = placeholder.includes('*');
+  const placeholderWithoutAsterisk = hasAsterisk ? placeholder.replace('*', '') : placeholder;
+  
+  return (
+    <View style={styles.inputContainer}>
+      <TextInput
+        ref={inputRef}
+        style={[
+          styles.input,
+          {
+            color: theme.colors.text,
+            borderColor: hasError ? theme.colors.error : (focusedField === field ? theme.colors.primary : theme.colors.border),
+            backgroundColor: theme.colors.inputBackground,
+          },
+          multiline && styles.multilineInput
+        ]}
+        value={value}
+        onChangeText={onChangeText}
+        onFocus={() => setFocusedField(field)}
+        onBlur={() => setFocusedField(null)}
+        placeholder="" // Remove placeholder completely
+        multiline={multiline}
+        numberOfLines={numberOfLines}
+        keyboardType={keyboardType}
+        secureTextEntry={secureTextEntry}
+        returnKeyType={returnKeyType}
+        onSubmitEditing={onSubmitEditing}
+        blurOnSubmit={blurOnSubmit}
+        autoCapitalize={autoCapitalize}
+        autoCorrect={autoCorrect}
+      />
+      {/* Custom placeholder with red asterisk */}
+      {!value && focusedField !== field && (
+        <View style={styles.customPlaceholderContainer}>
+          <Text style={[styles.customPlaceholderText, { color: theme.colors.textSecondary }]}>
+            {placeholderWithoutAsterisk}
+          </Text>
+          {hasAsterisk && (
+            <Text style={styles.redAsterisk}>*</Text>
+          )}
+        </View>
+      )}
+    </View>
+  );
+});
 
 interface RegistrationScreenProps {
   navigation: any;
@@ -850,7 +866,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
 
                 {/* Business Category */}
                 <View style={styles.categorySection}>
-                  <Text style={[styles.categoryLabel, { color: theme.colors.text }]}>Business Category *</Text>
+                  <Text style={[styles.categoryLabel, { color: theme.colors.text }]}>Business Category <Text style={styles.redAsteriskText}>*</Text></Text>
 
                   {/* Selected Category Display */}
                   <View style={styles.selectedCategoryContainer}>
@@ -864,7 +880,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                         }
                       ]}
                       value={formData.category}
-                      placeholder="Select your business category *"
+                      placeholder="Select your business category"
                       placeholderTextColor={theme.colors.textSecondary}
                       editable={false}
                       pointerEvents="none"
@@ -944,7 +960,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                 {/* Subcategory Field - Show when business category is selected */}
                 {formData.category && subcategories.length > 0 && (
                   <View style={styles.categorySection}>
-                    <Text style={[styles.categoryLabel, { color: theme.colors.text }]}>Subcategory *</Text>
+                    <Text style={[styles.categoryLabel, { color: theme.colors.text }]}>Subcategory <Text style={styles.redAsteriskText}>*</Text></Text>
 
                     {/* Selected Subcategory Display */}
                     <View style={styles.selectedCategoryContainer}>
@@ -958,7 +974,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                           }
                         ]}
                         value={formData.subcategory}
-                        placeholder="Select your business subcategory *"
+                        placeholder="Select your business subcategory"
                         placeholderTextColor={theme.colors.textSecondary}
                         editable={false}
                         pointerEvents="none"
@@ -1038,7 +1054,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
 
                 {/* Phone Number with Real-time Validation */}
                 <View style={styles.inputWrapper}>
-                  <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Phone Number *</Text>
+                  <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Phone Number <Text style={styles.redAsteriskText}>*</Text></Text>
                   <TextInput
                     ref={registerInputRef('phone')}
                     style={[
@@ -1214,12 +1230,20 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                       onChangeText={(value) => handleInputChange('password', value)}
                       onFocus={() => setFocusedField('password')}
                       onBlur={() => setFocusedField(null)}
-                      placeholder="Enter password *"
-                      placeholderTextColor={theme.colors.textSecondary}
+                      placeholder=""
                       secureTextEntry={!showPassword}
                       returnKeyType="next"
                       onSubmitEditing={handleSubmitEditing('confirmPassword')}
                     />
+                    {/* Custom placeholder with red asterisk */}
+                    {!formData.password && focusedField !== 'password' && (
+                      <View style={styles.customPasswordPlaceholderContainer}>
+                        <Text style={[styles.customPlaceholderText, { color: theme.colors.textSecondary }]}>
+                          Enter password
+                        </Text>
+                        <Text style={styles.redAsterisk}>*</Text>
+                      </View>
+                    )}
                     <TouchableOpacity
                       style={styles.eyeButton}
                       onPress={() => setShowPassword(!showPassword)}
@@ -1313,12 +1337,20 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                       onChangeText={(value) => handleInputChange('confirmPassword', value)}
                       onFocus={() => setFocusedField('confirmPassword')}
                       onBlur={() => setFocusedField(null)}
-                      placeholder="Confirm password *"
-                      placeholderTextColor={theme.colors.textSecondary}
+                      placeholder=""
                       secureTextEntry={!showConfirmPassword}
                       returnKeyType="done"
                       onSubmitEditing={handleSubmitEditing(undefined, handleRegister)}
                     />
+                    {/* Custom placeholder with red asterisk */}
+                    {!formData.confirmPassword && focusedField !== 'confirmPassword' && (
+                      <View style={styles.customPasswordPlaceholderContainer}>
+                        <Text style={[styles.customPlaceholderText, { color: theme.colors.textSecondary }]}>
+                          Confirm password
+                        </Text>
+                        <Text style={styles.redAsterisk}>*</Text>
+                      </View>
+                    )}
                     <TouchableOpacity
                       style={styles.eyeButton}
                       onPress={() => setShowConfirmPassword(!showConfirmPassword)}
@@ -1605,6 +1637,36 @@ const styles = StyleSheet.create({
   inputContainer: {
     marginBottom: Math.max(10, screenHeight * 0.012),
   },
+
+  customPlaceholderContainer: {
+    position: 'absolute',
+    left: Math.max(16, screenWidth * 0.04),
+    top: Math.max(14, screenHeight * 0.017),
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  customPlaceholderText: {
+    fontSize: isSmallScreen ? 14 : 16,
+  },
+  redAsterisk: {
+    color: '#ff4444',
+    fontSize: isSmallScreen ? 14 : 16,
+    fontWeight: 'bold',
+    marginLeft: 2,
+  },
+  redAsteriskText: {
+    color: '#ff4444',
+    fontWeight: 'bold',
+  },
+  customPasswordPlaceholderContainer: {
+    position: 'absolute',
+    left: Math.max(16, screenWidth * 0.04),
+    top: Math.max(14, screenHeight * 0.017),
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+
   inputWrapper: {
     marginBottom: Math.max(10, screenHeight * 0.012),
   },
