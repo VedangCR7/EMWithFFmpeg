@@ -12,6 +12,7 @@ import {
   ToastAndroid,
   ActivityIndicator,
   InteractionManager,
+  Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
@@ -110,12 +111,14 @@ const SubscriptionScreen: React.FC = () => {
   const effectiveSubscriptionStatus = isBusinessProfileMode ? businessSubscriptionStatus : contextSubscriptionStatus;
   const effectiveIsLoading = isBusinessProfileMode ? isBusinessSubscriptionLoading : isLoading;
 
+  // Helper flags for subscription status
+  const status = effectiveSubscriptionStatus?.status?.toUpperCase();
+  const isProcessingStatus = status === "PROCESSING";
+  const isActiveStatus = status === "ACTIVE";
+
   // Detect payment success from multiple sources
   const isPaymentSuccess = (route.params as any)?.paymentSuccess === true;
   const isActivationPendingState = isProfileActivationPending(businessProfileId);
-  
-  // Strong trigger: Show message if any payment completion indicator is true
-  const shouldShowProcessingMessage = isPaymentSuccess || isActivationPendingState;
   
   // ULTIMATE TRIGGER: Also show if screen loads with PENDING status (strong payment indicator)
   const [hasLoadedWithPending, setHasLoadedWithPending] = useState(false);
@@ -129,39 +132,33 @@ const SubscriptionScreen: React.FC = () => {
     }
   }, [effectiveSubscriptionStatus?.status]);
 
+  // Trigger processing modal based on status
+  useEffect(() => {
+    if (isProcessingStatus) {
+      setIsProcessingModalVisible(true);
+    } else {
+      setIsProcessingModalVisible(false);
+    }
+  }, [status, isProcessingStatus]);
+
   // FAILSAFE: Force show for business profiles with PENDING status
   const isBusinessProfileWithPending = useMemo(() => 
     isBusinessProfileMode && effectiveSubscriptionStatus?.status?.toUpperCase() === "PENDING",
     [isBusinessProfileMode, effectiveSubscriptionStatus?.status]
   );
 
-  // Memoize computed states to prevent re-renders
-  const ultimateTrigger = useMemo(() => {
-    const trigger = shouldShowProcessingMessage || hasLoadedWithPending || isBusinessProfileWithPending;
-    return trigger;
-  }, [shouldShowProcessingMessage, hasLoadedWithPending, isBusinessProfileWithPending]);
-
-  const finalTrigger = useMemo(() => {
-    const trigger = isPaymentSuccess || isActivationPendingState || hasLoadedWithPending;
-    return trigger;
-  }, [isPaymentSuccess, isActivationPendingState, hasLoadedWithPending]);
-
-  // Validate with backend - OPTIMIZED (removed heavy logging)
+  // Clean status-based UI control
   useEffect(() => {
-    if (!ultimateTrigger) {
-      setShowProcessingMessage(false);
-      setDisableSubscribeButton(false);
-      return;
-    }
-
-    if (effectiveSubscriptionStatus?.status?.toUpperCase() === "PENDING") {
-      setShowProcessingMessage(true);
+    if (status === "PROCESSING") {
+      setIsProcessingModalVisible(true);
       setDisableSubscribeButton(true);
-    } else {
       setShowProcessingMessage(false);
+    } else {
+      setIsProcessingModalVisible(false);
       setDisableSubscribeButton(false);
+      setShowProcessingMessage(false);
     }
-  }, [effectiveSubscriptionStatus?.status, ultimateTrigger, businessProfileId, isPaymentSuccess, isActivationPendingState, hasLoadedWithPending, shouldShowProcessingMessage, finalTrigger, isBusinessProfileWithPending]);
+  }, [status]);
 
   // Dynamic dimensions for responsive layout (matching HomeScreen)
   const [dimensions, setDimensions] = useState(() => {
@@ -215,6 +212,7 @@ const SubscriptionScreen: React.FC = () => {
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [isErrorModalVisible, setIsErrorModalVisible] = useState(false);
+  const [isProcessingModalVisible, setIsProcessingModalVisible] = useState(false);
   const [errorModalData, setErrorModalData] = useState({
     title: '',
     message: '',
@@ -1366,16 +1364,16 @@ const SubscriptionScreen: React.FC = () => {
           console.log('🔍 UI RENDER DEBUG:', {
             showProcessingMessage,
             debugForceShow,
-            ultimateTrigger,
             isPaymentSuccess,
             isActivationPendingState,
             hasLoadedWithPending,
             isBusinessProfileWithPending,
             subscriptionStatus: effectiveSubscriptionStatus?.status?.toUpperCase(),
             businessProfileId,
-            isBusinessProfileMode
+            isBusinessProfileMode,
+            isProcessingStatus
           });
-          return showProcessingMessage || debugForceShow;
+          return (showProcessingMessage || debugForceShow) && status !== "PROCESSING";
         })() && (
           <View style={{
             backgroundColor: "#E8F5E9",
@@ -1688,10 +1686,10 @@ const SubscriptionScreen: React.FC = () => {
           style={[styles.upgradeButton, {
             borderRadius: dynamicModerateScale(10),
             marginBottom: isTabletDevice ? dynamicModerateScale(8) : dynamicModerateScale(6),
-            opacity: disableSubscribeButton ? 0.6 : 1,
+            opacity: isProcessingStatus ? 0.6 : 1,
           }]}
           onPress={handleAutopayPayment}
-          disabled={disableSubscribeButton || isProcessing || effectiveSubscriptionStatus?.status?.toUpperCase() === 'ACTIVE' || paymentInProgress || isAuthenticating || isTransactionPending}
+          disabled={isProcessingStatus || isProcessing || paymentInProgress || isActiveStatus || isAuthenticating || isTransactionPending}
         >
           <LinearGradient
             colors={effectiveSubscriptionStatus?.status?.toUpperCase() === 'ACTIVE'
@@ -1712,10 +1710,10 @@ const SubscriptionScreen: React.FC = () => {
             <Text style={[styles.upgradeButtonText, {
               fontSize: dynamicModerateScale(11),
             }]}>
-              {effectiveSubscriptionStatus?.status?.toUpperCase() === 'ACTIVE'
+              {isActiveStatus
                 ? 'Already Pro'
-                : disableSubscribeButton
-                  ? 'Processing...'
+                : isProcessingStatus
+                  ? 'Payment in progress...'
                   : isAuthenticating
                     ? 'Authenticating...'
                     : isTransactionPending
@@ -1762,6 +1760,37 @@ const SubscriptionScreen: React.FC = () => {
           <Icon name="chevron-right" size={isTabletDevice ? getIconSize(18) : getIconSize(16)} color={theme.colors.textSecondary} />
         </TouchableOpacity>
       </View>
+
+      {/* Processing Modal */}
+      <Modal
+        visible={isProcessingModalVisible}
+        transparent={true}
+        animationType="fade"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <ActivityIndicator size="large" color="#667eea" />
+            
+            <Text style={styles.modalTitle}>
+              Payment in Progress
+            </Text>
+            
+            <Text style={styles.modalSubtitle}>
+              Please wait while we confirm your payment...
+            </Text>
+            
+            <TouchableOpacity
+              style={styles.modalOkButton}
+              onPress={() => {
+                setIsProcessingModalVisible(false);
+                navigation.navigate('BusinessProfiles' as any);
+              }}
+            >
+              <Text style={styles.modalOkButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Payment Error Modal */}
       <PaymentErrorModal
@@ -2009,6 +2038,46 @@ const styles = StyleSheet.create({
   transactionHistoryButtonText: {
     fontWeight: '600',
     flex: 1,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  modalContainer: {
+    width: '80%',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center'
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginTop: 16,
+    marginBottom: 8,
+    textAlign: 'center'
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 20
+  },
+  modalOkButton: {
+    backgroundColor: '#667eea',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 16,
+    alignItems: 'center'
+  },
+  modalOkButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600'
   },
 });
 

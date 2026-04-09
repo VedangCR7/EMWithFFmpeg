@@ -318,8 +318,8 @@ class SubscriptionApiService {
             
             // Check if response has the expected structure
             if (response.data.success) {
-              // ISSUE: Backend returns response.data.subscription, not response.data.data
-              const subscriptionData = response.data?.subscription ?? response.data?.data ?? null;
+              // FIXED: Prioritize response.data.data where backend now returns subscription data
+              const subscriptionData = response.data?.data ?? response.data?.subscription ?? null;
               console.log("SUBSCRIPTION_API_PARSING - Checking response structure:", {
                 'response.data.subscription': response.data?.subscription,
                 'response.data.data': response.data?.data,
@@ -371,6 +371,21 @@ class SubscriptionApiService {
                 };
               }
               
+              // FIXED: Prioritize backend subscriptionStatus field while maintaining compatibility
+              const correctedStatus = 
+                subscriptionData?.subscriptionStatus?.toLowerCase() ||
+                subscriptionData?.status?.toLowerCase() ||
+                (subscriptionData?.isActive ? "active" : "inactive");
+              
+              // ADDED: Debug logging to verify backend response mapping
+              console.log("SUBSCRIPTION_STATUS_MAPPING", {
+                backendSubscriptionStatus: subscriptionData?.subscriptionStatus,
+                backendStatus: subscriptionData?.status,
+                isActive: subscriptionData?.isActive,
+                finalStatus: correctedStatus,
+                context: 'user_subscription'
+              });
+              
               return {
                 success: true,
                 data: {
@@ -379,7 +394,7 @@ class SubscriptionApiService {
                   planName: subscriptionData?.planName ?? null,
                   expiryDate: subscriptionData?.expiryDate ?? null,
                   autoRenew: Boolean(subscriptionData?.autoRenew),
-                  status: subscriptionData?.isActive ? "active" : "inactive"
+                  status: correctedStatus
                 },
                 message: 'Status fetched successfully'
               };
@@ -449,7 +464,8 @@ class SubscriptionApiService {
             });
             
             if (response.data.success) {
-              const subscriptionData = response.data?.subscription ?? response.data?.data ?? null;
+              // FIXED: Prioritize response.data.data where backend now returns subscription data
+              const subscriptionData = response.data?.data ?? response.data?.subscription ?? null;
               
               if (!subscriptionData) {
                 return {
@@ -465,6 +481,21 @@ class SubscriptionApiService {
                 };
               }
               
+              // FIXED: Prioritize backend subscriptionStatus field while maintaining compatibility
+              const correctedStatus = 
+                subscriptionData?.subscriptionStatus?.toLowerCase() ||
+                subscriptionData?.status?.toLowerCase() ||
+                (subscriptionData?.isActive ? "active" : "inactive");
+              
+              // ADDED: Debug logging to verify backend response mapping
+              console.log("SUBSCRIPTION_STATUS_MAPPING", {
+                backendSubscriptionStatus: subscriptionData?.subscriptionStatus,
+                backendStatus: subscriptionData?.status,
+                isActive: subscriptionData?.isActive,
+                finalStatus: correctedStatus,
+                businessProfileId: businessProfileId
+              });
+              
               return {
                 success: true,
                 data: {
@@ -473,7 +504,7 @@ class SubscriptionApiService {
                   planName: subscriptionData?.planName ?? null,
                   expiryDate: subscriptionData?.expiryDate ?? null,
                   autoRenew: Boolean(subscriptionData?.autoRenew),
-                  status: subscriptionData?.status?.toLowerCase() || (subscriptionData?.isActive ? "active" : "inactive")
+                  status: correctedStatus
                 },
                 message: 'Status fetched successfully'
               };

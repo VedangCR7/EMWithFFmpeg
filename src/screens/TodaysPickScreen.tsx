@@ -687,7 +687,7 @@ const TodaysPickScreen: React.FC = () => {
       console.log(`📅 [TodaysPickScreen] Date string: ${dateString}`);
 
       // Load cached selections for TODAY first - if all exist, use them and skip API calls
-      const cacheKey = `todays_pick_${dateString}`;
+      const cacheKey = `todays_pick_${selectedBusinessProfile?.id}_${dateString}`;
       
 
       const cachedTodayData = await AsyncStorage.getItem(cacheKey).catch(() => null);
@@ -1141,7 +1141,7 @@ const TodaysPickScreen: React.FC = () => {
 
       // Cache today's selections for future use (persists across app restarts)
       if (orderedPosters.length > 0) {
-        const cacheKey = `todays_pick_${dateString}`;
+        const cacheKey = `todays_pick_${selectedBusinessProfile?.id}_${dateString}`;
         AsyncStorage.setItem(cacheKey, JSON.stringify(orderedPosters)).catch(() => { });
       }
 
@@ -1160,7 +1160,7 @@ const TodaysPickScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [getDailySeed, selectDailyItem, seededRandom]);
+  }, [getDailySeed, selectDailyItem, seededRandom, selectedBusinessProfile?.id]);
 
   // Load today's posters on mount
   useEffect(() => {
@@ -1169,6 +1169,16 @@ const TodaysPickScreen: React.FC = () => {
       console.error('❌ [TodaysPickScreen] Error in loadTodayPosters:', error);
     });
   }, [loadTodayPosters]);
+
+  // Reload posters when business profile changes
+  useEffect(() => {
+    if (selectedBusinessProfile?.id) {
+      console.log('🔄 [TodaysPickScreen] Business profile changed, reloading posters for profile:', selectedBusinessProfile.id);
+      loadTodayPosters().catch((error) => {
+        console.error('❌ [TodaysPickScreen] Error reloading posters after profile change:', error);
+      });
+    }
+  }, [selectedBusinessProfile?.id, loadTodayPosters]);
 
   // Use todayPosters for filteredPosters instead of allTemplates
   const filteredPosters = useMemo(() => {
