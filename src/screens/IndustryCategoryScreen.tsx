@@ -417,47 +417,91 @@ const IndustryCategoryScreen: React.FC = () => {
   ];
 
   const filteredPosters = useMemo(() => {
+    console.log('🏷️ [FILTERING] Starting image filtering process');
+    console.log(`📊 [FILTERING] Total posters before filtering: ${posters.length}`);
+    console.log(`🎯 [FILTERING] Selected category: ${selectedCategory}`);
+    console.log(`🌐 [FILTERING] Selected language: ${selectedLanguage}`);
+    
     let basePosters = posters;
 
     // Apply category filtering first
     if (selectedCategory !== 'all') {
       const selectedCategoryButton = categoryButtons.find(btn => btn.id === selectedCategory);
       if (selectedCategoryButton && selectedCategoryButton.tags.length > 0) {
+        console.log(`🏷️ [CATEGORY FILTER] Filtering by category: ${selectedCategoryButton.name}`);
+        console.log(`🏷️ [CATEGORY FILTER] Category tags: [${selectedCategoryButton.tags.join(', ')}]`);
+        
+        const postersBeforeCategoryFilter = basePosters.length;
         basePosters = basePosters.filter(poster => {
           const posterTags = poster.tags || [];
           const posterName = poster.name.toLowerCase();
-          const posterDescription = (poster.description || '').toLowerCase();
           
-          return selectedCategoryButton.tags.some(tag => 
-            posterTags.some(posterTag => posterTag.toLowerCase().includes(tag.toLowerCase())) ||
-            posterName.includes(tag.toLowerCase()) ||
-            posterDescription.includes(tag.toLowerCase())
-          );
+          const matchesTag = selectedCategoryButton.tags.some(tag => {
+            const exactTagMatch = posterTags.some(posterTag => posterTag.toLowerCase() === tag.toLowerCase());
+            const nameMatch = posterName.toLowerCase().includes(tag.toLowerCase());
+            
+            // For category filtering, prioritize exact tag matches over name/description matches
+            // Description matching is too broad and causes incorrect matches
+            if (exactTagMatch || nameMatch) {
+              console.log(`🔍 [MATCH DEBUG] Tag "${tag}" matched for poster "${poster.name}":`);
+              console.log(`   - Exact tag match: ${exactTagMatch}`);
+              console.log(`   - Name match: ${nameMatch} (name: "${posterName}")`);
+              console.log(`   - Poster tags: [${posterTags.join(', ')}]`);
+              return true;
+            }
+            return false;
+          });
+          
+          if (matchesTag) {
+            console.log(`✅ [CATEGORY FILTER] Poster "${poster.name}" matched - Tags: [${posterTags.join(', ')}]`);
+          } else {
+            console.log(`❌ [CATEGORY FILTER] Poster "${poster.name}" did NOT match - Tags: [${posterTags.join(', ')}]`);
+          }
+          
+          return matchesTag;
         });
+        
+        console.log(`📊 [CATEGORY FILTER] Posters after category filtering: ${basePosters.length} (removed ${postersBeforeCategoryFilter - basePosters.length})`);
       }
+    } else {
+      console.log(`🏷️ [CATEGORY FILTER] No category filter applied (selected: 'all')`);
     }
 
     // Apply language filtering
     if (selectedLanguage === 'all') {
+      console.log(`🌐 [LANGUAGE FILTER] No language filter applied (selected: 'all')`);
+      console.log(`🎉 [FILTERING COMPLETE] Final filtered posters count: ${basePosters.length}`);
       return basePosters;
     }
     
-    return basePosters.filter(poster => {
+    console.log(`🌐 [LANGUAGE FILTER] Applying language filter: ${selectedLanguage}`);
+    const postersBeforeLanguageFilter = basePosters.length;
+    
+    const finalPosters = basePosters.filter(poster => {
       const posterLanguages = poster.languages || [];
       const posterTags = poster.tags || [];
       
+      let matchesLanguage = false;
+      
       if (selectedLanguage === 'english') {
-        return posterLanguages.includes('english') || 
-               posterTags.some(tag => tag.toLowerCase().includes('english'));
+        matchesLanguage = posterLanguages.includes('english') || 
+                         posterTags.some(tag => tag.toLowerCase().includes('english'));
+      } else if (selectedLanguage === 'hindi') {
+        matchesLanguage = posterLanguages.includes('hindi') || 
+                         posterTags.some(tag => tag.toLowerCase().includes('hindi'));
       }
       
-      if (selectedLanguage === 'hindi') {
-        return posterLanguages.includes('hindi') || 
-               posterTags.some(tag => tag.toLowerCase().includes('hindi'));
+      if (matchesLanguage) {
+        console.log(`✅ [LANGUAGE FILTER] Poster "${poster.name}" matched language: ${selectedLanguage} - Languages: [${posterLanguages.join(', ')}], Tags: [${posterTags.join(', ')}]`);
       }
       
-      return false;
+      return matchesLanguage;
     });
+    
+    console.log(`📊 [LANGUAGE FILTER] Posters after language filtering: ${finalPosters.length} (removed ${postersBeforeLanguageFilter - finalPosters.length})`);
+    console.log(`🎉 [FILTERING COMPLETE] Final filtered posters count: ${finalPosters.length}`);
+    
+    return finalPosters;
   }, [posters, selectedCategory, selectedLanguage, categoryButtons]);
 
   useEffect(() => {
@@ -753,11 +797,23 @@ const IndustryCategoryScreen: React.FC = () => {
                   ]}
                   onPress={() => {
                     const newCategory = selectedCategory === category.id ? null : category.id;
-                    setSelectedCategory(newCategory);
+                    
+                    // Log button click details
+                    console.log(`🔘 [BUTTON CLICK] ${category.name} button clicked`);
+                    console.log(`🏷️ [BUTTON DETAILS] Category ID: ${category.id}`);
+                    console.log(`🏷️ [BUTTON DETAILS] Category tags: [${category.tags.join(', ')}]`);
+                    console.log(`🔄 [BUTTON DETAILS] Previous selected category: ${selectedCategory}`);
+                    console.log(`🔄 [BUTTON DETAILS] New selected category: ${newCategory || 'none (deselected)'}`);
                     
                     if (newCategory) {
-                      console.log(`[SOFTWARE COMPANY] Category selected: ${newCategory}`);
+                      console.log(`✅ [CATEGORY SELECTION] Activating category: ${category.name}`);
+                      console.log(`🎯 [CATEGORY SELECTION] Will filter posters with tags: [${category.tags.join(', ')}]`);
+                    } else {
+                      console.log(`❌ [CATEGORY SELECTION] Deactivating category: ${category.name}`);
+                      console.log(`🔄 [CATEGORY SELECTION] Will show all posters (no category filter)`);
                     }
+                    
+                    setSelectedCategory(newCategory);
                   }}
                   activeOpacity={0.85}
                 >
