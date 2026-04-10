@@ -71,13 +71,8 @@ class BusinessProfileService {
     return await cacheService.getOrFetch(
       cacheKey,
       async () => {
-        // First check if backend is available with a quick health check
-        try {
-          await api.get('/health', { timeout: 5000 });
-        } catch (healthError: any) {
-          throw new Error('Backend server not available');
-        }
-        
+        // PERFORMANCE FIX: Removed health check to eliminate 5-second timeout delay
+        // Health check was causing unnecessary delay on every fetch
         const response = await api.get(`/api/mobile/business-profile/${userId}`);
     
     if (response.data.success) {
@@ -149,17 +144,7 @@ class BusinessProfileService {
       true // Allow stale data
     ).catch((error: any) => {
       console.error('Error fetching business profiles:', error);
-      
-      // If it's a network/timeout error, throw it so the calling code can handle it
-      if (error instanceof Error && (
-        error.message === 'Backend server not available' ||
-        error.message === 'TIMEOUT' ||
-        error.message === 'NETWORK_ERROR' ||
-        error.message.includes('timeout')
-      )) {
-        throw error;
-      }
-      
+      // Return empty array on error to allow UI to handle gracefully
       return [];
     });
   }
@@ -266,7 +251,7 @@ class BusinessProfileService {
   async createBusinessProfile(data: CreateBusinessProfileData): Promise<BusinessProfile> {
     try {
       console.log('Creating business profile via API:', data.name);
-      
+
       // Get current user for owner name
       const currentUser = authService.getCurrentUser();
       const ownerNameFromUser = currentUser?.name || currentUser?.companyName || currentUser?.displayName || currentUser?.firstName;
@@ -280,6 +265,7 @@ class BusinessProfileService {
       const phone = (data.phone || '').trim();
       const category = (data.category || '').trim();
       const address = (data.address || '').trim();
+      const alternatePhone = (data.alternatePhone || '').trim();
 
       if (!businessName || !ownerName || !email || !phone || !category) {
         console.error('❌ [CREATE] Missing required fields:', {
@@ -291,88 +277,170 @@ class BusinessProfileService {
         });
         throw new Error('Business name, owner name, email, phone, and category are required.');
       }
-      
-      // Handle logo upload if it's a local file path
-      let logoUrl = data.companyLogo || '';
-      if (logoUrl && this.isLocalFilePath(logoUrl)) {
-        console.log('⚠️ [CREATE] Logo is a local file path, will send as-is (API should handle upload)');
-        // Note: If API doesn't handle local paths, we'd need to upload first
-        // For now, send it and let the API handle it
-      }
-      
-      // Map frontend data to backend format
-      const resolvedSubcategory =
-        data.businessSubcategory ??
-        data.subCategory ??
-        data.subcategory;
-      
-      const backendData: any = {
-        businessName,
-        ownerName,
-        email,
-        phone,
-        address,
-        category,
-        // Send both logo and companyLogo to ensure backend receives the logo
-        logo: logoUrl,
-        companyLogo: logoUrl,
-        description: data.description || '',
-        website: data.website || ''
-      };
-      
-      // Only include businessSubcategory if it has a value (prevent silent data loss)
-      if (resolvedSubcategory !== undefined) {
-        backendData.businessSubcategory = resolvedSubcategory;
-      }
-      
-      if (__DEV__) {
-        console.log("Final Backend Payload:", backendData);
-      }
-      
-      console.log('📤 Sending business profile data:', JSON.stringify(backendData, null, 2));
-      console.log('🖼️ Logo URL being sent:', logoUrl || '(empty)');
-      
-      const response = await api.post('/api/mobile/business-profile', backendData);
-      
-      if (response.data.success) {
-        console.log('✅ Business profile created via API:', response.data.data.id);
-        // Clear cache to force refresh
-        const currentUser = authService.getCurrentUser();
-        this.clearCache(currentUser?.id);
-        
-        // Map backend response to frontend format
-        const backendProfile = response.data.data;
-        const returnedLogo = backendProfile.logo || '';
-        console.log('🖼️ Logo URL returned from API:', returnedLogo || '(empty)');
-        
-        const newProfile: BusinessProfile = {
-          id: backendProfile.id,
-          name: backendProfile.businessName,
-          description: backendProfile.description || '',
-          category: backendProfile.category,
-          subCategory: backendProfile.subCategory || backendProfile.subcategory,
-          subcategory: backendProfile.subCategory || backendProfile.subcategory,
-          address: backendProfile.address || '',
-          phone: backendProfile.phone || '',
-          alternatePhone: backendProfile.alternatePhone || '',
-          email: backendProfile.email || '',
-          website: backendProfile.website || '',
-          // Enhanced logo field mapping for created profiles
-          companyLogo: returnedLogo || backendProfile.companyLogo || backendProfile.profileLogo || backendProfile.businessLogo || backendProfile.image || backendProfile.photo || '',
-          logo: returnedLogo || backendProfile.companyLogo || backendProfile.profileLogo || backendProfile.businessLogo || backendProfile.image || backendProfile.photo || '',
-          banner: '',
-          services: [],
-          createdAt: backendProfile.createdAt,
-          updatedAt: backendProfile.updatedAt,
-        };
-        return newProfile;
+
+      // Check if logo is being uploaded (local file path)
+      const logoUri = data.companyLogo || data.logo;
+      const hasLogo = logoUri && this.isLocalFilePath(logoUri);
+
+      if (hasLogo) {
+        console.log('📤 [CREATE] Creating FormData request with logo upload');
+
+        // Create FormData for file upload
+        const formData = new FormData();
+
+        // Add required fields
+        formData.append('businessName', businessName);
+        formData.append('ownerName', ownerName);
+        formData.append('email', email);
+        formData.append('phone', phone);
+        formData.append('address', address);
+        formData.append('category', category);
+
+        // Add optional fields
+        if (data.description) formData.append('description', data.description);
+        if (data.website) formData.append('website', data.website);
+        if (alternatePhone) formData.append('alternatePhone', alternatePhone);
+
+        const resolvedSubcategory = data.businessSubcategory ?? data.subCategory ?? data.subcategory;
+        if (resolvedSubcategory !== undefined) {
+          formData.append('businessSubcategory', resolvedSubcategory);
+        }
+
+        // Add logo file
+        const filename = logoUri.split('/').pop() || 'logo.jpg';
+        const fileExtension = filename.split('.').pop()?.toLowerCase() || 'jpg';
+
+        let mimeType = 'image/jpeg';
+        if (fileExtension === 'png') mimeType = 'image/png';
+        else if (fileExtension === 'gif') mimeType = 'image/gif';
+        else if (fileExtension === 'webp') mimeType = 'image/webp';
+
+        console.log('📤 [CREATE] Logo file info:', { filename, fileExtension, mimeType });
+
+        formData.append('logo', {
+          uri: logoUri,
+          type: mimeType,
+          name: filename,
+        } as any);
+
+        console.log('📤 [CREATE] Sending FormData request to /api/mobile/business-profile');
+
+        const response = await api.post('/api/mobile/business-profile', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+          timeout: 30000,
+        });
+
+        if (response.data.success) {
+          console.log('✅ Business profile created via API:', response.data.data.id);
+
+          // Clear cache
+          this.clearCache(currentUser?.id);
+
+          // Map backend response - prioritize businessLogo field
+          const backendProfile = response.data.data;
+          const logoUrl = backendProfile.businessLogo || backendProfile.logo ||
+                          backendProfile.companyLogo || backendProfile.profileLogo ||
+                          backendProfile.image || backendProfile.photo || '';
+
+          console.log('🖼️ Logo URL returned from API:', logoUrl || '(empty)');
+
+          const newProfile: BusinessProfile = {
+            id: backendProfile.id,
+            name: backendProfile.businessName,
+            description: backendProfile.description || '',
+            category: backendProfile.category,
+            subCategory: backendProfile.subCategory || backendProfile.subcategory,
+            subcategory: backendProfile.subCategory || backendProfile.subcategory,
+            address: backendProfile.address || '',
+            phone: backendProfile.phone || '',
+            alternatePhone: backendProfile.alternatePhone || '',
+            email: backendProfile.email || '',
+            website: backendProfile.website || '',
+            companyLogo: logoUrl,
+            logo: logoUrl,
+            banner: '',
+            services: [],
+            createdAt: backendProfile.createdAt,
+            updatedAt: backendProfile.updatedAt,
+          };
+
+          return newProfile;
+        } else {
+          throw new Error('API returned unsuccessful response');
+        }
       } else {
-        throw new Error('API returned unsuccessful response');
+        // Fallback to JSON for profiles without logo
+        console.log('📤 [CREATE] Creating JSON request (no logo upload)');
+
+        const resolvedSubcategory =
+          data.businessSubcategory ??
+          data.subCategory ??
+          data.subcategory;
+
+        const backendData: any = {
+          businessName,
+          ownerName,
+          email,
+          phone,
+          address,
+          category,
+          logo: data.companyLogo || data.logo || '',
+          companyLogo: data.companyLogo || data.logo || '',
+          description: data.description || '',
+          website: data.website || ''
+        };
+
+        if (resolvedSubcategory !== undefined) {
+          backendData.businessSubcategory = resolvedSubcategory;
+        }
+
+        if (alternatePhone) {
+          backendData.alternatePhone = alternatePhone;
+        }
+
+        console.log('📤 Sending business profile data:', JSON.stringify(backendData, null, 2));
+
+        const response = await api.post('/api/mobile/business-profile', backendData);
+
+        if (response.data.success) {
+          console.log('✅ Business profile created via API:', response.data.data.id);
+
+          this.clearCache(currentUser?.id);
+
+          const backendProfile = response.data.data;
+          const logoUrl = backendProfile.businessLogo || backendProfile.logo ||
+                          backendProfile.companyLogo || backendProfile.profileLogo ||
+                          backendProfile.image || backendProfile.photo || '';
+
+          const newProfile: BusinessProfile = {
+            id: backendProfile.id,
+            name: backendProfile.businessName,
+            description: backendProfile.description || '',
+            category: backendProfile.category,
+            subCategory: backendProfile.subCategory || backendProfile.subcategory,
+            subcategory: backendProfile.subCategory || backendProfile.subcategory,
+            address: backendProfile.address || '',
+            phone: backendProfile.phone || '',
+            alternatePhone: backendProfile.alternatePhone || '',
+            email: backendProfile.email || '',
+            website: backendProfile.website || '',
+            companyLogo: logoUrl,
+            logo: logoUrl,
+            banner: '',
+            services: [],
+            createdAt: backendProfile.createdAt,
+            updatedAt: backendProfile.updatedAt,
+          };
+
+          return newProfile;
+        } else {
+          throw new Error('API returned unsuccessful response');
+        }
       }
     } catch (error) {
       console.error('❌ Error creating business profile via API:', error);
-      console.log('⚠️ Business profile creation failed due to API error');
-      // Throw error instead of creating mock profile
       throw new Error('Failed to create business profile');
     }
   }
@@ -381,113 +449,190 @@ class BusinessProfileService {
   async updateBusinessProfile(id: string, data: Partial<CreateBusinessProfileData>): Promise<BusinessProfile> {
     try {
       console.log('Updating business profile via API:', id);
-      
-      // Validate logo URLs before sending to backend
-      if (data.logo && this.isLocalFilePath(data.logo)) {
-        console.error('❌ [UPDATE] Attempting to save local file path as logo:', data.logo);
-        throw new Error(
-          'Cannot save local file path as logo. Please use uploadImage() to upload the image file first.'
-        );
-      }
-      if (data.companyLogo && this.isLocalFilePath(data.companyLogo)) {
-        console.error('❌ [UPDATE] Attempting to save local file path as companyLogo:', data.companyLogo);
-        throw new Error(
-          'Cannot save local file path as logo. Please use uploadImage() to upload the image file first.'
-        );
-      }
-      
-      // SAFETY GUARD: Prevent accidental logo updates from user profile sync
-      // Only allow logo updates if they come from explicit business profile operations
-      if (data.logo !== undefined || data.companyLogo !== undefined) {
-        console.warn('⚠️ [SAFETY] Logo update detected in business profile update');
-        console.warn('⚠️ [SAFETY] This should only happen from explicit business profile operations, not user profile sync');
-        // Allow the update but log warning for debugging - remove this block if you want to block completely
-      }
-      
-      // Map frontend data to backend format - only include fields that are provided
-      const backendData: any = {};
-      
-      if (data.name !== undefined) backendData.businessName = data.name;
-      if (data.email !== undefined) backendData.email = data.email;
-      if (data.phone !== undefined) backendData.phone = data.phone;
-      if (data.address !== undefined) backendData.address = data.address;
-      if (data.category !== undefined) backendData.category = data.category;
-      
-      // Handle subcategory field with backward compatibility (prevent silent data loss)
-      const resolvedSubcategory =
-        data.businessSubcategory ??
-        data.subCategory ??
-        data.subcategory;
-      
-      if (resolvedSubcategory !== undefined) {
-        backendData.businessSubcategory = resolvedSubcategory;
-      }
-      
-      // Use 'logo' field if provided, otherwise use 'companyLogo'
-      if (data.logo !== undefined) backendData.logo = data.logo;
-      else if (data.companyLogo !== undefined) backendData.logo = data.companyLogo;
-      if (data.description !== undefined) backendData.description = data.description;
-      if (data.website !== undefined) backendData.website = data.website;
-      
-      if (__DEV__) {
-        console.log('🔍 Making PUT request to:', `/api/mobile/business-profile/${id}`);
-        console.log('📤 Request data (partial update):', backendData);
-      }
-      
-      const response = await api.put(`/api/mobile/business-profile/${id}`, backendData);
-      
-      console.log('═══════════════════════════════════════════════════════════');
-      console.log('📡 UPDATE BUSINESS PROFILE - BACKEND RESPONSE');
-      console.log('═══════════════════════════════════════════════════════════');
-      console.log('🆔 Profile ID:', id);
-      console.log('📤 Data we sent:', JSON.stringify(backendData, null, 2));
-      console.log('📥 Backend response:', JSON.stringify(response.data, null, 2));
-      console.log('═══════════════════════════════════════════════════════════');
-      
-      if (response.data.success) {
-        console.log('✅ Business profile updated via API:', response.data.data.businessName);
-        // Clear cache to force refresh
-        const currentUser = authService.getCurrentUser();
-        this.clearCache(currentUser?.id);
-        // Also clear the specific profile cache
-        cacheService.clear(`business_profile_${id}`);
-        
-        // Map backend response to frontend format
-        const backendProfile = response.data.data;
-        
-        console.log('📋 Backend returned profile fields:');
-        console.log('   🏢 businessName:', backendProfile.businessName);
-        console.log('   📍 address:', backendProfile.address || '(empty)');
-        console.log('   🌐 website:', backendProfile.website || '(empty)');
-        console.log('   🏷️ category:', backendProfile.category || '(empty)');
-        console.log('   📝 description:', backendProfile.description || '(empty)');
-        console.log('   📱 phone:', backendProfile.phone || '(empty)');
-        console.log('   📱 alternatePhone:', backendProfile.alternatePhone || '(empty)');
-        console.log('   📧 email:', backendProfile.email || '(empty)');
-        console.log('   🖼️ logo:', backendProfile.logo || '(empty)');
-        
-        const updatedProfile: BusinessProfile = {
-          id: backendProfile.id,
-          name: backendProfile.businessName,
-          description: backendProfile.description || '',
-          category: backendProfile.category,
-          subCategory: backendProfile.subCategory || backendProfile.subcategory,
-          subcategory: backendProfile.subCategory || backendProfile.subcategory,
-          address: backendProfile.address || '',
-          phone: backendProfile.phone || '',
-          alternatePhone: backendProfile.alternatePhone || '',
-          email: backendProfile.email || '',
-          website: backendProfile.website || '',
-          companyLogo: backendProfile.logo || '',
-          logo: backendProfile.logo || '',
-          banner: '',
-          services: [],
-          createdAt: backendProfile.createdAt,
-          updatedAt: backendProfile.updatedAt,
-        };
-        return updatedProfile;
+
+      // Check if logo is being uploaded (local file path)
+      const logoUri = data.companyLogo || data.logo;
+      const hasLogo = logoUri && this.isLocalFilePath(logoUri);
+
+      if (hasLogo) {
+        console.log('📤 [UPDATE] Creating FormData request with logo upload');
+
+        // Create FormData for file upload
+        const formData = new FormData();
+
+        // Add fields that are provided
+        if (data.name !== undefined) formData.append('businessName', data.name);
+        if (data.email !== undefined) formData.append('email', data.email);
+        if (data.phone !== undefined) formData.append('phone', data.phone);
+        if (data.address !== undefined) formData.append('address', data.address);
+        if (data.category !== undefined) formData.append('category', data.category);
+        if (data.description !== undefined) formData.append('description', data.description);
+        if (data.website !== undefined) formData.append('website', data.website);
+        if (data.alternatePhone !== undefined) formData.append('alternatePhone', data.alternatePhone);
+
+        // Handle subcategory field with backward compatibility
+        const resolvedSubcategory =
+          data.businessSubcategory ??
+          data.subCategory ??
+          data.subcategory;
+
+        if (resolvedSubcategory !== undefined) {
+          formData.append('businessSubcategory', resolvedSubcategory);
+        }
+
+        // Add logo file
+        const filename = logoUri.split('/').pop() || 'logo.jpg';
+        const fileExtension = filename.split('.').pop()?.toLowerCase() || 'jpg';
+
+        let mimeType = 'image/jpeg';
+        if (fileExtension === 'png') mimeType = 'image/png';
+        else if (fileExtension === 'gif') mimeType = 'image/gif';
+        else if (fileExtension === 'webp') mimeType = 'image/webp';
+
+        console.log('📤 [UPDATE] Logo file info:', { filename, fileExtension, mimeType });
+
+        formData.append('logo', {
+          uri: logoUri,
+          type: mimeType,
+          name: filename,
+        } as any);
+
+        console.log('📤 [UPDATE] Sending FormData request to:', `/api/mobile/business-profile/${id}`);
+
+        const response = await api.put(`/api/mobile/business-profile/${id}`, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+          timeout: 30000,
+        });
+
+        if (response.data.success) {
+          console.log('✅ Business profile updated via API:', response.data.data.businessName);
+          // Clear cache to force refresh
+          const currentUser = authService.getCurrentUser();
+          this.clearCache(currentUser?.id);
+          // Also clear the specific profile cache
+          cacheService.clear(`business_profile_${id}`);
+
+          // Map backend response to frontend format
+          const backendProfile = response.data.data;
+          const logoUrl = backendProfile.businessLogo || backendProfile.logo ||
+                          backendProfile.companyLogo || backendProfile.profileLogo ||
+                          backendProfile.image || backendProfile.photo || '';
+
+          const updatedProfile: BusinessProfile = {
+            id: backendProfile.id,
+            name: backendProfile.businessName,
+            description: backendProfile.description || '',
+            category: backendProfile.category,
+            subCategory: backendProfile.subCategory || backendProfile.subcategory,
+            subcategory: backendProfile.subCategory || backendProfile.subcategory,
+            address: backendProfile.address || '',
+            phone: backendProfile.phone || '',
+            alternatePhone: backendProfile.alternatePhone || '',
+            email: backendProfile.email || '',
+            website: backendProfile.website || '',
+            companyLogo: logoUrl,
+            logo: logoUrl,
+            banner: '',
+            services: [],
+            createdAt: backendProfile.createdAt,
+            updatedAt: backendProfile.updatedAt,
+          };
+          return updatedProfile;
+        } else {
+          throw new Error('API returned unsuccessful response');
+        }
       } else {
-        throw new Error('API returned unsuccessful response');
+        // Fallback to JSON for updates without logo
+        console.log('📤 [UPDATE] Creating JSON request (no logo upload)');
+
+        // Map frontend data to backend format - only include fields that are provided
+        const backendData: any = {};
+
+        if (data.name !== undefined) backendData.businessName = data.name;
+        if (data.email !== undefined) backendData.email = data.email;
+        if (data.phone !== undefined) backendData.phone = data.phone;
+        if (data.address !== undefined) backendData.address = data.address;
+        if (data.category !== undefined) backendData.category = data.category;
+
+        // Handle subcategory field with backward compatibility (prevent silent data loss)
+        const resolvedSubcategory =
+          data.businessSubcategory ??
+          data.subCategory ??
+          data.subcategory;
+
+        if (resolvedSubcategory !== undefined) {
+          backendData.businessSubcategory = resolvedSubcategory;
+        }
+
+        // Use 'logo' field if provided, otherwise use 'companyLogo'
+        if (data.logo !== undefined) backendData.logo = data.logo;
+        else if (data.companyLogo !== undefined) backendData.logo = data.companyLogo;
+        if (data.description !== undefined) backendData.description = data.description;
+        if (data.website !== undefined) backendData.website = data.website;
+        if (data.alternatePhone !== undefined) backendData.alternatePhone = data.alternatePhone;
+
+        if (__DEV__) {
+          console.log('🔍 Making PUT request to:', `/api/mobile/business-profile/${id}`);
+          console.log('📤 Request data (partial update):', backendData);
+        }
+
+        const response = await api.put(`/api/mobile/business-profile/${id}`, backendData);
+
+        console.log('═══════════════════════════════════════════════════════════');
+        console.log('📡 UPDATE BUSINESS PROFILE - BACKEND RESPONSE');
+        console.log('═══════════════════════════════════════════════════════════');
+        console.log('🆔 Profile ID:', id);
+        console.log('📤 Data we sent:', JSON.stringify(backendData, null, 2));
+        console.log('📥 Backend response:', JSON.stringify(response.data, null, 2));
+        console.log('═══════════════════════════════════════════════════════════');
+
+        if (response.data.success) {
+          console.log('✅ Business profile updated via API:', response.data.data.businessName);
+          // Clear cache to force refresh
+          const currentUser = authService.getCurrentUser();
+          this.clearCache(currentUser?.id);
+          // Also clear the specific profile cache
+          cacheService.clear(`business_profile_${id}`);
+
+          // Map backend response to frontend format
+          const backendProfile = response.data.data;
+
+          console.log('📋 Backend returned profile fields:');
+          console.log('   🏢 businessName:', backendProfile.businessName);
+          console.log('   📍 address:', backendProfile.address || '(empty)');
+          console.log('   🌐 website:', backendProfile.website || '(empty)');
+          console.log('   🏷️ category:', backendProfile.category || '(empty)');
+          console.log('   📝 description:', backendProfile.description || '(empty)');
+          console.log('   📱 phone:', backendProfile.phone || '(empty)');
+          console.log('   📱 alternatePhone:', backendProfile.alternatePhone || '(empty)');
+          console.log('   📧 email:', backendProfile.email || '(empty)');
+          console.log('   🖼️ logo:', backendProfile.logo || '(empty)');
+
+          const updatedProfile: BusinessProfile = {
+            id: backendProfile.id,
+            name: backendProfile.businessName,
+            description: backendProfile.description || '',
+            category: backendProfile.category,
+            subCategory: backendProfile.subCategory || backendProfile.subcategory,
+            subcategory: backendProfile.subCategory || backendProfile.subcategory,
+            address: backendProfile.address || '',
+            phone: backendProfile.phone || '',
+            alternatePhone: backendProfile.alternatePhone || '',
+            email: backendProfile.email || '',
+            website: backendProfile.website || '',
+            companyLogo: backendProfile.logo || '',
+            logo: backendProfile.logo || '',
+            banner: '',
+            services: [],
+            createdAt: backendProfile.createdAt,
+            updatedAt: backendProfile.updatedAt,
+          };
+          return updatedProfile;
+        } else {
+          throw new Error('API returned unsuccessful response');
+        }
       }
     } catch (error) {
       console.error('❌ Error updating business profile via API:', error);

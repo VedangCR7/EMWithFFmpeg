@@ -1,0 +1,1634 @@
+================================================================================
+MOBILE APP LOGO UPLOAD ANALYSIS REPORT
+================================================================================
+Date: April 10, 2026
+Analysis Scope: Business Profile Creation Flow
+Backend Status: Updated to support FormData logo upload
+Endpoint: POST /api/mobile/business-profile
+
+================================================================================
+1. MOBILE ARCHITECTURE OVERVIEW
+================================================================================
+
+Current Architecture:
+----------------------
+Image Selection Flow:
+  - ImagePickerModal component handles camera/gallery selection
+  - Uses react-native-image-picker for camera
+  - Uses react-native-image-crop-picker for cropping
+  - Returns local file URI (file:// or content://)
+
+State Management:
+  - BusinessProfileForm component manages form state
+  - formData state includes: companyLogo (string)
+  - logoImage state for UI preview (string | null)
+  - uploadingImage state for loading indicator (boolean)
+
+API Submission:
+  - BusinessProfilesScreen.handleFormSubmit() orchestrates submission
+  - businessProfileService.createBusinessProfile() makes API call
+  - Currently sends JSON payload via axios
+
+Key Components:
+  - BusinessProfileForm.tsx (Form UI and validation)
+  - BusinessProfilesScreen.tsx (Form submission orchestration)
+  - businessProfile.ts (API service layer)
+  - ImagePickerModal.tsx (Image selection UI)
+  - api.ts (Axios configuration)
+
+================================================================================
+2. IMAGE UPLOAD FLOW
+================================================================================
+
+Current Flow (BROKEN):
+-----------------------
+Step 1: User selects logo
+  ↓
+ImagePickerModal.handleCameraPress() or handleGalleryPress()
+  ↓
+Image cropped via ImageCropPicker.openCropper()
+  ↓
+onImageSelected(imageUri) callback invoked
+  ↓
+BusinessProfileForm.handleImageSelected() receives URI
+  ↓
+State updated: setFormData(prev => ({ ...prev, companyLogo: imageUri }))
+  ↓
+State updated: setLogoImage(imageUri) for UI preview
+  ↓
+User fills other form fields
+  ↓
+User clicks REGISTER button
+  ↓
+BusinessProfileForm.handleSubmit() called
+  ↓
+⚠️ LOGO REMOVED from payload:
+    const formDataWithoutLogo = { ...formData, companyLogo: '', logo: '' }
+  ↓
+onSubmit(formDataWithoutLogo, formData.companyLogo) called
+  ↓
+BusinessProfilesScreen.handleFormSubmit() receives:
+    - formData (WITHOUT logo)
+    - pendingLogoUri (original logo URI)
+  ↓
+businessProfileService.createBusinessProfile(formData) called
+  ↓
+API sends JSON with empty logo fields
+  ↓
+Backend creates profile without logo
+  ↓
+⚠️ pendingLogoUri stored in AsyncStorage but NEVER uploaded
+  ↓
+Logo lost forever
+
+Expected Flow (AFTER FIX):
+---------------------------
+Step 1: User selects logo
+  ↓
+ImagePickerModal returns local file URI
+  ↓
+BusinessProfileForm.handleImageSelected() stores URI in state
+  ↓
+User fills other form fields
+  ↓
+User clicks REGISTER button
+  ↓
+BusinessProfileForm.handleSubmit() creates FormData
+  ↓
+FormData.append('businessName', data.name)
+  ↓
+FormData.append('email', data.email)
+  ↓
+FormData.append('phone', data.phone)
+  ↓
+FormData.append('category', data.category)
+  ↓
+FormData.append('logo', { uri, type, name })
+  ↓
+onSubmit(formData) called
+  ↓
+businessProfileService.createBusinessProfile(formData) called
+  ↓
+API sends FormData with multipart/form-data
+  ↓
+Backend uploads logo to Cloudinary
+  ↓
+Backend stores logo URL in database
+  ↓
+Backend returns logo URL in response
+  ↓
+Mobile app updates UI with returned logo
+
+================================================================================
+3. API REQUEST ANALYSIS
+================================================================================
+
+Current Implementation:
+-----------------------
+File: src/services/businessProfile.ts
+Function: createBusinessProfile() (lines 251-363)
+
+Request Type: JSON (application/json)
+Request Format:
+```javascript
+const backendData = {
+  businessName: "Test Business",
+  ownerName: "Owner Name",
+  email: "test@example.com",
+  phone: "1234567890",
+  address: "Test Address",
+  category: "Event Planners",
+  logo: "",  // EMPTY STRING
+  companyLogo: "",  // EMPTY STRING
+  description: "",
+  website: ""
+};
+
+const response = await api.post('/api/mobile/business-profile', backendData);
+```
+
+API Configuration (src/services/api.ts lines 127-137):
+```javascript
+const api = axios.create({
+  baseURL: BASE_URL,
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',  // ❌ WRONG for file upload
+    'Accept': 'application/json',
+  },
+});
+```
+
+Expected Implementation:
+-----------------------
+Request Type: FormData (multipart/form-data)
+Request Format:
+```javascript
+const formData = new FormData();
+
+formData.append('businessName', data.name);
+formData.append('ownerName', ownerName);
+formData.append('email', data.email);
+formData.append('phone', data.phone);
+formData.append('address', data.address);
+formData.append('category', data.category);
+
+if (logoUri) {
+  const filename = logoUri.split('/').pop() || 'logo.jpg';
+  const fileExtension = filename.split('.').pop()?.toLowerCase() || 'jpg';
+  let mimeType = 'image/jpeg';
+  if (fileExtension === 'png') mimeType = 'image/png';
+  else if (fileExtension === 'gif') mimeType = 'image/gif';
+  
+  formData.append('logo', {
+    uri: logoUri,
+    type: mimeType,
+    name: filename,
+  } as any);
+}
+
+const response = await api.post('/api/mobile/business-profile', formData, {
+  headers: {
+    'Content-Type': 'multipart/form-data',
+  },
+  timeout: 30000,
+});
+```
+
+================================================================================
+4. BACKEND COMPATIBILITY CHECK
+================================================================================
+
+Backend Capabilities:
+-------------------
+✅ Endpoint: POST /api/mobile/business-profile
+✅ Accepts: multipart/form-data
+✅ Logo field: logoUpload.single("logo")
+✅ Storage: Cloudinary
+✅ Database field: businessLogo
+✅ Response field: logo
+✅ Response format:
+    {
+      "success": true,
+      "data": {
+        "id": "profileId",
+        "businessName": "Test Business",
+        "businessLogo": "https://res.cloudinary.com/...",
+        "logo": "https://res.cloudinary.com/..."
+      }
+    }
+
+Mobile App Current Status:
+-------------------------
+❌ Sends: JSON (application/json)
+❌ Logo field: Empty string ""
+❌ No file upload during creation
+❌ Two-step upload strategy (broken)
+❌ FormData not used for creation
+
+Compatibility Status: NOT COMPATIBLE
+------------------------------------
+The mobile app does NOT match the backend expectations:
+- Backend expects FormData with file object
+- Mobile app sends JSON with empty string
+- Backend cannot process empty string as file
+- Logo upload fails silently
+
+================================================================================
+5. PROBLEMS FOUND
+================================================================================
+
+Problem 1: Two-Step Upload Strategy (CRITICAL)
+----------------------------------------------
+Location: BusinessProfileForm.tsx lines 496-518
+Issue: Form removes logo from payload before submission
+Impact: Logo is never sent to backend
+Code:
+```javascript
+// For new profiles, upload image if it's a local file path
+if (!profile && formData.companyLogo && businessProfileService.isLocalFilePath(formData.companyLogo)) {
+  // Creates a copy of formData with logo REMOVED
+  const formDataWithoutLogo = { ...formData, companyLogo: '', logo: '' };
+  
+  // Submits form WITHOUT logo, passes logo URI separately
+  onSubmit(formDataWithoutLogo, formData.companyLogo);
+}
+```
+
+Problem 2: Pending Logo Storage (CRITICAL)
+------------------------------------------
+Location: BusinessProfilesScreen.tsx line 620
+Issue: Pending logo stored but never retrieved/uploaded
+Impact: Logo lost forever
+Code:
+```javascript
+if (pendingLogoUri) {
+  await AsyncStorage.setItem(`pending_logo_${newProfile.id}`, pendingLogoUri);
+}
+// ❌ No code to retrieve and upload this pending logo
+```
+
+Evidence: Search for "getItem.*pending_logo" returned ZERO results
+
+Problem 3: Wrong Request Type (CRITICAL)
+----------------------------------------
+Location: businessProfile.ts lines 294-320
+Issue: Sends JSON instead of FormData
+Impact: Backend cannot process file upload
+Code:
+```javascript
+const backendData: any = {
+  businessName,
+  ownerName,
+  email,
+  phone,
+  address,
+  category,
+  logo: logoUrl,  // This is a string, not a file object
+  companyLogo: logoUrl,
+  description: data.description || '',
+  website: data.website || ''
+};
+
+const response = await api.post('/api/mobile/business-profile', backendData);
+```
+
+Problem 4: Incorrect Content-Type (CRITICAL)
+---------------------------------------------
+Location: api.ts lines 127-137
+Issue: Default Content-Type is application/json
+Impact: FormData requests will fail
+Code:
+```javascript
+const api = axios.create({
+  baseURL: BASE_URL,
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',  // ❌ Wrong for FormData
+    'Accept': 'application/json',
+  },
+});
+```
+
+Problem 5: Legacy uploadImage Function (OBSOLETE)
+--------------------------------------------------
+Location: businessProfile.ts lines 522-620
+Issue: Separate upload endpoint exists but not needed anymore
+Impact: Code complexity, potential confusion
+Code:
+```javascript
+async uploadImage(profileId: string, imageType: 'logo' | 'banner', imageUri: string): Promise<{ url: string }> {
+  // This function uploads logo AFTER profile creation
+  // Not needed anymore since backend supports upload during creation
+  const formData = new FormData();
+  formData.append('logo', { uri: imageUri, type: mimeType, name: filename });
+  const response = await api.post(`/api/mobile/business-profile/${profileId}/upload`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+}
+```
+
+Problem 6: Data Type Mismatch (CRITICAL)
+----------------------------------------
+Location: CreateBusinessProfileData interface (lines 35-51)
+Issue: companyLogo is defined as string, not file object
+Impact: Cannot pass file object in type-safe way
+Code:
+```typescript
+export interface CreateBusinessProfileData {
+  name: string;
+  description?: string;
+  category: string;
+  businessSubcategory?: string;
+  subCategory?: string;
+  subcategory?: string;
+  address: string;
+  phone: string;
+  alternatePhone?: string;
+  email: string;
+  website?: string;
+  companyLogo?: string;  // ❌ Should support File object or URI
+  logo?: string;  // ❌ Should support File object or URI
+}
+```
+
+Problem 7: No FormData Support in Service Layer (CRITICAL)
+-----------------------------------------------------------
+Location: businessProfile.ts createBusinessProfile()
+Issue: Function only handles JSON payloads
+Impact: Cannot accept FormData from form
+Code:
+```javascript
+async createBusinessProfile(data: CreateBusinessProfileData): Promise<BusinessProfile> {
+  // ❌ No logic to handle FormData
+  // ❌ Always treats data as JSON object
+  // ❌ Always sends as JSON
+  const backendData: any = {
+    businessName,
+    ownerName,
+    email,
+    phone,
+    address,
+    category,
+    logo: logoUrl,  // Expects string
+    companyLogo: logoUrl,  // Expects string
+  };
+  const response = await api.post('/api/mobile/business-profile', backendData);
+}
+```
+
+Problem 8: Response Field Mapping (MINOR)
+------------------------------------------
+Location: businessProfile.ts lines 346-347
+Issue: Maps multiple possible logo fields from backend
+Impact: May not correctly map businessLogo
+Code:
+```javascript
+companyLogo: returnedLogo || backendProfile.companyLogo || backendProfile.profileLogo || 
+             backendProfile.businessLogo || backendProfile.image || backendProfile.photo || '',
+logo: returnedLogo || backendProfile.companyLogo || backendProfile.profileLogo || 
+      backendProfile.businessLogo || backendProfile.image || backendProfile.photo || '',
+```
+Note: This is actually good defensive coding, but should prioritize businessLogo
+
+Problem 9: Form State Handling (MINOR)
+---------------------------------------
+Location: BusinessProfileForm.tsx line 371
+Issue: Stores local URI directly in companyLogo field
+Impact: Confusion about whether this is URI or URL
+Code:
+```javascript
+// For new profiles, store the local URI temporarily
+setFormData(prev => ({ ...prev, companyLogo: imageUri }));
+```
+This is acceptable as long as FormData construction handles it correctly
+
+================================================================================
+6. CODE SNIPPETS
+================================================================================
+
+Snippet 1: Broken Form Submission Logic
+----------------------------------------
+File: src/components/BusinessProfileForm.tsx
+Lines: 496-518
+
+```javascript
+const handleSubmit = async () => {
+  const validation = validateForm();
+  if (!validation.isValid) {
+    setValidationErrors(validation.errors);
+    setShowValidationModal(true);
+    return;
+  }
+
+  // ❌ PROBLEM: Removes logo from payload
+  if (!profile && formData.companyLogo && businessProfileService.isLocalFilePath(formData.companyLogo)) {
+    try {
+      setUploadingImage(true);
+      console.log('📤 [BUSINESS FORM] Uploading logo for new profile creation...');
+
+      // ❌ Creates copy without logo
+      const formDataWithoutLogo = { ...formData, companyLogo: '', logo: '' };
+
+      console.log('✅ [BUSINESS FORM] Form validation passed, submitting to parent (without logo)');
+      onSubmit(formDataWithoutLogo, formData.companyLogo); // Pass original logo URI separately
+
+    } catch (error) {
+      console.error('❌ [BUSINESS FORM] Failed to prepare logo upload:', error);
+      Alert.alert('Upload Failed', 'Failed to prepare logo upload. Please try again.');
+    } finally {
+      setUploadingImage(false);
+    }
+  } else {
+    console.log('✅ [BUSINESS FORM] Form validation passed, submitting to parent');
+    onSubmit(formData);
+  }
+};
+```
+
+Snippet 2: Broken Pending Logo Storage
+---------------------------------------
+File: src/screens/BusinessProfilesScreen.tsx
+Lines: 614-636
+
+```javascript
+const handleFormSubmit = useCallback(async (formData: any, pendingLogoUri?: string) => {
+  if (!editingProfile) {
+    setFormLoading(true);
+    try {
+      const newProfile = await businessProfileService.createBusinessProfile(formData);
+      
+      // ❌ PROBLEM: Stores pending logo but never uploads it
+      if (pendingLogoUri) {
+        await AsyncStorage.setItem(`pending_logo_${newProfile.id}`, pendingLogoUri);
+      }
+      
+      const profileWithId = { ...formData, id: newProfile.id };
+      setPendingProfileData(profileWithId);
+      pendingProfileDataRef.current = profileWithId;
+      await AsyncStorage.setItem('pending_business_profile_data', JSON.stringify(profileWithId));
+      setShowPaymentModal(true);
+      setShowForm(false);
+      setShowBottomSheet(false);
+      loadBusinessProfiles(true, true);
+    } catch (error: any) {
+      setErrorMessage(error.message || 'Failed to create business profile.');
+      setShowErrorModal(true);
+    } finally {
+      setFormLoading(false);
+    }
+    return;
+  }
+  // ... edit profile logic
+}, [editingProfile, loadBusinessProfiles]);
+```
+
+Snippet 3: Broken API Request Construction
+------------------------------------------
+File: src/services/businessProfile.ts
+Lines: 280-320
+
+```javascript
+// Handle logo upload if it's a local file path
+let logoUrl = data.companyLogo || '';
+if (logoUrl && this.isLocalFilePath(logoUrl)) {
+  console.log('⚠️ [CREATE] Logo is a local file path, will send as-is (API should handle upload)');
+  // ❌ PROBLEM: Sends local path as string, not as file object
+  // Note: If API doesn't handle local paths, we'd need to upload first
+  // For now, send it and let the API handle it
+}
+
+const backendData: any = {
+  businessName,
+  ownerName,
+  email,
+  phone,
+  address,
+  category,
+  // ❌ PROBLEM: Sends logo as string, not file object
+  logo: logoUrl,
+  companyLogo: logoUrl,
+  description: data.description || '',
+  website: data.website || ''
+};
+
+// ❌ PROBLEM: Sends JSON, not FormData
+const response = await api.post('/api/mobile/business-profile', backendData);
+```
+
+Snippet 4: Wrong API Configuration
+-----------------------------------
+File: src/services/api.ts
+Lines: 127-137
+
+```javascript
+const api = axios.create({
+  baseURL: BASE_URL,
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',  // ❌ PROBLEM: Wrong for FormData
+    'Accept': 'application/json',
+  },
+});
+```
+
+================================================================================
+7. REQUIRED FIXES
+================================================================================
+
+Fix 1: Update CreateBusinessProfileData Interface
+-------------------------------------------------
+File: src/services/businessProfile.ts
+Lines: 35-51
+
+Action: Update interface to support FormData
+
+Current:
+```typescript
+export interface CreateBusinessProfileData {
+  name: string;
+  description?: string;
+  category: string;
+  businessSubcategory?: string;
+  subCategory?: string;
+  subcategory?: string;
+  address: string;
+  phone: string;
+  alternatePhone?: string;
+  email: string;
+  website?: string;
+  companyLogo?: string;  // ❌ String only
+  logo?: string;  // ❌ String only
+}
+```
+
+Fixed:
+```typescript
+export interface CreateBusinessProfileData {
+  name: string;
+  description?: string;
+  category: string;
+  businessSubcategory?: string;
+  subCategory?: string;
+  subcategory?: string;
+  address: string;
+  phone: string;
+  alternatePhone?: string;
+  email: string;
+  website?: string;
+  companyLogo?: string | FormData;  // ✅ Support both string and FormData
+  logo?: string | FormData;  // ✅ Support both string and FormData
+}
+```
+
+Fix 2: Remove Two-Step Upload Logic from Form
+----------------------------------------------
+File: src/components/BusinessProfileForm.tsx
+Lines: 496-518
+
+Action: Simplify handleSubmit to always submit form data
+
+Current:
+```javascript
+const handleSubmit = async () => {
+  const validation = validateForm();
+  if (!validation.isValid) {
+    setValidationErrors(validation.errors);
+    setShowValidationModal(true);
+    return;
+  }
+
+  // ❌ Remove this entire if block
+  if (!profile && formData.companyLogo && businessProfileService.isLocalFilePath(formData.companyLogo)) {
+    try {
+      setUploadingImage(true);
+      const formDataWithoutLogo = { ...formData, companyLogo: '', logo: '' };
+      onSubmit(formDataWithoutLogo, formData.companyLogo);
+    } catch (error) {
+      console.error('❌ [BUSINESS FORM] Failed to prepare logo upload:', error);
+      Alert.alert('Upload Failed', 'Failed to prepare logo upload. Please try again.');
+    } finally {
+      setUploadingImage(false);
+    }
+  } else {
+    onSubmit(formData);
+  }
+};
+```
+
+Fixed:
+```javascript
+const handleSubmit = async () => {
+  const validation = validateForm();
+  if (!validation.isValid) {
+    setValidationErrors(validation.errors);
+    setShowValidationModal(true);
+    return;
+  }
+
+  // ✅ Always submit form data directly
+  console.log('✅ [BUSINESS FORM] Form validation passed, submitting to parent');
+  onSubmit(formData);
+};
+```
+
+Fix 3: Remove Pending Logo Parameter from onSubmit
+--------------------------------------------------
+File: src/components/BusinessProfileForm.tsx
+Line: 114
+
+Action: Update interface to remove pendingLogoUri parameter
+
+Current:
+```typescript
+interface BusinessProfileFormProps {
+  visible: boolean;
+  onClose: () => void;
+  onSubmit: (data: CreateBusinessProfileData, pendingLogoUri?: string) => void;  // ❌
+  profile?: BusinessProfile | null;
+  loading?: boolean;
+}
+```
+
+Fixed:
+```typescript
+interface BusinessProfileFormProps {
+  visible: boolean;
+  onClose: () => void;
+  onSubmit: (data: CreateBusinessProfileData) => void;  // ✅
+  profile?: BusinessProfile | null;
+  loading?: boolean;
+}
+```
+
+Fix 4: Remove Pending Logo Handling from Screen
+------------------------------------------------
+File: src/screens/BusinessProfilesScreen.tsx
+Lines: 614-636
+
+Action: Remove pendingLogoUri parameter and AsyncStorage logic
+
+Current:
+```javascript
+const handleFormSubmit = useCallback(async (formData: any, pendingLogoUri?: string) => {
+  if (!editingProfile) {
+    setFormLoading(true);
+    try {
+      const newProfile = await businessProfileService.createBusinessProfile(formData);
+      
+      // ❌ Remove this block
+      if (pendingLogoUri) {
+        await AsyncStorage.setItem(`pending_logo_${newProfile.id}`, pendingLogoUri);
+      }
+      
+      const profileWithId = { ...formData, id: newProfile.id };
+      setPendingProfileData(profileWithId);
+      pendingProfileDataRef.current = profileWithId;
+      await AsyncStorage.setItem('pending_business_profile_data', JSON.stringify(profileWithId));
+      setShowPaymentModal(true);
+      setShowForm(false);
+      setShowBottomSheet(false);
+      loadBusinessProfiles(true, true);
+    } catch (error: any) {
+      setErrorMessage(error.message || 'Failed to create business profile.');
+      setShowErrorModal(true);
+    } finally {
+      setFormLoading(false);
+    }
+    return;
+  }
+  // ... rest of function
+}, [editingProfile, loadBusinessProfiles]);
+```
+
+Fixed:
+```javascript
+const handleFormSubmit = useCallback(async (formData: any) => {
+  if (!editingProfile) {
+    setFormLoading(true);
+    try {
+      const newProfile = await businessProfileService.createBusinessProfile(formData);
+      
+      // ✅ Pending logo logic removed
+      
+      const profileWithId = { ...formData, id: newProfile.id };
+      setPendingProfileData(profileWithId);
+      pendingProfileDataRef.current = profileWithId;
+      await AsyncStorage.setItem('pending_business_profile_data', JSON.stringify(profileWithId));
+      setShowPaymentModal(true);
+      setShowForm(false);
+      setShowBottomSheet(false);
+      loadBusinessProfiles(true, true);
+    } catch (error: any) {
+      setErrorMessage(error.message || 'Failed to create business profile.');
+      setShowErrorModal(true);
+    } finally {
+      setFormLoading(false);
+    }
+    return;
+  }
+  // ... rest of function
+}, [editingProfile, loadBusinessProfiles]);
+```
+
+Fix 5: Update Service Layer to Handle FormData
+-----------------------------------------------
+File: src/services/businessProfile.ts
+Lines: 251-363
+
+Action: Modify createBusinessProfile to detect and handle FormData
+
+Current:
+```javascript
+async createBusinessProfile(data: CreateBusinessProfileData): Promise<BusinessProfile> {
+  try {
+    console.log('Creating business profile via API:', data.name);
+    
+    const currentUser = authService.getCurrentUser();
+    const ownerNameFromUser = currentUser?.name || currentUser?.companyName || currentUser?.displayName || currentUser?.firstName;
+    const ownerNameFallback = currentUser?.email
+      ? currentUser.email.split('@')[0]
+      : (data.name ? `${data.name} Owner` : 'Business Owner');
+    const ownerName = (ownerNameFromUser && ownerNameFromUser.trim()) || ownerNameFallback;
+
+    const businessName = (data.name || '').trim();
+    const email = (data.email || '').trim();
+    const phone = (data.phone || '').trim();
+    const category = (data.category || '').trim();
+    const address = (data.address || '').trim();
+
+    if (!businessName || !ownerName || !email || !phone || !category) {
+      console.error('❌ [CREATE] Missing required fields:', {
+        businessName,
+        ownerName,
+        email,
+        phone,
+        category,
+      });
+      throw new Error('Business name, owner name, email, phone, and category are required.');
+    }
+    
+    let logoUrl = data.companyLogo || '';
+    if (logoUrl && this.isLocalFilePath(logoUrl)) {
+      console.log('⚠️ [CREATE] Logo is a local file path, will send as-is (API should handle upload)');
+    }
+    
+    const resolvedSubcategory =
+      data.businessSubcategory ??
+      data.subCategory ??
+      data.subcategory;
+    
+    const backendData: any = {
+      businessName,
+      ownerName,
+      email,
+      phone,
+      address,
+      category,
+      logo: logoUrl,
+      companyLogo: logoUrl,
+      description: data.description || '',
+      website: data.website || ''
+    };
+    
+    if (resolvedSubcategory !== undefined) {
+      backendData.businessSubcategory = resolvedSubcategory;
+    }
+    
+    console.log('📤 Sending business profile data:', JSON.stringify(backendData, null, 2));
+    console.log('🖼️ Logo URL being sent:', logoUrl || '(empty)');
+    
+    const response = await api.post('/api/mobile/business-profile', backendData);
+    
+    // ... response handling
+  } catch (error) {
+    console.error('❌ Error creating business profile via API:', error);
+    throw new Error('Failed to create business profile');
+  }
+}
+```
+
+Fixed:
+```javascript
+async createBusinessProfile(data: CreateBusinessProfileData): Promise<BusinessProfile> {
+  try {
+    console.log('Creating business profile via API:', data.name);
+    
+    const currentUser = authService.getCurrentUser();
+    const ownerNameFromUser = currentUser?.name || currentUser?.companyName || currentUser?.displayName || currentUser?.firstName;
+    const ownerNameFallback = currentUser?.email
+      ? currentUser.email.split('@')[0]
+      : (data.name ? `${data.name} Owner` : 'Business Owner');
+    const ownerName = (ownerNameFromUser && ownerNameFromUser.trim()) || ownerNameFallback;
+
+    const businessName = (data.name || '').trim();
+    const email = (data.email || '').trim();
+    const phone = (data.phone || '').trim();
+    const category = (data.category || '').trim();
+    const address = (data.address || '').trim();
+
+    if (!businessName || !ownerName || !email || !phone || !category) {
+      console.error('❌ [CREATE] Missing required fields:', {
+        businessName,
+        ownerName,
+        email,
+        phone,
+        category,
+      });
+      throw new Error('Business name, owner name, email, phone, and category are required.');
+    }
+    
+    // ✅ Check if data is FormData (contains file upload)
+    const isFormData = data.companyLogo instanceof FormData || 
+                       (typeof data.companyLogo === 'string' && this.isLocalFilePath(data.companyLogo));
+    
+    if (isFormData) {
+      console.log('📤 [CREATE] Creating FormData request with logo upload');
+      
+      // ✅ Create FormData for file upload
+      const formData = new FormData();
+      
+      formData.append('businessName', businessName);
+      formData.append('ownerName', ownerName);
+      formData.append('email', email);
+      formData.append('phone', phone);
+      formData.append('address', address);
+      formData.append('category', category);
+      
+      // Add optional fields
+      if (data.description) formData.append('description', data.description);
+      if (data.website) formData.append('website', data.website);
+      
+      const resolvedSubcategory = data.businessSubcategory ?? data.subCategory ?? data.subcategory;
+      if (resolvedSubcategory !== undefined) {
+        formData.append('businessSubcategory', resolvedSubcategory);
+      }
+      
+      // ✅ Add logo file if present
+      const logoUri = typeof data.companyLogo === 'string' ? data.companyLogo : data.logo;
+      if (logoUri && this.isLocalFilePath(logoUri)) {
+        const filename = logoUri.split('/').pop() || 'logo.jpg';
+        const fileExtension = filename.split('.').pop()?.toLowerCase() || 'jpg';
+        
+        let mimeType = 'image/jpeg';
+        if (fileExtension === 'png') mimeType = 'image/png';
+        else if (fileExtension === 'gif') mimeType = 'image/gif';
+        else if (fileExtension === 'webp') mimeType = 'image/webp';
+        
+        console.log('📋 [CREATE] Appending logo file:', { filename, fileExtension, mimeType });
+        
+        formData.append('logo', {
+          uri: logoUri,
+          type: mimeType,
+          name: filename,
+        } as any);
+      }
+      
+      console.log('📤 [CREATE] Sending FormData request');
+      
+      const response = await api.post('/api/mobile/business-profile', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        timeout: 30000,
+      });
+      
+      // ... response handling (same as before)
+    } else {
+      // ✅ Fallback to JSON for existing profiles or no logo
+      console.log('📤 [CREATE] Creating JSON request (no logo upload)');
+      
+      const resolvedSubcategory =
+        data.businessSubcategory ??
+        data.subCategory ??
+        data.subcategory;
+      
+      const backendData: any = {
+        businessName,
+        ownerName,
+        email,
+        phone,
+        address,
+        category,
+        logo: data.companyLogo || '',
+        companyLogo: data.companyLogo || '',
+        description: data.description || '',
+        website: data.website || ''
+      };
+      
+      if (resolvedSubcategory !== undefined) {
+        backendData.businessSubcategory = resolvedSubcategory;
+      }
+      
+      console.log('📤 Sending business profile data:', JSON.stringify(backendData, null, 2));
+      
+      const response = await api.post('/api/mobile/business-profile', backendData);
+      
+      // ... response handling (same as before)
+    }
+    
+    // ... common response handling
+  } catch (error) {
+    console.error('❌ Error creating business profile via API:', error);
+    throw new Error('Failed to create business profile');
+  }
+}
+```
+
+Fix 6: Update Response Handling to Prioritize businessLogo
+-----------------------------------------------------------
+File: src/services/businessProfile.ts
+Lines: 346-347
+
+Action: Prioritize businessLogo field from backend response
+
+Current:
+```javascript
+companyLogo: returnedLogo || backendProfile.companyLogo || backendProfile.profileLogo || 
+             backendProfile.businessLogo || backendProfile.image || backendProfile.photo || '',
+logo: returnedLogo || backendProfile.companyLogo || backendProfile.profileLogo || 
+      backendProfile.businessLogo || backendProfile.image || backendProfile.photo || '',
+```
+
+Fixed:
+```javascript
+// ✅ Prioritize businessLogo as per backend documentation
+const logoUrl = backendProfile.businessLogo || backendProfile.logo || 
+                backendProfile.companyLogo || backendProfile.profileLogo || 
+                backendProfile.image || backendProfile.photo || '';
+
+companyLogo: logoUrl,
+logo: logoUrl,
+```
+
+Fix 7: Remove or Deprecate uploadImage Function
+------------------------------------------------
+File: src/services/businessProfile.ts
+Lines: 522-620
+
+Action: Mark as deprecated or remove entirely
+
+Options:
+1. Remove entirely (recommended if backend no longer needs separate upload)
+2. Mark as deprecated with JSDoc comment
+
+Option 1 (Remove):
+```javascript
+// ❌ DELETE this entire function (lines 522-620)
+// async uploadImage(profileId: string, imageType: 'logo' | 'banner', imageUri: string): Promise<{ url: string }> {
+//   ...
+// }
+```
+
+Option 2 (Deprecate):
+```javascript
+/**
+ * @deprecated This function is no longer needed.
+ * Logo upload is now handled during profile creation via FormData.
+ * Use createBusinessProfile() with FormData instead.
+ */
+async uploadImage(profileId: string, imageType: 'logo' | 'banner', imageUri: string): Promise<{ url: string }> {
+  // ... existing code
+}
+```
+
+Fix 8: Update Image Selection Handler for Edit Mode
+----------------------------------------------------
+File: src/components/BusinessProfileForm.tsx
+Lines: 346-373
+
+Action: Simplify to store URI for both new and edit profiles
+
+Current:
+```javascript
+const handleImageSelected = async (imageUri: string) => {
+  setLogoImage(imageUri);
+  setShowImagePickerModal(false);
+
+  // For new profile creation, we'll upload during form submission
+  // For existing profile editing, upload immediately
+  if (profile?.id) {
+    try {
+      setUploadingImage(true);
+      console.log('📤 Uploading logo for existing profile:', profile.id);
+      const uploadResult = await businessProfileService.uploadImage(profile.id, 'logo', imageUri);
+      console.log('✅ Logo uploaded successfully:', uploadResult.url);
+      setFormData(prev => ({ ...prev, companyLogo: uploadResult.url }));
+    } catch (error) {
+      console.error('❌ Failed to upload logo:', error);
+      Alert.alert('Upload Failed', 'Failed to upload logo. Please try again.');
+      setLogoImage(null);
+      setFormData(prev => ({ ...prev, companyLogo: '' }));
+    } finally {
+      setUploadingImage(false);
+    }
+  } else {
+    // For new profiles, store the local URI temporarily
+    setFormData(prev => ({ ...prev, companyLogo: imageUri }));
+  }
+};
+```
+
+Fixed:
+```javascript
+const handleImageSelected = async (imageUri: string) => {
+  setLogoImage(imageUri);
+  setShowImagePickerModal(false);
+
+  // ✅ Always store local URI in state
+  // Upload will happen during form submission for both new and edit profiles
+  setFormData(prev => ({ ...prev, companyLogo: imageUri }));
+};
+```
+
+Note: This requires updating the updateBusinessProfile function to also handle FormData
+
+Fix 9: Update updateBusinessProfile to Support FormData
+--------------------------------------------------------
+File: src/services/businessProfile.ts
+Lines: 366-483
+
+Action: Add FormData support for profile updates (similar to create)
+
+Current:
+```javascript
+async updateBusinessProfile(id: string, data: Partial<CreateBusinessProfileData>): Promise<BusinessProfile> {
+  // ... validation logic
+  
+  const backendData: any = {};
+  // ... field mapping
+  
+  const response = await api.put(`/api/mobile/business-profile/${id}`, backendData);
+  // ... response handling
+}
+```
+
+Fixed:
+```javascript
+async updateBusinessProfile(id: string, data: Partial<CreateBusinessProfileData>): Promise<BusinessProfile> {
+  try {
+    console.log('Updating business profile via API:', id);
+    
+    // ✅ Check if logo is being updated
+    const hasLogoUpdate = data.companyLogo !== undefined || data.logo !== undefined;
+    const logoUri = data.companyLogo || data.logo;
+    const isLocalLogo = logoUri && this.isLocalFilePath(logoUri);
+    
+    if (hasLogoUpdate && isLocalLogo) {
+      console.log('📤 [UPDATE] Updating profile with logo upload using FormData');
+      
+      // ✅ Create FormData for update
+      const formData = new FormData();
+      
+      // Add fields that are being updated
+      if (data.name !== undefined) formData.append('businessName', data.name);
+      if (data.email !== undefined) formData.append('email', data.email);
+      if (data.phone !== undefined) formData.append('phone', data.phone);
+      if (data.address !== undefined) formData.append('address', data.address);
+      if (data.category !== undefined) formData.append('category', data.category);
+      if (data.description !== undefined) formData.append('description', data.description);
+      if (data.website !== undefined) formData.append('website', data.website);
+      
+      const resolvedSubcategory = data.businessSubcategory ?? data.subCategory ?? data.subcategory;
+      if (resolvedSubcategory !== undefined) {
+        formData.append('businessSubcategory', resolvedSubcategory);
+      }
+      
+      // ✅ Add logo file
+      const filename = logoUri.split('/').pop() || 'logo.jpg';
+      const fileExtension = filename.split('.').pop()?.toLowerCase() || 'jpg';
+      
+      let mimeType = 'image/jpeg';
+      if (fileExtension === 'png') mimeType = 'image/png';
+      else if (fileExtension === 'gif') mimeType = 'image/gif';
+      else if (fileExtension === 'webp') mimeType = 'image/webp';
+      
+      formData.append('logo', {
+        uri: logoUri,
+        type: mimeType,
+        name: filename,
+      } as any);
+      
+      console.log('📤 [UPDATE] Sending FormData request');
+      
+      const response = await api.put(`/api/mobile/business-profile/${id}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        timeout: 30000,
+      });
+      
+      // ... response handling
+    } else {
+      // ✅ Fallback to JSON for updates without logo
+      console.log('📤 [UPDATE] Updating profile with JSON (no logo upload)');
+      
+      const backendData: any = {};
+      // ... existing field mapping logic
+      
+      const response = await api.put(`/api/mobile/business-profile/${id}`, backendData);
+      // ... response handling
+    }
+    
+    // ... common response handling
+  } catch (error) {
+    console.error('❌ Error updating business profile via API:', error);
+    throw new Error('Failed to update business profile');
+  }
+}
+```
+
+Fix 10: Clean Up AsyncStorage (Optional but Recommended)
+---------------------------------------------------------
+Action: Remove any existing pending_logo entries from AsyncStorage
+
+This can be done via a one-time cleanup function or migration script:
+```javascript
+// Run once to clean up old pending logos
+const cleanupPendingLogos = async () => {
+  try {
+    const allKeys = await AsyncStorage.getAllKeys();
+    const pendingLogoKeys = allKeys.filter(key => key.startsWith('pending_logo_'));
+    await AsyncStorage.multiRemove(pendingLogoKeys);
+    console.log(`✅ Cleaned up ${pendingLogoKeys.length} pending logo entries`);
+  } catch (error) {
+    console.error('❌ Error cleaning up pending logos:', error);
+  }
+};
+```
+
+================================================================================
+8. RECOMMENDED CODE IMPLEMENTATION
+================================================================================
+
+Complete FormData Implementation for createBusinessProfile:
+-----------------------------------------------------------
+
+File: src/services/businessProfile.ts
+
+```typescript
+async createBusinessProfile(data: CreateBusinessProfileData): Promise<BusinessProfile> {
+  try {
+    console.log('Creating business profile via API:', data.name);
+    
+    // Get current user for owner name
+    const currentUser = authService.getCurrentUser();
+    const ownerNameFromUser = currentUser?.name || currentUser?.companyName || currentUser?.displayName || currentUser?.firstName;
+    const ownerNameFallback = currentUser?.email
+      ? currentUser.email.split('@')[0]
+      : (data.name ? `${data.name} Owner` : 'Business Owner');
+    const ownerName = (ownerNameFromUser && ownerNameFromUser.trim()) || ownerNameFallback;
+
+    const businessName = (data.name || '').trim();
+    const email = (data.email || '').trim();
+    const phone = (data.phone || '').trim();
+    const category = (data.category || '').trim();
+    const address = (data.address || '').trim();
+
+    // Validate required fields
+    if (!businessName || !ownerName || !email || !phone || !category) {
+      console.error('❌ [CREATE] Missing required fields:', {
+        businessName,
+        ownerName,
+        email,
+        phone,
+        category,
+      });
+      throw new Error('Business name, owner name, email, phone, and category are required.');
+    }
+    
+    // Check if logo is being uploaded
+    const logoUri = data.companyLogo || data.logo;
+    const hasLogo = logoUri && this.isLocalFilePath(logoUri);
+    
+    if (hasLogo) {
+      console.log('📤 [CREATE] Creating FormData request with logo upload');
+      
+      // Create FormData for file upload
+      const formData = new FormData();
+      
+      // Add required fields
+      formData.append('businessName', businessName);
+      formData.append('ownerName', ownerName);
+      formData.append('email', email);
+      formData.append('phone', phone);
+      formData.append('address', address);
+      formData.append('category', category);
+      
+      // Add optional fields
+      if (data.description) formData.append('description', data.description);
+      if (data.website) formData.append('website', data.website);
+      
+      const resolvedSubcategory = data.businessSubcategory ?? data.subCategory ?? data.subcategory;
+      if (resolvedSubcategory !== undefined) {
+        formData.append('businessSubcategory', resolvedSubcategory);
+      }
+      
+      // Add logo file
+      const filename = logoUri.split('/').pop() || 'logo.jpg';
+      const fileExtension = filename.split('.').pop()?.toLowerCase() || 'jpg';
+      
+      let mimeType = 'image/jpeg';
+      if (fileExtension === 'png') mimeType = 'image/png';
+      else if (fileExtension === 'gif') mimeType = 'image/gif';
+      else if (fileExtension === 'webp') mimeType = 'image/webp';
+      
+      console.log('📋 [CREATE] Logo file info:', { filename, fileExtension, mimeType });
+      
+      formData.append('logo', {
+        uri: logoUri,
+        type: mimeType,
+        name: filename,
+      } as any);
+      
+      console.log('📤 [CREATE] Sending FormData request to /api/mobile/business-profile');
+      
+      const response = await api.post('/api/mobile/business-profile', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        timeout: 30000,
+      });
+      
+      if (response.data.success) {
+        console.log('✅ Business profile created via API:', response.data.data.id);
+        
+        // Clear cache
+        this.clearCache(currentUser?.id);
+        
+        // Map backend response
+        const backendProfile = response.data.data;
+        
+        // Prioritize businessLogo field
+        const logoUrl = backendProfile.businessLogo || backendProfile.logo || 
+                        backendProfile.companyLogo || backendProfile.profileLogo || 
+                        backendProfile.image || backendProfile.photo || '';
+        
+        console.log('🖼️ Logo URL returned from API:', logoUrl || '(empty)');
+        
+        const newProfile: BusinessProfile = {
+          id: backendProfile.id,
+          name: backendProfile.businessName,
+          description: backendProfile.description || '',
+          category: backendProfile.category,
+          subCategory: backendProfile.subCategory || backendProfile.subcategory,
+          subcategory: backendProfile.subCategory || backendProfile.subcategory,
+          address: backendProfile.address || '',
+          phone: backendProfile.phone || '',
+          alternatePhone: backendProfile.alternatePhone || '',
+          email: backendProfile.email || '',
+          website: backendProfile.website || '',
+          companyLogo: logoUrl,
+          logo: logoUrl,
+          banner: '',
+          services: [],
+          createdAt: backendProfile.createdAt,
+          updatedAt: backendProfile.updatedAt,
+        };
+        
+        return newProfile;
+      } else {
+        throw new Error('API returned unsuccessful response');
+      }
+    } else {
+      // Fallback to JSON for profiles without logo
+      console.log('📤 [CREATE] Creating JSON request (no logo upload)');
+      
+      const resolvedSubcategory = data.businessSubcategory ?? data.subCategory ?? data.subcategory;
+      
+      const backendData: any = {
+        businessName,
+        ownerName,
+        email,
+        phone,
+        address,
+        category,
+        logo: data.companyLogo || data.logo || '',
+        companyLogo: data.companyLogo || data.logo || '',
+        description: data.description || '',
+        website: data.website || ''
+      };
+      
+      if (resolvedSubcategory !== undefined) {
+        backendData.businessSubcategory = resolvedSubcategory;
+      }
+      
+      console.log('📤 Sending business profile data:', JSON.stringify(backendData, null, 2));
+      
+      const response = await api.post('/api/mobile/business-profile', backendData);
+      
+      if (response.data.success) {
+        console.log('✅ Business profile created via API:', response.data.data.id);
+        
+        this.clearCache(currentUser?.id);
+        
+        const backendProfile = response.data.data;
+        const logoUrl = backendProfile.businessLogo || backendProfile.logo || 
+                        backendProfile.companyLogo || backendProfile.profileLogo || 
+                        backendProfile.image || backendProfile.photo || '';
+        
+        const newProfile: BusinessProfile = {
+          id: backendProfile.id,
+          name: backendProfile.businessName,
+          description: backendProfile.description || '',
+          category: backendProfile.category,
+          subCategory: backendProfile.subCategory || backendProfile.subcategory,
+          subcategory: backendProfile.subCategory || backendProfile.subcategory,
+          address: backendProfile.address || '',
+          phone: backendProfile.phone || '',
+          alternatePhone: backendProfile.alternatePhone || '',
+          email: backendProfile.email || '',
+          website: backendProfile.website || '',
+          companyLogo: logoUrl,
+          logo: logoUrl,
+          banner: '',
+          services: [],
+          createdAt: backendProfile.createdAt,
+          updatedAt: backendProfile.updatedAt,
+        };
+        
+        return newProfile;
+      } else {
+        throw new Error('API returned unsuccessful response');
+      }
+    }
+  } catch (error) {
+    console.error('❌ Error creating business profile via API:', error);
+    throw new Error('Failed to create business profile');
+  }
+}
+```
+
+Simplified Form Submission:
+---------------------------
+
+File: src/components/BusinessProfileForm.tsx
+
+```typescript
+const handleSubmit = async () => {
+  console.log('🔍 [BUSINESS FORM] Register button clicked');
+  console.log('🔍 [BUSINESS FORM] Form data being submitted:', formData);
+
+  const validation = validateForm();
+
+  if (!validation.isValid) {
+    console.log('⚠️ [BUSINESS FORM] Validation failed:', validation.errors);
+    setValidationErrors(validation.errors);
+    setShowValidationModal(true);
+    return;
+  }
+
+  // ✅ Simply submit form data - service layer handles FormData construction
+  console.log('✅ [BUSINESS FORM] Form validation passed, submitting to parent');
+  onSubmit(formData);
+};
+```
+
+Simplified Image Handler:
+--------------------------
+
+File: src/components/BusinessProfileForm.tsx
+
+```typescript
+const handleImageSelected = async (imageUri: string) => {
+  setLogoImage(imageUri);
+  setShowImagePickerModal(false);
+
+  // ✅ Always store local URI - service layer will handle upload
+  setFormData(prev => ({ ...prev, companyLogo: imageUri }));
+};
+```
+
+================================================================================
+9. UI IMPROVEMENTS
+================================================================================
+
+Improvement 1: Upload Progress Indicator
+-----------------------------------------
+Add progress tracking for FormData upload
+
+File: src/components/BusinessProfileForm.tsx
+
+```typescript
+const [uploadProgress, setUploadProgress] = useState(0);
+
+// In handleSubmit, pass upload progress callback
+const response = await api.post('/api/mobile/business-profile', formData, {
+  headers: { 'Content-Type': 'multipart/form-data' },
+  timeout: 30000,
+  onUploadProgress: (progressEvent) => {
+    const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+    setUploadProgress(progress);
+  },
+});
+
+// In UI, show progress bar
+{uploadingImage && (
+  <View style={styles.uploadProgressContainer}>
+    <Text style={styles.uploadProgressText}>Uploading logo... {uploadProgress}%</Text>
+    <ProgressBar progress={uploadProgress / 100} />
+  </View>
+)}
+```
+
+Improvement 2: Better Error Messages
+------------------------------------
+Provide specific error messages for upload failures
+
+File: src/services/businessProfile.ts
+
+```typescript
+catch (error: any) {
+  console.error('❌ Error creating business profile via API:', error);
+  
+  // Provide specific error messages
+  if (error.response?.status === 413) {
+    throw new Error('Logo file is too large. Please choose a smaller image (max 5MB).');
+  } else if (error.response?.status === 415) {
+    throw new Error('Invalid image format. Please use JPG, PNG, or GIF.');
+  } else if (error.code === 'ECONNABORTED') {
+    throw new Error('Upload timeout. Please check your connection and try again.');
+  } else {
+    throw new Error('Failed to create business profile. Please try again.');
+  }
+}
+```
+
+Improvement 3: Image Size Validation
+-------------------------------------
+Validate image size before upload
+
+File: src/components/BusinessProfileForm.tsx
+
+```typescript
+const handleImageSelected = async (imageUri: string) => {
+  // Validate image size
+  const fileInfo = await RNFS.stat(imageUri);
+  const maxSize = 5 * 1024 * 1024; // 5MB
+  
+  if (fileInfo.size > maxSize) {
+    Alert.alert(
+      'Image Too Large',
+      'Please select an image smaller than 5MB.',
+      [{ text: 'OK' }]
+    );
+    return;
+  }
+  
+  setLogoImage(imageUri);
+  setShowImagePickerModal(false);
+  setFormData(prev => ({ ...prev, companyLogo: imageUri }));
+};
+```
+
+Improvement 4: Image Format Validation
+--------------------------------------
+Validate image format before upload
+
+File: src/components/ImagePickerModal.tsx
+
+```typescript
+const ALLOWED_FORMATS = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+
+const handleGalleryPress = () => {
+  const options = {
+    title: 'Select Photo',
+    mediaType: 'photo' as const,
+    quality: 0.8,
+    maxWidth: 1024,
+    maxHeight: 1024,
+    selectionLimit: 1,
+  };
+
+  launchImageLibrary(options, (response) => {
+    if (response.assets && response.assets[0]) {
+      const imageUri = response.assets[0].uri;
+      const fileExtension = imageUri.split('.').pop()?.toLowerCase();
+      
+      if (!ALLOWED_FORMATS.includes(fileExtension || '')) {
+        Alert.alert(
+          'Invalid Format',
+          'Please select a JPG, PNG, GIF, or WebP image.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+      
+      onImageSelected(imageUri);
+      onClose();
+    }
+  });
+};
+```
+
+Improvement 5: Retry Mechanism
+-------------------------------
+Add retry logic for failed uploads
+
+File: src/services/businessProfile.ts
+
+```typescript
+async createBusinessProfileWithRetry(
+  data: CreateBusinessProfileData, 
+  maxRetries = 2
+): Promise<BusinessProfile> {
+  let lastError;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await this.createBusinessProfile(data);
+    } catch (error: any) {
+      lastError = error;
+      
+      if (attempt < maxRetries && error.code === 'ECONNABORTED') {
+        console.log(`⚠️ Upload failed (attempt ${attempt + 1}), retrying...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } else {
+        throw error;
+      }
+    }
+  }
+  
+  throw lastError;
+}
+```
+
+================================================================================
+10. FINAL CONCLUSION
+================================================================================
+
+Current Status:
+--------------
+❌ CRITICAL: Mobile app does NOT support FormData logo upload
+❌ CRITICAL: Two-step upload strategy is broken and incomplete
+❌ CRITICAL: Logo is removed from payload before submission
+❌ CRITICAL: Pending logo stored but never uploaded
+❌ CRITICAL: API sends JSON instead of FormData
+❌ CRITICAL: Wrong Content-Type header configuration
+⚠️ MEDIUM: Legacy uploadImage function creates confusion
+⚠️ MEDIUM: Type definitions don't support FormData
+⚠️ LOW: Response field mapping could be improved
+
+Issues Summary:
+--------------
+1. Form removes logo from payload before submission
+2. Pending logo stored in AsyncStorage but never retrieved/uploaded
+3. Service layer sends JSON instead of FormData
+4. API configuration has wrong default Content-Type
+5. Type definitions don't support FormData
+6. Legacy uploadImage function is obsolete
+7. No FormData detection logic in service layer
+8. Response handling doesn't prioritize businessLogo field
+
+Required Fixes:
+--------------
+1. Update CreateBusinessProfileData interface to support FormData
+2. Remove two-step upload logic from BusinessProfileForm.handleSubmit()
+3. Remove pendingLogoUri parameter from onSubmit callback
+4. Remove pending logo storage from BusinessProfilesScreen.handleFormSubmit()
+5. Update businessProfileService.createBusinessProfile() to handle FormData
+6. Add FormData construction logic with proper file object
+7. Update response handling to prioritize businessLogo field
+8. Update updateBusinessProfile() to support FormData (for consistency)
+9. Simplify handleImageSelected() to always store URI
+10. Remove or deprecate uploadImage() function
+11. Clean up AsyncStorage pending_logo entries (optional)
+
+After Implementation:
+-------------------
+✅ User selects logo from camera/gallery
+✅ Logo URI stored in form state
+✅ User fills other form fields
+✅ User clicks REGISTER button
+✅ Form submits data directly (no logo removal)
+✅ Service layer detects local logo URI
+✅ FormData constructed with all fields including logo file
+✅ API sends FormData with multipart/form-data
+✅ Backend receives logo file via logoUpload.single("logo")
+✅ Backend uploads to Cloudinary
+✅ Backend stores logo URL in businessLogo field
+✅ Backend returns logo URL in response
+✅ Mobile app parses response and updates UI
+✅ Logo displayed correctly in business profile
+
+Risk Level: HIGH
+----------------
+The current implementation completely breaks logo upload functionality.
+Users cannot set logos for new business profiles.
+The fix is critical and must be implemented before production release.
+
+Estimated Effort: 4-6 hours
+----------------------------
+- Interface updates: 30 minutes
+- Form logic changes: 1 hour
+- Service layer FormData implementation: 2 hours
+- Update service implementation: 1 hour
+- Testing and validation: 1-2 hours
+
+Priority: CRITICAL
+------------------
+This fix must be implemented immediately as it blocks a core feature.
+
+================================================================================
+END OF REPORT
+================================================================================

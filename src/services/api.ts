@@ -128,8 +128,9 @@ const api = axios.create({
   baseURL: BASE_URL, // Uses environment-specific base URL
   timeout: 30000, // 30 seconds timeout for slower connections and server cold starts
   headers: {
-    'Content-Type': 'application/json',
     'Accept': 'application/json',
+    // Note: Content-Type is not set here to allow FormData to set multipart/form-data automatically
+    // Axios will automatically set the correct Content-Type with boundary for FormData
     // Let axios handle compression automatically - it should decompress gzip responses
     // Removing Accept-Encoding: identity to allow server to send compressed data
     // Axios should automatically decompress if Content-Encoding header is present

@@ -70,6 +70,8 @@ const BusinessProfilesScreen: React.FC = () => {
     const [imageRefreshKey, setImageRefreshKey] = useState(Date.now()); // Key to force image refresh
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [backgroundRefreshing, setBackgroundRefreshing] = useState(false); // PERFORMANCE: Background refresh state
+  const [lastRefreshTime, setLastRefreshTime] = useState<number>(0); // PERFORMANCE: Track last refresh time
     const [showForm, setShowForm] = useState(false);
   const [showBottomSheet, setShowBottomSheet] = useState(false);
   const [editingProfile, setEditingProfile] = useState<any>(null);
@@ -147,8 +149,15 @@ const BusinessProfilesScreen: React.FC = () => {
     },
   ], []);
 
-  const loadBusinessProfiles = useCallback(async () => {
-    setLoading(true);
+  const loadBusinessProfiles = useCallback(async (showLoading: boolean = true, forceRefresh: boolean = false) => {
+    // PERFORMANCE: Only show loading spinner on force refresh or initial load
+    if (showLoading || forceRefresh) {
+      setLoading(true);
+    } else {
+      // Background refresh - show subtle indicator but don't block UI
+      setBackgroundRefreshing(true);
+    }
+    
     try {
       // Get current user ID
       const currentUser = authService.getCurrentUser();
@@ -166,7 +175,37 @@ const BusinessProfilesScreen: React.FC = () => {
       
       console.log('🔍 Loading user-specific business profiles for user:', userId);
       
-      // Try to get user-specific profiles from API first
+      // PERFORMANCE: Try to load from cache first for instant display
+      if (!forceRefresh && profiles.length === 0) {
+        try {
+          const cacheKey = `business_profiles_user_${userId}`;
+          const cachedData = await AsyncStorage.getItem(`@cache_${cacheKey}`);
+          if (cachedData) {
+            const parsed = JSON.parse(cachedData);
+            if (parsed.data && Date.now() < parsed.expiresAt) {
+              console.log('📦 PERFORMANCE: Loading profiles from cache for instant display');
+              const cachedProfiles = parsed.data;
+              if (cachedProfiles.length > 0) {
+                // Sort cached profiles
+                const sortedProfiles = cachedProfiles.sort((a: any, b: any) => {
+                  const aActive = a.subscriptionStatus?.toUpperCase() === "ACTIVE";
+                  const bActive = b.subscriptionStatus?.toUpperCase() === "ACTIVE";
+                  if (aActive === bActive) {
+                    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+                  }
+                  return aActive ? -1 : 1;
+                });
+                setProfiles(sortedProfiles);
+                setLoading(false); // Hide loading since we have cached data
+              }
+            }
+          }
+        } catch (cacheError) {
+          console.log('⚠️ Cache read failed, will fetch from API:', cacheError);
+        }
+      }
+      
+      // Fetch from API (this will use cacheService.getOrFetch which handles stale-while-revalidate)
       const apiProfiles = await businessProfileService.getUserBusinessProfiles(userId);
       
       console.log('🔍 [DEBUG] API Response Profiles:', apiProfiles.map(p => ({
@@ -196,6 +235,7 @@ const BusinessProfilesScreen: React.FC = () => {
         });
         
         setProfiles(sortedProfiles);
+        setLastRefreshTime(Date.now()); // PERFORMANCE: Track refresh time
         
         console.log('✅ Loaded user-specific business profiles from API:', sortedProfiles.length);
         console.log('🔍 Total profiles loaded:', sortedProfiles.length);
@@ -213,12 +253,15 @@ const BusinessProfilesScreen: React.FC = () => {
       }
     } catch (error) {
       console.error('Error loading business profiles:', error);
-      // No profiles available due to error
-      setProfiles([]);
+      // If we have cached profiles, keep them on error
+      if (profiles.length === 0) {
+        setProfiles([]);
+      }
     } finally {
       setLoading(false);
+      setBackgroundRefreshing(false);
     }
-  }, []);
+  }, [profiles.length]);
 
   // 5-minute polling logic for business profile subscription status
   const startPolling = useCallback(() => {
@@ -231,7 +274,7 @@ const BusinessProfilesScreen: React.FC = () => {
 
       try {
         // Refresh profiles to get latest status
-        await loadBusinessProfiles();
+        await loadBusinessProfiles(false, false); // Background refresh in polling
         
         // Check if any profile has ACTIVE status
         const hasActiveProfile = profiles.some(profile => 
@@ -257,7 +300,7 @@ const BusinessProfilesScreen: React.FC = () => {
 
   // Initial load of business profiles
   useEffect(() => {
-    loadBusinessProfiles();
+    loadBusinessProfiles(true, false); // Show loading on initial mount, but don't force refresh
   }, [loadBusinessProfiles]);
 
   // Handled by the consolidated useFocusEffect below
@@ -332,7 +375,7 @@ const BusinessProfilesScreen: React.FC = () => {
       console.log('✅ Business profile created:', newProfile.id);
 
       setTimeout(() => {
-        loadBusinessProfiles();
+        loadBusinessProfiles(true, true); // Force refresh after profile creation
       }, 1000);
     } catch (error) {
       console.error('❌ Error creating business profile:', error);
@@ -344,9 +387,20 @@ const BusinessProfilesScreen: React.FC = () => {
   // Consolidated useFocusEffect for refreshing profiles
   useFocusEffect(
     useCallback(() => {
-      console.log('🔄 BusinessProfilesScreen focused - refreshing profiles...');
+      console.log('🔄 BusinessProfilesScreen focused');
       setImageRefreshKey(Date.now());
-      loadBusinessProfiles();
+      
+      // PERFORMANCE: Only refresh if data is stale (older than 30 seconds) or empty
+      const STALE_THRESHOLD = 30 * 1000; // 30 seconds
+      const timeSinceRefresh = Date.now() - lastRefreshTime;
+      const isDataStale = timeSinceRefresh > STALE_THRESHOLD || profiles.length === 0;
+      
+      if (isDataStale) {
+        console.log(`🔄 Data is stale (${Math.round(timeSinceRefresh / 1000)}s old) or empty, refreshing...`);
+        loadBusinessProfiles(false, false); // Don't show loading, use background refresh
+      } else {
+        console.log(`✅ Data is fresh (${Math.round(timeSinceRefresh / 1000)}s old), skipping refresh`);
+      }
       
       // CRITICAL FIX: Clear processing state when returning from subscription screen
       // This prevents loader on "Activate Now" button after navigation
@@ -379,13 +433,13 @@ const BusinessProfilesScreen: React.FC = () => {
           pollingCleanupRef.current = null;
         }
       };
-    }, [loadBusinessProfiles, checkPaymentAndCreateProfile, profiles, startPolling])
+    }, [loadBusinessProfiles, checkPaymentAndCreateProfile, profiles, startPolling, lastRefreshTime])
   );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     setImageRefreshKey(Date.now());
-    await loadBusinessProfiles();
+    await loadBusinessProfiles(true, true); // Force refresh on pull-to-refresh
     setRefreshing(false);
   }, [loadBusinessProfiles]);
 
@@ -557,14 +611,11 @@ const BusinessProfilesScreen: React.FC = () => {
     );
   });
 
-  const handleFormSubmit = useCallback(async (formData: any, pendingLogoUri?: string) => {
+  const handleFormSubmit = useCallback(async (formData: any) => {
     if (!editingProfile) {
       setFormLoading(true);
       try {
         const newProfile = await businessProfileService.createBusinessProfile(formData);
-        if (pendingLogoUri) {
-          await AsyncStorage.setItem(`pending_logo_${newProfile.id}`, pendingLogoUri);
-        }
         const profileWithId = { ...formData, id: newProfile.id };
         setPendingProfileData(profileWithId);
         pendingProfileDataRef.current = profileWithId;
@@ -572,7 +623,7 @@ const BusinessProfilesScreen: React.FC = () => {
         setShowPaymentModal(true);
         setShowForm(false);
         setShowBottomSheet(false);
-        loadBusinessProfiles();
+        loadBusinessProfiles(true, true); // Force refresh after form submission
       } catch (error: any) {
         setErrorMessage(error.message || 'Failed to create business profile.');
         setShowErrorModal(true);
@@ -592,7 +643,7 @@ const BusinessProfilesScreen: React.FC = () => {
       setShowForm(false);
       setShowBottomSheet(false);
       setEditingProfile(null);
-      setTimeout(() => loadBusinessProfiles(), 1000);
+      setTimeout(() => loadBusinessProfiles(true, true), 1000); // Force refresh after profile update
     } catch (error) {
       setErrorMessage('Failed to update profile.');
       setShowErrorModal(true);
@@ -954,7 +1005,13 @@ const BusinessProfilesScreen: React.FC = () => {
           >
             <Icon name="arrow-back" size={24} color={theme.colors.text} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: isDarkMode ? '#ffffff' : '#1a1a1a' }]}>Business Profiles</Text>
+          <View style={styles.headerTitleContainer}>
+            <Text style={[styles.headerTitle, { color: isDarkMode ? '#ffffff' : '#1a1a1a' }]}>Business Profiles</Text>
+            {/* PERFORMANCE: Subtle background refresh indicator */}
+            {backgroundRefreshing && (
+              <ActivityIndicator size="small" color={theme.colors.primary} style={styles.backgroundRefreshIndicator} />
+            )}
+          </View>
           <TouchableOpacity
             style={[styles.addButton, { backgroundColor: theme.colors.cardBackground }]}
             onPress={handleAddProfile}
@@ -1381,6 +1438,15 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     flex: 1,
     textAlign: 'center',
+  },
+  headerTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+  },
+  backgroundRefreshIndicator: {
+    marginLeft: 8,
   },
   backButton: {
     width: Math.min(40, screenWidth * 0.09),

@@ -500,7 +500,7 @@ const AboutUsScreen: React.FC = () => {
             }]}>
               <Text style={[dynamicStyles.statNumber, {
                 marginBottom: dynamicModerateScale(5),
-              }]}>6</Text>
+              }]}>∞</Text>
               <Text style={dynamicStyles.statLabel}>Business Categories</Text>
             </View>
             <View style={[dynamicStyles.statItem, {
@@ -650,7 +650,7 @@ const AboutUsScreen: React.FC = () => {
                 marginTop: dynamicModerateScale(2),
               }} />
               <Text style={dynamicStyles.featureText}>
-                <Text style={{ fontWeight: '600', color: theme.colors.text }}>Industry-Specific Templates</Text> - Tailored designs for 6 major business categories
+                <Text style={{ fontWeight: '600', color: theme.colors.text }}>Industry-Specific Templates</Text> - Tailored designs for multiple business categories
               </Text>
             </View>
           </View>
