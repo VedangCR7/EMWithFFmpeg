@@ -271,11 +271,26 @@ const SubscriptionScreen: React.FC = () => {
     }
   }, [setPaymentInProgress]);
 
-  // Memoize purchasable plans to prevent recalculation
+  // Safe price extraction helper (handles string/number/undefined)
+  const getPrice = (plan: any) => {
+    if (typeof plan.price === 'number') return plan.price;
+    if (typeof plan.price === 'string') {
+      const numericValue = parseFloat(plan.price.replace(/[^\d.]/g, ''));
+      return Number.isFinite(numericValue) ? numericValue : 0;
+    }
+    return 0;
+  };
+
+  // Memoize purchasable plans to prevent recalculation, sorted by price ascending
   const purchasablePlans = useMemo(() => 
-    contextPlans.filter(plan => plan.name !== "PROMO"), 
+    [...contextPlans]
+      .filter(plan => plan.name !== "PROMO")
+      .sort((a, b) => getPrice(a) - getPrice(b)),
     [contextPlans]
   );
+
+  // TEMPORARY DEBUG: Verify sorted plans
+  console.log("Sorted Plans by price:", purchasablePlans.map(p => ({ id: p.id, name: p.name, price: p.price })));
 
   // Detect number of plans for layout adjustments
   const planCount = purchasablePlans.length;

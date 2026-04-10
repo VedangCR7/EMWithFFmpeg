@@ -451,10 +451,13 @@ const BusinessProfilesScreen: React.FC = () => {
       return;
     }
     const businessProfileId = pendingProfileDataRef.current.id;
-    
+
+    // Close the payment modal before navigation
+    setShowPaymentModal(false);
+
     // NAVIGATE TO SUBSCRIPTION SCREEN INSTEAD OF DIRECT RAZORPAY
     console.log('🔍 BUSINESS PROFILES - Navigating to Subscription screen for profile:', businessProfileId);
-    
+
     navigation.navigate('Subscription' as any, {
       source: 'BUSINESS_PROFILE',
       businessProfileId: businessProfileId

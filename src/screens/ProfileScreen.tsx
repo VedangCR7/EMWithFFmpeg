@@ -16,6 +16,7 @@ import {
   RefreshControl,
   Keyboard,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -1074,6 +1075,27 @@ const ProfileScreen: React.FC = () => {
     }
   };
 
+  const handleRateUs = async () => {
+    try {
+      const playStorePackage = 'com.marketbrand';
+      const playStoreUrl = `market://details?id=${playStorePackage}`;
+      const webUrl = `https://play.google.com/store/apps/details?id=${playStorePackage}`;
+
+      // Try to open Play Store app first
+      const canOpenPlayStore = await Linking.canOpenURL(playStoreUrl);
+      
+      if (canOpenPlayStore) {
+        await Linking.openURL(playStoreUrl);
+      } else {
+        // Fallback to web URL
+        await Linking.openURL(webUrl);
+      }
+    } catch (error) {
+      console.error('Error opening Play Store:', error);
+      Alert.alert('Error', 'Unable to open Play Store. Please try again later.');
+    }
+  };
+
   const handleEditProfile = async () => {
     try {
       const currentUser = authService.getCurrentUser();
@@ -2098,6 +2120,47 @@ const ProfileScreen: React.FC = () => {
                       marginTop: dynamicModerateScale(0.5),
                     }]}>
                       Help others discover amazing event posters
+                    </Text>
+                  </View>
+                </View>
+                <Icon name="chevron-right" size={getIconSize(20)} color={theme.colors.textSecondary} />
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.shareAppCard, { 
+                backgroundColor: theme.colors.cardBackground,
+                marginHorizontal: dynamicModerateScale(8),
+                marginBottom: dynamicModerateScale(6),
+                paddingVertical: dynamicModerateScale(10),
+                paddingHorizontal: dynamicModerateScale(12),
+                borderRadius: dynamicModerateScale(12),
+              }]}
+              onPress={handleRateUs}
+            >
+              <View style={styles.shareAppContent}>
+                <View style={styles.shareAppLeft}>
+                  <View style={[styles.shareAppIcon, { 
+                    backgroundColor: `${theme.colors.primary}20`,
+                    width: dynamicModerateScale(32),
+                    height: dynamicModerateScale(32),
+                    borderRadius: dynamicModerateScale(16),
+                    marginRight: dynamicModerateScale(10),
+                  }]}>
+                    <Icon name="star" size={getIconSize(16)} color={theme.colors.primary} />
+                  </View>
+                  <View style={styles.shareAppInfo}>
+                    <Text style={[styles.shareAppTitle, { 
+                      color: theme.colors.text,
+                      fontSize: getFontSize(10),
+                    }]}>
+                      Rate Us
+                    </Text>
+                    <Text style={[styles.shareAppSubtitle, { 
+                      color: theme.colors.textSecondary,
+                      fontSize: getFontSize(8),
+                      marginTop: dynamicModerateScale(0.5),
+                    }]}>
+                      Rate us on the Play Store
                     </Text>
                   </View>
                 </View>

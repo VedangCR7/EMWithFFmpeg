@@ -87,7 +87,10 @@ const PremiumTemplateModal: React.FC<PremiumTemplateModalProps> = ({
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.upgradeButton}
-                onPress={onUpgrade}
+                onPress={() => {
+                  onUpgrade();
+                  onClose();
+                }}
               >
                 <LinearGradient
                   colors={[ '#FF6B6B', '#FF8E53' ]}
