@@ -18,6 +18,7 @@ import {
   ActivityIndicator,
   Linking,
 } from 'react-native';
+import InAppReview from 'react-native-in-app-review';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -1081,6 +1082,32 @@ const ProfileScreen: React.FC = () => {
       const playStoreUrl = `market://details?id=${playStorePackage}`;
       const webUrl = `https://play.google.com/store/apps/details?id=${playStorePackage}`;
 
+      // Check if In-App Review is available
+      if (InAppReview.isAvailable()) {
+        try {
+          console.log('🌟 Requesting In-App Review...');
+          // Request the in-app review flow
+          await InAppReview.RequestInAppReview();
+          console.log('✅ In-App Review requested successfully');
+        } catch (error) {
+          console.error('❌ Error requesting In-App Review:', error);
+          // Fallback to Play Store if review request fails
+          console.log('🔄 Falling back to Play Store...');
+          await openPlayStoreFallback(playStoreUrl, webUrl);
+        }
+      } else {
+        console.log('⚠️ In-App Review not available, falling back to Play Store');
+        // Fallback to Play Store if API is not available
+        await openPlayStoreFallback(playStoreUrl, webUrl);
+      }
+    } catch (error) {
+      console.error('❌ Error in handleRateUs:', error);
+      Alert.alert('Error', 'Unable to open rating. Please try again later.');
+    }
+  };
+
+  const openPlayStoreFallback = async (playStoreUrl: string, webUrl: string) => {
+    try {
       // Try to open Play Store app first
       const canOpenPlayStore = await Linking.canOpenURL(playStoreUrl);
       
@@ -1091,7 +1118,7 @@ const ProfileScreen: React.FC = () => {
         await Linking.openURL(webUrl);
       }
     } catch (error) {
-      console.error('Error opening Play Store:', error);
+      console.error('Error opening Play Store fallback:', error);
       Alert.alert('Error', 'Unable to open Play Store. Please try again later.');
     }
   };
