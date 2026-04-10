@@ -976,7 +976,21 @@ const PosterPlayerScreen: React.FC = () => {
   // Check if current category is Software Company
   const isSoftwareCompanyCategory = useMemo(() => {
     const category = (currentPoster?.category || initialPoster?.category || '').trim().toLowerCase();
-    if (!category) return false;
+    const globalCategory = (globalBusinessCategory || '').trim().toLowerCase();
+    
+    console.log('?? [SOFTWARE COMPANY DETECTION]', {
+      currentPosterCategory: currentPoster?.category,
+      initialPosterCategory: initialPoster?.category,
+      globalBusinessCategory: globalBusinessCategory,
+      normalizedCategory: category,
+      normalizedGlobalCategory: globalCategory,
+      activeCategoryRef: activeCategoryRef.current
+    });
+
+    if (!category && !globalCategory) {
+      console.log('?? [SOFTWARE COMPANY DETECTION] No category found');
+      return false;
+    }
 
     // Check for multiple variations of "software company"
     const softwareCompanyVariations = [
@@ -988,19 +1002,20 @@ const PosterPlayerScreen: React.FC = () => {
       'softwarecompany'
     ];
 
-    const result = softwareCompanyVariations.some(variation => category.includes(variation));
+    // Check both poster category and global business category
+    const posterMatches = category ? softwareCompanyVariations.some(variation => category.includes(variation)) : false;
+    const globalMatches = globalCategory ? softwareCompanyVariations.some(variation => globalCategory.includes(variation)) : false;
+    const result = posterMatches || globalMatches;
 
-    // Debug logging for category detection
-    console.log('🔍 [SOFTWARE COMPANY DETECTION]', {
-      currentPosterCategory: currentPoster?.category,
-      initialPosterCategory: initialPoster?.category,
-      normalizedCategory: category,
+    console.log('?? [SOFTWARE COMPANY DETECTION RESULT]', {
+      posterMatches,
+      globalMatches,
       isSoftwareCompany: result,
       variations: softwareCompanyVariations
     });
 
     return result;
-  }, [currentPoster, initialPoster]);
+  }, [currentPoster, initialPoster, globalBusinessCategory]);
 
   const templateMatchesServiceFilter = useCallback((template: Template) => {
     if (!isEventPlannerCategory || !selectedServiceFilter) return true;
@@ -1106,6 +1121,92 @@ const PosterPlayerScreen: React.FC = () => {
     }
   }, [isEventPlannerCategory, fetchEventPlannerTemplates, serviceFilterTemplates]);
 
+  // Function to fetch all Software Company templates (similar to Event Planner)
+  const fetchSoftwareCompanyTemplates = useCallback(async () => {
+    if (!isSoftwareCompanyCategory) return;
+
+    // Check if we already have cached Software Company templates
+    if (serviceFilterTemplates['softwarecompany'] && serviceFilterTemplates['softwarecompany'].length > 0) {
+      console.log('📦 [SOFTWARE COMPANY] Using cached Software Company templates');
+      return;
+    }
+
+    const apiEndpoint = `/api/mobile/posters/category/software%20company?limit=500`;
+    console.log(`📡 [SOFTWARE COMPANY] Fetching all Software Company templates from endpoint: ${apiEndpoint}`);
+    setIsLoadingServiceFilter(prev => ({ ...prev, softwarecompany: true }));
+
+    try {
+      const response = await businessCategoryPostersApi.getPostersByCategory('software company', 500);
+
+      console.log(`🔍 [SOFTWARE COMPANY] API Response for ${apiEndpoint}:`, {
+        endpoint: apiEndpoint,
+        success: response.success,
+        posterCount: response.data?.posters?.length || 0
+      });
+
+      if (response.success && response.data.posters) {
+        // Convert BusinessCategoryPoster to Template format
+        const templates: Template[] = response.data.posters.map((poster: any) => ({
+          id: poster.id,
+          name: poster.title || poster.name,
+          thumbnail: poster.imageUrl || poster.thumbnail,
+          thumbnailUrl: poster.imageUrl || poster.thumbnail,
+          previewUrl: poster.imageUrl || poster.downloadUrl,
+          category: poster.category || 'Software Company',
+          downloads: poster.downloads || 0,
+          isDownloaded: false,
+          tags: poster.tags || [],
+          languages: poster.languages || [],
+        }));
+
+        // Cache all Software Company templates
+        setServiceFilterTemplates(prev => ({
+          ...prev,
+          softwarecompany: templates
+        }));
+
+        console.log(`✅ [SOFTWARE COMPANY] Successfully fetched ${templates.length} Software Company templates`);
+
+        // Log template tags for debugging
+        const allTags = templates.flatMap(t => t.tags || []);
+        const uniqueTags = Array.from(new Set(allTags));
+        console.log(`🏷️ [SOFTWARE COMPANY] All unique tags found:`, uniqueTags);
+
+        // Log samples for each software category
+        softwareCategoryButtons.forEach(category => {
+          const keywords = category.tags;
+          const matchingTemplates = templates.filter(template => {
+            const templateTags = template.tags || [];
+            return keywords.some(keyword => templateTags.some(tag => tag.toLowerCase().includes(keyword.toLowerCase())));
+          });
+          console.log(`📋 [SOFTWARE COMPANY] ${category.name}: ${matchingTemplates.length} templates found`);
+        });
+      } else {
+        console.warn(`⚠️ [SOFTWARE COMPANY] No templates found for Software Company category`);
+        setServiceFilterTemplates(prev => ({
+          ...prev,
+          softwarecompany: []
+        }));
+      }
+    } catch (error) {
+      console.error(`❌ [SOFTWARE COMPANY] Error fetching templates:`, error);
+      setServiceFilterTemplates(prev => ({
+        ...prev,
+        softwarecompany: []
+      }));
+    } finally {
+      setIsLoadingServiceFilter(prev => ({ ...prev, softwarecompany: false }));
+    }
+  }, [isSoftwareCompanyCategory, serviceFilterTemplates, softwareCategoryButtons]);
+
+  // Fetch Software Company templates when Software Company category is detected
+  useEffect(() => {
+    if (isSoftwareCompanyCategory && !serviceFilterTemplates['softwarecompany']) {
+      console.log('🎯 [SOFTWARE COMPANY] Software Company category detected, fetching templates...');
+      fetchSoftwareCompanyTemplates();
+    }
+  }, [isSoftwareCompanyCategory, fetchSoftwareCompanyTemplates, serviceFilterTemplates]);
+
   const filteredPosters = useMemo(() => {
     // If we have EventPlanner templates and a service filter selected, filter by tags
     if (isEventPlannerCategory && selectedServiceFilter && serviceFilterTemplates['eventplanner']) {
@@ -1140,47 +1241,98 @@ const PosterPlayerScreen: React.FC = () => {
     }
 
     // If we have Software Company category and a category selected, filter by tags
+    console.log(`\u{1F3F7}\uFE0F [FILTERING CHECK] Software Company filtering condition check:`, {
+      isSoftwareCompanyCategory,
+      selectedSoftwareCategory,
+      allTemplatesLength: allTemplates.length,
+      shouldFilter: isSoftwareCompanyCategory && selectedSoftwareCategory
+    });
+    
     if (isSoftwareCompanyCategory && selectedSoftwareCategory) {
+      console.log(`\n\u{1F3F7}\uFE0F [FILTERING - POSTER PLAYER] Starting software category filtering process`);
+      
+      // Use cached Software Company templates instead of allTemplates
+      const softwareTemplates = serviceFilterTemplates.softwarecompany || allTemplates;
+      console.log(`\ud83d\udcca [FILTERING] Total templates before filtering: ${softwareTemplates.length}`);
+      console.log(`\ud83c\udfaf [FILTERING] Selected software category: ${selectedSoftwareCategory}`);
+      console.log(`\ud83c\udf0d [FILTERING] Selected language: ${selectedLanguage}`);
+      
       const selectedCategoryButton = softwareCategoryButtons.find(btn => btn.id === selectedSoftwareCategory);
       if (selectedCategoryButton && selectedCategoryButton.tags.length > 0) {
-        const templatesWithLanguages = allTemplates.map(t => mergeTemplateLanguages(t));
+        console.log(`\u{1F3F7}\uFE0F [CATEGORY FILTER] Filtering by category: ${selectedCategoryButton.name}`);
+        console.log(`\u{1F3F7}\uFE0F [CATEGORY FILTER] Category tags: [${selectedCategoryButton.tags.join(', ')}]`);
+        
+        const templatesWithLanguages = softwareTemplates.map(t => mergeTemplateLanguages(t));
+        const templatesBeforeCategoryFilter = templatesWithLanguages.length;
         
         const filteredByCategory = templatesWithLanguages.filter(template => {
           const templateTags = Array.isArray(template.tags)
             ? template.tags.map(tag => tag.toLowerCase())
             : [];
           const templateName = (template.name || '').toLowerCase();
-          const templateDescription = (template.description || '').toLowerCase();
           
-          return selectedCategoryButton.tags.some(tag => 
-            templateTags.some(posterTag => posterTag.includes(tag.toLowerCase())) ||
-            templateName.includes(tag.toLowerCase()) ||
-            templateDescription.includes(tag.toLowerCase())
-          );
+          const matchesTag = selectedCategoryButton.tags.some(tag => {
+            const exactTagMatch = templateTags.some(posterTag => posterTag === tag.toLowerCase());
+            const nameMatch = templateName.includes(tag.toLowerCase());
+            
+            // For category filtering, prioritize exact tag matches over name matches
+            if (exactTagMatch || nameMatch) {
+              console.log(`\ud83d\udd0d [MATCH DEBUG] Tag "${tag}" matched for template "${template.name}":`);
+              console.log(`   - Exact tag match: ${exactTagMatch}`);
+              console.log(`   - Name match: ${nameMatch} (name: "${templateName}")`);
+              console.log(`   - Template tags: [${templateTags.join(', ')}]`);
+              return true;
+            }
+            return false;
+          });
+          
+          const finalMatch = matchesTag;
+          
+          if (finalMatch) {
+            console.log(`\u2705 [CATEGORY FILTER] Template "${template.name}" matched - Tags: [${templateTags.join(', ')}]`);
+          } else {
+            console.log(`\u274C [CATEGORY FILTER] Template "${template.name}" did NOT match - Tags: [${templateTags.join(', ')}]`);
+          }
+          
+          return finalMatch;
         });
 
+        console.log(`\ud83d\udcca [CATEGORY FILTER] Templates after category filtering: ${filteredByCategory.length} (removed ${templatesBeforeCategoryFilter - filteredByCategory.length})`);
         console.log(`[SOFTWARE COMPANY] Filtered ${filteredByCategory.length} templates for category: ${selectedSoftwareCategory}`);
 
-        // If "All" is selected, return ALL filtered templates without language filtering (max 6)
+        // Filter by language for software company category templates
         if (selectedLanguage === 'all') {
+          console.log(`\ud83c\udf0d [LANGUAGE FILTER] No language filter applied (selected: 'all')`);
           const result = filteredByCategory.slice(0, 6);
+          console.log(`\ud83c\udf89 [FILTERING COMPLETE] Final filtered templates count: ${result.length}`);
           console.log(`[SOFTWARE COMPANY] Returning ${result.length} templates (All language)`);
           return result;
         }
-
-        // Filter by language for software company category templates
+        
+        console.log(`\ud83c\udf0d [LANGUAGE FILTER] Applying language filter: ${selectedLanguage}`);
+        const templatesBeforeLanguageFilter = filteredByCategory.length;
+        
         const languageFilteredForSoftware = filteredByCategory.filter(template => {
           const matches = templateContainsLanguage(template, selectedLanguage);
+          
+          if (matches) {
+            console.log(`\u2705 [LANGUAGE FILTER] Template "${template.name}" matched language: ${selectedLanguage} - Languages: [${template.languages?.join(', ') || 'none'}], Tags: [${template.tags?.join(', ') || 'none'}]`);
+          }
+          
           return matches;
         });
 
+        console.log(`\ud83d\udcca [LANGUAGE FILTER] Templates after language filtering: ${languageFilteredForSoftware.length} (removed ${templatesBeforeLanguageFilter - languageFilteredForSoftware.length})`);
+
         if (languageFilteredForSoftware.length === 0) {
           console.log(`[SOFTWARE COMPANY] No templates found for language: ${selectedLanguage}`);
+          console.log(`\ud83c\udf89 [FILTERING COMPLETE] Final filtered templates count: 0`);
           return [];
         }
 
         // Limit to 6 images after language filtering
         const result = languageFilteredForSoftware.slice(0, 6);
+        console.log(`\ud83c\udf89 [FILTERING COMPLETE] Final filtered templates count: ${result.length}`);
         console.log(`[SOFTWARE COMPANY] Returning ${result.length} templates (language: ${selectedLanguage})`);
         return result;
       }
@@ -3068,8 +3220,10 @@ const PosterPlayerScreen: React.FC = () => {
     ) {
       const firstFilteredPoster = filteredPosters[0];
       
-      // Only update if the first filtered poster is different from current selection
-      if (currentPoster?.id !== firstFilteredPoster?.id) {
+      // Only auto-select if:
+      // 1. User hasn't manually selected a poster
+      // 2. The first filtered poster is different from current selection
+      if (!userSelectedPosterRef.current && currentPoster?.id !== firstFilteredPoster?.id) {
         console.log('[SOFTWARE COMPANY] Auto-selecting first filtered image:', {
           firstPosterId: firstFilteredPoster.id,
           firstPosterName: firstFilteredPoster.name,
@@ -3719,11 +3873,25 @@ const PosterPlayerScreen: React.FC = () => {
                     ]}
                     onPress={() => {
                       const newCategory = selectedSoftwareCategory === category.id ? null : category.id;
-                      setSelectedSoftwareCategory(newCategory);
+                      
+                      // Log button click details
+                      console.log(`\n\u{1F518} [BUTTON CLICK - POSTER PLAYER] ${category.name} button clicked`);
+                      console.log(`\u{1F3F7}\uFE0F [BUTTON DETAILS] Category ID: ${category.id}`);
+                      console.log(`\u{1F3F7}\uFE0F [BUTTON DETAILS] Category tags: [${category.tags.join(', ')}]`);
+                      console.log(`\u{1F504} [BUTTON DETAILS] Previous selected category: ${selectedSoftwareCategory}`);
+                      console.log(`\u{1F504} [BUTTON DETAILS] New selected category: ${newCategory || 'none (deselected)'}`);
                       
                       if (newCategory) {
-                        console.log(`[SOFTWARE COMPANY] Category selected: ${newCategory}`);
+                        console.log(`\u2705 [CATEGORY SELECTION] Activating category: ${category.name}`);
+                        console.log(`\ud83c\udfaf [CATEGORY SELECTION] Will filter posters with tags: [${category.tags.join(', ')}]`);
+                      } else {
+                        console.log(`\u274C [CATEGORY SELECTION] Deactivating category: ${category.name}`);
+                        console.log(`\u{1F504} [CATEGORY SELECTION] Will show all posters (no category filter)`);
                       }
+                      
+                      // Reset user selection flag when changing categories to allow auto-selection
+                      userSelectedPosterRef.current = false;
+                      setSelectedSoftwareCategory(newCategory);
                     }}
                     activeOpacity={0.85}
                   >
