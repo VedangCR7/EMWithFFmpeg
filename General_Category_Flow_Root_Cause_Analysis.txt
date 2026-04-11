@@ -1,0 +1,368 @@
+================================================================================
+GENERAL CATEGORY FLOW ROOT CAUSE ANALYSIS REPORT
+================================================================================
+
+Generated: April 11, 2026
+Analysis Type: Deep Root Cause Investigation
+Issue: General Category navigation passes selectedPoster: null to PosterPlayerScreen
+
+================================================================================
+1. EXECUTIVE SUMMARY
+================================================================================
+
+CRITICAL FINDING: The General Category flow is fundamentally designed differently
+from working flows. It navigates with ONLY category metadata, while other flows
+navigate with actual poster/template objects.
+
+PRIMARY ROOT CAUSE: General Categories use category-based navigation (category
+name only) whereas working flows use template-based navigation (specific poster
+object).
+
+DESIGN MISMATCH: HomeScreen treats General Categories as "category browsers"
+while PosterPlayerScreen expects "poster selectors" in all cases.
+
+================================================================================
+2. FLOW COMPARISON ANALYSIS (WORKING vs BROKEN)
+================================================================================
+
+2.1 WORKING FLOW 1: INDIVIDUAL TEMPLATE SELECTION
+--------------------------------------------------
+Data Source: Template objects from API/state
+Selection Logic: User clicks specific template card
+Navigation Params:
+```typescript
+{
+  selectedTemplateId: template.id,           // VALID poster ID
+  selectedPoster: template,                 // VALID poster object
+  relatedPosters: [],
+  templateSource: 'greeting',
+}
+```
+Result: PosterPlayerScreen receives valid poster, no crash
+
+2.2 WORKING FLOW 2: BUSINESS CATEGORY SELECTION  
+--------------------------------------------------
+Data Source: Cached business templates or API
+Selection Logic: handleBusinessCategoryPress() function
+Navigation Params (CACHED):
+```typescript
+{
+  selectedTemplateId: cachedTemplates[0].id, // VALID poster ID  
+  selectedPoster: cachedTemplates[0],         // VALID poster object
+  relatedPosters: cachedTemplates.slice(1),
+  templateSource: 'professional',
+}
+```
+Navigation Params (NO CACHE):
+```typescript
+{
+  selectedTemplateId: categoryId,            // VALID category ID
+  selectedPoster: {                          // VALID poster object
+    id: categoryId,
+    name: category.name,
+    thumbnail: '',
+    category: category.name,
+    // ... complete poster object
+  },
+  templateSource: 'professional',
+}
+```
+Result: PosterPlayerScreen receives valid poster, no crash
+
+2.3 BROKEN FLOW: GENERAL CATEGORY SELECTION
+-------------------------------------------
+Data Source: Category metadata only (no templates)
+Selection Logic: handleGreetingCategoryPress() function
+Navigation Params (CACHED):
+```typescript
+{
+  selectedTemplateId: firstTemplate.id,      // VALID poster ID
+  selectedPoster: {                          // VALID poster object
+    id: firstTemplate.id,
+    name: firstTemplate.name,
+    thumbnail: firstTemplate.thumbnail || categoryImage,
+    category: category.name,
+    // ... complete poster object
+  },
+  templateSource: 'greeting',
+}
+```
+Navigation Params (NO CACHE) - THE PROBLEM:
+```typescript
+{
+  selectedTemplateId: null,                 // NULL ID
+  selectedPoster: null,                     // NULL POSTER OBJECT
+  relatedPosters: [],
+  templateSource: 'greeting',
+  greetingCategory: category.name,
+}
+```
+Result: PosterPlayerScreen receives null poster, CRASH
+
+================================================================================
+3. GENERAL CATEGORY DATA FLOW BREAKDOWN
+================================================================================
+
+3.1 DATA SOURCE ANALYSIS
+------------------------
+General Categories data comes from:
+- greetingCategoriesList: Array of category metadata
+- Each category contains: {id, name, icon, color, imageUrl}
+- NO template objects included in category data
+- Templates must be fetched separately via API
+
+3.2 SELECTION LOGIC ANALYSIS  
+------------------------
+handleGreetingCategoryPress() function logic:
+```typescript
+const cachedTemplates = greetingCategoryPreviews[category.id];
+
+if (cachedTemplates && cachedTemplates.length > 0) {
+  // WORKS: Has cached templates, creates valid poster object
+  const firstTemplate = cachedTemplates[0];
+  // ... builds valid selectedPoster object
+} else {
+  // BROKEN: No cached templates, sends null
+  navigation.navigate('PosterPlayer', {
+    selectedTemplateId: null,
+    selectedPoster: null,     // CRASH CAUSE
+    // ...
+  });
+}
+```
+
+3.3 MISSING STEP IDENTIFICATION
+------------------------------
+MISSING: When no cached templates exist, the function should:
+1. Create a placeholder poster object (like Business Categories do)
+2. OR fetch templates synchronously before navigation
+3. OR implement a different navigation pattern
+
+Current implementation: Sends null and hopes PosterPlayerScreen handles it
+
+================================================================================
+4. NAVIGATION PARAM CONSTRUCTION ANALYSIS
+================================================================================
+
+4.1 EXACT BREAKDOWN POINT
+------------------------
+LOCATION: HomeScreen.tsx lines 4812-4819
+
+```typescript
+navigation.navigate('PosterPlayer', {
+  selectedTemplateId: null,  // EXACT LINE: 4813
+  selectedPoster: null,     // EXACT LINE: 4814 - CRASH SOURCE
+  relatedPosters: [],
+  searchQuery: '',
+  templateSource: 'greeting',
+  greetingCategory: category.name,
+});
+```
+
+4.2 WHY NULL IS ASSIGNED
+-----------------------
+REASON: Developer chose to let PosterPlayerScreen handle loading state
+ASSUMPTION: PosterPlayerScreen can handle null selectedPoster
+REALITY: PosterPlayerScreen crashes on null poster access
+
+4.3 MISSING FALLBACK IMPLEMENTATION
+----------------------------------
+Business Categories implement fallback:
+```typescript
+selectedPoster: {                // VALID fallback object
+  id: categoryId,
+  name: category.name,
+  thumbnail: '',
+  category: category.name,
+  downloads: 0,
+  isDownloaded: false,
+},
+```
+
+General Categories missing fallback:
+```typescript
+selectedPoster: null,     // NO fallback - CRASH
+```
+
+================================================================================
+5. ASYNC DATA DEPENDENCY FINDINGS
+================================================================================
+
+5.1 RACE CONDITION IDENTIFICATION
+---------------------------------
+General Categories have async dependency:
+- Category metadata: Available immediately
+- Template data: Requires API call (async)
+- Navigation: Happens immediately (before template data)
+
+5.2 TIMING ANALYSIS
+-------------------
+T=0ms: User clicks General Category
+T=5ms: handleGreetingCategoryPress() called
+T=10ms: Checks cachedTemplates (none found)
+T=15ms: Navigates with null poster (CRASH)
+T=1000ms: Background API call completes (too late)
+
+5.3 WORKING FLOWS TIMING
+------------------------
+Business Categories: Same timing but with fallback object
+Individual Templates: No async dependency (template already available)
+
+================================================================================
+6. STATE AVAILABILITY ANALYSIS
+================================================================================
+
+6.1 HOME SCREEN STATE AT NAVIGATION TIME
+----------------------------------------
+General Categories:
+- greetingCategoriesList: AVAILABLE (category metadata)
+- greetingCategoryPreviews: MAYBE EMPTY (template cache)
+- Selected category info: AVAILABLE
+
+Business Categories:  
+- businessCategoriesList: AVAILABLE (category metadata)
+- businessCategoryPreviews: MAYBE EMPTY (template cache)
+- BUT: Creates fallback poster object
+
+6.2 WHY WORKING FLOWS HAVE POSTER DATA
+---------------------------------------
+Individual Templates: User selects specific template object
+Business Categories: Creates fallback poster from category metadata
+General Categories: Sends null instead of creating fallback
+
+================================================================================
+7. ROOT CAUSE IDENTIFICATION (MANDATORY)
+================================================================================
+
+7.1 PRIMARY ROOT CAUSE
+----------------------
+**MISSING FALLBACK POSTER OBJECT IN GENERAL CATEGORY FLOW**
+
+The handleGreetingCategoryPress() function intentionally sends selectedPoster: null
+when no cached templates exist, instead of creating a valid fallback poster object
+like the Business Categories flow does.
+
+7.2 SECONDARY CONTRIBUTING CAUSES
+----------------------------------
+
+1. **Inconsistent Navigation Patterns**: Different flows use different strategies
+   - Individual Templates: Pass real template object
+   - Business Categories: Pass real template OR fallback object  
+   - General Categories: Pass real template OR null (BROKEN)
+
+2. **Assumption Mismatch**: HomeScreen assumes PosterPlayerScreen can handle null
+   - Reality: PosterPlayerScreen crashes on null poster access
+   - Expectation: All flows pass valid poster objects
+
+3. **Missing Error Handling**: No validation before navigation
+   - Should validate selectedPoster before navigation
+   - Should create fallback when needed
+
+7.3 LOGICAL FLAW IN HOME SCREEN
+------------------------------
+The logical flaw is treating General Categories differently from Business
+Categories when both have the same data availability pattern (category metadata
+with optional cached templates).
+
+7.4 MISSING STEP IN DATA FLOW
+-----------------------------
+Missing step: Create fallback poster object from category metadata when no
+templates are cached, identical to Business Categories pattern.
+
+================================================================================
+8. DESIGN MISMATCH EXPLANATION
+================================================================================
+
+8.1 INTENDED BEHAVIOR ANALYSIS
+-------------------------------
+Based on code patterns, the intended behavior should be:
+
+A) Pass a selected poster (fallback or real) in ALL cases
+B) Let PosterPlayerScreen handle template loading in background
+
+8.2 ACTUAL IMPLEMENTATION
+-------------------------
+General Categories implement:
+A) Pass selected poster only when cached templates exist
+B) Pass null when no cached templates (BROKEN)
+
+8.3 MISMATCH IDENTIFICATION
+---------------------------
+- Business Categories: Consistent - always pass poster object
+- General Categories: Inconsistent - sometimes pass null
+- PosterPlayerScreen: Expects always receives poster object
+
+================================================================================
+9. RISK ANALYSIS
+================================================================================
+
+9.1 WHY ONLY GENERAL CATEGORY BREAKS
+------------------------------------
+Because it's the ONLY flow that intentionally sends null poster:
+- Business Categories: Always create fallback object
+- Individual Templates: Always have real template object  
+- General Categories: Send null when no cache (BROKEN)
+
+9.2 OTHER SCENARIOS WITH SAME ISSUE
+----------------------------------
+Potential similar issues:
+1. Any new category-based flow that copies General Category pattern
+2. Flows where cache is cleared and user navigates quickly
+3. Network failures preventing template caching
+
+9.3 IMPACT ON SCALABILITY
+-------------------------
+Current design is not scalable because:
+- Inconsistent patterns make maintenance difficult
+- New developers will copy broken General Category pattern
+- No clear standard for category-based navigation
+
+================================================================================
+10. FINAL OBSERVATIONS
+================================================================================
+
+10.1 CRITICAL INSIGHT
+---------------------
+The crash is NOT a PosterPlayerScreen bug - it's a HomeScreen design flaw.
+PosterPlayerScreen correctly expects to receive valid poster objects in all
+cases, as evidenced by all other working flows.
+
+10.2 DESIGN INCONSISTENCY
+------------------------
+HomeScreen implements THREE different navigation strategies:
+1. Template-based (individual templates)
+2. Category-based with fallback (business categories)  
+3. Category-based with null (general categories) - BROKEN
+
+10.3 SIMPLE FIX NEEDED
+---------------------
+The fix is simple: Make General Categories behave like Business Categories
+by creating a fallback poster object instead of sending null.
+
+10.4 SYSTEMIC ISSUE
+------------------
+The root issue is inconsistent navigation patterns in HomeScreen. A standardized
+approach should be implemented for all category-based navigation.
+
+================================================================================
+RECOMMENDATION SUMMARY
+================================================================================
+
+IMMEDIATE ACTION REQUIRED:
+1. Fix handleGreetingCategoryPress() to create fallback poster object
+2. Make General Category flow consistent with Business Category flow
+3. Add validation to prevent null poster navigation
+
+MEDIUM-TERM IMPROVEMENTS:
+1. Standardize all navigation patterns in HomeScreen
+2. Create shared utility for building navigation params
+3. Add TypeScript validation for navigation parameters
+
+LONG-TERM ARCHITECTURAL CHANGES:
+1. Define clear contract between HomeScreen and PosterPlayerScreen
+2. Implement consistent error handling across all flows
+3. Add unit tests for navigation parameter construction
+
+================================================================================
+END OF ANALYSIS REPORT
+================================================================================

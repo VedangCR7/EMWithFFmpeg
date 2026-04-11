@@ -458,7 +458,7 @@ const TodaysPickScreen: React.FC = () => {
     if ((initialPoster as any).content?.background) {
       return {
         ...initialPoster,
-        thumbnail: initialPoster.thumbnail || (initialPoster as any).content.background,
+        thumbnail: initialPoster.thumbnail || (initialPoster as any).content?.background,
       } as Template;
     }
     return initialPoster;
@@ -1311,7 +1311,7 @@ const TodaysPickScreen: React.FC = () => {
       // Ensure thumbnail is set from content.background if needed
       let newPoster = mergeTemplateLanguages(initialPosterToUse);
       if (!newPoster.thumbnail && (newPoster as any).content?.background) {
-        newPoster = { ...newPoster, thumbnail: (newPoster as any).content.background };
+        newPoster = { ...newPoster, thumbnail: (newPoster as any).content?.background };
       }
 
       if (newPoster.thumbnail || (newPoster as any).content?.background) {
@@ -1345,7 +1345,7 @@ const TodaysPickScreen: React.FC = () => {
       // Ensure thumbnail is set from content.background if needed
       let newPoster = mergeTemplateLanguages(initialPosterToUse);
       if (!newPoster.thumbnail && (newPoster as any).content?.background) {
-        newPoster = { ...newPoster, thumbnail: (newPoster as any).content.background };
+        newPoster = { ...newPoster, thumbnail: (newPoster as any).content?.background };
       }
 
       if (newPoster.thumbnail || (newPoster as any).content?.background) {
@@ -1624,7 +1624,7 @@ const TodaysPickScreen: React.FC = () => {
 
           // Ensure the poster has thumbnail set (for GreetingTemplates, use content.background if thumbnail is missing)
           if (!posterToSet.thumbnail && (posterToSet as any).content?.background) {
-            posterToSet = { ...posterToSet, thumbnail: (posterToSet as any).content.background };
+            posterToSet = { ...posterToSet, thumbnail: (posterToSet as any).content?.background };
           }
 
           const finalPoster = mergeTemplateLanguages(posterToSet);

@@ -510,7 +510,25 @@ const PosterPlayerScreen: React.FC = () => {
     return initialPoster;
   }, [initialPoster]);
 
-  // ✅ SINGLE SOURCE OF TRUTH: Controlled poster state
+  // SAFE POSTER ACCESSOR: Prevent crashes when currentPoster is null
+  const safeGetPosterInfo = useCallback(() => {
+    if (!currentPoster || currentPoster.id === 'loading' || currentPoster.id.startsWith('category_')) {
+      return {
+        id: null,
+        name: 'Loading...',
+        category: 'General',
+        thumbnail: null
+      };
+    }
+    return {
+      id: currentPoster.id,
+      name: currentPoster.name || 'Untitled',
+      category: currentPoster.category || 'General',
+      thumbnail: currentPoster.thumbnail || (currentPoster as any)?.content?.background
+    };
+  }, [currentPoster]);
+
+  // SINGLE SOURCE OF TRUTH: Controlled poster state
   const [currentPoster, setCurrentPoster] = useState<Template | null>(null);
   const [currentId, setCurrentId] = useState<string>(initialTemplateId || initialPoster?.id || '');
   const [isPosterLoading, setIsPosterLoading] = useState<boolean>(true);
@@ -554,6 +572,7 @@ const PosterPlayerScreen: React.FC = () => {
   const [isGreetingCategoryLoading, setIsGreetingCategoryLoading] = useState(false);
   const lastAutoDetectedPosterIdRef = useRef<string | null>(null); // Track which poster triggered auto-detection to prevent duplicate detection
   const userManuallySelectedLanguageRef = useRef<boolean>(false); // Track if user manually selected a language (including "All")
+  const lastFetchedRealPosterIdRef = useRef<string | null>(null); // Track the last real poster ID fetched from API
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const [selectedServiceFilter, setSelectedServiceFilter] = useState<string | null>(null);
   const [selectedSoftwareCategory, setSelectedSoftwareCategory] = useState<string | null>(null);
@@ -1488,7 +1507,15 @@ const PosterPlayerScreen: React.FC = () => {
 
     // If initialPoster ID changed, update immediately regardless of category type
     // BUT: Don't override if user has manually selected a poster (unless navigating from different screen)
+    // AND: Don't override if we already have a real poster from API (not category placeholder)
     if (prevId !== null && prevId !== initialPosterId) {
+      // CRITICAL: Don't override if we have a real poster from API
+      // Check if currentPoster is a real backend poster (not category placeholder)
+      if (currentPoster && !currentPoster.id.startsWith('greeting_category_') && !currentPoster.id.startsWith('business_category_')) {
+        console.log(' [ROUTE PARAMS] Skipping override - real poster already loaded:', currentPoster.id);
+        return;
+      }
+      
       // Only update if user hasn't manually selected a poster, OR if navigating from different screen
       // (When navigating from different screen, prevId !== initialPosterId means new navigation)
       if (userSelectedPosterRef.current === true && currentPoster?.id !== initialPosterId) {
@@ -1502,7 +1529,14 @@ const PosterPlayerScreen: React.FC = () => {
       }
 
       if (newPoster.thumbnail || (newPoster as any).content?.background) {
+        // PROTECTION: Don't override if we already have a real poster from API
+        if (currentPoster?.id && !currentPoster.id.startsWith('greeting_category_')) {
+          console.log(' [ROUTE PARAMS] Skipping override - real poster already set:', currentPoster.id);
+          return;
+        }
+        
         // Update poster immediately
+        console.log(' [ROUTE PARAMS] Attempting to override poster:', newPoster.id);
         setCurrentPoster(newPoster);
         setCurrentId(initialPosterId);
         setImageDimensions(null); // Reset image dimensions when poster changes
@@ -1546,6 +1580,13 @@ const PosterPlayerScreen: React.FC = () => {
       }
 
       if (newPoster.thumbnail || (newPoster as any).content?.background) {
+        // PROTECTION: Don't override if we already have a real poster from API
+        if (currentPoster?.id && !currentPoster.id.startsWith('greeting_category_')) {
+          console.log(' [ROUTE PARAMS] Skipping override - real poster already set:', currentPoster.id);
+          return;
+        }
+        
+        console.log(' [ROUTE PARAMS] Attempting to override poster:', newPoster.id);
         setCurrentPoster(newPoster);
         setCurrentId(initialPosterId);
         // Clear user selection ref when resetting to initial poster
@@ -2535,7 +2576,7 @@ const PosterPlayerScreen: React.FC = () => {
 
           // Ensure we have a valid poster
           if (!posterToSet) {
-            console.warn('⚠️ [POSTER PLAYER] No valid poster found, skipping update');
+            console.warn('  [POSTER PLAYER] No valid poster found, skipping update');
             return;
           }
 
@@ -2546,7 +2587,7 @@ const PosterPlayerScreen: React.FC = () => {
 
           const finalPoster = mergeTemplateLanguages(posterToSet);
 
-          console.log('🔍 [GREETING FETCH] Poster selection:', {
+          console.log(' [GREETING FETCH] Poster selection:', {
             matchingPosterFound: !!matchingPoster,
             matchingPosterId: matchingPoster?.id,
             posterToSetId: posterToSet.id,
@@ -2556,31 +2597,35 @@ const PosterPlayerScreen: React.FC = () => {
             isLoadingPlaceholder: finalPoster.id === 'loading'
           });
 
-          // ✅ CONTROLLED API FETCH: Only auto-select if user hasn't interacted
+          //  CONTROLLED API FETCH: Only auto-select if user hasn't interacted
           if (!userSelectedPosterRef.current) {
-            // Find matching poster in templates
-            const findMatchingPoster = (templates: Template[], currentPoster: Template | null) => {
-              if (!currentPoster?.id || isPlaceholderPoster(currentPoster)) return null;
-              return templates.find(t => t.id === currentPoster.id);
-            };
-
-            const matchedPoster = findMatchingPoster(nextTemplates, currentPoster);
-            const posterToSet = matchedPoster || (nextTemplates.length > 0 ? nextTemplates[0] : null);
-
+            // CRITICAL FIX: Use the posterToSet that was determined above (includes matchingPoster)
             if (posterToSet && !isPlaceholderPoster(posterToSet)) {
-              setCurrentPoster(posterToSet);
-              setCurrentId(posterToSet.id);
+              setCurrentPoster(finalPoster);
+              setCurrentId(finalPoster.id);
+              
+              // Store the last fetched real poster ID for protection
+              lastFetchedRealPosterIdRef.current = finalPoster.id;
               
               console.log('[POSTER STATE UPDATE]', {
-                source: 'API',
-                posterId: posterToSet.id,
+                source: 'GREETING_FETCH',
+                posterId: finalPoster.id,
+                posterName: finalPoster.name,
                 timestamp: Date.now(),
-                note: userSelectedPosterRef.current ? 'User selection protected' : 'Auto-selected from API'
+                matchingPosterFound: !!matchingPoster,
+                wasPlaceholder: isPlaceholderPoster(posterToMatch),
+                note: 'Real poster set from greeting fetch'
               });
+
+              // VALIDATION LOGGING: Ensure we're using real ID
+              console.log(' FINAL POSTER ID USED:', finalPoster.id);
+              console.log(' Is category template:', finalPoster.id.startsWith('greeting_category_'));
+              console.log(' Is real backend poster:', finalPoster.id.startsWith('cmmt'));
+              console.log(' Stored in lastFetchedRealPosterIdRef:', finalPoster.id);
             }
           } else {
             console.log('[POSTER STATE UPDATE]', {
-              source: 'API',
+              source: 'GREETING_FETCH',
               posterId: currentPoster?.id,
               timestamp: Date.now(),
               note: 'User selection protected - API update skipped'
@@ -3003,14 +3048,20 @@ const PosterPlayerScreen: React.FC = () => {
 
     // Only run for business category, greeting category, or calendar posters
     if (!globalBusinessCategory && !greetingCategory && !calendarDate) {
-      console.log('🔍 [CURRENT LANG DETECT] Skipped - not a category/calendar poster');
+      console.log(' [CURRENT LANG DETECT] Skipped - not a category/calendar poster');
       return;
     }
 
-    console.log('🔍 [CURRENT LANG DETECT] Starting detection:', {
-      posterId: currentPoster.id,
-      posterName: currentPoster.name,
-      category: currentPoster.category,
+    const posterInfo = safeGetPosterInfo();
+    if (!posterInfo.id) {
+      console.log(' [CURRENT LANG DETECT] Skipped - invalid poster info');
+      return;
+    }
+
+    console.log(' [CURRENT LANG DETECT] Starting detection:', {
+      posterId: posterInfo.id,
+      posterName: posterInfo.name,
+      category: posterInfo.category,
       globalBusinessCategory,
       greetingCategory,
       calendarDate
@@ -3073,7 +3124,7 @@ const PosterPlayerScreen: React.FC = () => {
       console.log('ℹ️ [CURRENT LANG DETECT] User manually selected language, keeping:', selectedLanguage);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPoster?.id, globalBusinessCategory, greetingCategory, calendarDate]); // Run when current poster changes for category or calendar
+  }, [safeGetPosterInfo, currentPoster?.id, globalBusinessCategory, greetingCategory, calendarDate]); // Run when current poster changes for category or calendar
 
   // Log whenever allTemplates changes to track duplicates
   useEffect(() => {
@@ -3140,9 +3191,24 @@ const PosterPlayerScreen: React.FC = () => {
       const templatesWithLanguages = allTemplates.map(t => mergeTemplateLanguages(t));
 
       setCurrentPoster(previousPoster => {
+        // PROTECTION: Don't override if we already have a real poster from API
+        if (currentPoster?.id && !currentPoster.id.startsWith('greeting_category_')) {
+          console.log(' [ALL TEMPLATES] Skipping override - real poster already set:', currentPoster.id);
+          return;
+        }
+
         const resolvedPrevious = previousPoster
           ? templatesWithLanguages.find(template => template.id === previousPoster.id) || previousPoster
           : null;
+
+        // CRITICAL: Preserve poster if it was set by greeting fetch (real backend poster)
+        // Don't override with first template if we already have a real poster
+        if (previousPoster && !previousPoster.id.startsWith('greeting_category_') && !previousPoster.id.startsWith('business_category_')) {
+          console.log(' [ALL TEMPLATES] Preserving real poster from greeting fetch:', previousPoster.id);
+          return resolvedPrevious || previousPoster;
+        }
+
+        console.log(' [ALL TEMPLATES] Attempting to override poster:', templatesWithLanguages[0]?.id || 'null');
 
         // When "All" is selected, show any template (no language filtering)
         if (resolvedPrevious) {
@@ -3176,9 +3242,27 @@ const PosterPlayerScreen: React.FC = () => {
     const templatesWithLanguages = allTemplates.map(t => mergeTemplateLanguages(t));
 
     setCurrentPoster(previousPoster => {
+      // PROTECTION: Don't override if we already have a real poster from API
+      if (currentPoster?.id && !currentPoster.id.startsWith('greeting_category_')) {
+        console.log(' [LANGUAGE FILTER] Skipping override - real poster already set:', currentPoster.id);
+        return;
+      }
+
       const resolvedPrevious = previousPoster
         ? templatesWithLanguages.find(template => template.id === previousPoster.id) || previousPoster
         : null;
+
+      // CRITICAL: Preserve poster if it was set by greeting fetch (real backend poster)
+      // Don't override with language-filtered template if we already have a real poster
+      if (previousPoster && !previousPoster.id.startsWith('greeting_category_') && !previousPoster.id.startsWith('business_category_')) {
+        console.log(' [LANGUAGE FILTER] Preserving real poster from greeting fetch:', previousPoster.id);
+        // Only preserve if it matches the language filter, otherwise allow language override
+        if (resolvedPrevious && templateContainsLanguage(resolvedPrevious, selectedLanguage)) {
+          return resolvedPrevious;
+        }
+      }
+
+      console.log(' [LANGUAGE FILTER] Attempting to override poster:', templatesWithLanguages[0]?.id || 'null');
 
       // Check if current poster matches the selected language
       if (resolvedPrevious && templateContainsLanguage(resolvedPrevious, selectedLanguage)) {
@@ -3556,28 +3640,52 @@ const PosterPlayerScreen: React.FC = () => {
   }, [navigation, originScreen]);
 
   const navigateToPosterEditor = useCallback(() => {
-    // ✅ SAFETY: Use ID as primary source of truth
+    // SAFETY: Use ID as primary source of truth
     if (!currentId || currentId === 'loading') {
-      console.error('❌ Cannot navigate - invalid template ID');
+      console.error(' Cannot navigate - invalid template ID');
       return;
     }
 
-    console.log("➡️ Navigating to PosterEditorScreen with type:", type);
+    console.log(" Navigating to PosterEditorScreen with type:", type);
 
+    const posterInfo = safeGetPosterInfo();
+    
+    // SAFE GUARD: Always use real poster ID when available
+    let finalTemplateId = currentPoster?.id || currentId;
+    
+    // If we're still using a category ID but have a real poster stored, use the real one
+    if (finalTemplateId?.startsWith('greeting_category_') && lastFetchedRealPosterIdRef.current) {
+      console.warn(' SAFETY: Category ID detected but real poster available, using fetched ID:', lastFetchedRealPosterIdRef.current);
+      finalTemplateId = lastFetchedRealPosterIdRef.current;
+    }
+    
+    // Additional safety check
+    if (finalTemplateId?.startsWith('greeting_category_') && currentPoster && !currentPoster.id.startsWith('greeting_category_')) {
+      console.warn(' SAFETY: Category ID detected but real poster available, fixing...');
+      finalTemplateId = currentPoster.id;
+    }
+    
+    // VALIDATION LOGGING: Ensure we're using real ID
+    console.log(' FINAL POSTER ID USED FOR NAVIGATION:', finalTemplateId);
+    console.log(' Is category template:', finalTemplateId?.startsWith('greeting_category_'));
+    console.log(' Is real backend poster:', finalTemplateId?.startsWith('cmmt'));
+    console.log(' Current poster ID:', currentPoster?.id);
+    console.log(' Current ID state:', currentId);
+    
     navigation.navigate('PosterEditor', {
       selectedImage: {
         uri: getHighQualityImageUrl(currentPoster),
-        title: currentPoster.name,
-        description: currentPoster.category,
+        title: posterInfo.name,
+        description: posterInfo.category,
       },
       selectedLanguage: selectedLanguage,
-      selectedTemplateId: currentId,  // ✅ PRIMARY DATA - ID flows unchanged
+      selectedTemplateId: finalTemplateId,  // Use validated real template ID
       selectedTemplate: JSON.stringify(currentPoster),
-      posterCategory: currentPoster.category,
+      posterCategory: posterInfo.category,
       type: type,
       categoryName: categoryName
     });
-  }, [navigation, currentPoster, selectedLanguage, getHighQualityImageUrl, type, categoryName, currentId]);
+  }, [navigation, currentPoster, selectedLanguage, getHighQualityImageUrl, type, categoryName, currentId, safeGetPosterInfo]);
 
   const handleNextPress = useCallback(() => {
     // ✅ SAFETY: Use ID as primary validation

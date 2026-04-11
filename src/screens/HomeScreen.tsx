@@ -4806,12 +4806,19 @@ const HomeScreen: React.FC = React.memo(() => {
         greetingCategory: category.name,
       });
     } else {
-      // ✅ FIXED: Pass null for selectedPoster when no cached templates exist
-      // Let PosterPlayerScreen handle the loading state properly
+      // FIXED: Create fallback poster object (like Business Categories) to prevent crashes
+      const categoryId = `greeting_category_${category.id}`;
       
       navigation.navigate('PosterPlayer', {
-        selectedTemplateId: null,  // ✅ NO PLACEHOLDER - let API fetch determine the poster
-        selectedPoster: null,     // ✅ NO PLACEHOLDER - PosterPlayerScreen will handle loading
+        selectedTemplateId: categoryId,  // VALID ID - never null
+        selectedPoster: {                // VALID fallback poster object
+          id: categoryId,
+          name: category.name,
+          thumbnail: categoryImage || '',
+          category: category.name,
+          downloads: 0,
+          isDownloaded: false,
+        },
         relatedPosters: [],
         searchQuery: '',
         templateSource: 'greeting',

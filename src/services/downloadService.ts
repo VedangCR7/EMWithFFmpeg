@@ -56,6 +56,12 @@ class DownloadService {
       throw new Error('Business profile ID is required for downloads');
     }
 
+    // Check if this is a fallback/category-based template (not downloadable)
+    if (resourceId.startsWith('business_category_') || resourceId.startsWith('greeting_category_')) {
+      console.log(' Skipping download for category-based template:', resourceId);
+      throw new Error('Category templates cannot be downloaded. Please select a specific poster.');
+    }
+
     try {
       // 🔥 CRITICAL: Call EXACT API endpoint with EXACT payload
       const payload = {

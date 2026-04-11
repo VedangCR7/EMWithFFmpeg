@@ -237,13 +237,23 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
   // Additional debugging for image URI
   if (capturedImageUri) {
     console.log('Captured image URI starts with:', capturedImageUri.substring(0, 100));
-    console.log('Captured image URI is data URI:', capturedImageUri.startsWith('data:image'));
+    console.log('Captured image URI is data URI:', capturedImageUri.startsWith('data:'));
     console.log('Captured image URI is file URI:', capturedImageUri.startsWith('file://'));
     console.log('Captured image URI length:', capturedImageUri.length);
     console.log('Full URI type:', typeof capturedImageUri);
   } else {
     console.log('No captured image URI received');
   }
+
+  // Check if this is a category-based template (not downloadable)
+  const isCategoryTemplate = selectedTemplateId?.startsWith('business_category_') || 
+                           selectedTemplateId?.startsWith('greeting_category_');
+  
+  console.log('Template type check:', {
+    selectedTemplateId,
+    isCategoryTemplate,
+    canDownload: !isCategoryTemplate
+  });
 
   // Upload image to backend
   const uploadImage = async () => {
@@ -740,16 +750,22 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
           
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={downloadPoster}
+            onPress={isCategoryTemplate ? () => {
+              Alert.alert(
+                'Download Not Available',
+                'Category templates cannot be downloaded. Please select a specific poster from the category to download.',
+                [{ text: 'OK' }]
+              );
+            } : downloadPoster}
             disabled={isProcessing || isDownloadProcessing || isLimitReached}
           >
             <LinearGradient
-              colors={isLimitReached ? ['#dc3545', '#c82333'] : isProcessing ? ['#cccccc', '#999999'] : ['#28a745', '#20c997']}
+              colors={isCategoryTemplate ? ['#6c757d', '#5a6268'] : isLimitReached ? ['#dc3545', '#c82333'] : isProcessing ? ['#cccccc', '#999999'] : ['#28a745', '#20c997']}
               style={styles.saveButtonGradient}
             >
               <Icon name="download" size={getIconSize(28)} color="#ffffff" />
               <Text style={styles.saveButtonText}>
-                {isLimitReached ? 'Limit Reached' : isProcessing ? 'Saving...' : 'Download'}
+                {isCategoryTemplate ? 'Select a Poster' : isLimitReached ? 'Limit Reached' : isProcessing ? 'Saving...' : 'Download'}
               </Text>
             </LinearGradient>
           </TouchableOpacity>
