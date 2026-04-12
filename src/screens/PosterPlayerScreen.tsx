@@ -1284,21 +1284,37 @@ const PosterPlayerScreen: React.FC = () => {
         const templatesWithLanguages = softwareTemplates.map(t => mergeTemplateLanguages(t));
         const templatesBeforeCategoryFilter = templatesWithLanguages.length;
         
+        // 🧠 DETERMINE IF SELECTED POSTER MATCHES CATEGORY
+        let isSelectedPosterMatchingCategory = false;
+        if (currentPoster && currentPoster.id !== 'loading' && !currentPoster.id.startsWith('category_')) {
+          const selectedPosterTags = Array.isArray(currentPoster.tags)
+            ? currentPoster.tags.map(tag => tag.toLowerCase())
+            : [];
+          
+          isSelectedPosterMatchingCategory = selectedCategoryButton.tags.some(categoryTag => 
+            selectedPosterTags.some(posterTag => posterTag === categoryTag.toLowerCase())
+          );
+          
+          console.log(`\ud83d\udccc [VALID MATCH CHECK] Selected poster "${currentPoster.name}":`);
+          console.log(`   - Selected poster ID: ${currentPoster.id}`);
+          console.log(`   - Selected poster tags: [${selectedPosterTags.join(', ')}]`);
+          console.log(`   - Category tags: [${selectedCategoryButton.tags.join(', ')}]`);
+          console.log(`   - Matches category: ${isSelectedPosterMatchingCategory}`);
+        }
+        
         const filteredByCategory = templatesWithLanguages.filter(template => {
           const templateTags = Array.isArray(template.tags)
             ? template.tags.map(tag => tag.toLowerCase())
             : [];
-          const templateName = (template.name || '').toLowerCase();
           
           const matchesTag = selectedCategoryButton.tags.some(tag => {
+            // EXACT TAG MATCH ONLY - no name matching to prevent false positives
             const exactTagMatch = templateTags.some(posterTag => posterTag === tag.toLowerCase());
-            const nameMatch = templateName.includes(tag.toLowerCase());
             
-            // For category filtering, prioritize exact tag matches over name matches
-            if (exactTagMatch || nameMatch) {
+            // For category filtering, require EXACT tag match only
+            if (exactTagMatch) {
               console.log(`\ud83d\udd0d [MATCH DEBUG] Tag "${tag}" matched for template "${template.name}":`);
               console.log(`   - Exact tag match: ${exactTagMatch}`);
-              console.log(`   - Name match: ${nameMatch} (name: "${templateName}")`);
               console.log(`   - Template tags: [${templateTags.join(', ')}]`);
               return true;
             }
@@ -1322,7 +1338,34 @@ const PosterPlayerScreen: React.FC = () => {
         // Filter by language for software company category templates
         if (selectedLanguage === 'all') {
           console.log(`\ud83c\udf0d [LANGUAGE FILTER] No language filter applied (selected: 'all')`);
-          const result = filteredByCategory.slice(0, 6);
+          
+          // 🔁 SAFE FALLBACK LOGIC
+          // If no templates match category, fallback to current poster if available
+          let finalTemplates = [...filteredByCategory];
+          if (filteredByCategory.length === 0) {
+            if (currentPoster && currentPoster.id !== 'loading' && !currentPoster.id.startsWith('category_')) {
+              console.log(`[FALLBACK] No category matches, returning current poster: ${currentPoster.name}`);
+              finalTemplates = [currentPoster];
+            }
+          }
+          
+          // 🔒 CONDITIONAL PRESERVATION BASED ON MATCH STATUS
+          if (currentPoster && currentPoster.id !== 'loading' && !currentPoster.id.startsWith('category_')) {
+            const existsInFiltered = finalTemplates.some(t => t.id === currentPoster.id);
+            console.log(`[PRESERVE CHECK] currentPosterId: ${currentPoster.id}, existsInFiltered: ${existsInFiltered}`);
+            console.log(`[PRESERVE DECISION] shouldPreserve: ${isSelectedPosterMatchingCategory}, reason: ${isSelectedPosterMatchingCategory ? 'selected poster matches category' : 'selected poster does not match category'}`);
+            
+            if (!existsInFiltered && isSelectedPosterMatchingCategory) {
+              console.log(`[PRESERVE ACTION] Injecting selected poster at index 0: ${currentPoster.name}`);
+              finalTemplates.unshift(currentPoster);
+            } else if (!isSelectedPosterMatchingCategory) {
+              console.log(`[PRESERVE ACTION] NOT preserving - selected poster does not match category, allowing filter to replace it`);
+            }
+          }
+          
+          // 🛑 PROTECT SELECTED POSTER FROM SLICE LOSS
+          const result = finalTemplates.slice(0, 6);
+          console.log(`[FINAL LIST] firstPosterId: ${result[0]?.id}, includesCurrentPoster: ${result.some(t => t.id === currentPoster?.id)}`);
           console.log(`\ud83c\udf89 [FILTERING COMPLETE] Final filtered templates count: ${result.length}`);
           console.log(`[SOFTWARE COMPANY] Returning ${result.length} templates (All language)`);
           return result;
@@ -1330,6 +1373,24 @@ const PosterPlayerScreen: React.FC = () => {
         
         console.log(`\ud83c\udf0d [LANGUAGE FILTER] Applying language filter: ${selectedLanguage}`);
         const templatesBeforeLanguageFilter = filteredByCategory.length;
+        
+        // 🧠 DETERMINE IF SELECTED POSTER MATCHES CATEGORY (for language filtered case)
+        let isSelectedPosterMatchingCategoryLang = false;
+        if (currentPoster && currentPoster.id !== 'loading' && !currentPoster.id.startsWith('category_')) {
+          const selectedPosterTags = Array.isArray(currentPoster.tags)
+            ? currentPoster.tags.map(tag => tag.toLowerCase())
+            : [];
+          
+          isSelectedPosterMatchingCategoryLang = selectedCategoryButton.tags.some(categoryTag => 
+            selectedPosterTags.some(posterTag => posterTag === categoryTag.toLowerCase())
+          );
+          
+          console.log(`\ud83d\udccc [VALID MATCH CHECK - LANGUAGE] Selected poster "${currentPoster.name}":`);
+          console.log(`   - Selected poster ID: ${currentPoster.id}`);
+          console.log(`   - Selected poster tags: [${selectedPosterTags.join(', ')}]`);
+          console.log(`   - Category tags: [${selectedCategoryButton.tags.join(', ')}]`);
+          console.log(`   - Matches category: ${isSelectedPosterMatchingCategoryLang}`);
+        }
         
         const languageFilteredForSoftware = filteredByCategory.filter(template => {
           const matches = templateContainsLanguage(template, selectedLanguage);
@@ -1345,12 +1406,36 @@ const PosterPlayerScreen: React.FC = () => {
 
         if (languageFilteredForSoftware.length === 0) {
           console.log(`[SOFTWARE COMPANY] No templates found for language: ${selectedLanguage}`);
+          
+          // 🔁 SAFE FALLBACK LOGIC
+          // If we have a current poster, return it as only result
+          if (currentPoster && currentPoster.id !== 'loading' && !currentPoster.id.startsWith('category_')) {
+            console.log(`[FALLBACK] Returning current poster as only result: ${currentPoster.name}`);
+            return [currentPoster];
+          }
+          
           console.log(`\ud83c\udf89 [FILTERING COMPLETE] Final filtered templates count: 0`);
           return [];
         }
 
-        // Limit to 6 images after language filtering
-        const result = languageFilteredForSoftware.slice(0, 6);
+        // 🔒 CONDITIONAL PRESERVATION BASED ON MATCH STATUS
+        let finalTemplates = [...languageFilteredForSoftware];
+        if (currentPoster && currentPoster.id !== 'loading' && !currentPoster.id.startsWith('category_')) {
+          const existsInFiltered = finalTemplates.some(t => t.id === currentPoster.id);
+          console.log(`[PRESERVE CHECK - LANGUAGE] currentPosterId: ${currentPoster.id}, existsInFiltered: ${existsInFiltered}`);
+          console.log(`[PRESERVE DECISION - LANGUAGE] shouldPreserve: ${isSelectedPosterMatchingCategoryLang}, reason: ${isSelectedPosterMatchingCategoryLang ? 'selected poster matches category' : 'selected poster does not match category'}`);
+          
+          if (!existsInFiltered && isSelectedPosterMatchingCategoryLang) {
+            console.log(`[PRESERVE ACTION - LANGUAGE] Injecting selected poster at index 0: ${currentPoster.name}`);
+            finalTemplates.unshift(currentPoster);
+          } else if (!isSelectedPosterMatchingCategoryLang) {
+            console.log(`[PRESERVE ACTION - LANGUAGE] NOT preserving - selected poster does not match category, allowing filter to replace it`);
+          }
+        }
+        
+        // 🛑 PROTECT SELECTED POSTER FROM SLICE LOSS
+        const result = finalTemplates.slice(0, 6);
+        console.log(`[FINAL LIST] firstPosterId: ${result[0]?.id}, includesCurrentPoster: ${result.some(t => t.id === currentPoster?.id)}`);
         console.log(`\ud83c\udf89 [FILTERING COMPLETE] Final filtered templates count: ${result.length}`);
         console.log(`[SOFTWARE COMPANY] Returning ${result.length} templates (language: ${selectedLanguage})`);
         return result;
@@ -3304,21 +3389,56 @@ const PosterPlayerScreen: React.FC = () => {
     ) {
       const firstFilteredPoster = filteredPosters[0];
       
+      // 🧠 SMARTER AUTO-SELECTION CONDITION
       // Only auto-select if:
-      // 1. User hasn't manually selected a poster
-      // 2. The first filtered poster is different from current selection
-      if (!userSelectedPosterRef.current && currentPoster?.id !== firstFilteredPoster?.id) {
+      // 1. There is NO currentPoster (first load scenario)
+      // 2. OR currentPoster is invalid (loading/category placeholder)
+      // 3. OR selectedPoster does NOT match the current category
+      let shouldAutoSelect = false;
+      let reason = '';
+      
+      if (!currentPoster || currentPoster.id === 'loading' || currentPoster.id.startsWith('category_')) {
+        shouldAutoSelect = true;
+        reason = 'no valid current poster';
+      } else {
+        // Check if current poster matches the selected category
+        const selectedCategoryButton = softwareCategoryButtons.find(btn => btn.id === selectedSoftwareCategory);
+        if (selectedCategoryButton && selectedCategoryButton.tags.length > 0) {
+          const currentPosterTags = Array.isArray(currentPoster.tags)
+            ? currentPoster.tags.map(tag => tag.toLowerCase())
+            : [];
+          
+          const isSelectedPosterMatchingCategory = selectedCategoryButton.tags.some(categoryTag => 
+            currentPosterTags.some(posterTag => posterTag === categoryTag.toLowerCase())
+          );
+          
+          if (!isSelectedPosterMatchingCategory) {
+            shouldAutoSelect = true;
+            reason = 'current poster does not match category';
+          }
+        }
+      }
+      
+      if (shouldAutoSelect) {
         console.log('[SOFTWARE COMPANY] Auto-selecting first filtered image:', {
           firstPosterId: firstFilteredPoster.id,
           firstPosterName: firstFilteredPoster.name,
           currentPosterId: currentPoster?.id,
-          selectedSoftwareCategory
+          selectedSoftwareCategory,
+          reason: reason
         });
         
         handlePosterSelect(firstFilteredPoster);
+      } else {
+        console.log('[AUTO-SELECTION BLOCKED]', {
+          reason: 'current poster matches category - preserving user selection',
+          currentPosterId: currentPoster?.id,
+          firstPosterId: firstFilteredPoster?.id,
+          selectedSoftwareCategory
+        });
       }
     }
-  }, [filteredPosters, isSoftwareCompanyCategory, selectedSoftwareCategory, currentPoster?.id, handlePosterSelect]);
+  }, [filteredPosters, isSoftwareCompanyCategory, selectedSoftwareCategory, currentPoster, currentPoster?.id, handlePosterSelect, softwareCategoryButtons]);
 
   useEffect(() => {
     console.log('🔍 [SERVICE FILTER RENDER CHECK]', { isEventPlannerCategory });
@@ -3997,8 +4117,14 @@ const PosterPlayerScreen: React.FC = () => {
                         console.log(`\u{1F504} [CATEGORY SELECTION] Will show all posters (no category filter)`);
                       }
                       
-                      // Reset user selection flag when changing categories to allow auto-selection
-                      userSelectedPosterRef.current = false;
+                      // 🚫 DO NOT RESET USER SELECTION BLINDLY
+                      // Only reset this flag IF there is no poster currently selected
+                      if (!currentPoster || currentPoster.id === 'loading' || currentPoster.id.startsWith('category_')) {
+                        console.log(`[SELECTION FLAG RESET] No valid poster selected, resetting flag`);
+                        userSelectedPosterRef.current = false;
+                      } else {
+                        console.log(`[SELECTION FLAG PRESERVED] User has selected poster: ${currentPoster.name}`);
+                      }
                       setSelectedSoftwareCategory(newCategory);
                     }}
                     activeOpacity={0.85}
