@@ -5,8 +5,8 @@
  * Displays horizontal list of business category cards
  */
 
-import React, { useRef, useCallback, useMemo } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useCallback, useMemo } from 'react';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
 import { BusinessCategory } from '../../services/businessCategoriesService';
 import OptimizedImage from '../OptimizedImage';
 import LinearGradient from 'react-native-linear-gradient';
@@ -29,16 +29,27 @@ const BusinessCategoryCardItem: React.FC<BusinessCategoryCardItemProps> = React.
     }, [item, onPress]);
 
     const displayImage = useMemo(() => {
+      // First try to get preview template thumbnails
       const thumbnails =
         previewTemplates
           ?.map((template: Template) => template.thumbnail)
           .filter((uri): uri is string => typeof uri === 'string' && uri.length > 0) ?? [];
 
       if (thumbnails.length > 0) {
-        return thumbnails[0]; // Only use the first image
+        console.log(`BusinessCategoriesSection: Using preview template for ${item.name}:`, thumbnails[0]);
+        return thumbnails[0]; // Use preview template if available
       }
 
-      return item.imageUrl || (item as any).image || null;
+      // Fallback to category default image
+      const fallbackImage = item.imageUrl || (item as any).image;
+      if (fallbackImage) {
+        console.log(`BusinessCategoriesSection: Using fallback image for ${item.name}:`, fallbackImage);
+        return fallbackImage;
+      }
+
+      // Final fallback - no image available
+      console.log(`BusinessCategoriesSection: No image available for ${item.name}`);
+      return null;
     }, [previewTemplates, item]);
 
     return (
@@ -69,14 +80,18 @@ const BusinessCategoryCardItem: React.FC<BusinessCategoryCardItemProps> = React.
               <View
                 style={[
                   styles.businessCategoryImage,
+                  styles.fallbackImageContainer,
                   {
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    backgroundColor: 'rgba(0,0,0,0.05)',
+                    backgroundColor: theme.colors.primary + '15',
                   },
                 ]}
               >
-                <ActivityIndicator size="small" color={theme.colors.primary} />
+                <Text style={[styles.fallbackIcon, { color: theme.colors.primary }]}>
+                  {item.icon || 'business'}
+                </Text>
+                <Text style={[styles.fallbackText, { color: theme.colors.textSecondary }]}>
+                  {item.name}
+                </Text>
               </View>
             )}
             <LinearGradient
@@ -329,6 +344,23 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'left',
     letterSpacing: 0.2,
+  },
+  fallbackImageContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: moderateScale(8),
+  },
+  fallbackIcon: {
+    fontSize: moderateScale(24),
+    fontWeight: 'bold',
+    marginBottom: moderateScale(4),
+    textAlign: 'center',
+  },
+  fallbackText: {
+    fontSize: moderateScale(8),
+    fontWeight: '600',
+    textAlign: 'center',
+    textTransform: 'uppercase',
   },
 });
 

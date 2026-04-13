@@ -546,11 +546,25 @@ const PosterPlayerScreen: React.FC = () => {
   } = route.params;
 
   // Add debug log for received parameters
-  console.log("📥 PosterPlayerScreen received params:", {
+  console.log("PosterPlayerScreen received params:", {
     type,
     categoryName,
-    templateSource
+    templateSource,
+    hasSelectedPoster: !!initialPoster,
+    hasRelatedPosters: !!initialRelatedPosters?.length,
+    relatedPostersCount: initialRelatedPosters?.length || 0
   });
+
+  // PROTECTION: Detect if valid templates are received via navigation params
+  const hasNavigationTemplates = useMemo(() => {
+    return !!(initialPoster && initialRelatedPosters && initialRelatedPosters.length > 0);
+  }, [initialPoster, initialRelatedPosters]);
+
+  // PROTECTION: Construct initial templates from navigation params
+  const initialTemplates = useMemo(() => {
+    if (!hasNavigationTemplates) return [];
+    return [initialPoster, ...initialRelatedPosters];
+  }, [hasNavigationTemplates, initialPoster, initialRelatedPosters]);
 
   // Use global state for business data instead of route parameters
   const { 
@@ -563,6 +577,8 @@ const PosterPlayerScreen: React.FC = () => {
   // Track previous initialPoster ID to detect when a different poster is selected
   const prevInitialPosterIdRef = useRef<string | null>(null);
   const prevProfileRef = useRef<any>(null); // CRITICAL FIX: Track previous profile for change detection
+  const prevCategoryRef = useRef<string | null>(null); // PRODUCTION FIX: Track previous business category for safe state reset
+  const prevSourceRef = useRef<string | null>(null); // SINGLE SOURCE: Track previous render source
   const activeCategoryRef = useRef<{ type: 'business' | 'greeting' | 'calendar' | null; value: string | null }>({ type: null, value: null });
   // Ref to prevent multiple initial poster insertions
   const initialPosterAddedRef = useRef<boolean>(false);
@@ -693,6 +709,34 @@ const PosterPlayerScreen: React.FC = () => {
   const [selectedServiceFilter, setSelectedServiceFilter] = useState<string | null>(null);
   const [selectedSoftwareCategory, setSelectedSoftwareCategory] = useState<string | null>(null);
 
+  // SINGLE SOURCE OF TRUTH: Determine which source should control button rendering
+  const activeRenderSource = useMemo(() => {
+    // Priority order: Template > Subcategory > Profile > Business
+    const templateCategory = (currentPoster?.category || initialPoster?.category || '').trim();
+    const profileCategory = globalBusinessProfile?.category || globalBusinessProfile?.subCategory || globalBusinessProfile?.subcategory;
+    
+    if (templateSource === 'professional' && templateCategory && templateCategory !== 'General') {
+      return 'template';
+    }
+    if (selectedSoftwareCategory) {
+      return 'subcategory';
+    }
+    if (profileCategory && globalBusinessProfile) {
+      return 'profile';
+    }
+    if (globalBusinessCategory) {
+      return 'business';
+    }
+    return null;
+  }, [
+    templateSource,
+    selectedSoftwareCategory,
+    globalBusinessProfile,
+    globalBusinessCategory,
+    currentPoster?.category,
+    initialPoster?.category
+  ]);
+
   // Auto-set language to "All" when navigating from MyBusiness tab
   useEffect(() => {
     console.log("PosterPlayer origin:", originScreen);
@@ -708,6 +752,92 @@ const PosterPlayerScreen: React.FC = () => {
     }
   }, [originScreen]);
 
+  // SINGLE SOURCE: Controlled state isolation - clear conflicting states when source changes
+  useEffect(() => {
+    if (!activeRenderSource) return;
+
+    const isSourceChanged = prevSourceRef.current !== activeRenderSource;
+
+    if (isSourceChanged) {
+      console.log('SINGLE SOURCE: Render source changed from', prevSourceRef.current, 'to', activeRenderSource, '→ clearing conflicting states');
+      
+      // PROTECTION: Don't clear templates if we have navigation templates AND source is 'template'
+      const shouldProtectTemplates = hasNavigationTemplates && activeRenderSource === 'template';
+      
+      if (shouldProtectTemplates) {
+        console.log('SINGLE SOURCE: PROTECTING navigation templates from being cleared');
+      } else {
+        // Clear templates and filters
+        setAllTemplates([]);
+        allTemplatesRef.current = [];
+      }
+      
+      setServiceFilterTemplates({});
+      
+      // IMPORTANT: Clear conflicting sources safely (don't clear root business category)
+      if (activeRenderSource !== 'subcategory' && selectedSoftwareCategory) {
+        console.log('SINGLE SOURCE: Clearing conflicting subcategory');
+        setSelectedSoftwareCategory(null);
+      }
+      
+      if (activeRenderSource !== 'profile' && globalBusinessProfile && !globalBusinessCategory) {
+        console.log('SINGLE SOURCE: Clearing conflicting profile state');
+        // Profile state is managed by context, don't clear directly
+      }
+      
+      console.log('SINGLE SOURCE: State isolation completed, templates count:', allTemplatesRef.current.length);
+    }
+
+    prevSourceRef.current = activeRenderSource;
+  }, [activeRenderSource, selectedSoftwareCategory, globalBusinessProfile, globalBusinessCategory]);
+
+  // SINGLE SOURCE: State validation logging
+  useEffect(() => {
+    console.log('SINGLE SOURCE: State validation check:', {
+      activeRenderSource,
+      templateSource,
+      selectedSoftwareCategory,
+      globalBusinessCategory,
+      globalBusinessProfile: globalBusinessProfile?.name,
+      currentPosterCategory: currentPoster?.category,
+      initialPosterCategory: initialPoster?.category,
+      templateCount: allTemplates.length
+    });
+
+    // VALIDATION: Ensure no conflicting states are active
+    const conflictingStates = [];
+    if (selectedSoftwareCategory && activeRenderSource !== 'subcategory') {
+      conflictingStates.push('selectedSoftwareCategory');
+    }
+    if (selectedServiceFilter && activeRenderSource !== 'profile') {
+      conflictingStates.push('selectedServiceFilter');
+    }
+    
+    if (conflictingStates.length > 0) {
+      console.warn('SINGLE SOURCE: Conflicting states detected:', conflictingStates, 'active source:', activeRenderSource);
+    }
+  }, [activeRenderSource, templateSource, selectedSoftwareCategory, selectedServiceFilter, globalBusinessCategory, globalBusinessProfile, currentPoster?.category, initialPoster?.category, allTemplates.length]);
+
+  // DEBUG GUARD: Log template source information
+  useEffect(() => {
+    console.log('TEMPLATE SOURCE CHECK:', {
+      fromNavigation: hasNavigationTemplates,
+      templateCount: allTemplates.length,
+      activeRenderSource,
+      templateSource,
+      initialTemplatesCount: initialTemplates.length
+    });
+  }, [hasNavigationTemplates, allTemplates.length, activeRenderSource, templateSource, initialTemplates.length]);
+
+  // PROTECTION: Set initial templates from navigation params on mount
+  useEffect(() => {
+    if (hasNavigationTemplates && initialTemplates.length > 0) {
+      console.log('PROTECTION: Setting initial templates from navigation params:', initialTemplates.length);
+      setAllTemplates(initialTemplates);
+      allTemplatesRef.current = initialTemplates;
+    }
+  }, [hasNavigationTemplates, initialTemplates]);
+
   // Helper to detect placeholder posters
   const isPlaceholderPoster = useCallback((poster: any): boolean => {
     return !poster || 
@@ -715,7 +845,7 @@ const PosterPlayerScreen: React.FC = () => {
            (typeof poster.id === 'string' && poster.id.startsWith('category_'));
   }, []);
 
-  // ✅ SAFE INITIALIZATION: Initialize poster state from route params
+  // SAFE INITIALIZATION: Initialize poster state from route params
   useEffect(() => {
     const initializePoster = () => {
       if (route.params?.selectedPoster && !isPlaceholderPoster(route.params.selectedPoster)) {
@@ -1243,13 +1373,15 @@ const PosterPlayerScreen: React.FC = () => {
     }
   }, [isEventPlannerCategory, serviceFilterTemplates, serviceFilterKeywords]);
 
-  // Fetch EventPlanner templates when EventPlanner category is detected
+  // SINGLE SOURCE: Fetch EventPlanner templates only when profile source is active
   useEffect(() => {
-    if (isEventPlannerCategory && !serviceFilterTemplates['eventplanner']) {
-      console.log('🎯 [EVENT PLANNER] EventPlanner category detected, fetching templates...');
+    if (activeRenderSource === 'profile' && isEventPlannerCategory && !serviceFilterTemplates['eventplanner']) {
+      console.log('SINGLE SOURCE: EventPlanner profile detected, fetching templates...');
       fetchEventPlannerTemplates();
+    } else if (isEventPlannerCategory && activeRenderSource !== 'profile') {
+      console.log('SINGLE SOURCE: Skipping EventPlanner fetch - active source:', activeRenderSource);
     }
-  }, [isEventPlannerCategory, fetchEventPlannerTemplates, serviceFilterTemplates]);
+  }, [activeRenderSource, isEventPlannerCategory, fetchEventPlannerTemplates, serviceFilterTemplates]);
 
   // Function to fetch all Software Company templates (similar to Event Planner)
   const fetchSoftwareCompanyTemplates = useCallback(async () => {
@@ -1329,13 +1461,15 @@ const PosterPlayerScreen: React.FC = () => {
     }
   }, [isSoftwareCompanyCategory, serviceFilterTemplates, softwareCategoryButtons]);
 
-  // Fetch Software Company templates when Software Company category is detected
+  // SINGLE SOURCE: Fetch Software Company templates only when subcategory source is active
   useEffect(() => {
-    if (isSoftwareCompanyCategory && !serviceFilterTemplates['softwarecompany']) {
-      console.log('🎯 [SOFTWARE COMPANY] Software Company category detected, fetching templates...');
+    if (activeRenderSource === 'subcategory' && isSoftwareCompanyCategory && !serviceFilterTemplates['softwarecompany']) {
+      console.log('SINGLE SOURCE: Software Company subcategory detected, fetching templates...');
       fetchSoftwareCompanyTemplates();
+    } else if (isSoftwareCompanyCategory && activeRenderSource !== 'subcategory') {
+      console.log('SINGLE SOURCE: Skipping Software Company fetch - active source:', activeRenderSource);
     }
-  }, [isSoftwareCompanyCategory, fetchSoftwareCompanyTemplates, serviceFilterTemplates]);
+  }, [activeRenderSource, isSoftwareCompanyCategory, fetchSoftwareCompanyTemplates, serviceFilterTemplates]);
 
   const filteredPosters = useMemo(() => {
     // If we have EventPlanner templates and a service filter selected, filter by tags
@@ -1785,14 +1919,51 @@ const PosterPlayerScreen: React.FC = () => {
       categoryName = 'Event Planner'; // fallback
     }
 
+    // PRODUCTION FIX: Detect category change and reset state safely
+    const isCategoryChanged = prevCategoryRef.current !== globalBusinessCategory;
+
+    if (isCategoryChanged) {
+      console.log('PRODUCTION FIX: Category changed from', prevCategoryRef.current, 'to', globalBusinessCategory, '-> resetting state');
+      
+      // SAFE RESET (only internal state, no UI changes)
+      setAllTemplates([]);
+      allTemplatesRef.current = [];
+      setServiceFilterTemplates({});
+      
+      // Optional safe resets (only if functions exist)
+      if (typeof setSelectedServiceFilter === "function") {
+        setSelectedServiceFilter(null);
+      }
+      if (typeof setSelectedSoftwareCategory === "function") {
+        setSelectedSoftwareCategory(null);
+      }
+      
+      console.log('PRODUCTION FIX: State reset completed, templates count:', allTemplatesRef.current.length);
+    }
+
     // Reset language to "All" when switching to different business category
     if (activeCategoryRef.current.type !== 'business' || activeCategoryRef.current.value !== categoryName) {
-      console.log('🔄 Business category changed → resetting language to ALL');
+      console.log('Business category changed -> resetting language to ALL');
       userManuallySelectedLanguageRef.current = false;
       setSelectedLanguage('all');
     }
 
     activeCategoryRef.current = { type: 'business', value: categoryName };
+
+    // PRODUCTION FIX: Update previous category ref after state reset
+    prevCategoryRef.current = globalBusinessCategory;
+
+    // SINGLE SOURCE: Allow fetch if business source is active OR if templates are empty (fallback safety)
+    if (activeRenderSource !== 'business' && allTemplates.length > 0) {
+      console.log('SINGLE SOURCE: Skipping business fetch - active source:', activeRenderSource, 'templates:', allTemplates.length);
+      return;
+    }
+    
+    if (activeRenderSource !== 'business' && allTemplates.length === 0) {
+      console.log('SINGLE SOURCE: Allowing business fetch as fallback - active source:', activeRenderSource, 'templates empty');
+    }
+
+    console.log('SINGLE SOURCE: Fetching business posters - active source:', activeRenderSource);
 
     const fetchBusinessCategoryPosters = async () => {
       try {
@@ -1803,8 +1974,9 @@ const PosterPlayerScreen: React.FC = () => {
         const apiUrl = `/api/mobile/posters/category/${encodeURIComponent(categoryName)}?limit=${limit}`;
         console.log(`🔍 [MY BUSINESS API] Fetching: ${apiUrl} (limit: ${limit})`);
 
-        // Clear cache for "My Business" to ensure fresh data with new limit
+        // PRODUCTION FIX: Clear cache for current category to ensure fresh data
         businessCategoryPostersApi.clearCategoryCache(categoryName);
+        console.log('PRODUCTION FIX: Cache cleared for category:', categoryName);
 
         const response = await businessCategoryPostersApi.getPostersByCategory(categoryName, limit);
 
@@ -1927,8 +2099,9 @@ const PosterPlayerScreen: React.FC = () => {
   // does NOT require a new API call. Having selectedLanguage here caused the
   // business-category API to re-fire every time the user pressed a language
   // button, overwriting the date-scoped allTemplates with business posters.
+  // SINGLE SOURCE: Include activeRenderSource to ensure proper re-triggering
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [globalBusinessCategory, posterLimit, initialPoster, setAllTemplates, calendarDate]);
+  }, [globalBusinessCategory, posterLimit, initialPoster, setAllTemplates, calendarDate, activeRenderSource]);
 
   // Fetch greeting category templates when greetingCategory is provided
   useEffect(() => {
@@ -4163,8 +4336,8 @@ const PosterPlayerScreen: React.FC = () => {
           </View>
         )}
 
-        {/* Category buttons for Software Company */}
-        {isSoftwareCompanyCategory && (
+        {/* SINGLE SOURCE: Strict button rendering based on activeRenderSource */}
+        {activeRenderSource === 'subcategory' && (
           <View style={styles.serviceFilterContainer}>
             <ScrollView
               horizontal
@@ -4236,8 +4409,8 @@ const PosterPlayerScreen: React.FC = () => {
           </View>
         )}
 
-        {/* Service filter buttons for Event Planners */}
-        {isEventPlannerCategory && (
+        {/* SINGLE SOURCE: Event Planner buttons based on activeRenderSource */}
+        {activeRenderSource === 'profile' && isEventPlannerCategory && (
           <View style={styles.serviceFilterContainer}>
             {['generator', 'decorators', 'sound', 'mandap'].map(filterKey => {
               const isActive = selectedServiceFilter === filterKey;

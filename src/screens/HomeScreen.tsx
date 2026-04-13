@@ -2129,6 +2129,8 @@ const HomeScreen: React.FC = React.memo(() => {
       return;
     }
 
+    console.log(`BUSINESS CATEGORIES: Starting preview fetch for ${categories.length} categories`);
+
     // Process in batches for faster initial display
     const processBatch = async (batch: BusinessCategory[]) => {
       try {
@@ -2136,27 +2138,33 @@ const HomeScreen: React.FC = React.memo(() => {
         const imageEntries = await Promise.allSettled(
           batch.map(async (category: BusinessCategory) => {
             try {
+              console.log(`BUSINESS CATEGORIES: Fetching preview for ${category.name} (ID: ${category.id})`);
               const response = await businessCategoryPostersApi.getPostersByCategory(category.name, 200); // Request all posters to show complete collection
               const posters = response.data?.posters || [];
+
+              console.log(`BUSINESS CATEGORIES: Got ${posters.length} posters for ${category.name}`);
 
               const templates = posters
                 .map((poster: any) => convertBusinessPosterToTemplate(poster, category.name))
                 .filter((template: Template) => !!template.thumbnail)
                 .slice(0, 6); // Show 6 images for business categories
 
+              console.log(`BUSINESS CATEGORIES: ${templates.length} valid templates for ${category.name}`);
+
               if (templates.length > 0) {
                 // Prefetch first thumbnail immediately for instant display
                 const firstThumbnail = templates[0]?.thumbnail;
                 if (firstThumbnail) {
+                  console.log(`BUSINESS CATEGORIES: Prefetching thumbnail for ${category.name}:`, firstThumbnail);
                   Image.prefetch(firstThumbnail).catch(() => { });
                 }
 
                 return { categoryId: category.id, templates, success: true };
+              } else {
+                console.warn(`BUSINESS CATEGORIES: No valid templates found for ${category.name}`);
               }
             } catch (error) {
-              if (__DEV__) {
-                devWarn(`G��n+� Failed to fetch preview for category ${category.name}:`, error);
-              }
+              console.error(`BUSINESS CATEGORIES: Failed to fetch preview for category ${category.name}:`, error);
             }
             return { categoryId: category.id, templates: undefined, success: false };
           })
@@ -2166,6 +2174,9 @@ const HomeScreen: React.FC = React.memo(() => {
         imageEntries.forEach((result: PromiseSettledResult<{ categoryId: string; templates?: Template[]; success: boolean }>) => {
           if (result.status === 'fulfilled' && result.value.success && result.value.templates) {
             nextPreviews[result.value.categoryId] = result.value.templates;
+            console.log(`BUSINESS CATEGORIES: Successfully cached ${result.value.templates.length} templates for category ${result.value.categoryId}`);
+          } else if (result.status === 'rejected') {
+            console.error(`BUSINESS CATEGORIES: Promise rejected for category:`, result.reason);
           }
         });
 
@@ -2173,6 +2184,7 @@ const HomeScreen: React.FC = React.memo(() => {
         if (Object.keys(nextPreviews).length > 0) {
           React.startTransition(() => {
             setBusinessCategoryPreviews(prev => ({ ...prev, ...nextPreviews }));
+            console.log(`BUSINESS CATEGORIES: Updated preview cache with ${Object.keys(nextPreviews).length} categories`);
           });
         }
       } catch (error) {
@@ -4215,6 +4227,10 @@ const HomeScreen: React.FC = React.memo(() => {
   // Memoized renderItem functions for modal FlatLists
   const handleBusinessCategoryPress = useCallback(async (category: BusinessCategory) => {
     console.log('🏢 BUSINESS CATEGORY CLICKED:', category.name);
+
+    // PRODUCTION FIX: Clear all category caches before changing category
+    businessCategoryPostersApi.clearCache();
+    console.log('PRODUCTION FIX: All business category caches cleared from HomeScreen');
 
     // Update global business category state
     await setSelectedBusinessCategory(category.name);
