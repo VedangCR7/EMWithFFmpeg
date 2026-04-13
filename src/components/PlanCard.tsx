@@ -66,7 +66,12 @@ const PlanCard: React.FC<PlanCardProps> = ({ plan, isSelected, onSelect, isSingl
         <View style={styles.featuresList}>
           {plan.features.map((feature, index) => (
             <View key={index} style={styles.featureItem}>
-              <Icon name="check-circle" size={16} color="#28a745" />
+              <Icon 
+                name="check-circle" 
+                size={18} 
+                color="#22C55E" 
+                style={styles.checkIcon}
+              />
               <Text style={[styles.featureText, { color: theme.colors.textSecondary }]}>
                 {feature}
               </Text>
@@ -145,11 +150,14 @@ const styles = StyleSheet.create({
   featureItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 8,
+  },
+  checkIcon: {
+    marginRight: 10,
   },
   featureText: {
     fontSize: 14,
-    marginLeft: 8,
+    marginLeft: 0, // Removed since checkIcon has marginRight
     flex: 1,
   },
   selectedIndicator: {

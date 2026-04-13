@@ -206,7 +206,15 @@ const BusinessProfilesScreen: React.FC = () => {
       }
       
       // Fetch from API (this will use cacheService.getOrFetch which handles stale-while-revalidate)
+      console.log('🔍 [BUSINESS PROFILES SCREEN] Fetching profiles from API...');
+      console.log('🔍 [BUSINESS PROFILES SCREEN] User ID:', userId);
+      
       const apiProfiles = await businessProfileService.getUserBusinessProfiles(userId);
+      
+      console.log('========== BUSINESS PROFILE API RESPONSE ==========');
+      console.log('📊 Profiles Count:', apiProfiles.length);
+      console.log('📋 Profiles Data:', JSON.stringify(apiProfiles, null, 2));
+      console.log('==================================================');
       
       console.log('🔍 [DEBUG] API Response Profiles:', apiProfiles.map(p => ({
         id: p.id,
@@ -503,9 +511,6 @@ const BusinessProfilesScreen: React.FC = () => {
           success: true
         });
       }, 100);
-      
-      setSuccessMessage(`${profile.name} selected as active business profile`);
-      setShowSuccessModal(true);
     } catch (error: any) {
       console.error('❌ [PROFILE SELECTION] Selection failed:', error);
       setErrorMessage(error.message || 'Failed to select business profile');

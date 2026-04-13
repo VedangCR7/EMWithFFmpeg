@@ -39,6 +39,122 @@ const LANGUAGE_KEYWORDS: Record<string, string[]> = {
   hindi: ['hindi'],
 };
 
+// ========================================
+// TAG NORMALIZATION LAYER - SYSTEM DESIGN FIX
+// ========================================
+
+/**
+ * Normalizes tags by splitting combined words and cleaning them
+ * Handles cases like "websitedevelopment" -> ["website", "development"]
+ */
+const normalizeTags = (tags: string[]): string[] => {
+  if (!Array.isArray(tags)) {
+    return [];
+  }
+
+  const normalizedTags: string[] = [];
+
+  tags.forEach(tag => {
+    if (typeof tag !== 'string') return;
+
+    // Convert to lowercase and trim
+    const cleanTag = tag.toLowerCase().trim();
+    
+    if (!cleanTag) return;
+
+    // Remove special characters but keep spaces for splitting
+    const sanitizedTag = cleanTag.replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+    
+    if (!sanitizedTag) return;
+
+    // Split combined words using common patterns
+    let words: string[] = [];
+    
+    // Check if it's a combined word (no spaces)
+    if (!sanitizedTag.includes(' ')) {
+      // Try to split combined words using common delimiters and patterns
+      const possibleSplits = [
+        // Split before common prefixes
+        sanitizedTag.replace(/^(web|it|ai|ml|app|ios|android|mobile|software|custom|enterprise)/i, '$1 '),
+        // Split after common prefixes
+        sanitizedTag.replace(/^(web|it|ai|ml|app|ios|android|mobile|software|custom|enterprise)/i, '$1 '),
+        // Split common compound words
+        sanitizedTag.replace(/(website|webdevelopment|websitedesign|webdesign|itconsulting|itconsultant|softwaredevelopment|softwaredev|mobileapp|mobileapplication|aiautomation|machinelearning|customsoftware|enterprisesoftware)/gi, '$1 '),
+      ];
+
+      // Find the best split
+      let bestSplit = sanitizedTag; // Default to original if no good split found
+      let maxWordCount = 1;
+
+      possibleSplits.forEach(split => {
+        const splitWords = split.trim().split(/\s+/).filter(w => w.length > 1);
+        if (splitWords.length > maxWordCount) {
+          maxWordCount = splitWords.length;
+          bestSplit = split.trim();
+        }
+      });
+
+      words = bestSplit.split(/\s+/).filter(w => w.length > 1);
+    } else {
+      // Already has spaces, just split
+      words = sanitizedTag.split(/\s+/).filter(w => w.length > 1);
+    }
+
+    // Add all valid words
+    words.forEach(word => {
+      if (word.length >= 2 && !normalizedTags.includes(word)) {
+        normalizedTags.push(word);
+      }
+    });
+
+    // Also add the original sanitized tag if it's meaningful and different
+    if (sanitizedTag.length >= 3 && !normalizedTags.includes(sanitizedTag)) {
+      normalizedTags.push(sanitizedTag);
+    }
+  });
+
+  // Remove duplicates while preserving order
+  const uniqueTags = Array.from(new Set(normalizedTags));
+  
+  console.log(`[TAG NORMALIZATION] Input: [${tags.join(', ')}] -> Output: [${uniqueTags.join(', ')}]`);
+  
+  return uniqueTags;
+};
+
+/**
+ * Checks if template tags match category tags using strict exact matching after normalization
+ * This is the STANDARDIZED matching system for ALL categories
+ */
+const tagsMatchCategory = (templateTags: string[], categoryTags: string[]): boolean => {
+  // Normalize both tag arrays
+  const normalizedTemplateTags = normalizeTags(templateTags);
+  const normalizedCategoryTags = normalizeTags(categoryTags);
+
+  console.log(`[TAG MATCHING] Template tags: [${normalizedTemplateTags.join(', ')}]`);
+  console.log(`[TAG MATCHING] Category tags: [${normalizedCategoryTags.join(', ')}]`);
+
+  // STRICT EXACT MATCHING ONLY - no substring matching
+  const matchedTags = normalizedTemplateTags.filter(templateTag => 
+    normalizedCategoryTags.includes(templateTag)
+  );
+
+  const hasMatch = matchedTags.length > 0;
+
+  console.log(`[TAG MATCHING] Matched tags: [${matchedTags.join(', ')}] -> Has match: ${hasMatch}`);
+
+  if (!hasMatch && templateTags.length > 0 && categoryTags.length > 0) {
+    console.warn(`[TAG MATCHING] NO MATCH FOUND - This may indicate tag normalization issues`);
+    console.warn(`[TAG MATCHING] Original template tags: [${templateTags.join(', ')}]`);
+    console.warn(`[TAG MATCHING] Original category tags: [${categoryTags.join(', ')}]`);
+  }
+
+  return hasMatch;
+};
+
+// ========================================
+// UPDATED CATEGORY CONFIGURATION - SPECIFIC & NON-OVERLAPPING
+// ========================================
+
 const extractLanguagesFromTags = (tags: unknown): string[] => {
   if (!Array.isArray(tags)) {
     return [];
@@ -954,14 +1070,14 @@ const PosterPlayerScreen: React.FC = () => {
     mandap: ['mandap']
   }), []);
 
-  // Software Company category buttons configuration
+  // Software Company category buttons configuration - UPDATED FOR SPECIFICITY
   const softwareCategoryButtons = useMemo(() => [
-    { id: 'website-dev', name: 'Website Development', tags: ['website', 'web', 'development', 'design'] },
-    { id: 'mobile-app-dev', name: 'Mobile App Development', tags: ['mobile', 'app', 'android', 'ios'] },
-    { id: 'custom-software', name: 'Custom Software Solutions', tags: ['software', 'custom', 'solution', 'application'] },
-    { id: 'ai-automation', name: 'AI & Automation', tags: ['ai', 'automation', 'machine learning', 'ml'] },
-    { id: 'it-consulting', name: 'IT Consulting & Support', tags: ['it', 'consulting', 'support', 'technical'] },
-    { id: 'software-dev', name: 'Software Development', tags: ['software', 'development', 'programming', 'coding'] },
+    { id: 'website-dev', name: 'Website Development', tags: ['website'] },
+    { id: 'mobile-app-dev', name: 'Mobile App Development', tags: [ 'mobile'] },
+    { id: 'custom-software', name: 'Custom Software Solutions', tags: ['software'] },
+    { id: 'ai-automation', name: 'AI & Automation', tags: ['ai'] },
+    { id: 'it-consulting', name: 'IT Consulting & Support', tags: ['consulting'] },
+    { id: 'software-dev', name: 'Software Development', tags: ['coding'] },
   ], []);
 
   const isEventPlannerCategory = useMemo(() => {
@@ -1039,13 +1155,10 @@ const PosterPlayerScreen: React.FC = () => {
   const templateMatchesServiceFilter = useCallback((template: Template) => {
     if (!isEventPlannerCategory || !selectedServiceFilter) return true;
     const keywords = serviceFilterKeywords[selectedServiceFilter] || [];
-    const templateTags = Array.isArray(template.tags)
-      ? template.tags
-        .filter((tag): tag is string => typeof tag === 'string')
-        .map(tag => tag.toLowerCase())
-      : [];
+    const templateTags = Array.isArray(template.tags) ? template.tags : [];
 
-    const matches = keywords.some(keyword => templateTags.some(tag => tag.includes(keyword)));
+    // Use standardized exact matching system
+    const matches = tagsMatchCategory(templateTags, keywords);
 
     return matches;
   }, [isEventPlannerCategory, selectedServiceFilter, serviceFilterKeywords]);
@@ -1107,10 +1220,8 @@ const PosterPlayerScreen: React.FC = () => {
         Object.keys(serviceKeywords).forEach(service => {
           const keywords = serviceKeywords[service];
           const matchingTemplates = templates.filter(template => {
-            const templateTags = Array.isArray(template.tags)
-              ? template.tags.map(tag => tag.toLowerCase())
-              : [];
-            return keywords.some(keyword => templateTags.some(tag => tag.includes(keyword)));
+            const templateTags = template.tags || [];
+            return tagsMatchCategory(templateTags, keywords);
           });
           console.log(`📋 [EVENT PLANNER] ${service}: ${matchingTemplates.length} templates found`);
         });
@@ -1191,12 +1302,12 @@ const PosterPlayerScreen: React.FC = () => {
         const uniqueTags = Array.from(new Set(allTags));
         console.log(`🏷️ [SOFTWARE COMPANY] All unique tags found:`, uniqueTags);
 
-        // Log samples for each software category
+        // Log samples for each software category using standardized matching
         softwareCategoryButtons.forEach(category => {
           const keywords = category.tags;
           const matchingTemplates = templates.filter(template => {
             const templateTags = template.tags || [];
-            return keywords.some(keyword => templateTags.some(tag => tag.toLowerCase().includes(keyword.toLowerCase())));
+            return tagsMatchCategory(templateTags, keywords);
           });
           console.log(`📋 [SOFTWARE COMPANY] ${category.name}: ${matchingTemplates.length} templates found`);
         });
@@ -1232,13 +1343,11 @@ const PosterPlayerScreen: React.FC = () => {
       const eventPlannerTemplates = serviceFilterTemplates['eventplanner'];
       const templatesWithLanguages = eventPlannerTemplates.map(t => mergeTemplateLanguages(t));
 
-      // Filter by service keywords (tags)
+      // Filter by service keywords using standardized exact matching
       const keywords = serviceFilterKeywords[selectedServiceFilter] || [];
       const filteredByTags = templatesWithLanguages.filter(template => {
-        const templateTags = Array.isArray(template.tags)
-          ? template.tags.map(tag => tag.toLowerCase())
-          : [];
-        return keywords.some(keyword => templateTags.some(tag => tag.includes(keyword)));
+        const templateTags = Array.isArray(template.tags) ? template.tags : [];
+        return tagsMatchCategory(templateTags, keywords);
       });
 
       // If "All" is selected, return filtered templates with 6-image limit
@@ -1284,52 +1393,32 @@ const PosterPlayerScreen: React.FC = () => {
         const templatesWithLanguages = softwareTemplates.map(t => mergeTemplateLanguages(t));
         const templatesBeforeCategoryFilter = templatesWithLanguages.length;
         
-        // 🧠 DETERMINE IF SELECTED POSTER MATCHES CATEGORY
+        // DETERMINE IF SELECTED POSTER MATCHES CATEGORY using standardized matching
         let isSelectedPosterMatchingCategory = false;
         if (currentPoster && currentPoster.id !== 'loading' && !currentPoster.id.startsWith('category_')) {
-          const selectedPosterTags = Array.isArray(currentPoster.tags)
-            ? currentPoster.tags.map(tag => tag.toLowerCase())
-            : [];
+          const selectedPosterTags = Array.isArray(currentPoster.tags) ? currentPoster.tags : [];
           
-          isSelectedPosterMatchingCategory = selectedCategoryButton.tags.some(categoryTag => 
-            selectedPosterTags.some(posterTag => posterTag === categoryTag.toLowerCase())
-          );
+          isSelectedPosterMatchingCategory = tagsMatchCategory(selectedPosterTags, selectedCategoryButton.tags);
           
           console.log(`\ud83d\udccc [VALID MATCH CHECK] Selected poster "${currentPoster.name}":`);
           console.log(`   - Selected poster ID: ${currentPoster.id}`);
-          console.log(`   - Selected poster tags: [${selectedPosterTags.join(', ')}]`);
-          console.log(`   - Category tags: [${selectedCategoryButton.tags.join(', ')}]`);
-          console.log(`   - Matches category: ${isSelectedPosterMatchingCategory}`);
+          console.log(`   - Matches category "${selectedCategoryButton.name}": ${isSelectedPosterMatchingCategory}`);
         }
         
         const filteredByCategory = templatesWithLanguages.filter(template => {
-          const templateTags = Array.isArray(template.tags)
-            ? template.tags.map(tag => tag.toLowerCase())
-            : [];
+          const templateTags = Array.isArray(template.tags) ? template.tags : [];
+          const categoryTags = selectedCategoryButton.tags;
           
-          const matchesTag = selectedCategoryButton.tags.some(tag => {
-            // EXACT TAG MATCH ONLY - no name matching to prevent false positives
-            const exactTagMatch = templateTags.some(posterTag => posterTag === tag.toLowerCase());
-            
-            // For category filtering, require EXACT tag match only
-            if (exactTagMatch) {
-              console.log(`\ud83d\udd0d [MATCH DEBUG] Tag "${tag}" matched for template "${template.name}":`);
-              console.log(`   - Exact tag match: ${exactTagMatch}`);
-              console.log(`   - Template tags: [${templateTags.join(', ')}]`);
-              return true;
-            }
-            return false;
-          });
+          // Use standardized exact matching system
+          const matchesCategory = tagsMatchCategory(templateTags, categoryTags);
           
-          const finalMatch = matchesTag;
-          
-          if (finalMatch) {
-            console.log(`\u2705 [CATEGORY FILTER] Template "${template.name}" matched - Tags: [${templateTags.join(', ')}]`);
+          if (matchesCategory) {
+            console.log(`\u2705 [CATEGORY FILTER] Template "${template.name}" matched category "${selectedCategoryButton.name}"`);
           } else {
-            console.log(`\u274C [CATEGORY FILTER] Template "${template.name}" did NOT match - Tags: [${templateTags.join(', ')}]`);
+            console.log(`\u274C [CATEGORY FILTER] Template "${template.name}" did NOT match category "${selectedCategoryButton.name}"`);
           }
           
-          return finalMatch;
+          return matchesCategory;
         });
 
         console.log(`\ud83d\udcca [CATEGORY FILTER] Templates after category filtering: ${filteredByCategory.length} (removed ${templatesBeforeCategoryFilter - filteredByCategory.length})`);
@@ -1374,22 +1463,16 @@ const PosterPlayerScreen: React.FC = () => {
         console.log(`\ud83c\udf0d [LANGUAGE FILTER] Applying language filter: ${selectedLanguage}`);
         const templatesBeforeLanguageFilter = filteredByCategory.length;
         
-        // 🧠 DETERMINE IF SELECTED POSTER MATCHES CATEGORY (for language filtered case)
+        // DETERMINE IF SELECTED POSTER MATCHES CATEGORY (for language filtered case) using standardized matching
         let isSelectedPosterMatchingCategoryLang = false;
         if (currentPoster && currentPoster.id !== 'loading' && !currentPoster.id.startsWith('category_')) {
-          const selectedPosterTags = Array.isArray(currentPoster.tags)
-            ? currentPoster.tags.map(tag => tag.toLowerCase())
-            : [];
+          const selectedPosterTags = Array.isArray(currentPoster.tags) ? currentPoster.tags : [];
           
-          isSelectedPosterMatchingCategoryLang = selectedCategoryButton.tags.some(categoryTag => 
-            selectedPosterTags.some(posterTag => posterTag === categoryTag.toLowerCase())
-          );
+          isSelectedPosterMatchingCategoryLang = tagsMatchCategory(selectedPosterTags, selectedCategoryButton.tags);
           
           console.log(`\ud83d\udccc [VALID MATCH CHECK - LANGUAGE] Selected poster "${currentPoster.name}":`);
           console.log(`   - Selected poster ID: ${currentPoster.id}`);
-          console.log(`   - Selected poster tags: [${selectedPosterTags.join(', ')}]`);
-          console.log(`   - Category tags: [${selectedCategoryButton.tags.join(', ')}]`);
-          console.log(`   - Matches category: ${isSelectedPosterMatchingCategoryLang}`);
+          console.log(`   - Matches category "${selectedCategoryButton.name}": ${isSelectedPosterMatchingCategoryLang}`);
         }
         
         const languageFilteredForSoftware = filteredByCategory.filter(template => {

@@ -148,14 +148,10 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
   const { theme, isDarkMode } = useTheme();
   const [formData, setFormData] = useState({
     name: '',
-    description: '',
     category: '',
     subcategory: '',
-    address: '',
     phone: '',
-    alternatePhone: '',
     email: '',
-    website: '',
     companyLogo: '',
     password: '',
     confirmPassword: '',
@@ -173,8 +169,9 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [phoneValidationError, setPhoneValidationError] = useState<string>('');
-  const [alternatePhoneValidationError, setAlternatePhoneValidationError] = useState<string>('');
   const [passwordValidationErrors, setPasswordValidationErrors] = useState<string[]>([]);
+  const [showPasswordRules, setShowPasswordRules] = useState(false);
+  const [hasPromo, setHasPromo] = useState<boolean | null>(null);
   const [categories, setCategories] = useState<BusinessCategory[]>([]);
   const [subcategories, setSubcategories] = useState<BusinessCategory[]>([]);
   const [isLoadingCategories, setIsLoadingCategories] = useState<boolean>(true);
@@ -564,18 +561,6 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
       errors.phone = 'Please enter a valid Indian mobile number starting with 6-9';
     }
 
-    // Alternate phone validation (optional field)
-    if (formData.alternatePhone && formData.alternatePhone.trim()) {
-      if (!/^\d+$/.test(formData.alternatePhone)) {
-        errors.alternatePhone = 'Alternate phone must contain only digits (0-9)';
-      } else if (formData.alternatePhone.length !== 10) {
-        errors.alternatePhone = 'Alternate phone must be exactly 10 digits';
-      } else if (!/^[6-9]\d{9}$/.test(formData.alternatePhone)) {
-        errors.alternatePhone = 'Please enter a valid Indian mobile number starting with 6-9';
-      } else if (formData.alternatePhone === formData.phone) {
-        errors.alternatePhone = 'Alternate phone must be different from primary phone number';
-      }
-    }
 
     // Password validation with strong policy
     const passwordErrors = validatePasswordStrength(formData.password);
@@ -644,12 +629,8 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
         password: formData.password.trim(),
         companyName: formData.name.trim(),
         phoneNumber: formData.phone.trim(),
-        description: formData.description.trim(),
         category: formData.category.trim(),
         subCategory: formData.subcategory.trim(),
-        address: formData.address.trim(),
-        alternatePhone: formData.alternatePhone.trim(),
-        website: formData.website.trim(),
         companyLogo: logoImage || formData.companyLogo,
         displayName: formData.name.trim(),
         promoCode: formData.promoCode.trim(),
@@ -848,21 +829,6 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                   )}
                 </View>
 
-                <FloatingInput
-                  value={formData.description}
-                  onChangeText={(value) => handleInputChange('description', value)}
-                  field="description"
-                  placeholder="Enter company description"
-                  multiline
-                  numberOfLines={3}
-                  focusedField={focusedField}
-                  setFocusedField={setFocusedField}
-                  theme={theme}
-                  inputRef={registerInputRef('description')}
-                  returnKeyType="next"
-                  blurOnSubmit
-                  onSubmitEditing={handleSubmitEditing('phone')}
-                />
 
                 {/* Business Category */}
                 <View style={styles.categorySection}>
@@ -1102,55 +1068,6 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                   )}
                 </View>
 
-                {/* Alternate Phone Number with Real-time Validation */}
-                <View style={styles.inputWrapper}>
-                  <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Alternate Phone (Optional)</Text>
-                  <TextInput
-                    ref={registerInputRef('alternatePhone')}
-                    style={[
-                      styles.input,
-                      {
-                        color: theme.colors.text,
-                        borderColor: alternatePhoneValidationError ? theme.colors.error : (focusedField === 'alternatePhone' ? theme.colors.primary : theme.colors.border),
-                        backgroundColor: theme.colors.inputBackground,
-                      }
-                    ]}
-                    value={formData.alternatePhone || ''}
-                    onChangeText={(value) => handleInputChange('alternatePhone', value)}
-                    onFocus={() => setFocusedField('alternatePhone')}
-                    onBlur={() => setFocusedField(null)}
-                    placeholder="Enter 10 digit alternate phone (optional)"
-                    placeholderTextColor={theme.colors.textSecondary}
-                    keyboardType="phone-pad"
-                    maxLength={10}
-                    returnKeyType="next"
-                    onSubmitEditing={handleSubmitEditing('email')}
-                  />
-                  {alternatePhoneValidationError ? (
-                    <View style={styles.errorContainer}>
-                      <Icon name="error" size={16} color={theme.colors.error} />
-                      <Text style={[styles.errorText, { color: theme.colors.error }]}>
-                        {alternatePhoneValidationError}
-                      </Text>
-                    </View>
-                  ) : null}
-                  {!alternatePhoneValidationError && formData.alternatePhone && formData.alternatePhone.trim() && formData.alternatePhone.replace(/\D/g, '').length === 10 && /^[6-9]\d{9}$/.test(formData.alternatePhone) ? (
-                    <View style={styles.successContainer}>
-                      <Icon name="check-circle" size={16} color="#4CAF50" />
-                      <Text style={[styles.successText, { color: '#4CAF50' }]}>
-                        ✓ Valid phone number
-                      </Text>
-                    </View>
-                  ) : null}
-                  {validationErrors.alternatePhone && (
-                    <View style={styles.errorContainer}>
-                      <Icon name="error" size={16} color={theme.colors.error} />
-                      <Text style={[styles.errorText, { color: theme.colors.error }]}>
-                        {validationErrors.alternatePhone}
-                      </Text>
-                    </View>
-                  )}
-                </View>
 
                 <View style={styles.inputWrapper}>
                   <FloatingInput
@@ -1167,7 +1084,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                     hasError={!!validationErrors.email}
                     inputRef={registerInputRef('email')}
                     returnKeyType="next"
-                    onSubmitEditing={handleSubmitEditing('website')}
+                    onSubmitEditing={handleSubmitEditing('password')}
                   />
                   {validationErrors.email && (
                     <View style={styles.errorContainer}>
@@ -1179,35 +1096,6 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                   )}
                 </View>
 
-                <FloatingInput
-                  value={formData.website || ''}
-                  onChangeText={(value) => handleInputChange('website', value)}
-                  field="website"
-                  placeholder="Enter company website URL"
-                  keyboardType="url"
-                  focusedField={focusedField}
-                  setFocusedField={setFocusedField}
-                  theme={theme}
-                  inputRef={registerInputRef('website')}
-                  returnKeyType="next"
-                  onSubmitEditing={handleSubmitEditing('address')}
-                />
-
-                <FloatingInput
-                  value={formData.address}
-                  onChangeText={(value) => handleInputChange('address', value)}
-                  field="address"
-                  placeholder="Enter company address"
-                  multiline
-                  numberOfLines={2}
-                  focusedField={focusedField}
-                  setFocusedField={setFocusedField}
-                  theme={theme}
-                  inputRef={registerInputRef('address')}
-                  returnKeyType="next"
-                  blurOnSubmit
-                  onSubmitEditing={handleSubmitEditing('password')}
-                />
               </View>
 
               {/* Account Security */}
@@ -1228,8 +1116,14 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                       ]}
                       value={formData.password}
                       onChangeText={(value) => handleInputChange('password', value)}
-                      onFocus={() => setFocusedField('password')}
-                      onBlur={() => setFocusedField(null)}
+                      onFocus={() => {
+                        setFocusedField('password');
+                        setShowPasswordRules(true);
+                      }}
+                      onBlur={() => {
+                        setFocusedField(null);
+                        setShowPasswordRules(false);
+                      }}
                       placeholder=""
                       secureTextEntry={!showPassword}
                       returnKeyType="next"
@@ -1256,29 +1150,31 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                     </TouchableOpacity>
                   </View>
                   
-                  {/* Password Requirements Hint */}
-                  <View style={styles.passwordRequirementsContainer}>
-                    <Text style={[styles.passwordRequirementsTitle, { color: theme.colors.textSecondary }]}>
-                      Password Requirements:
-                    </Text>
-                    <View style={styles.requirementsList}>
-                      <Text style={[styles.requirementItem, { color: formData.password.length >= 8 ? '#4CAF50' : theme.colors.textSecondary }]}>
-                        ✓ Minimum 8 characters
+                  {/* Password Requirements Hint - Show only on focus */}
+                  {showPasswordRules && (
+                    <View style={styles.passwordRequirementsContainer}>
+                      <Text style={[styles.passwordRequirementsTitle, { color: theme.colors.textSecondary }]}>
+                        Password Requirements:
                       </Text>
-                      <Text style={[styles.requirementItem, { color: /[A-Z]/.test(formData.password) ? '#4CAF50' : theme.colors.textSecondary }]}>
-                        ✓ At least 1 uppercase letter (A-Z)
-                      </Text>
-                      <Text style={[styles.requirementItem, { color: /[a-z]/.test(formData.password) ? '#4CAF50' : theme.colors.textSecondary }]}>
-                        ✓ At least 1 lowercase letter (a-z)
-                      </Text>
-                      <Text style={[styles.requirementItem, { color: /\d/.test(formData.password) ? '#4CAF50' : theme.colors.textSecondary }]}>
-                        ✓ At least 1 number (0-9)
-                      </Text>
-                      <Text style={[styles.requirementItem, { color: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(formData.password) ? '#4CAF50' : theme.colors.textSecondary }]}>
-                        ✓ At least 1 special character (! @ # $ % ^ & * etc.)
-                      </Text>
+                      <View style={styles.requirementsList}>
+                        <Text style={[styles.requirementItem, { color: formData.password.length >= 8 ? '#4CAF50' : theme.colors.textSecondary }]}>
+                          ✓ Minimum 8 characters
+                        </Text>
+                        <Text style={[styles.requirementItem, { color: /[A-Z]/.test(formData.password) ? '#4CAF50' : theme.colors.textSecondary }]}>
+                          ✓ At least 1 uppercase letter (A-Z)
+                        </Text>
+                        <Text style={[styles.requirementItem, { color: /[a-z]/.test(formData.password) ? '#4CAF50' : theme.colors.textSecondary }]}>
+                          ✓ At least 1 lowercase letter (a-z)
+                        </Text>
+                        <Text style={[styles.requirementItem, { color: /\d/.test(formData.password) ? '#4CAF50' : theme.colors.textSecondary }]}>
+                          ✓ At least 1 number (0-9)
+                        </Text>
+                        <Text style={[styles.requirementItem, { color: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(formData.password) ? '#4CAF50' : theme.colors.textSecondary }]}>
+                          ✓ At least 1 special character (! @ # $ % ^ & * etc.)
+                        </Text>
+                      </View>
                     </View>
-                  </View>
+                  )}
                   
                   {/* Show all password validation errors at once */}
                   {passwordValidationErrors.length > 0 && formData.password && (
@@ -1374,37 +1270,50 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
               </View>
 
               {/* Promo Code Section */}
-              <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Promo Code (Optional)</Text>
+              <View style={[styles.section, { marginBottom: Math.max(8, screenHeight * 0.01) }]}>
 
-                <View style={styles.inputWrapper}>
-                  <TextInput
-                    style={[
-                      styles.input,
-                      {
-                        color: theme.colors.text,
-                        borderColor: focusedField === 'promoCode' ? theme.colors.primary : theme.colors.border,
-                        backgroundColor: theme.colors.inputBackground,
-                        textTransform: 'uppercase',
-                        letterSpacing: 2,
-                      }
-                    ]}
-                    value={formData.promoCode}
-                    onChangeText={(value) => handleInputChange('promoCode', value.toUpperCase())}
-                    onFocus={() => setFocusedField('promoCode')}
-                    onBlur={() => setFocusedField(null)}
-                    placeholder="ENTER PROMO CODE"
-                    placeholderTextColor={theme.colors.textSecondary}
-                    autoCapitalize="characters"
-                    returnKeyType="done"
-                    onSubmitEditing={handleRegister}
-                  />
-                  {formData.promoCode ? (
-                    <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 4 }}>
-                      Promo code will be verified upon email verification.
-                    </Text>
-                  ) : null}
-                </View>
+                {/* Show question text if no selection made */}
+                {hasPromo === null && (
+                  <View style={styles.inputWrapper}>
+                    <TouchableOpacity onPress={() => setHasPromo(true)}>
+                      <Text style={[styles.promoQuestionText, { color: theme.colors.primary }]}>
+                        Do you have a promo code?
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* Show promo input if user selected Yes */}
+                {hasPromo === true && (
+                  <View style={styles.inputWrapper}>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        {
+                          color: theme.colors.text,
+                          borderColor: focusedField === 'promoCode' ? theme.colors.primary : theme.colors.border,
+                          backgroundColor: theme.colors.inputBackground,
+                          textTransform: 'uppercase',
+                          letterSpacing: 2,
+                        }
+                      ]}
+                      value={formData.promoCode}
+                      onChangeText={(value) => handleInputChange('promoCode', value.toUpperCase())}
+                      onFocus={() => setFocusedField('promoCode')}
+                      onBlur={() => setFocusedField(null)}
+                      placeholder="ENTER PROMO CODE"
+                      placeholderTextColor={theme.colors.textSecondary}
+                      autoCapitalize="characters"
+                      returnKeyType="done"
+                      onSubmitEditing={handleRegister}
+                    />
+                    {formData.promoCode ? (
+                      <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 4 }}>
+                        Promo code will be verified upon email verification.
+                      </Text>
+                    ) : null}
+                  </View>
+                )}
               </View>
 
               {/* Register Button */}
@@ -2134,6 +2043,12 @@ const styles = StyleSheet.create({
     fontSize: isSmallScreen ? 13 : isTablet ? 16 : 14,
     fontWeight: '600',
     marginLeft: 7,
+  },
+  promoQuestionText: {
+    fontSize: isSmallScreen ? 14 : 16,
+    fontWeight: '600',
+    textAlign: 'left',
+    marginVertical: Math.max(4, screenHeight * 0.005),
   },
 });
 

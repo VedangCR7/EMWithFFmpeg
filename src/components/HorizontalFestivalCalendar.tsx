@@ -1045,10 +1045,12 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(9),
     fontWeight: '500',
     marginBottom: moderateScale(2),
+    textAlign: 'center',
   },
   dayNumberText: {
     fontSize: moderateScale(14),
     fontWeight: '600',
+    textAlign: 'center',
   },
   festivalDot: {
     position: 'absolute',
@@ -1070,6 +1072,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     borderRadius: isTablet ? 33 : 28,
     overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   runningBorderOverlay: {
     position: 'absolute',

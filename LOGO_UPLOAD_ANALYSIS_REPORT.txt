@@ -1,0 +1,194 @@
+# LOGO UPLOAD AND RENDERING ANALYSIS REPORT
+## Frontend-Only Deep Analysis
+
+---
+
+## 1. PROBLEM SUMMARY
+
+A successfully uploaded logo is NOT being displayed after API success and screen refresh. The logs show:
+- `selectedLogo: ''` 
+- `hasLogo: false` 
+- `companyLogo: ''` 
+- No valid logo URL after API call
+
+The logo upload process completes successfully, but the UI fails to display the uploaded logo.
+
+---
+
+## 2. STEP-BY-STEP FLOW BREAKDOWN
+
+### 2.1 Image Selection Flow
+1. **Image Picker**: User selects image via `ImagePickerModal` (camera/gallery)
+2. **Image Cropping**: `ImageCropPicker.openCropper` processes the image
+3. **Local URI Generation**: Cropped image returns local file URI (e.g., `file://...`)
+4. **Form State Update**: `handleImageSelected` stores local URI in `formData.companyLogo`
+5. **Visual Preview**: Form shows local image preview successfully
+
+### 2.2 API Submission Flow
+1. **Form Submit**: `handleSubmit` in `BusinessProfileForm` calls `onSubmit(formData)`
+2. **Service Layer**: `businessProfileService.createBusinessProfile` receives data
+3. **Local File Detection**: `isLocalFilePath()` detects `companyLogo` is a local file
+4. **FormData Creation**: Service creates FormData with logo file appended
+5. **API Call**: POST to `/api/mobile/business-profile` with multipart/form-data
+
+### 2.3 API Response Handling
+1. **Success Response**: Backend returns `response.data.success = true`
+2. **Logo URL Extraction**: Service attempts to extract logo URL from response:
+   ```typescript
+   const logoUrl = backendProfile.businessLogo || backendProfile.logo ||
+                   backendProfile.companyLogo || backendProfile.profileLogo ||
+                   backendProfile.image || backendProfile.photo || '';
+   ```
+3. **Profile Mapping**: New profile created with extracted logo URL
+4. **Cache Clear**: Service clears cache to force refresh
+
+### 2.4 UI Refresh Flow
+1. **Force Refresh**: `loadBusinessProfiles(true, true)` called after creation
+2. **Cache Bypass**: Force refresh ignores cache, fetches from API
+3. **Profile Mapping**: `getUserBusinessProfiles` maps backend response to frontend format
+4. **Logo Field Mapping**: Enhanced logo mapping attempts to find valid logo field
+5. **UI Rendering**: `BusinessCard` component attempts to display logo
+
+---
+
+## 3. EXACT FAILURE POINT
+
+### CRITICAL ISSUE IDENTIFIED:
+**Logo field mapping inconsistency between API response and frontend expectations**
+
+#### Location: `businessProfile.ts` lines 343-345 and 519-521
+```typescript
+// CREATE operation - expects businessLogo field
+const logoUrl = backendProfile.businessLogo || backendProfile.logo ||
+                backendProfile.companyLogo || backendProfile.profileLogo ||
+                backendProfile.image || backendProfile.photo || '';
+
+// UPDATE operation - expects logo field  
+const logoUrl = backendProfile.businessLogo || backendProfile.logo ||
+                backendProfile.companyLogo || backendProfile.profileLogo ||
+                backendProfile.image || backendProfile.photo || '';
+```
+
+#### Location: `businessProfile.ts` lines 84-95 (getUserBusinessProfiles)
+```typescript
+// FETCH operation - maps multiple logo fields
+const logoMapping = {
+  logo: profile.logo,
+  companyLogo: profile.companyLogo,
+  profileLogo: profile.profileLogo,
+  businessLogo: profile.businessLogo,
+  image: profile.image,
+  photo: profile.photo,
+};
+const foundLogo = Object.values(logoMapping).find(url => url && url.trim() !== '') || '';
+```
+
+---
+
+## 4. ROOT CAUSE (Frontend Only)
+
+### 4.1 Primary Root Cause: **Backend Response Field Mismatch**
+The backend API response for logo upload contains a different field name than expected by the frontend logo mapping logic. Based on the logs showing empty logo values, the backend is likely returning the logo URL in a field that the frontend is not checking.
+
+### 4.2 Secondary Root Cause: **Inconsistent Logo Field Priority**
+Different operations (CREATE vs UPDATE vs FETCH) use different field priority orders, creating potential for field mismatches.
+
+### 4.3 Tertiary Root Cause: **Missing Backend Response Logging**
+The frontend logs show "Logo URL returned from API: (empty)" but don't log the actual backend response structure to identify which field contains the logo URL.
+
+---
+
+## 5. SUPPORTING LOG EVIDENCE
+
+### 5.1 From BusinessProfilesScreen.tsx (lines 244-248):
+```typescript
+sortedProfiles.forEach((profile, index) => {
+  console.log(`Profile ${index + 1} - ${profile.name}:`);
+  console.log(`   - Logo: ${profile.logo || '(empty)'}`);
+  console.log(`   - CompanyLogo: ${profile.companyLogo || '(empty)'}`);
+});
+```
+**Evidence**: Both logo and companyLogo fields are empty after API refresh.
+
+### 5.2 From businessProfile.ts (lines 97-103):
+```typescript
+console.log('Profile logo mapping:', {
+  id: profile.id,
+  name: profile.name || profile.businessName,
+  logoFields: logoMapping,
+  selectedLogo: foundLogo,
+  hasLogo: !!foundLogo
+});
+```
+**Evidence**: Logo mapping shows `selectedLogo: ''` and `hasLogo: false`.
+
+### 5.3 From businessProfile.ts (line 347):
+```typescript
+console.log('Logo URL returned from API:', logoUrl || '(empty)');
+```
+**Evidence**: API response processing shows empty logo URL extraction.
+
+---
+
+## 6. IMPACT ON UI STATE
+
+### 6.1 Conditional Rendering Failure
+In `BusinessCard` component (lines 805-847):
+```typescript
+const logoUrl = item.companyLogo || item.logo;
+const isValidUrl = logoUrl && 
+  typeof logoUrl === 'string' && 
+  logoUrl.trim() !== '' && 
+  (logoUrl.startsWith('http://') || logoUrl.startsWith('https://') || logoUrl.startsWith('file://'));
+
+if (isValidUrl) {
+  // Render Image component
+} else {
+  // Render placeholder
+}
+```
+
+**Impact**: `isValidUrl` is `false`, causing placeholder to render instead of uploaded logo.
+
+### 6.2 State Consistency Issue
+- Local form state: Contains valid file URI during upload
+- API response state: Logo URL lost during field mapping
+- UI state: Empty logo fields trigger placeholder rendering
+
+---
+
+## 7. EDGE CASES IDENTIFIED
+
+### 7.1 Field Name Variations
+Backend may return logo URL in any of these fields:
+- `logo`
+- `companyLogo` 
+- `businessLogo`
+- `profileLogo`
+- `image`
+- `photo`
+- `logoUrl` (not currently checked)
+- `company_logo` (snake_case variation)
+- `business_logo` (snake_case variation)
+
+### 7.2 Response Format Variations
+Backend may return logo URL as:
+- Direct string field
+- Nested object (`logo.url`)
+- Array (`logos[0].url`)
+- Base64 encoded string
+
+### 7.3 Timing Issues
+- Cache clearing may not propagate immediately
+- Force refresh may race with cache invalidation
+- Image refresh key may not trigger re-render
+
+---
+
+## 8. FINAL CONCLUSION
+
+**The logo upload succeeds but the logo URL is lost during backend response mapping due to field name mismatch between actual API response and frontend extraction logic.**
+
+The frontend expects the logo URL in specific field names (`businessLogo`, `logo`, `companyLogo`, etc.) but the backend is returning it in a field that is not being checked, resulting in `selectedLogo: ''` and `hasLogo: false` in the UI.
+
+**Single most critical failure point**: Logo field extraction logic in `businessProfileService.createBusinessProfile()` and `getUserBusinessProfiles()` methods.

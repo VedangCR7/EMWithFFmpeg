@@ -119,7 +119,7 @@ const HelpSupportScreen: React.FC = () => {
     },
     {
       question: 'What subscription plans are available?',
-      answer: 'We offer multiple subscription plans including Monthly, Quarterly, and Annual plans. Each plan provides access to premium templates, unlimited downloads, and exclusive features. Visit the Subscription section to view all available plans.',
+      answer: 'We offer multiple subscription plans including Quarterly and Annual plans. Each plan provides access to premium templates, unlimited downloads, and exclusive features. Visit the Subscription section to view all available plans.',
     },
     {
       question: 'Can I cancel my subscription?',

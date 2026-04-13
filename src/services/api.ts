@@ -158,8 +158,15 @@ api.interceptors.request.use(
 // Response interceptor to handle caching and errors
 api.interceptors.response.use(
   async (response) => {
-    // Removed verbose response logging - use logger for essential logs only
-    // Let axios handle response parsing automatically (same as calendarApi pattern)
+    // Log business profile API responses
+    if (response.config.url?.includes('/api/mobile/business-profile')) {
+      console.log('========== BUSINESS PROFILE API RESPONSE ==========');
+      console.log('URL:', response.config.baseURL + response.config.url);
+      console.log('Method:', response.config.method?.toUpperCase());
+      console.log('Status:', response.status);
+      console.log('Response Data:', JSON.stringify(response.data, null, 2));
+      console.log('==================================================');
+    }
     
     // Cache successful GET responses
     if (response.config.method?.toLowerCase() === 'get' && response.status === 200) {

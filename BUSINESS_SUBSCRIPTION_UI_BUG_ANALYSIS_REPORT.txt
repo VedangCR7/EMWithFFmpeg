@@ -1,0 +1,183 @@
+BUSINESS SUBSCRIPTION UI BUG - ROOT CAUSE ANALYSIS REPORT
+============================================================
+
+ISSUE SUMMARY
+-------------
+For already subscribed business profiles, the UI is displaying the message "For Premium images — Subscribe Now." 
+This message should NOT be visible for subscribed businesses.
+
+EXPECTED VS ACTUAL BEHAVIOR
+---------------------------
+Expected:
+- Subscribed business profiles should NOT see "For Premium images — Subscribe Now" message
+- Language filter buttons should be displayed instead
+
+Actual:
+- Subscribed business profiles ARE seeing "For Premium images — Subscribe Now" message
+- Language filter buttons are hidden
+
+DATA FLOW FINDINGS
+------------------
+1. Backend API → Frontend Flow:
+   - Backend API: `/api/mobile/subscription/status` with businessProfileId parameter
+   - API Response Structure: SubscriptionStatus object with fields:
+     * isActive: boolean
+     * status: 'active' | 'expired' | 'cancelled' | 'pending' | 'inactive'
+     * subscriptionStatus: string (alternative field)
+     * planId, planName, expiryDate, autoRenew
+
+2. Frontend State Management:
+   - SubscriptionContext stores: businessProfileSubscriptions: Record<string, SubscriptionStatus>
+   - BusinessProfileContext stores: businessSubscriptionStatus field in profile object
+   - Two parallel state systems exist for the same data
+
+3. UI Rendering Flow:
+   - PosterPlayerScreen.tsx determines message visibility via shouldShowSubscriptionMessage
+   - Condition: templateSource === 'professional' && !!globalBusinessCategory
+   - Missing: Actual subscription status check
+
+BACKEND VALIDATION RESULT
+--------------------------
+API Response Analysis:
+- getBusinessProfileSubscriptionStatus() returns correct SubscriptionStatus data
+- Status mapping logic: subscriptionStatus?.status?.toLowerCase() || (isActive ? "active" : "inactive")
+- Backend appears to send correct data for subscribed profiles
+- 10-second cache TTL with stale-while-revalidate pattern
+
+FRONTEND STATE ISSUES
+---------------------
+1. CRITICAL ISSUE: UI Logic Disconnect
+   - shouldShowSubscriptionMessage in PosterPlayerScreen ONLY checks templateSource and globalBusinessCategory
+   - COMPLETELY IGNORES actual subscription status
+   - This is the root cause of the bug
+
+2. State Fragmentation:
+   - SubscriptionContext: businessProfileSubscriptions[profileId] 
+   - BusinessProfileContext: profile.businessSubscriptionStatus
+   - PosterPlayerScreen: Uses neither for subscription check
+
+3. Data Flow Gaps:
+   - PosterPlayerScreen imports useSubscription but only uses: isSubscribed, checkPremiumAccess, refreshSubscription
+   - Does NOT use: getBusinessProfileSubscription, businessProfileSubscriptions
+   - Missing connection between business profile subscription state and UI rendering
+
+CONDITIONAL RENDERING ANALYSIS
+------------------------------
+Current Logic (PosterPlayerScreen.tsx lines 775-777):
+```typescript
+const shouldShowSubscriptionMessage = useMemo(() => {
+  return templateSource === 'professional' && !!globalBusinessCategory;
+}, [templateSource, globalBusinessCategory]);
+```
+
+Problem:
+- Only checks if user is in business category (templateSource === 'professional')
+- Does NOT check if the specific business profile is subscribed
+- Shows subscription message for ALL business profiles regardless of subscription status
+
+Correct Logic Should Be:
+```typescript
+const shouldShowSubscriptionMessage = useMemo(() => {
+  const businessSubscription = getBusinessProfileSubscription(globalBusinessProfile?.id);
+  const isBusinessSubscribed = businessSubscription?.status === 'active' || businessSubscription?.isActive === true;
+  return templateSource === 'professional' && !!globalBusinessCategory && !isBusinessSubscribed;
+}, [templateSource, globalBusinessCategory, globalBusinessProfile?.id, getBusinessProfileSubscription]);
+```
+
+ASYNC / TIMING ISSUES
+----------------------
+1. Cache Timing:
+   - 10-second TTL for subscription status
+   - Stale data allowed during refresh
+   - Potential for showing stale subscription state
+
+2. Loading States:
+   - No loading state handling in shouldShowSubscriptionMessage
+   - UI renders immediately before subscription data loads
+   - May show incorrect message temporarily
+
+3. Race Conditions:
+   - Business profile changes may not trigger subscription status refresh
+   - useEffect dependencies may miss subscription updates
+
+NAVIGATION & PARAMETER PASSING
+------------------------------
+1. Parameter Flow:
+   - HomeScreen → PosterPlayerScreen: templateSource='professional'
+   - BusinessProfileContext provides: globalBusinessProfile, globalBusinessCategory
+   - SubscriptionContext provides: businessProfileSubscriptions
+
+2. Missing Connections:
+   - PosterPlayerScreen doesn't read business profile subscription status
+   - No dependency on businessProfileSubscriptions in shouldShowSubscriptionMessage
+
+EDGE CASES
+-----------
+1. Profile Switching:
+   - When user switches between business profiles, subscription message may not update
+   - Cached subscription data may belong to previous profile
+
+2. Multiple Profiles:
+   - User may have mix of subscribed and unsubscribed business profiles
+   - Current logic doesn't differentiate between profiles
+
+3. App Reload:
+   - On app restart, subscription data loads asynchronously
+   - UI may show incorrect message until data loads
+
+4. Network Issues:
+   - If API fails, subscription status defaults to 'inactive'
+   - May incorrectly show subscription message
+
+ROOT CAUSE (MOST IMPORTANT)
+----------------------------
+**PRIMARY ROOT CAUSE: Complete Disconnect Between Subscription State and UI Logic**
+
+The bug occurs because PosterPlayerScreen.tsx determines subscription message visibility based ONLY on:
+1. templateSource === 'professional' 
+2. globalBusinessCategory exists
+
+It COMPLETELY IGNORES the actual subscription status of the business profile. The UI has access to subscription data through:
+- getBusinessProfileSubscription(profileId) from SubscriptionContext
+- businessProfileSubscriptions state
+
+But this data is NOT used in the shouldShowSubscriptionMessage calculation.
+
+**Secondary Contributing Factors:**
+1. State Fragmentation: Two separate systems storing subscription data
+2. Missing Dependencies: useEffect doesn't trigger on subscription changes
+3. No Loading States: UI renders before subscription data is available
+
+SUPPORTING EVIDENCE
+-------------------
+1. Code Location: PosterPlayerScreen.tsx lines 775-777
+2. Missing Import: getBusinessProfileSubscription not imported from useSubscription
+3. Wrong Dependencies: useMemo dependency array missing subscription state
+4. Available Data: businessProfileSubscriptions contains correct subscription status but is unused
+
+RISK ASSESSMENT
+---------------
+Impact on Other Features:
+- HIGH: All business category screens may have similar issues
+- MEDIUM: VideoEditorScreen, PosterEditorScreen also use business profiles
+- LOW: Global user subscription (non-business) features work correctly
+
+Potential Regression Risk:
+- HIGH: Fixing this may reveal other areas with similar logic gaps
+- MEDIUM: Changes to subscription state management may affect multiple screens
+- LOW: Backend API changes not required
+
+Business Impact:
+- CRITICAL: Subscribed users see upgrade prompts, damaging user experience
+- HIGH: May reduce conversion rates for business subscriptions
+- MEDIUM: Creates confusion about subscription benefits
+
+RECOMMENDATION SUMMARY
+----------------------
+The fix requires updating shouldShowSubscriptionMessage in PosterPlayerScreen.tsx to:
+1. Import getBusinessProfileSubscription from useSubscription
+2. Check actual subscription status of current business profile
+3. Add subscription state to useMemo dependencies
+4. Handle loading states appropriately
+
+This is a UI logic bug, not a backend or data flow issue.

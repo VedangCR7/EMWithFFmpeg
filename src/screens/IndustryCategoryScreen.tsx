@@ -255,12 +255,12 @@ const IndustryCategoryScreen: React.FC = () => {
 
   const categoryButtons = useMemo(() => [
     // { id: 'all', name: 'All', tags: [] },
-    { id: 'website-dev', name: 'Website Development', tags: ['website', 'web', 'development', 'design'] },
-    { id: 'mobile-app-dev', name: 'Mobile App Development', tags: ['mobile', 'app', 'android', 'ios'] },
-    { id: 'custom-software', name: 'Custom S/W Solutions', tags: ['software', 'custom', 'solution', 'application'] },
-    { id: 'ai-automation', name: 'AI & Automation', tags: ['ai', 'automation', 'machine learning', 'ml'] },
-    { id: 'it-consulting', name: 'IT Consulting & Support', tags: ['it', 'consulting', 'support', 'technical'] },
-    { id: 'software-dev', name: 'Software Development', tags: ['software', 'development', 'programming', 'coding'] },
+    { id: 'website-dev', name: 'Website Development', tags: ['website'] },
+    { id: 'mobile-app-dev', name: 'Mobile App Development', tags: [ 'mobile'] },
+    { id: 'custom-software', name: 'Custom S/W Solutions', tags: ['software'] },
+    { id: 'ai-automation', name: 'AI & Automation', tags: ['ai'] },
+    { id: 'it-consulting', name: 'IT Consulting & Support', tags: ['consulting'] },
+    { id: 'software-dev', name: 'Software Development', tags: ['coding'] },
   ], []);
 
   const fetchPosters = useCallback(async () => {
