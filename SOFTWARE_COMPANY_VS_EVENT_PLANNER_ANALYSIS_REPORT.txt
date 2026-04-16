@@ -1,0 +1,243 @@
+================================================================================
+COMPREHENSIVE ANALYSIS REPORT: Event Planner vs Software Company Behavior
+================================================================================
+
+Analysis Date: April 16, 2026
+Scope: Complete flow comparison between Event Planner and Software Company subcategories
+Objective: Identify root causes of behavioral differences when clicked from Home Screen
+
+================================================================================
+EXECUTIVE SUMMARY
+================================================================================
+
+WHAT WORKS CORRECTLY:
+- Event Planner renders buttons and filters correctly from all entry points
+- API data fetching works for both categories
+- Template conversion and caching functions properly
+- Basic navigation flow is functional
+
+WHAT FAILS:
+- Software Company buttons do NOT render from HomeScreen flow
+- Software Company filtering fails or returns empty results
+- Button visibility conditions are not met for Software Company
+- State management conflicts between multiple flows
+
+ROOT CAUSE:
+Complex button visibility logic with multiple conditional checks that fail for HomeScreen Software Company flow, combined with inconsistent data source handling and timing issues in production builds.
+
+================================================================================
+SIDE-BY-SIDE COMPARISON TABLE
+================================================================================
+
+| Feature | Event Planner | Software Company | Issue |
+|---------|---------------|------------------|-------|
+| Data Fetch | API: /api/mobile/posters/category/eventplanner | API: /api/mobile/posters/category/software%20company | Different endpoint encoding |
+| Data Source | Single: serviceFilterTemplates['eventplanner'] | Multiple: allTemplates, serviceFilterTemplates, tagBased | Inconsistent data sources |
+| Button Visibility | Simple: activeRenderSource === 'profile' && isEventPlannerCategory | Complex: 4 different flow checks with multiple conditions | Over-engineered conditions |
+| Flow Detection | Single source: 'profile' | Multiple sources: 'template', 'subcategory', 'profile', 'business' | Conflicting source logic |
+| Rendering Logic | Direct filtering from cached templates | Complex filtering with fallbacks and multiple paths | Race conditions |
+| State Management | Simple: selectedServiceFilter | Complex: selectedSoftwareCategory + multiple states | State conflicts |
+| Cache Strategy | 5-minute client-side cache | No consistent caching | Performance issues |
+| Auto-Selection | None (uses navigation params) | Complex auto-selection with setTimeout | Timing issues |
+| Tag Matching | Fixed keywords: ['generator', 'decor', 'sound', 'mandap'] | Dynamic mapping with 6 categories | Inconsistent matching |
+| Production Behavior | Stable in APK | Fails in APK only | Production build issues |
+
+================================================================================
+ROOT CAUSE ANALYSIS
+================================================================================
+
+1. BUTTON VISIBILITY CONDITIONS (CRITICAL FAILURE):
+   - Event Planner: Single condition - activeRenderSource === 'profile' && isEventPlannerCategory
+   - Software Company: 4 complex conditions with multiple AND checks:
+     * isMyBusinessFlow: flowSource === "MyBusiness" && normalizedSubCategory === 'software company'
+     * isHomeTemplateFlow: flowSource === "HomeScreen" && templateSource === "professional" && normalizedCategory === 'software company'
+     * isHomeSubcategoryFlow: flowSource === "HomeScreen" && normalizedSubCategory === 'software company'
+     * isHomeBusinessCategoryFlow: flowSource === "HomeScreen" && templateSource === "professional" && categoryName === 'Software Company'
+
+2. DATA SOURCE INCONSISTENCY:
+   - Event Planner: Uses only serviceFilterTemplates['eventplanner'] (cached)
+   - Software Company: Mixes allTemplates, serviceFilterTemplates['softwarecompany'], and tag-based filtering
+   - Result: Unpredictable data availability and timing issues
+
+3. FLOW ISOLATION FAILURE:
+   - Event Planner: Isolated to 'profile' source only
+   - Software Company: Attempts to handle 4 different sources simultaneously
+   - Result: State conflicts and race conditions
+
+4. CATEGORY NORMALIZATION ISSUES:
+   - Event Planner: Simple category detection with variations
+   - Software Company: Complex normalization with multiple checks (currentPoster, initialPoster, globalBusinessCategory, categoryName)
+   - Result: Inconsistent category detection
+
+5. PRODUCTION BUILD TIMING:
+   - Event Planner: Simple logic works consistently
+   - Software Company: Complex async operations with setTimeout and multiple useEffect dependencies
+   - Result: Production optimizations break timing-sensitive logic
+
+================================================================================
+WHAT IS ALREADY IMPLEMENTED CORRECTLY (Software Company)
+================================================================================
+
+1. API DATA FETCHING:
+   - Correct endpoint: /api/mobile/posters/category/software%20company
+   - Proper template conversion from BusinessCategoryPoster to Template
+   - Error handling for failed API calls
+
+2. TEMPLATE CACHING:
+   - serviceFilterTemplates['softwarecompany] cache structure exists
+   - Cache check before API calls
+   - Template mapping with mergeTemplateLanguages()
+
+3. BUTTON CONFIGURATION:
+   - 6 software category buttons defined correctly
+   - Tag mapping for each category exists
+   - Button press handlers implemented
+
+4. FILTERING LOGIC:
+   - tagsMatchCategory function works correctly
+   - Template tag extraction and normalization
+   - Language filtering integration
+
+5. NAVIGATION PARAMETERS:
+   - HomeScreen sends correct params: type: 'business', templateSource: 'professional', categoryName: 'Software Company'
+   - Parameter reception and parsing works
+
+================================================================================
+WHAT IS MISSING / BROKEN
+================================================================================
+
+1. BUTTON RENDERING CONDITIONS:
+   - shouldShowSoftwareButtons logic is over-engineered
+   - Multiple flow checks create conflicts
+   - Case sensitivity and normalization inconsistencies
+
+2. DATA SOURCE UNIFICATION:
+   - No single source of truth for templates
+   - Mixed usage of allTemplates vs cached templates
+   - Inconsistent filtering paths
+
+3. STATE MANAGEMENT:
+   - Multiple conflicting states: selectedSoftwareCategory, selectedServiceFilter
+   - State reset logic is incomplete
+   - Race conditions between useEffect hooks
+
+4. FLOW DETECTION:
+   - flowSource calculation is complex
+   - activeRenderSource conflicts with flow detection
+   - Source isolation is incomplete
+
+5. PRODUCTION TIMING:
+   - setTimeout usage for auto-selection
+   - Multiple useEffect dependencies create timing issues
+   - Production build optimizations affect async behavior
+
+================================================================================
+WHY EVENT PLANNER WORKS BUT SOFTWARE COMPANY FAILS
+================================================================================
+
+1. ARCHITECTURAL SIMPLICITY:
+   - Event Planner: Single data source, single condition, single state
+   - Software Company: Multiple sources, multiple conditions, multiple states
+   - Result: Complexity introduces failure points
+
+2. FLOW CONSISTENCY:
+   - Event Planner: Only works from MyBusiness tab (profile source)
+   - Software Company: Attempts to work from HomeScreen + MyBusiness + others
+   - Result: Event Planner has predictable flow, Software Company has conflicting flows
+
+3. TIMING RELIABILITY:
+   - Event Planner: No auto-selection, no setTimeout, simple useEffect
+   - Software Company: Complex auto-selection with setTimeout, multiple useEffect
+   - Result: Event Planner timing is deterministic, Software Company is not
+
+4. PRODUCTION RESILIENCE:
+   - Event Planner: Simple logic survives production optimizations
+   - Software Company: Complex timing-sensitive logic breaks in production
+   - Result: Event Planner works in APK, Software Company fails in APK
+
+5. DEBUGGING COMPLEXITY:
+   - Event Planner: Easy to trace single path
+   - Software Company: Multiple paths make debugging difficult
+   - Result: Issues in Software Company are harder to identify and fix
+
+================================================================================
+PRODUCTION-SAFE FIX STRATEGY (NO CODE)
+================================================================================
+
+1. SIMPLIFY BUTTON VISIBILITY:
+   - Replace 4 complex conditions with single condition
+   - Use consistent category detection method
+   - Remove case sensitivity issues
+
+2. UNIFY DATA SOURCE:
+   - Use only serviceFilterTemplates['softwarecompany] for filtering
+   - Remove dependency on allTemplates for Software Company
+   - Implement consistent caching strategy
+
+3. FIX FLOW ISOLATION:
+   - Identify single source for HomeScreen Software Company flow
+   - Prevent conflicting sources from interfering
+   - Add proper state reset between flows
+
+4. REMOVE TIMING DEPENDENCIES:
+   - Eliminate setTimeout for auto-selection
+   - Reduce useEffect dependencies
+   - Use deterministic state management
+
+5. STANDARDIZE CATEGORY DETECTION:
+   - Use single method for category detection
+   - Apply consistent normalization
+   - Remove multiple category sources
+
+6. PRODUCTION TESTING:
+   - Test button visibility in production build
+   - Verify timing without debug logging
+   - Ensure consistent behavior across environments
+
+================================================================================
+TECHNICAL IMPLEMENTATION POINTS
+================================================================================
+
+COMPONENTS TO MODIFY:
+- PosterPlayerScreen.tsx: shouldShowSoftwareButtons logic
+- PosterPlayerScreen.tsx: filteredPosters data source selection
+- PosterPlayerScreen.tsx: flow detection and isolation
+- HomeScreen.tsx: navigation parameter consistency
+
+FUNCTIONS TO REFACTOR:
+- isSoftwareCompanyCategory detection
+- shouldShowSoftwareButtons conditions
+- filteredPosters data source logic
+- fetchSoftwareCompanyTemplates timing
+
+STATES TO SIMPLIFY:
+- selectedSoftwareCategory management
+- activeRenderSource conflicts
+- serviceFilterTemplates usage
+- flowSource calculation
+
+================================================================================
+VERIFICATION CHECKLIST
+================================================================================
+
+BEFORE FIX:
+- Event Planner buttons render correctly from MyBusiness
+- Software Company buttons fail from HomeScreen
+- API data fetching works for both
+- Production build exacerbates timing issues
+
+AFTER FIX:
+- Software Company buttons render from HomeScreen
+- Filtering works consistently
+- No timing dependencies
+- Production build behavior matches development
+
+TEST SCENARIOS:
+1. HomeScreen > Industry > Software Company
+2. HomeScreen > Industry > Event Planner (regression test)
+3. MyBusiness > Software Company profile
+4. APK production build verification
+
+================================================================================
+END OF ANALYSIS
+================================================================================

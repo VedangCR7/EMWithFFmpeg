@@ -534,15 +534,15 @@ const PosterPlayerScreen: React.FC = () => {
 
   const {
     selectedPoster: initialPoster,
-    selectedTemplateId: initialTemplateId,  // ✅ PRIMARY DATA - ID as source of truth
+    selectedTemplateId: initialTemplateId,  // ? PRIMARY DATA - ID as source of truth
     relatedPosters: initialRelatedPosters,
     greetingCategory,
+    categoryName, // Use categoryName instead of poster category
     originScreen,
     posterLimit,
     calendarDate,
     templateSource,
     type,
-    categoryName,
   } = route.params;
 
   // Add debug log for received parameters
@@ -552,7 +552,9 @@ const PosterPlayerScreen: React.FC = () => {
     templateSource,
     hasSelectedPoster: !!initialPoster,
     hasRelatedPosters: !!initialRelatedPosters?.length,
-    relatedPostersCount: initialRelatedPosters?.length || 0
+    relatedPostersCount: initialRelatedPosters?.length || 0,
+    // DEBUG: HomeScreen Software Company specific
+    isHomeScreenSoftwareFlow: type === 'business' && categoryName === 'Software Company' && templateSource === 'professional'
   });
 
   // PROTECTION: Detect if valid templates are received via navigation params
@@ -736,6 +738,51 @@ const PosterPlayerScreen: React.FC = () => {
     currentPoster?.category,
     initialPoster?.category
   ]);
+
+  // FLOW SOURCE IDENTIFIER: Normalize flow source for validation
+  const flowSource = useMemo(() => {
+    if (originScreen === "MainTabs") return "MyBusiness";
+    if (templateSource === "professional") return "HomeScreen";
+    return "Other";
+  }, [originScreen, templateSource]);
+
+  // NORMALIZED CATEGORY + SUBCATEGORY: Safe normalization for validation
+  const normalizedCategory = useMemo(() => (
+    currentPoster?.category ||
+    initialPoster?.category ||
+    globalBusinessCategory ||
+    categoryName ||
+    ''
+  ).toLowerCase().trim(), [currentPoster?.category, initialPoster?.category, globalBusinessCategory, categoryName]);
+
+  const normalizedSubCategory = useMemo(() => (
+    globalBusinessProfile?.subCategory ||
+    globalBusinessProfile?.subcategory ||
+    ''
+  ).toLowerCase().trim(), [globalBusinessProfile]);
+
+
+  // FLOW VALIDATION LOGGING V2: Track extended button rendering decisions
+  useEffect(() => {
+    console.log('?? FLOW VALIDATION CHECK V2:', {
+      flowSource,
+      isSoftwareCompanyCategory,
+      shouldShowSoftwareButtons,
+      normalizedCategory,
+      normalizedSubCategory,
+      categoryName,
+      currentPosterCategory: currentPoster?.category,
+      initialPosterCategory: initialPoster?.category,
+      templateSource,
+      originScreen,
+      validationReason: shouldShowSoftwareButtons ? 'ALLOWED' : 'BLOCKED',
+      // DEBUG: Add individual flow checks
+      isMyBusinessFlow: flowSource === "MyBusiness" && normalizedSubCategory === 'software company',
+      isHomeTemplateFlow: flowSource === "HomeScreen" && templateSource === "professional" && normalizedCategory === 'software company',
+      isHomeSubcategoryFlow: flowSource === "HomeScreen" && normalizedSubCategory === 'software company',
+      isHomeBusinessCategoryFlow: flowSource === "HomeScreen" && templateSource === "professional" && categoryName === 'Software Company'
+    });
+  }, [flowSource, isSoftwareCompanyCategory, shouldShowSoftwareButtons, normalizedCategory, normalizedSubCategory, categoryName, currentPoster?.category, initialPoster?.category, templateSource, originScreen]);
 
   // Auto-set language to "All" when navigating from MyBusiness tab
   useEffect(() => {
@@ -1206,9 +1253,10 @@ const PosterPlayerScreen: React.FC = () => {
     { id: 'mobile-app-dev', name: 'Mobile App Development', tags: [ 'mobile'] },
     { id: 'custom-software', name: 'Custom Software Solutions', tags: ['software'] },
     { id: 'ai-automation', name: 'AI & Automation', tags: ['ai'] },
-    { id: 'it-consulting', name: 'IT Consulting & Support', tags: ['consulting'] },
-    { id: 'software-dev', name: 'Software Development', tags: ['coding'] },
+    { id: 'it-consulting', name: 'IT Consulting', tags: ['consulting'] },
+    { id: 'software-dev', name: 'Software Development', tags: ['coding'] }
   ], []);
+
 
   const isEventPlannerCategory = useMemo(() => {
     const category = (currentPoster?.category || initialPoster?.category || '').trim().toLowerCase();
@@ -1281,6 +1329,73 @@ const PosterPlayerScreen: React.FC = () => {
 
     return result;
   }, [currentPoster, initialPoster, globalBusinessCategory]);
+
+  // FLOW + CATEGORY + SUBCATEGORY VALIDATION: Extended safe button rendering control
+  const shouldShowSoftwareButtons = useMemo(() => {
+    // FIX: Ensure isSoftwareCompanyCategory is available before using it
+    const isSoftware = isSoftwareCompanyCategory;
+
+    // DEBUG: Direct log to see if this function is being called
+    console.log('🔍 [SHOULDSHOW DEBUG]', {
+      flowSource,
+      templateSource,
+      categoryName,
+      isSoftware,
+      isSoftwareCompanyCategory
+    });
+
+    // CASE 1: My Business Flow
+    const isMyBusinessFlow =
+      flowSource === "MyBusiness" &&
+      normalizedSubCategory === 'software company';
+
+    // CASE 2: HomeScreen Template Flow - REPLICATE MY BUSINESS LOGIC
+    const isHomeTemplateFlow =
+      flowSource === "HomeScreen" &&
+      templateSource === "professional" &&
+      normalizedCategory === 'software company';
+
+    // CASE 3: HomeScreen Subcategory Flow (NEW)
+    const isHomeSubcategoryFlow =
+      flowSource === "HomeScreen" &&
+      normalizedSubCategory === 'software company';
+
+    // CASE 4: HomeScreen Business Category Flow (FIXED)
+    const isHomeBusinessCategoryFlow =
+      flowSource === "HomeScreen" &&
+      templateSource === "professional" &&
+      categoryName === 'Software Company';
+
+    // DEBUG: Log individual flow results
+    console.log('🔍 [FLOW CHECKS]', {
+      isMyBusinessFlow,
+      isHomeTemplateFlow,
+      isHomeSubcategoryFlow,
+      isHomeBusinessCategoryFlow,
+      isSoftware
+    });
+
+    const shouldShow = isSoftware && (
+      isMyBusinessFlow ||
+      isHomeTemplateFlow ||
+      isHomeSubcategoryFlow ||
+      isHomeBusinessCategoryFlow
+    );
+
+    console.log('🔍 [FINAL RESULT]', { shouldShow, reason: shouldShow ? 'SHOW BUTTONS' : 'HIDE BUTTONS' });
+
+    return Boolean(shouldShow);
+  }, [
+    flowSource,
+    isSoftwareCompanyCategory,
+    normalizedCategory,
+    normalizedSubCategory,
+    templateSource,
+    categoryName,
+    currentPoster?.category,
+    initialPoster?.category,
+    globalBusinessCategory
+  ]);
 
   const templateMatchesServiceFilter = useCallback((template: Template) => {
     if (!isEventPlannerCategory || !selectedServiceFilter) return true;
@@ -1472,191 +1587,63 @@ const PosterPlayerScreen: React.FC = () => {
   }, [activeRenderSource, isSoftwareCompanyCategory, fetchSoftwareCompanyTemplates, serviceFilterTemplates]);
 
   const filteredPosters = useMemo(() => {
-    // If we have EventPlanner templates and a service filter selected, filter by tags
+
+    // EVENT PLANNER: Filter by service keywords using standardized exact matching
     if (isEventPlannerCategory && selectedServiceFilter && serviceFilterTemplates['eventplanner']) {
       const eventPlannerTemplates = serviceFilterTemplates['eventplanner'];
       const templatesWithLanguages = eventPlannerTemplates.map(t => mergeTemplateLanguages(t));
-
-      // Filter by service keywords using standardized exact matching
       const keywords = serviceFilterKeywords[selectedServiceFilter] || [];
       const filteredByTags = templatesWithLanguages.filter(template => {
         const templateTags = Array.isArray(template.tags) ? template.tags : [];
         return tagsMatchCategory(templateTags, keywords);
       });
 
-      // If "All" is selected, return filtered templates with 6-image limit
       if (selectedLanguage === 'all') {
-        const limitedTemplates = filteredByTags.slice(0, 6);
-        console.log(`[EVENT PLANNER] Total: ${filteredByTags.length}, Showing: ${Math.min(filteredByTags.length, 6)} templates (All language)`);
-        return limitedTemplates;
+        return filteredByTags.slice(0, 6);
       }
 
-      // Filter by language for service filter templates
       const languageFiltered = filteredByTags.filter(template => {
         const matches = templateContainsLanguage(template, selectedLanguage);
         return matches;
       });
 
-      const limitedTemplates = languageFiltered.slice(0, 6);
-      console.log(`[EVENT PLANNER] After language filter: ${languageFiltered.length}, Showing: ${Math.min(languageFiltered.length, 6)} templates (language: ${selectedLanguage})`);
-      return limitedTemplates;
+      return languageFiltered.slice(0, 6);
     }
 
-    // If we have Software Company category and a category selected, filter by tags
-    console.log(`\u{1F3F7}\uFE0F [FILTERING CHECK] Software Company filtering condition check:`, {
-      isSoftwareCompanyCategory,
-      selectedSoftwareCategory,
-      allTemplatesLength: allTemplates.length,
-      shouldFilter: isSoftwareCompanyCategory && selectedSoftwareCategory
-    });
-    
-    if (isSoftwareCompanyCategory && selectedSoftwareCategory) {
-      console.log(`\n\u{1F3F7}\uFE0F [FILTERING - POSTER PLAYER] Starting software category filtering process`);
-      
-      // Use cached Software Company templates instead of allTemplates
+    // SOFTWARE COMPANY: Initial display or category filtering
+    if (isSoftwareCompanyCategory) {
       const softwareTemplates = serviceFilterTemplates.softwarecompany || allTemplates;
-      console.log(`\ud83d\udcca [FILTERING] Total templates before filtering: ${softwareTemplates.length}`);
-      console.log(`\ud83c\udfaf [FILTERING] Selected software category: ${selectedSoftwareCategory}`);
-      console.log(`\ud83c\udf0d [FILTERING] Selected language: ${selectedLanguage}`);
-      
-      const selectedCategoryButton = softwareCategoryButtons.find(btn => btn.id === selectedSoftwareCategory);
-      if (selectedCategoryButton && selectedCategoryButton.tags.length > 0) {
-        console.log(`\u{1F3F7}\uFE0F [CATEGORY FILTER] Filtering by category: ${selectedCategoryButton.name}`);
-        console.log(`\u{1F3F7}\uFE0F [CATEGORY FILTER] Category tags: [${selectedCategoryButton.tags.join(', ')}]`);
-        
-        const templatesWithLanguages = softwareTemplates.map(t => mergeTemplateLanguages(t));
-        const templatesBeforeCategoryFilter = templatesWithLanguages.length;
-        
-        // DETERMINE IF SELECTED POSTER MATCHES CATEGORY using standardized matching
-        let isSelectedPosterMatchingCategory = false;
-        if (currentPoster && currentPoster.id !== 'loading' && !currentPoster.id.startsWith('category_')) {
-          const selectedPosterTags = Array.isArray(currentPoster.tags) ? currentPoster.tags : [];
-          
-          isSelectedPosterMatchingCategory = tagsMatchCategory(selectedPosterTags, selectedCategoryButton.tags);
-          
-          console.log(`\ud83d\udccc [VALID MATCH CHECK] Selected poster "${currentPoster.name}":`);
-          console.log(`   - Selected poster ID: ${currentPoster.id}`);
-          console.log(`   - Matches category "${selectedCategoryButton.name}": ${isSelectedPosterMatchingCategory}`);
-        }
-        
-        const filteredByCategory = templatesWithLanguages.filter(template => {
-          const templateTags = Array.isArray(template.tags) ? template.tags : [];
-          const categoryTags = selectedCategoryButton.tags;
-          
-          // Use standardized exact matching system
-          const matchesCategory = tagsMatchCategory(templateTags, categoryTags);
-          
-          if (matchesCategory) {
-            console.log(`\u2705 [CATEGORY FILTER] Template "${template.name}" matched category "${selectedCategoryButton.name}"`);
-          } else {
-            console.log(`\u274C [CATEGORY FILTER] Template "${template.name}" did NOT match category "${selectedCategoryButton.name}"`);
-          }
-          
-          return matchesCategory;
-        });
+      const templatesWithLanguages = softwareTemplates.map(t => mergeTemplateLanguages(t));
 
-        console.log(`\ud83d\udcca [CATEGORY FILTER] Templates after category filtering: ${filteredByCategory.length} (removed ${templatesBeforeCategoryFilter - filteredByCategory.length})`);
-        console.log(`[SOFTWARE COMPANY] Filtered ${filteredByCategory.length} templates for category: ${selectedSoftwareCategory}`);
-
-        // Filter by language for software company category templates
-        if (selectedLanguage === 'all') {
-          console.log(`\ud83c\udf0d [LANGUAGE FILTER] No language filter applied (selected: 'all')`);
-          
-          // 🔁 SAFE FALLBACK LOGIC
-          // If no templates match category, fallback to current poster if available
-          let finalTemplates = [...filteredByCategory];
-          if (filteredByCategory.length === 0) {
-            if (currentPoster && currentPoster.id !== 'loading' && !currentPoster.id.startsWith('category_')) {
-              console.log(`[FALLBACK] No category matches, returning current poster: ${currentPoster.name}`);
-              finalTemplates = [currentPoster];
-            }
-          }
-          
-          // 🔒 CONDITIONAL PRESERVATION BASED ON MATCH STATUS
-          if (currentPoster && currentPoster.id !== 'loading' && !currentPoster.id.startsWith('category_')) {
-            const existsInFiltered = finalTemplates.some(t => t.id === currentPoster.id);
-            console.log(`[PRESERVE CHECK] currentPosterId: ${currentPoster.id}, existsInFiltered: ${existsInFiltered}`);
-            console.log(`[PRESERVE DECISION] shouldPreserve: ${isSelectedPosterMatchingCategory}, reason: ${isSelectedPosterMatchingCategory ? 'selected poster matches category' : 'selected poster does not match category'}`);
-            
-            if (!existsInFiltered && isSelectedPosterMatchingCategory) {
-              console.log(`[PRESERVE ACTION] Injecting selected poster at index 0: ${currentPoster.name}`);
-              finalTemplates.unshift(currentPoster);
-            } else if (!isSelectedPosterMatchingCategory) {
-              console.log(`[PRESERVE ACTION] NOT preserving - selected poster does not match category, allowing filter to replace it`);
-            }
-          }
-          
-          // 🛑 PROTECT SELECTED POSTER FROM SLICE LOSS
-          const result = finalTemplates.slice(0, 6);
-          console.log(`[FINAL LIST] firstPosterId: ${result[0]?.id}, includesCurrentPoster: ${result.some(t => t.id === currentPoster?.id)}`);
-          console.log(`\ud83c\udf89 [FILTERING COMPLETE] Final filtered templates count: ${result.length}`);
-          console.log(`[SOFTWARE COMPANY] Returning ${result.length} templates (All language)`);
-          return result;
-        }
-        
-        console.log(`\ud83c\udf0d [LANGUAGE FILTER] Applying language filter: ${selectedLanguage}`);
-        const templatesBeforeLanguageFilter = filteredByCategory.length;
-        
-        // DETERMINE IF SELECTED POSTER MATCHES CATEGORY (for language filtered case) using standardized matching
-        let isSelectedPosterMatchingCategoryLang = false;
-        if (currentPoster && currentPoster.id !== 'loading' && !currentPoster.id.startsWith('category_')) {
-          const selectedPosterTags = Array.isArray(currentPoster.tags) ? currentPoster.tags : [];
-          
-          isSelectedPosterMatchingCategoryLang = tagsMatchCategory(selectedPosterTags, selectedCategoryButton.tags);
-          
-          console.log(`\ud83d\udccc [VALID MATCH CHECK - LANGUAGE] Selected poster "${currentPoster.name}":`);
-          console.log(`   - Selected poster ID: ${currentPoster.id}`);
-          console.log(`   - Matches category "${selectedCategoryButton.name}": ${isSelectedPosterMatchingCategoryLang}`);
-        }
-        
-        const languageFilteredForSoftware = filteredByCategory.filter(template => {
-          const matches = templateContainsLanguage(template, selectedLanguage);
-          
-          if (matches) {
-            console.log(`\u2705 [LANGUAGE FILTER] Template "${template.name}" matched language: ${selectedLanguage} - Languages: [${template.languages?.join(', ') || 'none'}], Tags: [${template.tags?.join(', ') || 'none'}]`);
-          }
-          
-          return matches;
-        });
-
-        console.log(`\ud83d\udcca [LANGUAGE FILTER] Templates after language filtering: ${languageFilteredForSoftware.length} (removed ${templatesBeforeLanguageFilter - languageFilteredForSoftware.length})`);
-
-        if (languageFilteredForSoftware.length === 0) {
-          console.log(`[SOFTWARE COMPANY] No templates found for language: ${selectedLanguage}`);
-          
-          // 🔁 SAFE FALLBACK LOGIC
-          // If we have a current poster, return it as only result
-          if (currentPoster && currentPoster.id !== 'loading' && !currentPoster.id.startsWith('category_')) {
-            console.log(`[FALLBACK] Returning current poster as only result: ${currentPoster.name}`);
-            return [currentPoster];
-          }
-          
-          console.log(`\ud83c\udf89 [FILTERING COMPLETE] Final filtered templates count: 0`);
-          return [];
-        }
-
-        // 🔒 CONDITIONAL PRESERVATION BASED ON MATCH STATUS
-        let finalTemplates = [...languageFilteredForSoftware];
-        if (currentPoster && currentPoster.id !== 'loading' && !currentPoster.id.startsWith('category_')) {
-          const existsInFiltered = finalTemplates.some(t => t.id === currentPoster.id);
-          console.log(`[PRESERVE CHECK - LANGUAGE] currentPosterId: ${currentPoster.id}, existsInFiltered: ${existsInFiltered}`);
-          console.log(`[PRESERVE DECISION - LANGUAGE] shouldPreserve: ${isSelectedPosterMatchingCategoryLang}, reason: ${isSelectedPosterMatchingCategoryLang ? 'selected poster matches category' : 'selected poster does not match category'}`);
-          
-          if (!existsInFiltered && isSelectedPosterMatchingCategoryLang) {
-            console.log(`[PRESERVE ACTION - LANGUAGE] Injecting selected poster at index 0: ${currentPoster.name}`);
-            finalTemplates.unshift(currentPoster);
-          } else if (!isSelectedPosterMatchingCategoryLang) {
-            console.log(`[PRESERVE ACTION - LANGUAGE] NOT preserving - selected poster does not match category, allowing filter to replace it`);
-          }
-        }
-        
-        // 🛑 PROTECT SELECTED POSTER FROM SLICE LOSS
-        const result = finalTemplates.slice(0, 6);
-        console.log(`[FINAL LIST] firstPosterId: ${result[0]?.id}, includesCurrentPoster: ${result.some(t => t.id === currentPoster?.id)}`);
-        console.log(`\ud83c\udf89 [FILTERING COMPLETE] Final filtered templates count: ${result.length}`);
-        console.log(`[SOFTWARE COMPANY] Returning ${result.length} templates (language: ${selectedLanguage})`);
-        return result;
+      // INITIAL DISPLAY: Show first 6 templates when no category selected
+      if (!selectedSoftwareCategory) {
+        console.log('[SOFTWARE COMPANY] Initial display - showing first 6 templates');
+        return templatesWithLanguages.slice(0, 6);
       }
+
+      // CATEGORY FILTERING: Filter by selected category
+      const selectedCategoryButton = softwareCategoryButtons.find(btn => btn.id === selectedSoftwareCategory);
+      
+      if (!selectedCategoryButton || !selectedCategoryButton.tags.length) {
+        return [];
+      }
+      
+      // Filter by category tags
+      const filteredByCategory = templatesWithLanguages.filter(template => {
+        const templateTags = Array.isArray(template.tags) ? template.tags : [];
+        return tagsMatchCategory(templateTags, selectedCategoryButton.tags);
+      });
+
+      // Filter by language if not 'all'
+      if (selectedLanguage === 'all') {
+        return filteredByCategory.slice(0, 6);
+      }
+
+      const filteredByLanguage = filteredByCategory.filter(template => {
+        return templateContainsLanguage(template, selectedLanguage);
+      });
+
+      return filteredByLanguage.slice(0, 6);
     }
 
     // Ensure all templates have languages merged before filtering
@@ -1685,7 +1672,7 @@ const PosterPlayerScreen: React.FC = () => {
 
     // Return service-filtered results (even if empty, don't fallback to all templates)
     return serviceFiltered;
-  }, [allTemplates, selectedLanguage, templateMatchesServiceFilter, calendarDate, greetingCategory, globalBusinessCategory, selectedServiceFilter, serviceFilterTemplates, isSoftwareCompanyCategory, selectedSoftwareCategory, softwareCategoryButtons]);
+  }, [serviceFilterTemplates, isEventPlannerCategory, selectedServiceFilter, serviceFilterKeywords, selectedLanguage, templateMatchesServiceFilter, isSoftwareCompanyCategory, selectedSoftwareCategory, softwareCategoryButtons, allTemplates]);
 
   // Preload images for better scrolling performance
   const preloadImages = useCallback((posters: Template[], startIndex: number = 0, count: number = 20) => {
@@ -1912,11 +1899,11 @@ const PosterPlayerScreen: React.FC = () => {
     }
 
     // Track active category to prevent other useEffects from overwriting templates
-    let categoryName: string;
+    let businessCategoryName: string;
     if (typeof globalBusinessCategory === 'string') {
-      categoryName = globalBusinessCategory;
+      businessCategoryName = globalBusinessCategory;
     } else {
-      categoryName = 'Event Planner'; // fallback
+      businessCategoryName = 'Event Planner'; // fallback
     }
 
     // PRODUCTION FIX: Detect category change and reset state safely
@@ -1970,18 +1957,19 @@ const PosterPlayerScreen: React.FC = () => {
         // Show loading state when starting to fetch
         setIsBusinessCategoryLoading(true);
 
-        const limit = posterLimit || 1000; // Default to 1000 for "My Business", use 5 for other cases
-        const apiUrl = `/api/mobile/posters/category/${encodeURIComponent(categoryName)}?limit=${limit}`;
+        // Use 500 for Software Company to enable proper filtering, otherwise use posterLimit or default to 1000
+        const limit = (businessCategoryName === 'Software Company') ? 500 : (posterLimit || 1000);
+        const apiUrl = `/api/mobile/posters/category/${encodeURIComponent(businessCategoryName)}?limit=${limit}`;
         console.log(`🔍 [MY BUSINESS API] Fetching: ${apiUrl} (limit: ${limit})`);
 
         // PRODUCTION FIX: Clear cache for current category to ensure fresh data
-        businessCategoryPostersApi.clearCategoryCache(categoryName);
-        console.log('PRODUCTION FIX: Cache cleared for category:', categoryName);
+        businessCategoryPostersApi.clearCategoryCache(businessCategoryName);
+        console.log('PRODUCTION FIX: Cache cleared for category:', businessCategoryName);
 
-        const response = await businessCategoryPostersApi.getPostersByCategory(categoryName, limit);
+        const response = await businessCategoryPostersApi.getPostersByCategory(businessCategoryName, limit);
 
         if (response.success && response.data.posters) {
-          // Convert BusinessCategoryPoster to Template format (already limited to 5 by API)
+          // Convert BusinessCategoryPoster to Template format (fetched up to 500 for Software Company, will be filtered and limited to 6 in frontend)
           const convertedTemplates: Template[] = response.data.posters.map((poster: any) => {
             // Normalize tags to ensure they're in the correct format
             let normalizedTags: string[] = [];
@@ -2147,17 +2135,17 @@ const PosterPlayerScreen: React.FC = () => {
 
         // Normalize category name for search (like HomeScreen does)
         // Convert "Money & Finance" to "money and finance" to match how templates are tagged
-        const normalizedCategory = greetingCategory.toLowerCase()
+        const normalizedGreetingCategory = greetingCategory.toLowerCase()
           .replace(/[&]/g, 'and')
           .replace(/[^a-z0-9\s]/g, ' ')
           .replace(/\s+/g, ' ')
           .trim();
 
         // Generate search variations for better matching (e.g., "hiring/vacancy" -> ["hiring", "vacancy", "hiring vacancy"])
-        const categoryWords = normalizedCategory.split(/\s+/).filter(word => word.length > 0);
+        const categoryWords = normalizedGreetingCategory.split(/\s+/).filter(word => word.length > 0);
         const searchVariations = [
           greetingCategory.toLowerCase(),
-          normalizedCategory,
+          normalizedGreetingCategory,
           ...categoryWords, // Individual words
           categoryWords.join(' '), // Combined words
         ].filter((v, i, arr) => arr.indexOf(v) === i); // Remove duplicates
@@ -2289,7 +2277,7 @@ const PosterPlayerScreen: React.FC = () => {
         };
 
         // Pre-compute normalized category and variations for efficient filtering
-        const normalizedCategoryLower = normalizedCategory.toLowerCase();
+        const normalizedCategoryLower = normalizedGreetingCategory.toLowerCase();
         const greetingCategoryLower = greetingCategory.toLowerCase();
         const categoryWordsLower = categoryWords.map(w => w.toLowerCase());
 
@@ -2337,7 +2325,7 @@ const PosterPlayerScreen: React.FC = () => {
             try {
               // Capture values for closure
               const currentCategory = greetingCategory;
-              const currentNormalized = normalizedCategory;
+              const currentNormalized = normalizedGreetingCategory;
               const currentCategoryLower = greetingCategoryLower;
               const currentNormalizedLower = normalizedCategoryLower;
               const currentPoster = posterToMatch;
@@ -3643,58 +3631,18 @@ const PosterPlayerScreen: React.FC = () => {
       filteredPosters &&
       filteredPosters.length > 0
     ) {
-      const firstFilteredPoster = filteredPosters[0];
+      // Auto-select if no current poster OR if current poster is not in filtered results
+      const currentPosterInFiltered = currentPoster && filteredPosters.some(p => p.id === currentPoster.id);
       
-      // 🧠 SMARTER AUTO-SELECTION CONDITION
-      // Only auto-select if:
-      // 1. There is NO currentPoster (first load scenario)
-      // 2. OR currentPoster is invalid (loading/category placeholder)
-      // 3. OR selectedPoster does NOT match the current category
-      let shouldAutoSelect = false;
-      let reason = '';
-      
-      if (!currentPoster || currentPoster.id === 'loading' || currentPoster.id.startsWith('category_')) {
-        shouldAutoSelect = true;
-        reason = 'no valid current poster';
-      } else {
-        // Check if current poster matches the selected category
-        const selectedCategoryButton = softwareCategoryButtons.find(btn => btn.id === selectedSoftwareCategory);
-        if (selectedCategoryButton && selectedCategoryButton.tags.length > 0) {
-          const currentPosterTags = Array.isArray(currentPoster.tags)
-            ? currentPoster.tags.map(tag => tag.toLowerCase())
-            : [];
-          
-          const isSelectedPosterMatchingCategory = selectedCategoryButton.tags.some(categoryTag => 
-            currentPosterTags.some(posterTag => posterTag === categoryTag.toLowerCase())
-          );
-          
-          if (!isSelectedPosterMatchingCategory) {
-            shouldAutoSelect = true;
-            reason = 'current poster does not match category';
-          }
-        }
-      }
-      
-      if (shouldAutoSelect) {
-        console.log('[SOFTWARE COMPANY] Auto-selecting first filtered image:', {
-          firstPosterId: firstFilteredPoster.id,
-          firstPosterName: firstFilteredPoster.name,
-          currentPosterId: currentPoster?.id,
-          selectedSoftwareCategory,
-          reason: reason
-        });
-        
+      if (!currentPoster || !currentPosterInFiltered) {
+        const firstFilteredPoster = filteredPosters[0];
+        const selectionType = selectedSoftwareCategory ? `category ${selectedSoftwareCategory}` : 'initial display';
+        const reason = !currentPoster ? 'no current poster' : 'current poster not in filtered results';
+        console.log(`[SOFTWARE COMPANY] Auto-selecting first filtered image (${selectionType}) - ${reason}:`, firstFilteredPoster.id);
         handlePosterSelect(firstFilteredPoster);
-      } else {
-        console.log('[AUTO-SELECTION BLOCKED]', {
-          reason: 'current poster matches category - preserving user selection',
-          currentPosterId: currentPoster?.id,
-          firstPosterId: firstFilteredPoster?.id,
-          selectedSoftwareCategory
-        });
       }
     }
-  }, [filteredPosters, isSoftwareCompanyCategory, selectedSoftwareCategory, currentPoster, currentPoster?.id, handlePosterSelect, softwareCategoryButtons]);
+  }, [filteredPosters, isSoftwareCompanyCategory, selectedSoftwareCategory, currentPoster, handlePosterSelect]);
 
   useEffect(() => {
     console.log('🔍 [SERVICE FILTER RENDER CHECK]', { isEventPlannerCategory });
@@ -4336,8 +4284,17 @@ const PosterPlayerScreen: React.FC = () => {
           </View>
         )}
 
-        {/* SINGLE SOURCE: Strict button rendering based on activeRenderSource */}
-        {activeRenderSource === 'subcategory' && (
+        {/* FLOW + CATEGORY CONTROLLED: Safe button rendering */}
+        {/* DEBUG: Button rendering check */}
+        {console.log('🔍 [BUTTON RENDER DEBUG]', {
+          shouldShowSoftwareButtons,
+          isSoftwareCompanyCategory,
+          flowSource,
+          templateSource,
+          normalizedCategory,
+          categoryName,
+          renderButtons: shouldShowSoftwareButtons
+        }) || shouldShowSoftwareButtons && (
           <View style={styles.serviceFilterContainer}>
             <ScrollView
               horizontal
@@ -4356,6 +4313,7 @@ const PosterPlayerScreen: React.FC = () => {
                       isCategoryActive && styles.serviceFilterButtonActive
                     ]}
                     onPress={() => {
+                      // Original logic for all flows (following My Business pattern)
                       const newCategory = selectedSoftwareCategory === category.id ? null : category.id;
                       
                       // Log button click details

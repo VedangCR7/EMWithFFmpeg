@@ -1,0 +1,231 @@
+================================================================================
+BUTTON RENDERING DEBUG REPORT
+================================================================================
+
+Debug Date: April 15, 2026
+Issue: Software Company buttons not visible in HomeScreen flow
+Status: Enhanced debugging implemented
+
+================================================================================
+DEBUG ENHANCEMENTS ADDED
+================================================================================
+
+## 1. Added Comprehensive Debug Logging
+
+### 1.1 Flow Validation Debug:
+```typescript
+console.log('?? FLOW VALIDATION DEBUG:', {
+  isSoftware,
+  isMyBusinessFlow,
+  isHomeTemplateFlow,
+  isHomeSubcategoryFlow,
+  finalResult: Boolean(shouldShow)
+});
+```
+
+### 1.2 Final Result Debug:
+```typescript
+console.log('?? SHOULD SHOW BUTTONS FINAL RESULT:', {
+  result,
+  shouldShow,
+  isSoftware,
+  isMyBusinessFlow,
+  isHomeTemplateFlow,
+  isHomeSubcategoryFlow,
+  flowSource,
+  templateSource,
+  normalizedCategory,
+  normalizedSubCategory
+});
+```
+
+### 1.3 Button Render Check:
+```typescript
+console.log('?? BUTTON RENDER CHECK:', {
+  shouldShowSoftwareButtons,
+  flowSource,
+  isSoftwareCompanyCategory,
+  normalizedCategory,
+  normalizedSubCategory,
+  templateSource,
+  activeRenderSource
+});
+```
+
+================================================================================
+EXPECTED DEBUG OUTPUT FOR WORKING CASE
+================================================================================
+
+## 1. HomeScreen + Software Company Template (Expected):
+
+```
+?? FLOW VALIDATION DEBUG: {
+  isSoftware: true,
+  isMyBusinessFlow: false,
+  isHomeTemplateFlow: true,        // <-- Should be true
+  isHomeSubcategoryFlow: false,
+  finalResult: true
+}
+
+?? SHOULD SHOW BUTTONS FINAL RESULT: {
+  result: true,                    // <-- Should be true
+  shouldShow: true,
+  isSoftware: true,
+  isMyBusinessFlow: false,
+  isHomeTemplateFlow: true,        // <-- Should be true
+  isHomeSubcategoryFlow: false,
+  flowSource: 'HomeScreen',
+  templateSource: 'professional',
+  normalizedCategory: 'software company',
+  normalizedSubCategory: 'spa & wellness'
+}
+
+?? BUTTON RENDER CHECK: {
+  shouldShowSoftwareButtons: true, // <-- Should be true
+  flowSource: 'HomeScreen',
+  isSoftwareCompanyCategory: true,
+  normalizedCategory: 'software company',
+  normalizedSubCategory: 'spa & wellness',
+  templateSource: 'professional',
+  activeRenderSource: 'template'
+}
+```
+
+================================================================================
+TROUBLESHOOTING GUIDE
+================================================================================
+
+## 1. If Buttons Still Don't Show, Check These Logs:
+
+### 1.1 Check Flow Validation Debug:
+- `isSoftware` should be `true`
+- `isHomeTemplateFlow` should be `true`
+- `finalResult` should be `true`
+
+### 1.2 Check Final Result Debug:
+- `result` should be `true`
+- `shouldShow` should be `true`
+- `isHomeTemplateFlow` should be `true`
+
+### 1.3 Check Button Render Check:
+- `shouldShowSoftwareButtons` should be `true`
+- All other values should match expected
+
+## 2. Common Issues and Solutions:
+
+### 2.1 If `isHomeTemplateFlow` is false:
+```typescript
+// Check these values:
+flowSource === "HomeScreen"           // Should be true
+templateSource === "professional"    // Should be true
+normalizedCategory.includes('software') // Should be true
+```
+
+### 2.2 If `isSoftware` is false:
+```typescript
+// Check isSoftwareCompanyCategory calculation
+// This depends on currentPoster, initialPoster, and globalBusinessCategory
+```
+
+### 2.3 If `shouldShowSoftwareButtons` is undefined:
+- The Boolean() wrapper should fix this
+- Check if the useMemo is returning properly
+
+### 2.4 If buttons don't render despite `shouldShowSoftwareButtons: true`:
+- Check for CSS/display issues
+- Check if the component is actually rendering
+- Look for any other conditions blocking the render
+
+## 3. Step-by-Step Debugging:
+
+### 3.1 Step 1: Check Basic Values
+```
+Look for: "PosterPlayerScreen received params"
+Verify: categoryName: 'Software Company', templateSource: 'professional'
+```
+
+### 3.2 Step 2: Check Flow Source
+```
+Look for: "?? FLOW VALIDATION CHECK V2"
+Verify: flowSource: 'HomeScreen'
+```
+
+### 3.3 Step 3: Check Category Detection
+```
+Look for: "?? [SOFTWARE COMPANY DETECTION RESULT]"
+Verify: isSoftwareCompany: true
+```
+
+### 3.4 Step 4: Check Flow Validation
+```
+Look for: "?? FLOW VALIDATION DEBUG"
+Verify: isHomeTemplateFlow: true
+```
+
+### 3.5 Step 5: Check Final Result
+```
+Look for: "?? SHOULD SHOW BUTTONS FINAL RESULT"
+Verify: result: true
+```
+
+### 3.6 Step 6: Check Button Render
+```
+Look for: "?? BUTTON RENDER CHECK"
+Verify: shouldShowSoftwareButtons: true
+```
+
+================================================================================
+POSSIBLE ROOT CAUSES
+================================================================================
+
+## 1. Logic Issues:
+- `normalizedCategory` might not include 'software'
+- `flowSource` might not be 'HomeScreen'
+- `templateSource` might not be 'professional'
+
+## 2. State Issues:
+- `isSoftwareCompanyCategory` might be false
+- `shouldShowSoftwareButtons` might be undefined
+- Component might not be re-rendering
+
+## 3. Rendering Issues:
+- CSS display issues
+- Component not in DOM
+- Parent component not rendering
+
+## 4. Data Issues:
+- Category name mismatch
+- Template source not set correctly
+- Business profile interfering
+
+================================================================================
+NEXT STEPS
+================================================================================
+
+## 1. Test Again:
+1. Navigate to HomeScreen
+2. Click Software Company category
+3. Check all debug logs
+4. Identify where the logic fails
+
+## 2. Based on Debug Results:
+- If `isHomeTemplateFlow` is false, fix the flow detection
+- If `isSoftware` is false, fix category detection
+- If `shouldShowSoftwareButtons` is undefined, fix the return value
+- If all values are correct but buttons don't show, check rendering
+
+## 3. Additional Debugging:
+- Add more specific logs if needed
+- Check component lifecycle
+- Verify parent component rendering
+
+================================================================================
+DEBUGGING READY - TEST THE FLOW AGAIN
+================================================================================
+
+The enhanced debugging will show exactly where the logic is failing.
+Run the same test case (HomeScreen + Software Company) and share the debug logs.
+
+================================================================================
+END OF DEBUG REPORT
+================================================================================

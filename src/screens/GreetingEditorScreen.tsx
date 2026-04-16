@@ -84,7 +84,7 @@ const GreetingEditorScreen: React.FC<GreetingEditorScreenProps> = ({ route }) =>
   const [canvasElements, setCanvasElements] = useState<CanvasElement[]>([]);
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
   const [backgroundImage, setBackgroundImage] = useState<string | null>(
-    template?.content?.background || null
+    template?.content.background || null
   );
   const [textModalVisible, setTextModalVisible] = useState(false);
   const [stickerModalVisible, setStickerModalVisible] = useState(false);
@@ -102,11 +102,11 @@ const GreetingEditorScreen: React.FC<GreetingEditorScreenProps> = ({ route }) =>
       const initialElements: CanvasElement[] = [];
       
       // Add template text
-      if (template.content?.text) {
+      if (template.content.text) {
         initialElements.push({
           id: 'template-text',
           type: 'text',
-          content: template.content?.text,
+          content: template.content.text,
           position: { x: dimensions.canvasWidth / 2 - 100, y: dimensions.canvasHeight / 2 - 20 },
           size: { width: 200, height: 40 },
           rotation: 0,
@@ -121,8 +121,8 @@ const GreetingEditorScreen: React.FC<GreetingEditorScreenProps> = ({ route }) =>
       }
 
       // Add template stickers/emojis
-      if (template.content?.stickers) {
-        template.content?.stickers.forEach((sticker: string, index: number) => {
+      if (template.content.stickers) {
+        template.content.stickers.forEach((sticker: string, index: number) => {
           initialElements.push({
             id: `sticker-${index}`,
             type: 'sticker',

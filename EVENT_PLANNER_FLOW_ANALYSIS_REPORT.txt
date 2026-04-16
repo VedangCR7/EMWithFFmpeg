@@ -1,0 +1,279 @@
+================================================================================
+DEEP ANALYSIS: EVENT PLANNER FLOW (REFERENCE IMPLEMENTATION)
+================================================================================
+
+Analysis Date: April 16, 2026
+Scope: Complete Event Planner business subcategory flow analysis
+Objective: Understand stable architecture for Software Company implementation reference
+
+================================================================================
+PART 1: API ANALYSIS
+================================================================================
+
+1. API ENDPOINT USED:
+   - URL: /api/mobile/posters/category/eventplanner?limit=500
+   - Method: GET
+   - Service: businessCategoryPostersApi.getPostersByCategory()
+
+2. API PARAMETERS:
+   - category: 'eventplanner' (string)
+   - limit: 500 (number)
+   - Optional: categoryId, isRefresh
+
+3. API RESPONSE STRUCTURE:
+   {
+     success: boolean,
+     data: {
+       posters: BusinessCategoryPoster[],
+       category: string,
+       total: number
+     },
+     message: string
+   }
+
+4. TEMPLATE CONVERSION:
+   - BusinessCategoryPoster → Template format
+   - Fields mapped: id, name, thumbnail, category, downloads, tags, previewUrl
+   - Tags preserved as-is from backend
+   - Languages array initialized empty
+
+5. CACHING STRATEGY:
+   - Client-side caching with 5-minute duration
+   - Cache key: 'category_eventplanner'
+   - Cache check before API call
+   - Cache cleared on explicit refresh
+
+================================================================================
+PART 2: PARAMETER FLOW ANALYSIS
+================================================================================
+
+1. NAVIGATION PARAMETERS RECEIVED:
+   const {
+     selectedPoster: initialPoster,
+     selectedTemplateId: initialTemplateId,
+     relatedPosters: initialRelatedPosters,
+     greetingCategory,
+     categoryName,
+     originScreen,
+     posterLimit,
+     calendarDate,
+     templateSource,
+     type,
+   } = route.params;
+
+2. CATEGORY DETECTION LOGIC:
+   - Source: currentPoster?.category || initialPoster?.category
+   - Normalization: .trim().toLowerCase()
+   - Event Planner variations checked:
+     * 'event planners'
+     * 'event planner' 
+     * 'event-planners'
+     * 'event-planner'
+     * 'eventplanners'
+     * 'eventplanner'
+
+3. ACTIVE RENDER SOURCE:
+   - 'profile' for My Business flow
+   - 'subcategory' for HomeScreen subcategory flow
+   - Single source control prevents conflicting states
+
+================================================================================
+PART 3: SUBCATEGORY + BUTTON LOGIC
+================================================================================
+
+1. BUTTON VISIBILITY CONDITION:
+   activeRenderSource === 'profile' && isEventPlannerCategory
+
+2. BUTTON RENDERING:
+   - Only 4 service filters: ['generator', 'decorators', 'sound', 'mandap']
+   - Buttons: Generator, Decorators, Sound, Mandap
+   - Active state: selectedServiceFilter === filterKey
+
+3. STATE MANAGEMENT:
+   - selectedServiceFilter state tracks active button
+   - Click handler: setSelectedServiceFilter(newFilter)
+   - Auto-reset when not Event Planner category
+
+4. SERVICE FILTER KEYWORDS:
+   {
+     generator: ['generator'],
+     decorators: ['decor', 'decorator', 'stage'],
+     sound: ['sound', 'audio', 'dj'],
+     mandap: ['mandap']
+   }
+
+================================================================================
+PART 4: FILTERING LOGIC (CORE)
+================================================================================
+
+1. SINGLE SOURCE OF TRUTH:
+   - Source: serviceFilterTemplates['eventplanner'] (cached templates)
+   - No dependency on allTemplates for filtering
+   - Templates fetched once and cached
+
+2. FILTERING TRIGGER:
+   - Condition: isEventPlannerCategory && selectedServiceFilter && serviceFilterTemplates['eventplanner']
+   - useEffect dependencies: [isEventPlannerCategory, selectedServiceFilter, serviceFilterTemplates]
+
+3. FILTERING PIPELINE:
+   Step 1: Get cached EventPlanner templates
+   Step 2: Map templates with mergeTemplateLanguages()
+   Step 3: Filter by service keywords using tagsMatchCategory()
+   Step 4: Apply language filter if not 'all'
+   Step 5: Limit to 6 templates
+
+4. MATCHING SYSTEM:
+   - Function: tagsMatchCategory(templateTags, keywords)
+   - Exact tag matching (case-insensitive)
+   - Template must include at least one keyword
+   - No fuzzy matching or loose criteria
+
+5. NO FALLBACK LOGIC:
+   - Empty results returned as-is
+   - No mixing with other template sources
+   - No fallback to allTemplates
+
+================================================================================
+PART 5: AUTO-SELECTION BEHAVIOR
+================================================================================
+
+1. NO AUTO-SELECTION LOGIC:
+   - Event Planner flow has NO dedicated auto-selection
+   - Relies on initialPoster from navigation params
+   - No useEffect for automatic poster selection
+
+2. SELECTION PRESERVATION:
+   - currentPosterIndex finds poster in filteredPosters
+   - ID-based matching first, thumbnail fallback
+   - Preserves user selection across filter changes
+
+3. LANGUAGE CHANGE HANDLING:
+   - Separate useEffect for language filtering
+   - Attempts to preserve current poster if language matches
+   - Falls back to first matching template
+
+================================================================================
+PART 6: LOADING & TIMING CONTROL
+================================================================================
+
+1. LOADING STATE:
+   - State: isLoadingServiceFilter.eventplanner
+   - Set to true before API call
+   - Set to false in finally block
+
+2. TIMING GUARDS:
+   - Templates fetched only when activeRenderSource === 'profile'
+   - Cache check prevents duplicate API calls
+   - 5-minute cache duration
+
+3. RACE CONDITION PREVENTION:
+   - Single source control prevents conflicting filters
+   - Service filter reset when not Event Planner category
+   - No filtering during loading state
+
+================================================================================
+PART 7: RENDERING PIPELINE
+================================================================================
+
+1. RENDERING PRIORITY:
+   - First: currentPoster (if exists in filteredPosters)
+   - Second: filteredPosters[0] (first filtered template)
+   - Fallback: filteredPosters array
+
+2. INDEX CALCULATION:
+   - currentPosterIndex useMemo for performance
+   - ID-based matching with thumbnail fallback
+   - Returns -1 if not found
+
+3. NO FLICKER BEHAVIOR:
+   - Templates cached before filtering
+   - Instant filtering from cached data
+   - No loading states during filter changes
+
+================================================================================
+PART 8: COMPARISON WITH SOFTWARE COMPANY
+================================================================================
+
+| Aspect | Event Planner | Software Company (Before Fix) | Why Event Planner Works |
+|---------|---------------|----------------------------|------------------------|
+| API Source | Single endpoint | Multiple sources | Consistent data structure |
+| Data Source | Cached templates | Mixed sources | Single source of truth |
+| Filtering | Client-side only | Server + client | Predictable filtering |
+| Cache Strategy | 5-minute cache | No caching | Prevents duplicate calls |
+| Loading Control | True before/after | Inconsistent loading | Clear loading states |
+| Auto-Selection | None (uses params) | Complex auto-select | No race conditions |
+| Fallback Logic | None (empty results) | Multiple fallbacks | Clean behavior |
+| State Management | Simple selectedServiceFilter | Multiple conflicting states | Single source control |
+| Button Logic | 4 fixed buttons | Dynamic categories | Stable button set |
+| Tag Matching | Exact keywords | Complex mapping | Predictable matching |
+| Flow Isolation | Profile source only | Multiple sources | Clear separation |
+
+================================================================================
+KEY DIFFERENCES IDENTIFIED
+================================================================================
+
+1. SINGLE SOURCE OF TRUTH:
+   - Event Planner: Uses only cached serviceFilterTemplates['eventplanner']
+   - Software Company: Mixed allTemplates, serviceFilterTemplates, tagBasedTemplates
+
+2. SIMPLER FILTERING:
+   - Event Planner: Direct tag-based filtering from cached data
+   - Software Company: Multi-path filtering with fallbacks
+
+3. NO AUTO-SELECTION:
+   - Event Planner: Relies on navigation params, preserves user choice
+   - Software Company: Complex auto-selection causing race conditions
+
+4. CONSISTENT LOADING:
+   - Event Planner: Clear loading state with finally block
+   - Software Company: Multiple loading states, inconsistent timing
+
+5. STABLE BUTTON SET:
+   - Event Planner: Fixed 4 service filters
+   - Software Company: Dynamic 6 categories with complex mapping
+
+================================================================================
+WHY EVENT PLANNER WORKS CORRECTLY
+================================================================================
+
+1. ARCHITECTURAL SIMPLICITY:
+   - Single data source (cached templates)
+   - Single filtering mechanism (tag-based)
+   - Single state management (selectedServiceFilter)
+
+2. NO RACE CONDITIONS:
+   - Templates fetched once and cached
+   - No auto-selection to interfere with user choice
+   - Clear timing control with loading states
+
+3. PREDICTABLE BEHAVIOR:
+   - Same input always produces same output
+   - No fallback logic causing unexpected results
+   - Consistent tag matching
+
+4. FLOW ISOLATION:
+   - Clear separation from other category flows
+   - Profile source control prevents conflicts
+   - Simple reset conditions
+
+5. PERFORMANCE OPTIMIZATION:
+   - Client-side caching reduces API calls
+   - useMemo for expensive calculations
+   - Efficient filtering from pre-processed data
+
+================================================================================
+RECOMMENDATIONS FOR SOFTWARE COMPANY (Based on Event Planner Success)
+================================================================================
+
+1. Implement single source of truth (cached templates only)
+2. Remove complex auto-selection logic
+3. Use simple tag-based filtering
+4. Add proper loading state management
+5. Implement flow isolation with single source control
+6. Remove fallback logic that causes unexpected results
+7. Simplify button set to fixed categories
+8. Add client-side caching for performance
+
+================================================================================
+END OF ANALYSIS
+================================================================================

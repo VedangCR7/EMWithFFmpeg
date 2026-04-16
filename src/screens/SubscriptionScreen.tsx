@@ -82,7 +82,7 @@ const SubscriptionScreen: React.FC = () => {
   const screenTitle = source === 'BUSINESS_PROFILE_REQUIRED' ? 'Activate Business Plan' : 'Upgrade to Pro';
   console.log('🔍 SUBSCRIPTION SCREEN - Screen title:', screenTitle);
   
-  const { isSubscribed, subscriptionStatus: contextSubscriptionStatus, plans: contextPlans, refreshSubscription, refreshPlans, addTransaction, setIsSubscribed, transactionStats, isLoading, autopayState, enableAutopay, disableAutopay, refreshAutopayStatus, setPaymentInProgress } = useSubscription();
+  const { isSubscribed, subscriptionStatus: contextSubscriptionStatus, plans: contextPlans, refreshSubscription, refreshPlans, addTransaction, setIsSubscribed, isLoading, autopayState, enableAutopay, disableAutopay, refreshAutopayStatus, setPaymentInProgress } = useSubscription();
   const { setActivationPending, clearActivationPending, isActivationPending: isProfileActivationPending } = useBusinessProfile();
   
   // Business profile subscription state
@@ -1753,27 +1753,7 @@ const SubscriptionScreen: React.FC = () => {
           </Text>
         )}
 
-        {/* Transaction History Button */}
-        <TouchableOpacity
-          style={[styles.transactionHistoryButton, {
-            backgroundColor: theme.colors.inputBackground,
-            paddingHorizontal: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(10),
-            paddingVertical: isTabletDevice ? dynamicModerateScale(10) : dynamicModerateScale(8),
-            borderRadius: dynamicModerateScale(10),
-            marginTop: isTabletDevice ? dynamicModerateScale(8) : dynamicModerateScale(6),
-          }]}
-          onPress={() => navigation.navigate('TransactionHistory' as never)}
-        >
-          <Icon name="receipt-long" size={isTabletDevice ? getIconSize(18) : getIconSize(16)} color={theme.colors.text} />
-          <Text style={[styles.transactionHistoryButtonText, {
-            color: theme.colors.text,
-            fontSize: dynamicModerateScale(9),
-            marginLeft: dynamicModerateScale(6),
-          }]}>
-            View Transaction History ({transactionStats.total})
-          </Text>
-          <Icon name="chevron-right" size={isTabletDevice ? getIconSize(18) : getIconSize(16)} color={theme.colors.textSecondary} />
-        </TouchableOpacity>
+        
       </View>
 
       {/* Processing Modal */}
@@ -2044,15 +2024,6 @@ const styles = StyleSheet.create({
   },
   termsText: {
     textAlign: 'center',
-  },
-  transactionHistoryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  transactionHistoryButtonText: {
-    fontWeight: '600',
-    flex: 1,
   },
   modalOverlay: {
     flex: 1,
