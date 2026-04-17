@@ -1546,7 +1546,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
         id: generateId(),
         type: 'text',
         content: `✉️ ${profile.email}`,
-        position: { x: leftColumnX, y: Math.round(443 * scaleY) },
+        position: { x: leftColumnX, y: Math.round(436.0 * scaleY) },
         size: { width: (canvasWidth - 40) / 2, height: contactLineHeight },
         rotation: 0,
         zIndex: 10,

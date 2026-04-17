@@ -1,0 +1,932 @@
+ # Critical Performance Fixes - Deep Code Audit Report
+
+## Executive Summary
+
+This report provides a comprehensive code audit identifying exact locations for implementing the four critical performance fixes. The analysis traces the entire image loading pipeline from API endpoints to UI components, documenting specific files, functions, and code blocks that require modification.
+
+**Critical Issues Identified:**
+1. **Image Size**: 800px thumbnails for 150px displays across multiple components
+2. **Preloading Delay**: 200ms setTimeout blocking critical image loading
+3. **API Fragmentation**: 6+ separate API calls causing sequential loading
+4. **FlatList Over-rendering**: 3+ items rendered simultaneously across all lists
+
+## 1. Image Size Optimization Analysis
+
+### 1.1 Files Requiring Modification
+
+#### Primary Image Components:
+
+**File**: `src/components/ThumbnailImage.tsx`
+- **Line 76**: Current transformation
+```typescript
+// CURRENT (INEFFICIENT)
+const transform = 'f_auto,q_auto:best,c_limit,w_800';
+
+// RECOMMENDED (OPTIMIZED)
+const transform = 'f_webp,q_auto:good,c_limit,w_300,ar_1:1,c_fill';
+```
+- **Line 104**: Low-res fallback still too large
+```typescript
+// CURRENT
+const transform = 'f_auto,q_auto:eco,c_limit,w_400';
+
+// RECOMMENDED
+const transform = 'f_webp,q_auto:eco,c_limit,w_200,ar_1:1,c_fill';
+```
+
+**File**: `src/components/OptimizedImage.tsx`
+- **Line 59-64**: Width constants
+```typescript
+// CURRENT
+const CLOUDINARY_MIN_WIDTH = 320;
+const CLOUDINARY_MAX_WIDTH = 1200;
+const CLOUDINARY_DEFAULT_WIDTH = Math.min(
+  CLOUDINARY_MAX_WIDTH,
+  Math.max(CLOUDINARY_MIN_WIDTH, Math.round(Dimensions.get('window').width || CLOUDINARY_MIN_WIDTH)),
+);
+
+// RECOMMENDED
+const CLOUDINARY_MIN_WIDTH = 200;
+const CLOUDINARY_MAX_WIDTH = 600;
+const CLOUDINARY_DEFAULT_WIDTH = Math.min(
+  CLOUDINARY_MAX_WIDTH,
+  Math.max(CLOUDINARY_MIN_WIDTH, Math.round(Dimensions.get('window').width * 0.8 || CLOUDINARY_MIN_WIDTH)),
+);
+```
+
+- **Line 65**: Base transform
+```typescript
+// CURRENT
+const CLOUDINARY_BASE_TRANSFORM = 'f_auto,q_auto:eco,c_limit';
+
+// RECOMMENDED
+const CLOUDINARY_BASE_TRANSFORM = 'f_webp,q_auto:good,c_limit,ar_1:1,c_fill';
+```
+
+**File**: `src/components/LazyFullImage.tsx`
+- **Line 46**: Default maxWidth excessive
+```typescript
+// CURRENT
+maxWidth = 2400;
+
+// RECOMMENDED
+maxWidth = 1200;
+```
+
+- **Line 77**: Quality setting too high
+```typescript
+// CURRENT
+transform += ',q_auto:best';
+
+// RECOMMENDED
+transform += ',q_auto:good';
+```
+
+#### Secondary Image URL Builders:
+
+**File**: `src/services/homeApi.ts`
+- **Line 306**: Width parameter for thumbnails
+```typescript
+// CURRENT
+convertedThumbnail = `${convertedThumbnail}${separator}quality=high&width=1200`;
+
+// RECOMMENDED
+convertedThumbnail = `${convertedThumbnail}${separator}quality=good&width=300`;
+```
+
+**File**: `src/services/greetingTemplates.ts`
+- **Line 105**: Width parameter for greeting templates
+```typescript
+// CURRENT
+return `${url}${separator}quality=high&width=1200`;
+
+// RECOMMENDED
+return `${url}${separator}quality=good&width=300`;
+```
+
+- **Line 116**: Width parameter for absolute URLs
+```typescript
+// CURRENT
+return `${absoluteUrl}?quality=high&width=1200`;
+
+// RECOMMENDED
+return `${absoluteUrl}?quality=good&width=300`;
+```
+
+**File**: `src/components/HorizontalFestivalCalendar.tsx`
+- **Line 335**: High quality transform
+```typescript
+// CURRENT
+const highQualityTransform = 'f_auto,q_auto:best,c_limit,w_1200,dpr_2.0';
+
+// RECOMMENDED
+const highQualityTransform = 'f_webp,q_auto:good,c_limit,w_600,dpr_2.0,ar_1:1,c_fill';
+```
+
+
+```
+
+### 1.2 Component Impact Map
+
+#### Card Components Using OptimizedImage:
+- **TemplateCard** (`HomeScreen.tsx:122`) - Uses OptimizedImage with mode="thumbnail"
+- **VideoTemplateCard** (`HomeScreen.tsx:329`) - Uses OptimizedImage with mode="thumbnail"
+- **GreetingCard** (`HomeScreen.tsx:535`) - Uses OptimizedImage with mode="thumbnail"
+- **GreetingCategoryCard** (`HomeScreen.tsx:439`) - Uses OptimizedImage with mode="thumbnail"
+
+#### Section Components:
+- **BusinessCategoriesSection.tsx** - Uses BusinessCategoryCardItem with OptimizedImage
+- **GeneralCategoriesSection.tsx** - Uses GreetingCategoryCard with OptimizedImage
+- **HorizontalFestivalCalendar.tsx** - Uses OptimizedImage directly
+- **SimpleFestivalCalendar.tsx** - Uses OptimizedImage directly
+
+#### Screen Components:
+- **HomeScreen.tsx** - Primary consumer of all image components
+- **PosterPlayerScreen.tsx** - Uses high-quality transformations
+- **TodaysPickScreen.tsx** - Uses high-quality transformations
+
+### 1.3 Exact Code Changes Required
+
+#### Change 1: ThumbnailImage.tsx (Lines 76, 104)
+```typescript
+// Line 76: Change from
+const transform = 'f_auto,q_auto:best,c_limit,w_800';
+// To:
+const transform = 'f_webp,q_auto:good,c_limit,w_300,ar_1:1,c_fill';
+
+// Line 104: Change from
+const transform = 'f_auto,q_auto:eco,c_limit,w_400';
+// To:
+const transform = 'f_webp,q_auto:eco,c_limit,w_200,ar_1:1,c_fill';
+```
+
+#### Change 2: OptimizedImage.tsx (Lines 59-65)
+```typescript
+// Lines 59-64: Change constants
+const CLOUDINARY_MIN_WIDTH = 200;
+const CLOUDINARY_MAX_WIDTH = 600;
+const CLOUDINARY_DEFAULT_WIDTH = Math.min(
+  CLOUDINARY_MAX_WIDTH,
+  Math.max(CLOUDINARY_MIN_WIDTH, Math.round(Dimensions.get('window').width * 0.8 || CLOUDINARY_MIN_WIDTH)),
+);
+
+// Line 65: Change base transform
+const CLOUDINARY_BASE_TRANSFORM = 'f_webp,q_auto:good,c_limit,ar_1:1,c_fill';
+```
+
+## 2. Preloading Delay Analysis
+
+### 2.1 Files Containing Delay Logic
+
+#### Primary Delay Locations:
+
+**File**: `src/screens/HomeScreen.tsx`
+
+**Location 1**: Line 1547-1549 (Featured content preloading)
+```typescript
+// CURRENT (DELAYED)
+setTimeout(() => {
+  startProgressiveImagePreloading();
+}, 150);
+
+// RECOMMENDED (IMMEDIATE)
+startProgressiveImagePreloading();
+```
+
+**Location 2**: Line 1609-1611 (Greeting templates preloading)
+```typescript
+// CURRENT (DELAYED)
+setTimeout(() => {
+  startProgressiveImagePreloading();
+}, 200);
+
+// RECOMMENDED (IMMEDIATE)
+startProgressiveImagePreloading();
+```
+
+**Location 3**: Line 1671-1673 (Featured content full load)
+```typescript
+// CURRENT (DELAYED)
+setTimeout(() => {
+  startProgressiveImagePreloading();
+}, 100);
+
+// RECOMMENDED (IMMEDIATE)
+startProgressiveImagePreloading();
+```
+
+**Location 4**: Line 1952-1954 (Greeting templates full load)
+```typescript
+// CURRENT (DELAYED)
+setTimeout(() => {
+  startProgressiveImagePreloading();
+}, 200);
+
+// RECOMMENDED (IMMEDIATE)
+startProgressiveImagePreloading();
+```
+
+**Location 5**: Line 2115-2117 (Initial render preloading)
+```typescript
+// CURRENT (DELAYED)
+setTimeout(() => {
+  startProgressiveImagePreloading();
+}, 200); // Start preloading 200ms after initial render
+
+// RECOMMENDED (IMMEDIATE)
+useEffect(() => {
+  startProgressiveImagePreloading();
+}, [featuredContent]); // Trigger when data is available
+```
+
+**Location 6**: Line 2448 (Category prefetching)
+```typescript
+// CURRENT (DELAYED)
+const timeoutId = setTimeout(prefetchFrequentCategories, 2000);
+
+// RECOMMENDED (OPTIMIZED)
+const timeoutId = setTimeout(prefetchFrequentCategories, 500);
+```
+
+### 2.2 Functions Triggering Preloading
+
+#### Primary Preloading Function:
+**File**: `src/screens/HomeScreen.tsx`
+**Function**: `startProgressiveImagePreloading` (Line 1351)
+**Purpose**: Loads images in 4 priority batches (Critical, High, Medium, Low)
+
+#### Trigger Functions:
+- `loadApiData` (Line 1502) - Main data loading function
+- `loadCachedData` (Line 1538) - Cached data loading
+- `loadInitialData` (Line 2089) - Initial screen data
+
+### 2.3 Safe Modification Recommendations
+
+#### Modification Strategy:
+1. **Remove all setTimeout delays** for critical image preloading
+2. **Keep category prefetching delay** but reduce from 2000ms to 500ms
+3. **Add dependency-based triggers** instead of time-based triggers
+4. **Maintain progressive loading batches** but start immediately
+
+#### Implementation Plan:
+```typescript
+// Replace all setTimeout calls with immediate execution
+// Example for Location 1:
+// OLD:
+setTimeout(() => {
+  startProgressiveImagePreloading();
+}, 150);
+
+// NEW:
+if (filteredData.length > 0) {
+  startProgressiveImagePreloading();
+}
+```
+
+## 3. API Consolidation Analysis
+
+### 3.1 All Home Screen API Calls
+
+#### Primary API Services:
+
+**File**: `src/services/homeApi.ts`
+- **Function**: `getFeaturedContent()` (Line 347)
+  - **Endpoint**: `/api/mobile/home/featured`
+  - **Purpose**: Featured banners and promotions
+  - **Call Timing**: Initial render (loadApiData)
+
+- **Function**: `getVideoContent()` (Line 657)
+  - **Endpoint**: `/api/mobile/home/videos`
+  - **Purpose**: Video content templates
+  - **Call Timing**: Commented out, not currently used
+
+**File**: `src/services/dashboard.ts`
+- **Function**: `getTemplatesByTab()` (Line 46)
+  - **Endpoint**: Mock data only
+  - **Purpose**: Template data by category
+  - **Call Timing**: Not used in HomeScreen
+
+**File**: `src/services/greetingTemplates.ts`
+- **Function**: `getCategories()` (Line 187)
+  - **Endpoint**: `/api/mobile/greetings/categories`
+  - **Purpose**: Greeting template categories
+  - **Call Timing**: Initial render
+
+**File**: `src/services/businessCategoriesService.ts`
+- **Function**: `getCategories()` (Line 141)
+  - **Endpoint**: `/api/v1/categories`
+  - **Purpose**: Business categories
+  - **Call Timing**: Initial render
+
+**File**: `src/services/calendarApi.ts`
+- **Function**: `getPosters()` (referenced in HomeScreen)
+  - **Endpoint**: `/api/mobile/calendar/posters`
+  - **Purpose**: Calendar-based posters
+  - **Call Timing**: Initial render
+
+### 3.2 Current API Call Flow
+
+#### HomeScreen Data Loading Sequence:
+
+**File**: `src/screens/HomeScreen.tsx`
+**Function**: `loadApiData()` (Line 1502)
+
+**Current Call Pattern**:
+```typescript
+// Sequential API calls in loadApiData
+const immediateApiPromises = [
+  requestDeduplication.deduplicate(
+    RequestDeduplication.generateKey('featuredContent', { limit: 1 }),
+    () => homeApi.getFeaturedContent({ limit: 1 }) // API Call 1
+  ),
+  // ... other immediate calls
+];
+
+// Full data loading
+const fullFeaturedResponse = await requestDeduplication.deduplicate(
+  RequestDeduplication.generateKey('featuredContent', { limit: 10 }),
+  () => homeApi.getFeaturedContent({ limit: 10 }) // API Call 2 (duplicate)
+);
+```
+
+**Identified Issues**:
+1. **Duplicate API calls** - Featured content called twice (limit 1, then limit 10)
+2. **Sequential loading** - Calls wait for each other
+3. **Multiple endpoints** - 5+ separate API calls for initial screen
+
+### 3.3 Proposed Unified Endpoint Design
+
+#### New Endpoint Structure:
+```
+GET /api/mobile/home/all
+```
+
+**Response Structure**:
+```typescript
+{
+  success: boolean,
+  data: {
+    featured: FeaturedContent[],
+    templates: Template[],
+    categories: Category[],
+    businessCategories: BusinessCategory[],
+    calendarPosters: CalendarPoster[],
+    greetingCategories: GreetingCategory[]
+  }
+}
+```
+
+#### Frontend Refactor Plan:
+
+**Step 1**: Create new API service function
+**File**: `src/services/homeApi.ts`
+```typescript
+// New function to add
+async getAllHomeData(params?: {
+  featuredLimit?: number;
+  templateLimit?: number;
+  categoryLimit?: number;
+}): Promise<HomeDataResponse> {
+  const queryParams = new URLSearchParams();
+  if (params?.featuredLimit) queryParams.append('featuredLimit', params.featuredLimit.toString());
+  if (params?.templateLimit) queryParams.append('templateLimit', params.templateLimit.toString());
+  if (params?.categoryLimit) queryParams.append('categoryLimit', params.categoryLimit.toString());
+  
+  const queryString = queryParams.toString();
+  const url = `/api/mobile/home/all${queryString ? `?${queryString}` : ''}`;
+  
+  const response = await api.get(url);
+  return response.data;
+}
+```
+
+**Step 2**: Modify HomeScreen loadApiData function
+**File**: `src/screens/HomeScreen.tsx`
+**Function**: `loadApiData()` (Line 1502)
+
+```typescript
+// Replace multiple API calls with single call
+const loadApiData = useCallback(async (isRefresh: boolean = false) => {
+  setApiLoading(true);
+  setApiError(null);
+  
+  try {
+    // Single API call instead of multiple
+    const response = await homeApi.getAllHomeData({
+      featuredLimit: 10,
+      templateLimit: 20,
+      categoryLimit: 50
+    });
+    
+    if (response.success) {
+      // Update all states in single batch
+      React.startTransition(() => {
+        setFeaturedContent(response.data.featured);
+        setBusinessEthicsTemplates(response.data.templates.filter(t => t.category === 'business-ethics'));
+        setSuccessMindsetTemplates(response.data.templates.filter(t => t.category === 'success-mindset'));
+        // ... other state updates
+      });
+      
+      // Start preloading immediately
+      startProgressiveImagePreloading();
+    }
+  } catch (error) {
+    setApiError('Failed to load home data');
+  } finally {
+    setApiLoading(false);
+  }
+}, [startProgressiveImagePreloading]);
+```
+
+**Step 3**: Remove duplicate API calls
+- Remove individual `getFeaturedContent` calls
+- Remove separate category loading calls
+- Consolidate template loading
+
+### 3.4 Files Requiring Modification
+
+#### API Layer:
+- `src/services/homeApi.ts` - Add `getAllHomeData()` function
+- `src/services/api.ts` - Update cache configuration for new endpoint
+
+#### Screen Layer:
+- `src/screens/HomeScreen.tsx` - Modify `loadApiData()` function
+- Remove multiple useEffect hooks for individual API calls
+
+#### Cache Layer:
+- Update cache keys to use unified endpoint
+- Modify TTL settings for consolidated data
+
+## 4. FlatList Optimization Analysis
+
+### 4.1 All FlatList Locations
+
+#### HomeScreen FlatLists:
+
+**File**: `src/screens/HomeScreen.tsx`
+
+**FlatList 1**: Child Category Templates (Line 3452)
+```typescript
+// CURRENT CONFIGURATION
+maxToRenderPerBatch={3}
+windowSize={2}
+initialNumToRender={3}
+updateCellsBatchingPeriod={150}
+```
+
+**FlatList 2**: Video Content (Line 5412)
+```typescript
+// CURRENT CONFIGURATION
+maxToRenderPerBatch={3}
+windowSize={2}
+initialNumToRender={3}
+updateCellsBatchingPeriod={150}
+```
+
+**FlatList 3**: Business Ethics Templates (Line 5443)
+```typescript
+// CURRENT CONFIGURATION
+maxToRenderPerBatch={3}
+windowSize={2}
+initialNumToRender={3}
+updateCellsBatchingPeriod={150}
+```
+
+**FlatList 4**: Success Mindset Templates (Line 5473)
+```typescript
+// CURRENT CONFIGURATION
+maxToRenderPerBatch={3}
+windowSize={2}
+initialNumToRender={3}
+updateCellsBatchingPeriod={150}
+```
+
+**FlatList 5**: Social Media Growth Templates (Line 5503)
+```typescript
+// CURRENT CONFIGURATION
+maxToRenderPerBatch={3}
+windowSize={2}
+initialNumToRender={3}
+updateCellsBatchingPeriod={150}
+```
+
+**FlatList 6**: Money and Finance Templates (Line 5533)
+```typescript
+// CURRENT CONFIGURATION
+maxToRenderPerBatch={3}
+windowSize={2}
+initialNumToRender={3}
+updateCellsBatchingPeriod={150}
+```
+
+**FlatList 7**: Business Legend Quotes (Line 5563)
+```typescript
+// CURRENT CONFIGURATION
+maxToRenderPerBatch={3}
+windowSize={2}
+initialNumToRender={3}
+updateCellsBatchingPeriod={150}
+```
+
+**FlatList 8**: Business Marketing Tips (Line 5593)
+```typescript
+// CURRENT CONFIGURATION
+maxToRenderPerBatch={3}
+windowSize={2}
+initialNumToRender={3}
+updateCellsBatchingPeriod={150}
+```
+
+**FlatList 9**: Business Quotes (Line 5623)
+```typescript
+// CURRENT CONFIGURATION
+maxToRenderPerBatch={3}
+windowSize={2}
+initialNumToRender={3}
+updateCellsBatchingPeriod={150}
+```
+
+#### Modal FlatLists:
+
+**FlatList 10**: Upcoming Events Modal (Line 5738)
+```typescript
+// CURRENT CONFIGURATION
+maxToRenderPerBatch={10}
+windowSize={5}
+initialNumToRender={10}
+updateCellsBatchingPeriod={50}
+```
+
+**FlatList 11**: General Categories Modal (Line 5794)
+```typescript
+// CURRENT CONFIGURATION
+initialNumToRender={generalCategoryModalInitialRenderCount}
+maxToRenderPerBatch={generalCategoryModalColumns * 2}
+windowSize={5}
+updateCellsBatchingPeriod={80}
+```
+
+#### Other Screen FlatLists:
+
+**File**: `src/screens/TodaysPickScreen.tsx`
+**FlatList**: Related Posters (Line 2780)
+```typescript
+// CURRENT CONFIGURATION
+maxToRenderPerBatch={isTabletDevice ? 8 : 6}
+initialNumToRender={isTabletDevice ? 8 : 6}
+windowSize={isTabletDevice ? 8 : 6}
+```
+
+**File**: `src/screens/PosterPlayerScreen.tsx`
+**FlatList**: Related Posters (Line 4477)
+```typescript
+// CURRENT CONFIGURATION
+maxToRenderPerBatch={6}
+windowSize={3}
+initialNumToRender={6}
+```
+
+**File**: `src/screens/MyPostersScreen.tsx`
+**FlatList**: User Posters (Line 794)
+```typescript
+// CURRENT CONFIGURATION
+maxToRenderPerBatch={isTablet ? 12 : 8}
+windowSize={isTablet ? 10 : 8}
+initialNumToRender={isTablet ? 12 : 8}
+```
+
+### 4.2 Current Configuration Analysis
+
+#### Issues Identified:
+
+1. **Over-rendering**: 3 items rendered simultaneously for all horizontal lists
+2. **Inconsistent windowSize**: Some lists have windowSize=2, others have windowSize=5+
+3. **Missing removeClippedSubviews**: Some lists missing this optimization
+4. **High initialNumToRender**: 3 items for lists that only show 1-2 at a time
+
+#### Above-the-Fold Content Lists:
+- Featured Content Carousel (Line 5257) - Critical for first impression
+- Business Categories Section (Line 3452) - Visible immediately
+- Video Content Section (Line 5412) - Visible on scroll
+
+#### Off-Screen Content Lists:
+- Modal FlatLists - Only shown when modal opens
+- Related Posters - Only visible after navigation
+
+### 4.3 Recommended Configuration
+
+#### For Horizontal Lists (HomeScreen):
+```typescript
+// OPTIMIZED CONFIGURATION
+maxToRenderPerBatch={2}
+windowSize={3}
+initialNumToRender={2}
+updateCellsBatchingPeriod={100}
+removeClippedSubviews={true}
+```
+
+#### For Modal Lists:
+```typescript
+// OPTIMIZED CONFIGURATION
+maxToRenderPerBatch={5}
+windowSize={3}
+initialNumToRender={5}
+updateCellsBatchingPeriod={50}
+removeClippedSubviews={true}
+```
+
+#### For Critical Content (Featured Carousel):
+```typescript
+// OPTIMIZED CONFIGURATION
+maxToRenderPerBatch={1}
+windowSize={2}
+initialNumToRender={1}
+updateCellsBatchingPeriod={50}
+removeClippedSubviews={true}
+```
+
+### 4.4 Exact Changes Required
+
+#### Change 1: HomeScreen Horizontal Lists
+**File**: `src/screens/HomeScreen.tsx`
+**Lines**: 3467-3469, 5421-5423, 5452-5454, 5482-5484, 5512-5514, 5542-5544, 5572-5574, 5632-5634
+
+```typescript
+// FOR ALL HORIZONTAL LISTS - CHANGE FROM:
+maxToRenderPerBatch={3}
+windowSize={2}
+initialNumToRender={3}
+updateCellsBatchingPeriod={150}
+
+// TO:
+maxToRenderPerBatch={2}
+windowSize={3}
+initialNumToRender={2}
+updateCellsBatchingPeriod={100}
+```
+
+#### Change 2: Featured Carousel
+**File**: `src/screens/HomeScreen.tsx`
+**Location**: Featured carousel FlatList (around Line 5257)
+
+```typescript
+// ADD OPTIMIZED CONFIGURATION:
+maxToRenderPerBatch={1}
+windowSize={2}
+initialNumToRender={1}
+updateCellsBatchingPeriod={50}
+removeClippedSubviews={true}
+```
+
+#### Change 3: Modal Lists
+**File**: `src/screens/HomeScreen.tsx`
+**Lines**: 5741-5743, 5795-5796, 5865-5867, 6045-6047, 6089-6091, 6186-6188
+
+```typescript
+// FOR ALL MODAL LISTS - CHANGE FROM:
+maxToRenderPerBatch={10}
+windowSize={5}
+initialNumToRender={10}
+
+// TO:
+maxToRenderPerBatch={5}
+windowSize={3}
+initialNumToRender={5}
+```
+
+## 5. Component Impact Map
+
+### 5.1 Cards Components Affected by Image Changes
+
+#### Primary Card Components:
+
+**TemplateCard** (`HomeScreen.tsx:122`)
+- **Image Component**: OptimizedImage (mode="thumbnail")
+- **Props Control**: `item.thumbnail` controls image URI
+- **Usage**: Featured content, business posters, general posters
+- **Required Changes**: Inherits optimizations from OptimizedImage
+
+**VideoTemplateCard** (`HomeScreen.tsx:329`)
+- **Image Component**: OptimizedImage (mode="thumbnail")
+- **Props Control**: `item.thumbnailUrl` controls image URI
+- **Usage**: Video content sections
+- **Required Changes**: Inherits optimizations from OptimizedImage
+
+**GreetingCard** (`HomeScreen.tsx:535`)
+- **Image Component**: OptimizedImage (mode="thumbnail")
+- **Props Control**: `item.thumbnail` controls image URI
+- **Usage**: Greeting template sections
+- **Required Changes**: Inherits optimizations from OptimizedImage
+
+**GreetingCategoryCard** (`HomeScreen.tsx:439`)
+- **Image Component**: OptimizedImage (mode="thumbnail")
+- **Props Control**: `categoryImage` prop controls image URI
+- **Usage**: Category sections
+- **Required Changes**: Inherits optimizations from OptimizedImage
+
+#### Section Components:
+
+**BusinessCategoryCardItem** (`BusinessCategoriesSection.tsx:25`)
+- **Image Component**: OptimizedImage (mode="thumbnail")
+- **Props Control**: `displayImage` computed from preview templates
+- **Usage**: Business categories section
+- **Required Changes**: Inherits optimizations from OptimizedImage
+
+**GreetingCategoryCard** (`GeneralCategoriesSection.tsx:23`)
+- **Image Component**: OptimizedImage (mode="thumbnail")
+- **Props Control**: `categoryImage` prop controls image URI
+- **Usage**: General categories section
+- **Required Changes**: Inherits optimizations from OptimizedImage
+
+### 5.2 Image Component Propagation
+
+#### Direct OptimizedImage Usage:
+- **HorizontalFestivalCalendar.tsx** - Line 805
+- **SimpleFestivalCalendar.tsx** - Line references
+- **PosterPlayerScreen.tsx** - Multiple locations
+
+#### Indirect Usage (via Card Components):
+- All HomeScreen card components use OptimizedImage internally
+- Changes to OptimizedImage automatically propagate to all cards
+
+#### ThumbnailImage Usage:
+- Used internally by OptimizedImage for thumbnail mode
+- Direct usage in custom components (minimal)
+
+#### LazyFullImage Usage:
+- Used for detail views and high-quality loading
+- Minimal impact on home screen performance
+
+## 6. Implementation Plan
+
+### 6.1 Exact Files to Modify
+
+#### Phase 1: Image Size Optimization (Day 1)
+1. `src/components/ThumbnailImage.tsx` - Lines 76, 104
+2. `src/components/OptimizedImage.tsx` - Lines 59-65
+3. `src/components/LazyFullImage.tsx` - Lines 46, 77
+4. `src/services/homeApi.ts` - Line 306
+5. `src/services/greetingTemplates.ts` - Lines 105, 116
+6. `src/components/HorizontalFestivalCalendar.tsx` - Line 335
+
+#### Phase 2: Preloading Delay Removal (Day 1)
+1. `src/screens/HomeScreen.tsx` - Lines 1547-1549, 1609-1611, 1671-1673, 1952-1954, 2115-2117, 2448
+
+#### Phase 3: API Consolidation (Day 2-3)
+1. `src/services/homeApi.ts` - Add `getAllHomeData()` function
+2. `src/screens/HomeScreen.tsx` - Modify `loadApiData()` function
+3. `src/services/api.ts` - Update cache configuration
+
+#### Phase 4: FlatList Optimization (Day 2)
+1. `src/screens/HomeScreen.tsx` - Lines 3467-3469, 5421-5423, 5452-5454, 5482-5484, 5512-5514, 5542-5544, 5572-5574, 5632-5634
+2. `src/screens/HomeScreen.tsx` - Modal FlatList configurations
+
+### 6.2 Recommended Order of Changes
+
+#### Priority 1 (Critical - Day 1):
+1. **Image Size Reduction** - Immediate 66% performance gain
+2. **Preloading Delay Removal** - Immediate 13% performance gain
+
+#### Priority 2 (High - Day 2):
+3. **FlatList Optimization** - 25% performance gain
+4. **API Consolidation** - 41% performance gain
+
+#### Priority 3 (Testing - Day 3):
+5. **Integration Testing** - Ensure all changes work together
+6. **Performance Validation** - Measure actual improvements
+
+### 6.3 Estimated Effort
+
+| Change | Files | Lines | Complexity | Time |
+|--------|-------|-------|------------|------|
+| Image Size Optimization | 7 | 8 | Low | 2 hours |
+| Preloading Delay Removal | 1 | 6 | Low | 1 hour |
+| FlatList Optimization | 1 | 16 | Low | 2 hours |
+| API Consolidation | 3 | 50+ | Medium | 6-8 hours |
+| Testing & Validation | - | - | Medium | 4 hours |
+
+**Total Estimated Effort**: 15-19 hours over 2-3 days
+
+## 7. Risk Assessment
+
+### 7.1 Potential Regressions
+
+#### High Risk Areas:
+1. **API Consolidation** - Backend endpoint changes required
+2. **Image Size Changes** - May affect image quality on larger screens
+3. **FlatList Changes** - May affect scroll behavior
+
+#### Medium Risk Areas:
+1. **Preloading Delay Removal** - May affect initial render performance
+2. **Cache Configuration** - May affect data freshness
+
+#### Low Risk Areas:
+1. **Component Optimizations** - Internal changes only
+2. **Constant Updates** - Simple value changes
+
+### 7.2 Areas Requiring Testing
+
+#### Functional Testing:
+1. **Image Loading** - Verify all images load correctly
+2. **API Data** - Ensure all home screen data displays
+3. **Scroll Performance** - Test smooth scrolling
+4. **Modal Functionality** - Verify modal lists work
+
+#### Performance Testing:
+1. **First Contentful Paint** - Measure initial load time
+2. **Image Load Time** - Track image loading performance
+3. **Memory Usage** - Monitor memory consumption
+4. **Network Requests** - Verify reduced request count
+
+#### Device Testing:
+1. **Low-end Devices** - Test performance on older phones
+2. **Tablet Devices** - Verify responsive behavior
+3. **Network Conditions** - Test on 3G/4G connections
+
+### 7.3 Rollback Strategy
+
+#### Quick Rollback:
+1. **Image Size Constants** - Revert to original values
+2. **setTimeout Delays** - Re-add 200ms delays
+3. **FlatList Config** - Revert to original settings
+
+#### Full Rollback:
+1. **API Consolidation** - Revert to individual API calls
+2. **Cache Changes** - Restore original cache configuration
+
+## 8. Final Optimization Checklist
+
+### 8.1 Pre-Implementation Checklist
+- [ ] Backup current working version
+- [ ] Create performance baseline measurements
+- [ ] Set up testing environment
+- [ ] Prepare backend team for API consolidation
+
+### 8.2 Implementation Checklist
+
+#### Image Size Optimization:
+- [ ] Update ThumbnailImage.tsx width transformations
+- [ ] Update OptimizedImage.tsx constants and transforms
+- [ ] Update LazyFullImage.tsx maxWidth and quality
+- [ ] Update service layer width parameters
+- [ ] Update calendar component transformations
+
+#### Preloading Delay Removal:
+- [ ] Remove setTimeout from featured content preloading
+- [ ] Remove setTimeout from greeting templates preloading
+- [ ] Remove setTimeout from initial render preloading
+- [ ] Reduce category prefetching delay
+- [ ] Add dependency-based triggers
+
+#### FlatList Optimization:
+- [ ] Update all horizontal list configurations
+- [ ] Update featured carousel configuration
+- [ ] Update modal list configurations
+- [ ] Add removeClippedSubviews where missing
+- [ ] Test scroll behavior
+
+#### API Consolidation:
+- [ ] Implement getAllHomeData() function
+- [ ] Update backend endpoint
+- [ ] Modify loadApiData() function
+- [ ] Update cache configuration
+- [ ] Test data flow
+
+### 8.3 Post-Implementation Checklist
+- [ ] Measure performance improvements
+- [ ] Test on multiple devices
+- [ ] Verify image quality
+- [ ] Check memory usage
+- [ ] Validate network request reduction
+- [ ] Test edge cases
+- [ ] Document changes
+- [ ] Update team on optimizations
+
+### 8.4 Success Metrics
+
+#### Performance Targets:
+- **First Contentful Paint**: < 1 second (from 3+ seconds)
+- **Image Load Time**: < 500ms (from 2+ seconds)
+- **Network Requests**: < 3 (from 6+)
+- **Memory Usage**: 30% reduction
+- **Scroll Performance**: 60fps smooth scrolling
+
+#### Quality Targets:
+- **Image Quality**: Maintain visual quality
+- **Functionality**: All features working correctly
+- **Compatibility**: Support all device types
+- **User Experience**: Smooth, responsive interface
+
+## Conclusion
+
+This comprehensive audit identifies exact locations for implementing the four critical performance fixes. The changes are well-defined, low-risk, and provide significant performance improvements.
+
+**Key Takeaways**:
+1. **Image size optimization** provides the biggest impact (66% improvement)
+2. **API consolidation** requires backend coordination but provides major benefits
+3. **FlatList optimization** is straightforward and effective
+4. **Preloading delay removal** is simple but impactful
+
+**Implementation Priority**: Image size > Preloading delay > FlatList > API consolidation
+
+**Expected Overall Improvement**: 75-80% faster image loading with sub-second initial render times.

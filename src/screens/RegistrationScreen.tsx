@@ -804,14 +804,14 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
 
               {/* Company Information */}
               <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Company Information</Text>
+                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Company Name <Text style={styles.redAsteriskText}>*</Text></Text>
 
                 <View style={styles.inputWrapper}>
                   <FloatingInput
                     value={formData.name}
                     onChangeText={(value) => handleInputChange('name', value)}
                     field="name"
-                    placeholder="Enter company name *"
+                    placeholder="Enter company name"
                     focusedField={focusedField}
                     setFocusedField={setFocusedField}
                     theme={theme}
@@ -832,7 +832,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
 
                 {/* Business Category */}
                 <View style={styles.categorySection}>
-                  <Text style={[styles.categoryLabel, { color: theme.colors.text }]}>Business Category <Text style={styles.redAsteriskText}>*</Text></Text>
+                  <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Business Category <Text style={styles.redAsteriskText}>*</Text></Text>
 
                   {/* Selected Category Display */}
                   <View style={styles.selectedCategoryContainer}>
@@ -1070,11 +1070,13 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
 
 
                 <View style={styles.inputWrapper}>
+                    <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Email address <Text style={styles.redAsteriskText}>*</Text></Text>
+
                   <FloatingInput
                     value={formData.email}
                     onChangeText={(value) => handleInputChange('email', value)}
                     field="email"
-                    placeholder="Enter email address *"
+                    placeholder="Enter email address "
                     keyboardType="email-address"
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -1272,8 +1274,8 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
               {/* Promo Code Section */}
               <View style={[styles.section, { marginBottom: Math.max(8, screenHeight * 0.01) }]}>
 
-                {/* Show question text if no selection made */}
-                {hasPromo === null && (
+                {/* Show question text when promo field is hidden */}
+                {hasPromo !== true && (
                   <View style={styles.inputWrapper}>
                     <TouchableOpacity onPress={() => setHasPromo(true)}>
                       <Text style={[styles.promoQuestionText, { color: theme.colors.primary }]}>
@@ -1283,9 +1285,23 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
                   </View>
                 )}
 
-                {/* Show promo input if user selected Yes */}
+                {/* Show promo input when field is visible */}
                 {hasPromo === true && (
                   <View style={styles.inputWrapper}>
+                    {/* Header with close icon */}
+                    <View style={styles.promoCodeHeader}>
+                      <Text style={[styles.promoCodeTitle, { color: theme.colors.text }]}>
+                        Promo Code
+                      </Text>
+                      <TouchableOpacity 
+                        style={[styles.promoCodeCloseButton, { backgroundColor: theme.colors.inputBackground }]}
+                        onPress={() => setHasPromo(false)}
+                        activeOpacity={0.7}
+                      >
+                        <Icon name="close" size={16} color={theme.colors.textSecondary} />
+                      </TouchableOpacity>
+                    </View>
+                    
                     <TextInput
                       style={[
                         styles.input,
@@ -1360,59 +1376,83 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ navigation }) =
       <Modal
         visible={showErrorModal}
         transparent={true}
-        animationType="none"
+        animationType="fade"
         onRequestClose={hideModal}
+        statusBarTranslucent={true}
       >
-        <View style={[
-          styles.modalOverlay,
-          modalDimensions.isLandscape && {
-            paddingHorizontal: modalDimensions.width * 0.15,
-            paddingVertical: modalDimensions.height * 0.05,
-          }
-        ]}>
-          <Animated.View
-            style={[
-              styles.modalContainer,
-              { backgroundColor: theme.colors.surface },
-              modalDimensions.isLandscape && {
-                maxWidth: modalDimensions.width * 0.7,
-                maxHeight: modalDimensions.height * 0.9,
-              },
-              {
-                transform: [{
-                  scale: modalAnimation.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0.8, 1],
-                  }),
-                }],
-                opacity: modalAnimation,
-              }
-            ]}
+        <TouchableOpacity 
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={hideModal}
+        >
+          <TouchableOpacity 
+            activeOpacity={1}
+            onPress={() => {}} // Prevent closing when tapping inside modal
           >
-            <View style={styles.modalHeader}>
-              <View style={[styles.modalIconContainer, { backgroundColor: theme.colors.error + '20' }]}>
-                <Icon name="error-outline" size={Math.min(screenWidth * 0.08, 32)} color={theme.colors.error} />
+            <Animated.View
+              style={[
+                styles.modalContainer,
+                { backgroundColor: theme.colors.surface },
+                {
+                  transform: [{
+                    scale: modalAnimation.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.8, 1],
+                    }),
+                  }],
+                  opacity: modalAnimation,
+                }
+              ]}
+            >
+              {/* Header with close button */}
+              <View style={styles.modalHeader}>
+                <TouchableOpacity 
+                  style={[styles.closeModalButton, { backgroundColor: theme.colors.inputBackground }]}
+                  onPress={hideModal}
+                  activeOpacity={0.7}
+                >
+                  <Icon name="close" size={Math.min(screenWidth * 0.06, 24)} color={theme.colors.textSecondary} />
+                </TouchableOpacity>
               </View>
-              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Registration Error</Text>
-            </View>
-
-            <View style={styles.modalContent}>
-              <Text style={[styles.modalMessage, { color: theme.colors.textSecondary }]}>
-                {errorMessage}
+              
+              {/* Warning icon centered at top */}
+              <View style={[styles.modalIconContainer, { backgroundColor: '#ffaa0030' }]}>
+                <Icon name="warning-amber" size={Math.min(screenWidth * 0.08, 32)} color="#ffaa00" />
+              </View>
+              
+              {/* Title */}
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+                {errorMessage.includes('resource') && errorMessage.includes('not found') ? 'Resource Not Found' : 'Registration Error'}
               </Text>
-            </View>
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[styles.modalButton, { backgroundColor: theme.colors.primary }]}
-                onPress={hideModal}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.modalButtonText}>Try Again</Text>
-              </TouchableOpacity>
-            </View>
-          </Animated.View>
-        </View>
+              
+              {/* Message */}
+              <View style={styles.modalContent}>
+                <Text style={[styles.modalMessage, { color: theme.colors.textSecondary }]}>
+                  {errorMessage}
+                </Text>
+              </View>
+              
+              {/* Buttons Layout */}
+              <View style={styles.modalButtonsContainer}>
+                {/* Cancel Button */}
+                <TouchableOpacity 
+                  style={[styles.modalCancelButton, { backgroundColor: theme.colors.inputBackground }]}
+                  onPress={hideModal}
+                >
+                  <Text style={[styles.modalCancelButtonText, { color: theme.colors.textSecondary }]}>Cancel</Text>
+                </TouchableOpacity>
+                
+                {/* Try Again Button */}
+                <TouchableOpacity 
+                  style={[styles.modalButton, { backgroundColor: '#ff4444' }]}
+                  onPress={hideModal}
+                >
+                  <Text style={styles.modalButtonText}>Try Again</Text>
+                </TouchableOpacity>
+              </View>
+            </Animated.View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
 
       {/* Image Picker Modal */}
@@ -1895,36 +1935,50 @@ const styles = StyleSheet.create({
     paddingHorizontal: Math.max(28, screenWidth * 0.08),
   },
   modalContainer: {
-    width: '100%',
-    maxWidth: screenWidth * 0.88,
-    borderRadius: 16,
-    padding: Math.max(18, screenWidth * 0.05),
+    width: screenWidth * 0.85,
+    maxWidth: 400,
+    borderRadius: 20,
+    padding: Math.max(18, screenWidth * 0.06),
+    paddingTop: Math.max(14, screenWidth * 0.04),
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   modalHeader: {
-    alignItems: 'center',
-    marginBottom: Math.max(14, screenHeight * 0.017),
+    alignItems: 'flex-end',
+    marginBottom: Math.max(8, screenHeight * 0.01),
+    height: Math.min(screenWidth * 0.08, 32),
+    width: '100%',
   },
   modalIconContainer: {
-    width: screenWidth * 0.13,
-    height: screenWidth * 0.13,
-    borderRadius: screenWidth * 0.065,
+    width: Math.min(screenWidth * 0.16, 64),
+    height: Math.min(screenWidth * 0.16, 64),
+    borderRadius: Math.min(screenWidth * 0.08, 32),
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: Math.max(8, screenHeight * 0.008),
+    alignSelf: 'center',
+    marginBottom: Math.max(12, screenHeight * 0.02),
   },
   modalTitle: {
-    fontSize: isSmallScreen ? 16 : 18,
-    fontWeight: '600',
+    fontSize: isSmallScreen ? 17 : 22,
+    fontWeight: '700',
     textAlign: 'center',
+    marginBottom: Math.max(10, screenHeight * 0.015),
   },
   modalContent: {
-    marginBottom: Math.max(14, screenHeight * 0.017),
+    marginBottom: Math.max(18, screenHeight * 0.03),
+    paddingHorizontal: Math.max(8, screenWidth * 0.02),
   },
   modalMessage: {
-    fontSize: isSmallScreen ? 12 : 14,
+    fontSize: isSmallScreen ? 13 : 15,
     textAlign: 'center',
-    lineHeight: 19,
+    lineHeight: isSmallScreen ? 18 : 22,
   },
   modalActions: {
     width: '100%',
@@ -1938,6 +1992,38 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: isSmallScreen ? 14 : 16,
     fontWeight: '600',
+  },
+  // Updated Modal Styles
+  modalButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: Math.max(14, screenHeight * 0.017),
+    gap: Math.max(10, screenWidth * 0.03),
+  },
+  modalCancelButton: {
+    flex: 1,
+    paddingVertical: Math.max(11, screenHeight * 0.013),
+    borderRadius: 10,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  modalCancelButtonText: {
+    fontSize: isSmallScreen ? 14 : 16,
+    fontWeight: '600',
+  },
+  closeModalButton: {
+    width: Math.min(screenWidth * 0.08, 32),
+    height: Math.min(screenWidth * 0.08, 32),
+    borderRadius: Math.min(screenWidth * 0.04, 16),
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   // Validation Modal Styles
   validationModalContainer: {
@@ -2049,6 +2135,23 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'left',
     marginVertical: Math.max(4, screenHeight * 0.005),
+  },
+  promoCodeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Math.max(8, screenHeight * 0.01),
+  },
+  promoCodeTitle: {
+    fontSize: isSmallScreen ? 14 : 16,
+    fontWeight: '600',
+  },
+  promoCodeCloseButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

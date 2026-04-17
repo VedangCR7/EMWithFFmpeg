@@ -1,0 +1,120 @@
+Cloudinary Image Optimization Analysis Report
+HorizontalFestivalCalendar Component
+=============================================
+
+Filename | Issue | Suggested Optimization
+---------|-------|----------------------
+HorizontalFestivalCalendar.tsx | Inconsistent Cloudinary transformations | getHighQualityThumbnailUrl uses w_1200,q_auto:best for all images regardless of display size
+HorizontalFestivalCalendar.tsx | URL recalculated on every render | getHighQualityThumbnailUrl called inside render functions without memoization
+HorizontalFestivalCalendar.tsx | Over-sized images for thumbnails | w_1200 transformation too large for small thumbnail cards (55-66px width)
+HorizontalFestivalCalendar.tsx | No responsive width calculation | Fixed width transformations don't adapt to different screen sizes
+HorizontalFestivalCalendar.tsx | Missing dpr optimization | Only using dpr_2.0 in one function but not consistently
+OptimizedImage.tsx | Good optimization but complex | Multiple transformation functions create complexity
+ThumbnailImage.tsx | Good thumbnail optimization | Uses w_800 for optimized thumbnails, w_400 for low-res fallback
+ThumbnailImage.tsx | Aggressive caching | 7-day cache may be too long for frequently updated content
+LazyFullImage.tsx | Good lazy loading | Proper quality levels and width limits implemented
+
+DETAILED ANALYSIS
+=================
+
+1. CURRENT CLOUDINARY USAGE
+---------------------------
+- Images fetched from: calendarApi service → backend API → Cloudinary URLs
+- URL transformation happens in multiple places:
+  * getHighQualityThumbnailUrl() in HorizontalFestivalCalendar (lines 308-346)
+  * applyCloudinaryTransform() in OptimizedImage (lines 94-141)
+  * optimizedThumbnailUri in ThumbnailImage (lines 67-95)
+  * optimizedFullImageUri in LazyFullImage (lines 58-105)
+
+2. IDENTIFIED ISSUES
+-------------------
+
+A. PERFORMANCE ISSUES:
+- getHighQualityThumbnailUrl recalculates on every render (line 555, 626, 744)
+- Using w_1200 for small thumbnail cards (actual card width: 55-66px)
+- Multiple transformation functions create redundant processing
+- No memoization of transformed URLs
+
+B. OPTIMIZATION OPPORTUNITIES:
+- Thumbnail cards should use w_100-200 instead of w_1200
+- Modal cards should use w_400-600 instead of w_1200
+- Missing f_auto,q_auto,c_fill combination for better compression
+- No device pixel ratio consideration for consistent quality
+
+C. CACHING STRATEGY:
+- ThumbnailImage uses 7-day cache (good for thumbnails)
+- OptimizedImage has no persistent caching
+- No cache invalidation strategy for updated images
+
+3. SPECIFIC OPTIMIZATIONS NEEDED
+---------------------------------
+
+A. HORIZONTAL FESTIVAL CALENDAR:
+- Replace getHighQualityThumbnailUrl with size-aware transformation
+- Add useMemo for URL transformations
+- Use appropriate sizes:
+  * Calendar date cells: w_50-75 (not applicable - no images)
+  * Thumbnail cards: w_150-200
+  * Modal cards: w_400-500
+
+B. UNIFIED TRANSFORMATION FUNCTION:
+- Create single, memoized Cloudinary URL transformer
+- Support responsive widths based on container size
+- Consistent quality settings across components
+
+C. CACHING IMPROVEMENTS:
+- Implement cache versioning for invalidation
+- Reduce ThumbnailImage cache to 3 days for fresher content
+- Add cache size limits to prevent storage bloat
+
+4. RECOMMENDED IMPLEMENTATION
+------------------------------
+
+A. NEW HELPER FUNCTION:
+```typescript
+const getOptimizedCloudinaryUrl = useMemo(() => {
+  return (url: string, displayWidth: number, quality: 'thumbnail' | 'medium' | 'high' = 'medium') => {
+    if (!url?.includes('res.cloudinary.com')) return url;
+    
+    const transforms = {
+      thumbnail: `f_auto,q_auto:eco,c_fill,w_${Math.min(displayWidth * 2, 400)}`,
+      medium: `f_auto,q_auto:good,c_fill,w_${Math.min(displayWidth * 2, 800)}`,
+      high: `f_auto,q_auto:best,c_fill,w_${Math.min(displayWidth * 2, 1200)}`
+    };
+    
+    // Apply transformation logic...
+  };
+}, []);
+```
+
+B. COMPONENT-SPECIFIC SIZES:
+- Thumbnail cards: 150-200px width
+- Modal cards: 400-500px width  
+- Detail view: up to 1200px width
+
+C. MEMOIZATION STRATEGY:
+- Memoize transformed URLs based on original URL + target width
+- Clear cache when refreshKey changes
+- Use React.memo for poster card components
+
+5. PRIORITY IMPLEMENTATION ORDER
+---------------------------------
+1. Fix getHighQualityThumbnailUrl size calculations (HIGH)
+2. Add useMemo for URL transformations (HIGH)
+3. Create unified transformation helper (MEDIUM)
+4. Optimize caching strategy (LOW)
+5. Add cache invalidation (LOW)
+
+ESTIMATED IMPACT
+----------------
+- Bandwidth reduction: 60-80% for thumbnail images
+- Load time improvement: 40-60% for initial render
+- Memory usage reduction: 30-50% for image cache
+- Scroll performance: Significant improvement in FlatList
+
+IMPLEMENTATION NOTES
+-------------------
+- All changes are frontend-only as requested
+- No backend or database modifications needed
+- Maintains existing UI layout and functionality
+- Backward compatible with existing URL formats

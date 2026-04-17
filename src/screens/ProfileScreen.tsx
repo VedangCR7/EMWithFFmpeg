@@ -1082,43 +1082,29 @@ const ProfileScreen: React.FC = () => {
       const playStoreUrl = `market://details?id=${playStorePackage}`;
       const webUrl = `https://play.google.com/store/apps/details?id=${playStorePackage}`;
 
-      // Check if In-App Review is available
-      if (InAppReview.isAvailable()) {
-        try {
-          console.log('🌟 Requesting In-App Review...');
-          // Request the in-app review flow
-          await InAppReview.RequestInAppReview();
-          console.log('✅ In-App Review requested successfully');
-        } catch (error) {
-          console.error('❌ Error requesting In-App Review:', error);
-          // Fallback to Play Store if review request fails
-          console.log('🔄 Falling back to Play Store...');
-          await openPlayStoreFallback(playStoreUrl, webUrl);
-        }
-      } else {
-        console.log('⚠️ In-App Review not available, falling back to Play Store');
-        // Fallback to Play Store if API is not available
-        await openPlayStoreFallback(playStoreUrl, webUrl);
-      }
-    } catch (error) {
-      console.error('❌ Error in handleRateUs:', error);
-      Alert.alert('Error', 'Unable to open rating. Please try again later.');
-    }
-  };
+      console.log('Rate Us button pressed');
+      console.log('Package:', playStorePackage);
+      console.log('Play Store URL:', playStoreUrl);
+      console.log('Web URL:', webUrl);
 
-  const openPlayStoreFallback = async (playStoreUrl: string, webUrl: string) => {
-    try {
       // Try to open Play Store app first
       const canOpenPlayStore = await Linking.canOpenURL(playStoreUrl);
       
       if (canOpenPlayStore) {
+        console.log('Opening Play Store app...');
         await Linking.openURL(playStoreUrl);
       } else {
         // Fallback to web URL
-        await Linking.openURL(webUrl);
+        console.log('Play Store app not available, opening web URL...');
+        const canOpenWeb = await Linking.canOpenURL(webUrl);
+        if (canOpenWeb) {
+          await Linking.openURL(webUrl);
+        } else {
+          throw new Error('Neither Play Store app nor web URL can be opened');
+        }
       }
     } catch (error) {
-      console.error('Error opening Play Store fallback:', error);
+      console.error('Error in handleRateUs:', error);
       Alert.alert('Error', 'Unable to open Play Store. Please try again later.');
     }
   };
@@ -2261,7 +2247,7 @@ const ProfileScreen: React.FC = () => {
           }]}>
             <View style={[styles.modalHeader, {
               paddingHorizontal: dynamicModerateScale(12),
-              paddingVertical: dynamicModerateScale(12),
+              paddingVertical: dynamicModerateScale(14),
               borderBottomWidth: 0.5,
             }]}>
               <Text style={[styles.modalTitle, { 
@@ -2277,7 +2263,7 @@ const ProfileScreen: React.FC = () => {
 
             <ScrollView style={[styles.modalBody, {
               paddingHorizontal: dynamicModerateScale(12),
-              paddingVertical: dynamicModerateScale(12),
+              paddingVertical: dynamicModerateScale(14),
             }]} showsVerticalScrollIndicator={false}>
               {/* Company Name */}
               <View style={[styles.inputGroup, {
@@ -2477,7 +2463,7 @@ const ProfileScreen: React.FC = () => {
 
             <View style={[styles.modalFooter, {
               paddingHorizontal: dynamicModerateScale(12),
-              paddingVertical: dynamicModerateScale(12),
+              paddingVertical: dynamicModerateScale(14),
               borderTopWidth: 0.5,
               gap: dynamicModerateScale(8),
             }]}>
@@ -2729,30 +2715,31 @@ const ProfileScreen: React.FC = () => {
             activeOpacity={1}
             onPress={() => {}} // Prevent closing when tapping inside modal
           >
-            <View style={[styles.signOutModalContainer, {
+            <View style={[styles.deleteAccountModalContainer, {
               backgroundColor: theme.colors.surface,
-              borderRadius: dynamicModerateScale(16),
-              padding: dynamicModerateScale(16),
+              borderRadius: dynamicModerateScale(20),
+              padding: dynamicModerateScale(20),
             }]}>
               <View style={[styles.signOutModalHeader, {
-                marginBottom: dynamicModerateScale(10),
+                marginBottom: dynamicModerateScale(8),
               }]}>
-                <View style={[styles.signOutIconContainer, { 
-                  backgroundColor: '#ffebee',
-                  width: dynamicModerateScale(42),
-                  height: dynamicModerateScale(42),
-                  borderRadius: dynamicModerateScale(21),
-                  marginBottom: dynamicModerateScale(6),
+                <View style={[styles.deleteAccountIconContainer, { 
+                  backgroundColor: '#ff4444',
+                  width: dynamicModerateScale(48),
+                  height: dynamicModerateScale(48),
+                  borderRadius: dynamicModerateScale(24),
+                  marginBottom: dynamicModerateScale(12),
                 }]}>
-                  <Icon name="delete-forever" size={getIconSize(22)} color="#cc0000" />
+                  <Icon name="close" size={getIconSize(24)} color="#ffffff" />
                 </View>
                 <Text 
-                  style={[styles.signOutModalTitle, { 
+                  style={[styles.deleteAccountModalTitle, { 
                     color: theme.colors.text,
-                    fontSize: getFontSize(14),
+                    fontSize: getFontSize(12),
+                    textAlign: 'center',
                   }]}
                 >
-                  Delete Account
+                  Are you sure you want to delete your account?
                 </Text>
                 <TouchableOpacity 
                   style={[styles.closeModalButton, { 
@@ -2798,49 +2785,45 @@ const ProfileScreen: React.FC = () => {
                   </View>
                 ) : (
                   <>
-                    <Text style={[styles.signOutModalMessage, { 
-                      color: theme.colors.text,
-                      fontSize: getFontSize(10),
-                      lineHeight: dynamicModerateScale(16),
-                    }]}>
-                      ⚠️ This action cannot be undone!
-                    </Text>
-                    <Text style={[styles.signOutModalSubMessage, { 
-                      color: theme.colors.textSecondary,
+                    <Text style={[styles.deleteAccountModalDescription, { 
+                      color: '#666666',
                       fontSize: getFontSize(9),
                       textAlign: 'center',
-                      lineHeight: dynamicModerateScale(14),
+                      lineHeight: dynamicModerateScale(18),
                       marginTop: dynamicModerateScale(8),
                     }]}>
-                      Deleting your account will permanently remove all your data, including posters, business profiles, and subscription information.
+                      This will remove your account and all saved data forever.
                     </Text>
                   </>
                 )}
               </View>
               
               <View style={[styles.signOutModalButtons, {
-                gap: dynamicModerateScale(8),
+                gap: dynamicModerateScale(12),
               }]}>
                 {!isDeletingAccount && (
                   <TouchableOpacity 
-                    style={[styles.signOutCancelButton, { 
-                      backgroundColor: theme.colors.inputBackground,
-                      paddingVertical: dynamicModerateScale(9),
+                    style={[styles.deleteAccountCancelButton, { 
+                      backgroundColor: '#ffffff',
+                      borderWidth: 1,
+                      borderColor: '#cccccc',
+                      paddingVertical: dynamicModerateScale(14),
                       borderRadius: dynamicModerateScale(10),
                     }]}
                     onPress={() => setShowDeleteAccountModal(false)}
                   >
-                    <Text style={[styles.signOutCancelButtonText, { 
+                    <Text style={[styles.deleteAccountCancelButtonText, { 
                       color: theme.colors.text,
-                      fontSize: getFontSize(10),
-                    }]}>Cancel</Text>
+                      fontSize: getFontSize(9),
+                      fontWeight: '600',
+                    }]} numberOfLines={1}>Cancel</Text>
                   </TouchableOpacity>
                 )}
                 
                 <TouchableOpacity 
-                  style={[styles.signOutConfirmButton, { 
-                    backgroundColor: isDeletingAccount ? '#cccccc' : '#cc0000',
-                    paddingVertical: dynamicModerateScale(9),
+                  style={[styles.deleteAccountConfirmButton, { 
+                    backgroundColor: isDeletingAccount ? '#cccccc' : '#ff4444',
+                    paddingVertical: dynamicModerateScale(14),
                     borderRadius: dynamicModerateScale(10),
                     opacity: isDeletingAccount ? 0.6 : 1,
                   }]}
@@ -2850,14 +2833,14 @@ const ProfileScreen: React.FC = () => {
                   {isDeletingAccount ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
                       <ActivityIndicator size="small" color="#ffffff" style={{ marginRight: dynamicModerateScale(6) }} />
-                      <Text style={[styles.signOutConfirmButtonText, {
-                        fontSize: getFontSize(10),
+                      <Text style={[styles.deleteAccountConfirmButtonText, {
+                        fontSize: getFontSize(9),
                       }]}>Deleting...</Text>
                     </View>
                   ) : (
-                    <Text style={[styles.signOutConfirmButtonText, {
-                      fontSize: getFontSize(10),
-                    }]}>Delete Forever</Text>
+                    <Text style={[styles.deleteAccountConfirmButtonText, {
+                      fontSize: getFontSize(9),
+                    }]} numberOfLines={1}>Delete Account</Text>
                   )}
                 </TouchableOpacity>
               </View>
@@ -3521,6 +3504,81 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: moderateScale(6),
     elevation: moderateScale(6),
+  },
+  
+  // Delete Account Modal Styles
+  deleteAccountModalContainer: {
+    width: screenWidth * 0.87,
+    maxWidth: 340,
+    borderRadius: moderateScale(20),
+    padding: moderateScale(20),
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: moderateScale(3),
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: moderateScale(6),
+    elevation: moderateScale(6),
+  },
+  deleteAccountIconContainer: {
+    width: moderateScale(48),
+    height: moderateScale(48),
+    borderRadius: moderateScale(24),
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: moderateScale(12),
+  },
+  deleteAccountModalTitle: {
+    fontSize: moderateScale(14),
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: moderateScale(8),
+  },
+  deleteAccountModalDescription: {
+    fontSize: moderateScale(10),
+    textAlign: 'center',
+    lineHeight: moderateScale(16),
+    color: '#666666',
+  },
+  deleteAccountCancelButton: {
+    flex: 1,
+    alignItems: 'center',
+    minHeight: moderateScale(40),
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: moderateScale(1),
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: moderateScale(3),
+    elevation: moderateScale(2),
+  },
+  deleteAccountCancelButtonText: {
+    fontSize: moderateScale(14),
+    fontWeight: '600',
+    textAlign: 'center',
+    flexShrink: 1,
+  },
+  deleteAccountConfirmButton: {
+    flex: 1,
+    alignItems: 'center',
+    minHeight: moderateScale(40),
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: moderateScale(1),
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: moderateScale(3),
+    elevation: moderateScale(2),
+  },
+  deleteAccountConfirmButtonText: {
+    color: '#ffffff',
+    fontSize: moderateScale(14),
+    fontWeight: '600',
+    textAlign: 'center',
+    flexShrink: 1,
   },
   signOutModalHeader: {
     alignItems: 'center',

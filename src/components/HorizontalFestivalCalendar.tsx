@@ -304,16 +304,16 @@ const moderateScale = (size: number, factor = 0.5) => {
   return size + (scale(size) - size) * factor;
 };
 
-// Helper function to enhance thumbnail URL for high quality
-const getHighQualityThumbnailUrl = (thumbnailUrl: string): string => {
-  if (!thumbnailUrl) return thumbnailUrl;
+// Optimized Cloudinary URL helper function
+const getOptimizedCloudinaryUrl = (url: string, width: number = 200): string => {
+  if (!url || !url.includes('res.cloudinary.com')) return url;
   
-  // For Cloudinary URLs, enhance to high quality
-  if (thumbnailUrl.includes('res.cloudinary.com') && thumbnailUrl.includes('/upload/')) {
+  // For Cloudinary URLs, add optimized transformation
+  if (url.includes('/upload/')) {
     try {
-      const [prefix, remainder] = thumbnailUrl.split('/upload/');
+      const [prefix, remainder] = url.split('/upload/');
       if (!remainder) {
-        return thumbnailUrl;
+        return url;
       }
       
       const parts = remainder.split('/');
@@ -331,18 +331,18 @@ const getHighQualityThumbnailUrl = (thumbnailUrl: string): string => {
         // Extract everything from version onwards
         const versionAndPath = parts.slice(versionIndex).join('/');
         
-        // Use ultra high quality transform for thumbnails (w_1200 for HD displays)
-        const highQualityTransform = 'f_auto,q_auto:best,c_limit,w_1200,dpr_2.0';
-        const highQualityUrl = `${prefix}/upload/${highQualityTransform}/${versionAndPath}`;
+        // Use optimized transformation for thumbnails
+        const transformation = `f_auto,q_auto:eco,c_fill,w_${width},dpr_auto`;
+        const optimizedUrl = `${prefix}/upload/${transformation}/${versionAndPath}`;
         
-        return highQualityUrl;
+        return optimizedUrl;
       }
     } catch (error) {
       // Fall through to return original URL
     }
   }
   
-  return thumbnailUrl;
+  return url;
 };
 
 interface HorizontalFestivalCalendarProps {
@@ -455,6 +455,16 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
   const [currentDateState, setCurrentDateState] = useState(() => new Date());
   const autoSelectRef = useRef<string | null>(null);
   const generalCategoryCardWidth = useMemo(() => getGeneralCategoryCardWidth(), []);
+  
+  // Memoized optimized URL function for thumbnail cards
+  const getThumbnailUrl = useCallback((thumbnailUrl: string) => {
+    return getOptimizedCloudinaryUrl(thumbnailUrl, Math.round(generalCategoryCardWidth * 2));
+  }, [generalCategoryCardWidth]);
+  
+  // Memoized optimized URL function for modal cards
+  const getModalThumbnailUrl = useCallback((thumbnailUrl: string) => {
+    return getOptimizedCloudinaryUrl(thumbnailUrl, 400);
+  }, []);
   
   // Generate dates from today to 15 days forward
   const upcomingDates = useMemo(() => {
@@ -652,13 +662,13 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
         activeOpacity={0.8}
       >
         <OptimizedImage 
-          uri={getHighQualityThumbnailUrl(item.thumbnail)} 
+          uri={getThumbnailUrl(item.thumbnail)} 
           style={styles.posterImage} 
           resizeMode="cover" 
         />
       </TouchableOpacity>
     );
-  }, [generalCategoryCardWidth, handlePosterPress, selectedDate]);
+  }, [generalCategoryCardWidth, handlePosterPress, selectedDate, getThumbnailUrl]);
 
   // Format date as "1 Nov"
   const formatDateShort = useCallback((date: Date) => {
@@ -723,7 +733,7 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
     const padding = moderateScale(24); // 12 padding on each side
     const gap = moderateScale(8); // Gap between cards
     const cardWidth = (actualModalWidth - padding - gap) / 2;
-    const highQualityThumbnail = getHighQualityThumbnailUrl(item.thumbnail);
+    const highQualityThumbnail = getModalThumbnailUrl(item.thumbnail);
     
     return (
       <TouchableOpacity
@@ -753,7 +763,7 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
         </View>
       </TouchableOpacity>
     );
-  }, [handlePosterPress, formatDateShort, theme]);
+  }, [handlePosterPress, formatDateShort, theme, getModalThumbnailUrl]);
 
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 

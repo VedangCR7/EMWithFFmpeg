@@ -991,7 +991,7 @@ const BusinessProfilesScreen: React.FC = () => {
   return (
     <SafeAreaView 
       style={[styles.container, { backgroundColor: theme.colors.background }]}
-      edges={['top', 'left', 'right']}
+      edges={['left', 'right']}
     >
       <StatusBar 
         barStyle="light-content"
@@ -1006,7 +1006,7 @@ const BusinessProfilesScreen: React.FC = () => {
         end={{ x: 1, y: 1 }}
       >
         {/* Header */}
-        <View style={[styles.header, { paddingTop: insets.top + responsiveSpacing.sm }]}>
+        <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
           <TouchableOpacity 
             style={[styles.backButton, { backgroundColor: theme.colors.cardBackground }]}
             onPress={() => navigation.goBack()}
@@ -1437,7 +1437,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: responsiveLayout.headerPaddingHorizontal,
-    paddingTop: Math.max(responsiveSpacing.md, screenHeight * 0.02),
     paddingBottom: Math.max(responsiveSpacing.md, screenHeight * 0.02),
   },
   headerTitle: {
@@ -1703,11 +1702,13 @@ const styles = StyleSheet.create({
   successModalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: Math.min(screenHeight * 0.015, 12),
     paddingBottom: Math.min(screenHeight * 0.01, 8),
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.1)',
     minHeight: Math.min(screenWidth * 0.1, 40),
+    position: 'relative',
   },
   successIconContainer: {
     width: Math.min(screenWidth * 0.1, 40),
@@ -1715,22 +1716,27 @@ const styles = StyleSheet.create({
     borderRadius: Math.min(screenWidth * 0.05, 20),
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: Math.min(screenWidth * 0.03, 12),
+    position: 'absolute',
+    left: 0,
+    zIndex: 1,
   },
   successModalTitle: {
     fontSize: Math.min(screenWidth * 0.042, 16),
     fontWeight: '700',
-    flex: 1,
-    marginHorizontal: Math.min(screenWidth * 0.015, 6),
+    position: 'absolute',
+    left: 0,
+    right: 0,
     textAlign: 'center',
+    zIndex: 0,
   },
   successModalContent: {
-    paddingVertical: Math.min(screenHeight * 0.008, 6),
-    marginBottom: Math.min(screenHeight * 0.015, 12),
+    paddingVertical: Math.min(screenHeight * 0.02, 16),
+    marginBottom: Math.min(screenHeight * 0.02, 16),
+    paddingHorizontal: Math.min(screenWidth * 0.02, 16),
   },
   successModalMessage: {
     fontSize: Math.min(screenWidth * 0.035, 14),
-    lineHeight: Math.min(screenWidth * 0.045, 18),
+    lineHeight: Math.min(screenWidth * 0.05, 20),
     textAlign: 'center',
     opacity: 0.9,
   },
@@ -1787,13 +1793,14 @@ const styles = StyleSheet.create({
   },
   closeModalButton: {
     position: 'absolute',
-    top: -Math.max(8, screenHeight * 0.008),
-    right: -Math.max(8, screenWidth * 0.015),
+    top: Math.min(screenHeight * 0.01, 8),
+    right: 0,
     width: Math.min(screenWidth * 0.07, 28),
     height: Math.min(screenWidth * 0.07, 28),
     borderRadius: Math.min(screenWidth * 0.035, 14),
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 1,
   },
   deleteModalContent: {
     marginBottom: Math.max(16, screenHeight * 0.02),

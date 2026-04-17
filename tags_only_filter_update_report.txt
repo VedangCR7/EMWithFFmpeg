@@ -1,0 +1,50 @@
+File: IndustryCategoryScreen.tsx
+
+Changes Made:
+- Removed filtering based on poster.name
+- Removed filtering using poster.languages
+- Filtering now works only using poster.tags
+
+New Filtering Logic:
+```javascript
+// Category filtering (lines 435-462)
+basePosters = basePosters.filter(poster => {
+  const posterTags = poster.tags || [];
+  
+  const matchesTag = selectedCategoryButton.tags.some(tag => {
+    const exactTagMatch = posterTags.some(posterTag => posterTag.toLowerCase() === tag.toLowerCase());
+    
+    if (exactTagMatch) {
+      console.log(`[MATCH DEBUG] Tag "${tag}" matched for poster "${poster.name}":`);
+      console.log(`   - Exact tag match: ${exactTagMatch}`);
+      console.log(`   - Poster tags: [${posterTags.join(', ')}]`);
+      return true;
+    }
+    return false;
+  });
+  
+  return matchesTag;
+});
+
+// Language filtering (lines 475-491)
+const finalPosters = basePosters.filter(poster => {
+  const posterTags = poster.tags || [];
+  
+  let matchesLanguage = false;
+  
+  if (selectedLanguage === 'english') {
+    matchesLanguage = posterTags.some(tag => tag.toLowerCase() === 'english');
+  } else if (selectedLanguage === 'hindi') {
+    matchesLanguage = posterTags.some(tag => tag.toLowerCase() === 'hindi');
+  }
+  
+  return matchesLanguage;
+});
+```
+
+Impact:
+- Category filtering now depends strictly on tags
+- Language filtering uses only tags
+- Reduced filtering complexity
+- More precise filtering based on exact tag matches
+- Eliminated false positives from name-based matching

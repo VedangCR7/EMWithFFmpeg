@@ -332,15 +332,9 @@ const LoginScreen: React.FC = ({ navigation }: any) => {
             onPress={() => {}} // Prevent closing when tapping inside modal
           >
             <View style={[styles.errorModalContainer, { backgroundColor: theme.colors.surface }]}>
+              {/* Header with warning icon and close button */}
               <View style={styles.errorModalHeader}>
-                <View style={[styles.errorIconContainer, { backgroundColor: '#ff444420' }]}>
-                  <Icon name="error-outline" size={Math.min(screenWidth * 0.08, 32)} color="#ff4444" />
-                </View>
-                <Text 
-                  style={[styles.errorModalTitle, { color: theme.colors.text }]}
-                >
-                  Error
-                </Text>
+                {/* Close button (X) positioned top-right */}
                 <TouchableOpacity 
                   style={[styles.closeModalButton, { backgroundColor: theme.colors.inputBackground }]}
                   onPress={() => setShowErrorModal(false)}
@@ -350,18 +344,65 @@ const LoginScreen: React.FC = ({ navigation }: any) => {
                 </TouchableOpacity>
               </View>
               
+              {/* Warning icon centered at top */}
+              <View style={[styles.errorIconContainer, { backgroundColor: '#ffaa0030' }]}>
+                <Icon name="warning-amber" size={Math.min(screenWidth * 0.08, 32)} color="#ffaa00" />
+              </View>
+              
+              {/* Title */}
+              <Text 
+                style={[styles.errorModalTitle, { color: theme.colors.text }]}
+              >
+                {errorMessage.includes('registration') || errorMessage.includes('register') || errorMessage.includes('resource') && errorMessage.includes('not found') ? 'Registration Required' : 'Error'}
+              </Text>
+              
+              {/* Message */}
               <View style={styles.errorModalContent}>
-                <Text style={[styles.errorModalMessage, { color: theme.colors.text }]}>
-                  {errorMessage}
+                <Text style={[styles.errorModalMessage, { color: theme.colors.textSecondary }]}>
+                  {errorMessage.includes('registration') || errorMessage.includes('register') || errorMessage.includes('resource') && errorMessage.includes('not found') ? 'Please register first to continue.' : errorMessage}
                 </Text>
               </View>
               
-              <TouchableOpacity 
-                style={[styles.errorModalButton, { backgroundColor: '#ff4444' }]}
-                onPress={() => setShowErrorModal(false)}
-              >
-                <Text style={styles.errorModalButtonText}>OK</Text>
-              </TouchableOpacity>
+              {/* Buttons Layout - Two buttons horizontally aligned */}
+              <View style={styles.errorModalButtonsContainer}>
+                {/* Cancel Button */}
+                <TouchableOpacity 
+                  style={[styles.errorModalCancelButton, { backgroundColor: theme.colors.inputBackground }]}
+                  onPress={() => setShowErrorModal(false)}
+                >
+                  <Text style={[styles.errorModalCancelButtonText, { color: theme.colors.textSecondary }]}>Cancel</Text>
+                </TouchableOpacity>
+                
+                {/* Register Now Button - shown for registration errors and resource not found errors */}
+                {(errorMessage.includes('registration') || errorMessage.includes('register') || (errorMessage.includes('resource') && errorMessage.includes('not found'))) && (
+                  <TouchableOpacity 
+                    style={[styles.errorModalRegisterButton]}
+                    onPress={() => {
+                      setShowErrorModal(false);
+                      navigation.navigate('Registration');
+                    }}
+                  >
+                    <LinearGradient
+                      colors={['#4A90E2', '#357ABD']}
+                      style={styles.errorModalRegisterButtonGradient}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                    >
+                      <Text style={styles.errorModalRegisterButtonText}>Register Now</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                )}
+                
+                {/* OK Button - shown for non-registration errors */}
+                {!(errorMessage.includes('registration') || errorMessage.includes('register') || (errorMessage.includes('resource') && errorMessage.includes('not found'))) && (
+                  <TouchableOpacity 
+                    style={[styles.errorModalButton, { backgroundColor: '#ff4444' }]}
+                    onPress={() => setShowErrorModal(false)}
+                  >
+                    <Text style={styles.errorModalButtonText}>OK</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           </TouchableOpacity>
         </TouchableOpacity>
@@ -518,6 +559,7 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     borderRadius: 20,
     padding: screenWidth * 0.06,
+    paddingTop: screenWidth * 0.04,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -528,27 +570,26 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   errorModalHeader: {
-    alignItems: 'center',
-    marginBottom: screenHeight * 0.02,
-    position: 'relative',
+    alignItems: 'flex-end',
+    marginBottom: screenHeight * 0.01,
+    height: Math.min(screenWidth * 0.08, 32),
   },
   errorIconContainer: {
-    width: Math.min(screenWidth * 0.18, 72),
-    height: Math.min(screenWidth * 0.18, 72),
-    borderRadius: Math.min(screenWidth * 0.09, 36),
+    width: Math.min(screenWidth * 0.16, 64),
+    height: Math.min(screenWidth * 0.16, 64),
+    borderRadius: Math.min(screenWidth * 0.08, 32),
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: screenHeight * 0.015,
+    alignSelf: 'center',
+    marginBottom: screenHeight * 0.02,
   },
   errorModalTitle: {
-    fontSize: Math.min(screenWidth * 0.06, 24),
+    fontSize: Math.min(screenWidth * 0.055, 22),
     fontWeight: '700',
     textAlign: 'center',
+    marginBottom: screenHeight * 0.015,
   },
   closeModalButton: {
-    position: 'absolute',
-    top: -screenHeight * 0.01,
-    right: -screenWidth * 0.02,
     width: Math.min(screenWidth * 0.08, 32),
     height: Math.min(screenWidth * 0.08, 32),
     borderRadius: Math.min(screenWidth * 0.04, 16),
@@ -556,12 +597,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   errorModalContent: {
-    marginBottom: screenHeight * 0.025,
+    marginBottom: screenHeight * 0.03,
+    paddingHorizontal: screenWidth * 0.02,
   },
   errorModalMessage: {
-    fontSize: Math.min(screenWidth * 0.04, 16),
+    fontSize: Math.min(screenWidth * 0.038, 15),
     textAlign: 'center',
-    lineHeight: Math.min(screenWidth * 0.06, 24),
+    lineHeight: Math.min(screenWidth * 0.055, 22),
   },
   errorModalButton: {
     paddingVertical: screenHeight * 0.018,
@@ -587,6 +629,56 @@ const styles = StyleSheet.create({
   },
   forgotPasswordText: {
     fontSize: Math.min(screenWidth * 0.032, 12),
+    fontWeight: '600',
+  },
+
+  // Updated Error Modal Styles
+  errorModalButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: screenHeight * 0.02,
+    gap: screenWidth * 0.03,
+  },
+  errorModalCancelButton: {
+    flex: 1,
+    paddingVertical: screenHeight * 0.018,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  errorModalCancelButtonText: {
+    fontSize: Math.min(screenWidth * 0.042, 17),
+    fontWeight: '600',
+  },
+  errorModalRegisterButton: {
+    flex: 1,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  errorModalRegisterButtonGradient: {
+    flex: 1,
+    paddingVertical: screenHeight * 0.018,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  errorModalRegisterButtonText: {
+    color: '#FFFFFF',
+    fontSize: Math.min(screenWidth * 0.042, 17),
     fontWeight: '600',
   },
 });

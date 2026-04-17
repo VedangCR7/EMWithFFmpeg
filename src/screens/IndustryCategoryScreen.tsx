@@ -257,7 +257,7 @@ const IndustryCategoryScreen: React.FC = () => {
     // { id: 'all', name: 'All', tags: [] },
     { id: 'website-dev', name: 'Website Development', tags: ['website'] },
     { id: 'mobile-app-dev', name: 'Mobile App Development', tags: [ 'mobile'] },
-    { id: 'custom-software', name: 'Custom S/W Solutions', tags: ['software'] },
+    { id: 'custom-software', name: 'Custom Software Solutions', tags: ['software'] },
     { id: 'ai-automation', name: 'AI & Automation', tags: ['ai'] },
     { id: 'it-consulting', name: 'IT Consulting & Support', tags: ['consulting'] },
     { id: 'software-dev', name: 'Software Development', tags: ['coding'] },
@@ -434,18 +434,13 @@ const IndustryCategoryScreen: React.FC = () => {
         const postersBeforeCategoryFilter = basePosters.length;
         basePosters = basePosters.filter(poster => {
           const posterTags = poster.tags || [];
-          const posterName = poster.name.toLowerCase();
           
           const matchesTag = selectedCategoryButton.tags.some(tag => {
             const exactTagMatch = posterTags.some(posterTag => posterTag.toLowerCase() === tag.toLowerCase());
-            const nameMatch = posterName.toLowerCase().includes(tag.toLowerCase());
             
-            // For category filtering, prioritize exact tag matches over name/description matches
-            // Description matching is too broad and causes incorrect matches
-            if (exactTagMatch || nameMatch) {
+            if (exactTagMatch) {
               console.log(`🔍 [MATCH DEBUG] Tag "${tag}" matched for poster "${poster.name}":`);
               console.log(`   - Exact tag match: ${exactTagMatch}`);
-              console.log(`   - Name match: ${nameMatch} (name: "${posterName}")`);
               console.log(`   - Poster tags: [${posterTags.join(', ')}]`);
               return true;
             }
@@ -478,21 +473,18 @@ const IndustryCategoryScreen: React.FC = () => {
     const postersBeforeLanguageFilter = basePosters.length;
     
     const finalPosters = basePosters.filter(poster => {
-      const posterLanguages = poster.languages || [];
       const posterTags = poster.tags || [];
       
       let matchesLanguage = false;
       
       if (selectedLanguage === 'english') {
-        matchesLanguage = posterLanguages.includes('english') || 
-                         posterTags.some(tag => tag.toLowerCase().includes('english'));
+        matchesLanguage = posterTags.some(tag => tag.toLowerCase() === 'english');
       } else if (selectedLanguage === 'hindi') {
-        matchesLanguage = posterLanguages.includes('hindi') || 
-                         posterTags.some(tag => tag.toLowerCase().includes('hindi'));
+        matchesLanguage = posterTags.some(tag => tag.toLowerCase() === 'hindi');
       }
       
       if (matchesLanguage) {
-        console.log(`✅ [LANGUAGE FILTER] Poster "${poster.name}" matched language: ${selectedLanguage} - Languages: [${posterLanguages.join(', ')}], Tags: [${posterTags.join(', ')}]`);
+        console.log(`✅ [LANGUAGE FILTER] Poster "${poster.name}" matched language: ${selectedLanguage} - Tags: [${posterTags.join(', ')}]`);
       }
       
       return matchesLanguage;

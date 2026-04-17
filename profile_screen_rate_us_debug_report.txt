@@ -1,0 +1,53 @@
+Profile Screen Rate Us Debug Report
+
+File Checked:
+- ProfileScreen.tsx (c:\Users\ADMIN\Desktop\New_App_V6\EMWithFFmpeg\src\screens\ProfileScreen.tsx)
+- android/app/build.gradle (c:\Users\ADMIN\Desktop\New_App_V6\EMWithFFmpeg\android\app\build.gradle)
+- android/app/src/main/AndroidManifest.xml (c:\Users\ADMIN\Desktop\New_App_V6\EMWithFFmpeg\android\app\src\main\AndroidManifest.xml)
+
+Issue Found:
+- The original handleRateUs function had several issues:
+  1. It prioritized In-App Review API over direct Play Store link, which could fail silently
+  2. Limited error logging made debugging difficult
+  3. The fallback logic was complex and potentially unreliable
+  4. No validation of whether URLs could actually be opened before attempting
+  5. Missing console logs for debugging the flow
+
+Root Cause Analysis:
+- The Rate Us button was correctly connected to handleRateUs function (line 2165)
+- The package name 'com.marketbrand' matches the build.gradle configuration
+- AndroidManifest.xml has proper internet permissions
+- The issue was in the implementation logic of handleRateUs function
+
+Fix Implemented:
+- Simplified the handleRateUs function to use direct Play Store linking
+- Added comprehensive console logging for debugging
+- Implemented proper URL validation before attempting to open
+- Added fallback from market:// to https:// URL with validation
+- Improved error handling with specific error messages
+- Removed dependency on In-App Review API to ensure reliability
+
+Code Changes:
+1. Replaced the complex handleRateUs function with a simplified version
+2. Added console.log statements for debugging:
+   - "Rate Us button pressed"
+   - Package name and URLs being used
+   - Which URL is being attempted
+3. Added Linking.canOpenURL() validation for both market:// and https:// URLs
+4. Improved error handling with specific error messages
+
+Files Modified:
+- ProfileScreen.tsx (lines 1079-1110)
+
+Result:
+- Rate Us button now has robust error handling and logging
+- Will attempt to open Play Store app first, then fall back to web URL
+- Provides clear console output for debugging
+- Shows user-friendly error messages if both methods fail
+- No more dependency on potentially unreliable In-App Review API
+
+Testing Recommendations:
+1. Test on a device with Play Store app installed
+2. Test on a device without Play Store app (should open web browser)
+3. Test with no internet connection (should show error message)
+4. Monitor console logs for debugging information
