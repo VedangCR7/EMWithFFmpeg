@@ -1,0 +1,123 @@
+File: IndustryCategoryScreen.tsx
+
+1. Image Data Source
+- Images are fetched from the businessCategoryPostersApi service
+- API endpoint: `/api/mobile/posters/category/${encodeURIComponent(category)}?limit=${requestLimit}`
+- Base URL: https://eventmarketersbackend.onrender.com
+- The fetchPosters function (lines 266-316) calls businessCategoryPostersApi.getPostersByCategory('software company', 200)
+- Images come as BusinessCategoryPoster objects and are converted to Template interface
+- Data structure includes: id, title, thumbnail, imageUrl, tags, category, description, downloads
+- Images are stored in the 'posters' state (line 116) as Template[] array
+
+2. Filtering Logic
+- Primary filtering happens in the 'filteredPosters' useMemo (lines 419-505)
+- Two-level filtering: Category filtering first, then Language filtering
+- Category filtering code snippet:
+```javascript
+if (selectedCategory !== 'all') {
+  const selectedCategoryButton = categoryButtons.find(btn => btn.id === selectedCategory);
+  if (selectedCategoryButton && selectedCategoryButton.tags.length > 0) {
+    basePosters = basePosters.filter(poster => {
+      const posterTags = poster.tags || [];
+      const posterName = poster.name.toLowerCase();
+      
+      const matchesTag = selectedCategoryButton.tags.some(tag => {
+        const exactTagMatch = posterTags.some(posterTag => posterTag.toLowerCase() === tag.toLowerCase());
+        const nameMatch = posterName.toLowerCase().includes(tag.toLowerCase());
+        
+        if (exactTagMatch || nameMatch) {
+          return true;
+        }
+        return false;
+      });
+      
+      return matchesTag;
+    });
+  }
+}
+```
+
+- Language filtering code snippet:
+```javascript
+if (selectedLanguage !== 'all') {
+  const finalPosters = basePosters.filter(poster => {
+    const posterLanguages = poster.languages || [];
+    const posterTags = poster.tags || [];
+    
+    let matchesLanguage = false;
+    
+    if (selectedLanguage === 'english') {
+      matchesLanguage = posterLanguages.includes('english') || 
+                       posterTags.some(tag => tag.toLowerCase().includes('english'));
+    } else if (selectedLanguage === 'hindi') {
+      matchesLanguage = posterLanguages.includes('hindi') || 
+                       posterTags.some(tag => tag.toLowerCase().includes('hindi'));
+    }
+    
+    return matchesLanguage;
+  });
+}
+```
+
+3. Category Mapping
+- Category buttons are defined in categoryButtons constant (lines 256-264)
+- Each category has an 'id', 'name', and 'tags' array
+- Categories available:
+  - 'website-dev': tags ['website']
+  - 'mobile-app-dev': tags ['mobile']
+  - 'custom-software': tags ['software']
+  - 'ai-automation': tags ['ai']
+  - 'it-consulting': tags ['consulting']
+  - 'software-dev': tags ['coding']
+- Filtering field: 'tags' array on Template objects
+- Secondary matching: poster.name.toLowerCase().includes(tag.toLowerCase())
+- Selected category stored in 'selectedCategory' state (line 121)
+- Category selection triggers filtering through setSelectedCategory calls (line 816)
+
+4. State Management
+- 'posters' state (line 116): stores all fetched posters from API
+- 'filteredPosters' useMemo (line 419): stores filtered results based on category and language
+- 'selectedCategory' state (line 121): current category filter
+- 'selectedLanguage' state (line 120): current language filter ('all', 'english', 'hindi')
+- 'selectedPoster' state (line 118): currently selected poster for preview
+- 'loading' state (line 117): loading indicator for API calls
+- useEffect hooks:
+  - Line 318-320: fetchPosters() on component mount
+  - Line 322-326: auto-select first poster when posters load
+  - Line 507-511: auto-select first poster when filtered results change
+
+5. Rendering Logic
+- Filtered posters are rendered in a FlatList component (lines 860-874)
+- FlatList configuration:
+  - data: filteredPosters
+  - renderItem: renderRelatedPoster function
+  - numColumns: 3 (mobile) or 4 (tablet)
+  - Performance optimizations: removeClippedSubviews, maxToRenderPerBatch, windowSize
+- Individual poster items rendered by RelatedPosterItem component (lines 37-94)
+- Selected poster displayed in main preview area (lines 728-744)
+- LazyFullImage component used for efficient image loading
+- Skeleton loading state shown while fetching (lines 844-858)
+
+6. Performance Observations
+- Efficient filtering with useMemo - only recalculates when dependencies change
+- Two-level filtering prevents unnecessary re-processing
+- API caching implemented in businessCategoryPostersApi (5-minute cache duration)
+- FlatList optimizations for smooth scrolling:
+  - removeClippedSubviews: true
+  - maxToRenderPerBatch: 6-8 items
+  - windowSize: 3-5
+  - initialNumToRender: 6-8 items
+- LazyFullImage component for progressive image loading
+- Potential inefficiencies:
+  - Console logging in production filtering code (lines 420-504)
+  - Multiple string.toLowerCase() calls in filtering loops
+  - No debouncing for rapid category/language changes
+- Image quality optimization: getHighQualityImageUrl function (lines 170-240) converts thumbnail URLs to high-quality versions
+
+Key Filtering Flow:
+1. API fetches all posters for 'software company' category
+2. Raw posters stored in 'posters' state
+3. 'filteredPosters' useMemo applies category and language filters
+4. FlatList renders only filtered posters
+5. User interactions update selectedCategory/selectedLanguage states
+6. State changes trigger re-filtering through useMemo dependencies

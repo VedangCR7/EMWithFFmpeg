@@ -1,0 +1,325 @@
+================================================================================
+CALENDAR IMAGES NOT SHOWING - ROOT CAUSE ANALYSIS REPORT
+================================================================================
+
+REPORT DATE: April 12, 2026
+ISSUE: Calendar images are NOT showing on HomeScreen
+COMPONENT: HorizontalFestivalCalendar
+ANALYZED BY: Senior React Native + Backend Debugging Expert
+
+================================================================================
+1. ISSUE SUMMARY
+================================================================================
+
+Calendar images (posters) are not displaying in the HorizontalFestivalCalendar component 
+on the HomeScreen. The component renders correctly with dates and festival indicators,
+but the image carousel section below the calendar remains empty.
+
+Expected: Festival posters should appear when a date is selected
+Actual: No images are displayed, only the calendar dates are visible
+
+================================================================================
+2. EXPECTED BEHAVIOR
+================================================================================
+
+1. User opens HomeScreen
+2. HorizontalFestivalCalendar component loads with today's date auto-selected
+3. API call to `/api/mobile/calendar/posters/{date}` is triggered
+4. Posters are fetched and displayed in horizontal scrollable carousel
+5. User can tap different dates to see corresponding posters
+6. "View More" modal shows all available posters
+
+================================================================================
+3. ACTUAL BEHAVIOR
+================================================================================
+
+1. HomeScreen loads with HorizontalFestivalCalendar component
+2. Calendar dates and festival indicators display correctly
+3. Today's date is auto-selected
+4. API calls are triggered (based on code analysis)
+5. No posters appear in the carousel section
+6. Empty state is not shown (indicating condition `selectedDatePosters.length > 0` is false)
+
+================================================================================
+4. API ANALYSIS
+================================================================================
+
+API ENDPOINT: `/api/mobile/calendar/posters/{date}`
+BASE URL: https://eventmarketersbackend.onrender.com
+METHOD: GET
+HEADERS: Authorization token from AsyncStorage (handled by api.ts)
+
+API SERVICE: calendarApi.ts
+- Service implements proper error handling with graceful degradation
+- Uses centralized caching with 2-minute TTL
+- Has force refresh capability
+- Returns empty posters array on API failure (lines 204-214)
+
+KEY FINDINGS:
+- API endpoint is correctly defined and called
+- Response structure matches expected CalendarPostersResponse interface
+- URL transformation logic exists to convert relative URLs to absolute
+- Graceful degradation returns empty array instead of throwing errors
+
+POTENTIAL API ISSUES:
+1. Backend endpoint may not exist or return 404/500 errors
+2. Authentication token may be missing/invalid
+3. Backend may return empty posters array for all dates
+4. Network connectivity issues
+5. CORS or server-side errors
+
+================================================================================
+5. DATA FLOW ANALYSIS
+================================================================================
+
+COMPLETE DATA FLOW TRACE:
+
+1. COMPONENT MOUNT (HorizontalFestivalCalendar)
+   useEffect at line 621-632 triggers
+   todayDate is identified (line 625)
+   handleDateSelect(todayDate) called (line 631)
+
+2. DATE SELECTION (handleDateSelect - lines 499-536)
+   formatDateKey() converts Date to YYYY-MM-DD string
+   calendarApi.getPostersByDate(dateString, forceRefresh) called
+   API response processed and mapped to Template format
+   setSelectedDatePosters(resolvedPosters) updates state
+
+3. API RESPONSE PROCESSING (calendarApi.ts lines 507-518)
+   response.data.posters array is mapped to Template format
+   thumbnail field is properly extracted and URL-transformed
+   Empty array is preserved if API returns no posters
+
+4. UI RENDERING CONDITION (line 915)
+   {selectedDate && selectedDatePosters.length > 0 && (
+   This condition controls poster carousel visibility
+
+5. IMAGE RENDERING (lines 654-658)
+   OptimizedImage component receives thumbnail URL
+   getHighQualityThumbnailUrl() enhances Cloudinary URLs
+   Images rendered in TouchableOpacity cards
+
+CRITICAL DATA TRANSFORMATION POINTS:
+- API response to Template mapping (lines 509-517)
+- Thumbnail URL enhancement (getHighQualityThumbnailUrl function)
+- State update with resolvedPosters (line 535)
+
+================================================================================
+6. STATE MANAGEMENT ANALYSIS
+================================================================================
+
+STATE VARIABLES:
+- selectedDate: string - Currently selected date (YYYY-MM-DD)
+- selectedDatePosters: Template[] - Array of posters for selected date
+- isLoadingAllPosters: boolean - Loading state for "View More" modal
+- allPostersWithDates: PosterWithDate[] - All posters for modal view
+
+STATE INITIALIZATION:
+- selectedDate: initialized as empty string ('')
+- selectedDatePosters: initialized as empty array ([])
+- Auto-selection happens via useEffect (line 621-632)
+
+STATE UPDATES:
+1. handleDateSelect() updates both selectedDate and selectedDatePosters
+2. API response directly populates selectedDatePosters state
+3. No race conditions detected in state updates
+
+CONDITIONAL RENDERING LOGIC:
+- Posters section renders ONLY when: selectedDate && selectedDatePosters.length > 0
+- If API returns empty array, section will not render
+- No loading state is shown during API fetch
+
+POTENTIAL STATE ISSUES:
+1. selectedDatePosters remains empty if API fails or returns empty data
+2. No loading indicator during API calls
+3. Silent failure may leave users confused
+
+================================================================================
+7. UI RENDERING ANALYSIS
+================================================================================
+
+RENDERING CONDITIONS:
+Line 915: {selectedDate && selectedDatePosters.length > 0 && (
+
+This condition requires BOTH:
+- selectedDate to be truthy (non-empty string)
+- selectedDatePosters array to have length > 0
+
+COMPONENT STRUCTURE:
+1. Calendar dates scroll view (always visible)
+2. Selected date posters section (conditional)
+3. "View More" modal (separate state)
+
+RENDERING LOGIC BREAKDOWN:
+- Calendar always renders regardless of poster availability
+- Poster carousel only renders if posters exist
+- No empty state or loading state is shown
+- Silent failure results in no visual feedback
+
+KEY RENDERING ISSUE:
+The conditional rendering logic creates a "binary" display:
+- Either show posters (if data exists)
+- OR show nothing (if no data)
+- No intermediate states (loading, error, empty)
+
+================================================================================
+8. IMAGE LOADING ANALYSIS
+================================================================================
+
+IMAGE COMPONENT: OptimizedImage
+PROPS PASSED:
+- uri: getHighQualityThumbnailUrl(item.thumbnail)
+- style: styles.posterImage
+- resizeMode: "cover"
+- mode: "thumbnail" (for carousel images)
+
+IMAGE URL PROCESSING:
+1. getHighQualityThumbnailUrl() enhances Cloudinary URLs
+2. Adds high-quality transforms: 'f_auto,q_auto:best,c_limit,w_1200,dpr_2.0'
+3. Preserves original URL if not Cloudinary
+
+OPTIMIZEDIMAGE BEHAVIOR:
+- Handles loading states internally
+- Shows fallback image on error
+- Implements proper caching
+- Supports thumbnail/full image modes
+
+POTENTIAL IMAGE ISSUES:
+1. Invalid or malformed thumbnail URLs from API
+2. Cloudinary transformation failures
+3. Network issues preventing image loading
+4. OptimizedImage component internal errors
+5. Missing or undefined thumbnail fields
+
+================================================================================
+9. LOGS BREAKDOWN
+================================================================================
+
+EXISTING LOGGING POINTS:
+
+calendarApi.ts:
+- Line 73: "Force refresh - Endpoint:" 
+- Line 75: "Force refresh - Response:"
+- Line 144: "Normal fetch - Endpoint:"
+- Line 145: "Normal fetch - Response:"
+- Line 524: "Error fetching calendar posters:"
+
+HorizontalFestivalCalendar.tsx:
+- Line 591: "Could not pre-load upcoming posters (this is okay)" (dev only)
+- Line 706: "Error fetching all posters:" (for modal view)
+
+MISSING CRITICAL LOGS:
+1. No logging when handleDateSelect is called
+2. No logging of selectedDatePosters state updates
+3. No logging when poster rendering condition fails
+4. No logging of individual poster data processing
+5. No logging of OptimizedImage loading states
+
+================================================================================
+10. ROOT CAUSE HYPOTHESIS (TOP 3 PROBABLE CAUSES)
+================================================================================
+
+HYPOTHESIS #1: BACKEND API RETURNING EMPTY DATA
+- Confidence Level: HIGH (85%)
+- Evidence: 
+  * API service handles empty responses gracefully
+  * Conditional rendering depends on data.length > 0
+  * No error logs suggest API calls are succeeding
+- Impact: Posters section never renders because array is always empty
+- Verification: Check API response logs, test endpoint directly
+
+HYPOTHESIS #2: AUTHENTICATION TOKEN ISSUES
+- Confidence Level: MEDIUM (70%)
+- Evidence:
+  * API calls require authentication via api.ts
+  * Calendar API not in cache config (may affect auth handling)
+  * Silent failure returns empty array
+- Impact: API returns 401/403, service returns empty posters array
+- Verification: Check auth token status, test with valid token
+
+HYPOTHESIS #3: THUMBNAIL URL MAPPING ISSUES
+- Confidence Level: MEDIUM (65%)
+- Evidence:
+  * Complex URL transformation logic in calendarApi
+  * Multiple field fallbacks (thumbnailUrl, thumbnail, imageUrl)
+  * Cloudinary URL enhancement in component
+- Impact: Posters array populated but with invalid/null thumbnail URLs
+- Verification: Log individual poster.thumbnail values before rendering
+
+================================================================================
+11. CONFIDENCE LEVEL FOR EACH CAUSE
+================================================================================
+
+1. BACKEND EMPTY DATA: 85% - Most likely given graceful error handling
+2. AUTHENTICATION ISSUES: 70% - Possible but would likely affect other APIs
+3. URL MAPPING ISSUES: 65% - Complex logic could introduce bugs
+
+================================================================================
+12. RISK ASSESSMENT (IF FIXED INCORRECTLY)
+================================================================================
+
+HIGH RISK FIXES:
+- Removing conditional rendering without proper loading states
+- Bypassing authentication without proper token handling
+- Hardcoding mock data instead of fixing root API issue
+
+MEDIUM RISK FIXES:
+- Modifying URL transformation logic without testing
+- Changing cache configuration without considering performance
+- Adding complex error states that confuse users
+
+LOW RISK FIXES:
+- Adding comprehensive logging for debugging
+- Implementing proper loading and empty states
+- Adding API response validation
+
+RECOMMENDED APPROACH:
+1. Add comprehensive logging first (low risk)
+2. Test API endpoint independently
+3. Verify authentication flow
+4. Check data transformation logic
+5. Implement proper UI states
+
+================================================================================
+13. IMMEDIATE VERIFICATION STEPS
+================================================================================
+
+STEP 1: Add Debug Logging
+- Log API request/response in calendarApi
+- Log selectedDatePosters state updates
+- Log individual poster data before rendering
+
+STEP 2: Test API Endpoint
+- Make direct HTTP request to `/api/mobile/calendar/posters/{today's date}`
+- Verify response structure and data
+- Check authentication requirements
+
+STEP 3: Verify Data Flow
+- Add breakpoint in handleDateSelect
+- Check resolvedPosters array content
+- Verify thumbnail URL values
+
+STEP 4: Check Network Logs
+- Use React Native debugger or Charles Proxy
+- Verify actual HTTP requests being made
+- Check response status and body
+
+================================================================================
+14. CONCLUSION
+================================================================================
+
+The calendar images not showing issue is most likely caused by the backend API 
+returning empty data arrays, either due to missing data, authentication issues, or 
+endpoint problems. The frontend code appears robust with proper error handling,
+but the silent failure mode means users see no feedback when no data is available.
+
+The conditional rendering logic (`selectedDatePosters.length > 0`) combined with 
+graceful API error handling creates a scenario where "no data" and "API error" 
+both result in the same visual outcome: no images displayed.
+
+Primary focus should be on verifying the backend API endpoint and authentication
+flow, followed by implementing proper loading and empty states in the UI.
+
+================================================================================
+END OF REPORT
+================================================================================

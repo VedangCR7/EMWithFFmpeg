@@ -1,0 +1,117 @@
+BUSINESS PROFILE FORM ANALYSIS REPORT
+=====================================
+
+1. ISSUE SUMMARY
+---------------
+The BusinessProfileForm.tsx component is sending the field name "subCategory" to the backend instead of "businessSubcategory", causing the backend to store an empty subcategory value.
+
+2. EXPECTED VS ACTUAL FIELD MAPPING
+-----------------------------------
+Expected:
+* businessSubcategory should be sent to backend
+
+Actual:
+* subCategory is being sent to backend
+
+3. FORM STATE STRUCTURE
+----------------------
+The form stores subcategory in state as:
+```typescript
+formData.subcategory = "Wedding Photography"
+```
+
+Key findings:
+- Line 115: `subcategory: '',` in initial state
+- Line 238: `subcategory: profile.subCategory || profile.subcategory || '',` when loading existing profile
+- Line 250: `subcategory: '',` when resetting form
+- Line 301: `subcategory: '', // Reset subcategory when business category changes`
+
+4. PAYLOAD CONSTRUCTION LOGIC
+------------------------------
+The payload is created in handleSubmit function (Line 456-492):
+
+```typescript
+const handleSubmit = async () => {
+  // ... validation logic ...
+  
+  if (!profile && formData.companyLogo && businessProfileService.isLocalFilePath(formData.companyLogo)) {
+    const formDataWithoutLogo = { ...formData, companyLogo: '', logo: '' };
+    onSubmit(formDataWithoutLogo, formData.companyLogo);
+  } else {
+    onSubmit(formData);
+  }
+};
+```
+
+The form passes `formData` directly to the parent's `onSubmit` callback.
+
+5. FINAL API PAYLOAD
+-------------------
+The final payload sent to backend is created in businessProfile.ts (Line 308):
+
+```typescript
+const backendData = {
+  businessName,
+  ownerName,
+  email,
+  phone,
+  address,
+  category,
+  subCategory: data.subCategory || data.subcategory,  // ← PROBLEM LINE
+  logo: logoUrl,
+  companyLogo: logoUrl,
+  description: data.description || '',
+  website: data.website || ''
+};
+```
+
+6. ROOT CAUSE IDENTIFIED
+------------------------
+File: src/services/businessProfile.ts
+Line Number: 308
+
+Code: `subCategory: data.subCategory || data.subcategory,`
+
+Explanation:
+The backendData object is created with the field name "subCategory" instead of "businessSubcategory". This is the exact point where the incorrect field name is introduced before sending to the backend.
+
+7. DATA FLOW TRACE
+------------------
+Step-by-step flow:
+1. UI Input → User selects subcategory in dropdown
+2. State Update → `formData.subcategory` is updated (Line 314-320 in BusinessProfileForm.tsx)
+3. Form Submission → `handleSubmit` calls `onSubmit(formData)` (Line 490 in BusinessProfileForm.tsx)
+4. Parent Handler → `handleFormSubmit` calls `businessProfileService.createBusinessProfile(formData)` (Line 562 in BusinessProfilesScreen.tsx)
+5. Service Layer → `createBusinessProfile` creates `backendData` with wrong field name (Line 308 in businessProfile.ts)
+6. API Call → Backend receives `subCategory` instead of `businessSubcategory`
+
+8. FIELD OVERRIDE CHECK
+-----------------------
+Was the correct field ever created and later overwritten? 
+
+Answer: NO
+
+The field "businessSubcategory" is never created at any point in the data flow. The issue originates from the initial payload construction in the service layer, not from an override.
+
+9. RISK ANALYSIS
+---------------
+What could break if this is fixed incorrectly?
+
+High Risk:
+- Backend might not recognize the new field name if not updated simultaneously
+- Existing business profiles might continue to use old field name
+- Data migration issues between old and new field names
+
+Medium Risk:
+- Form validation logic might need updates
+- Profile editing functionality might break
+- API response parsing might fail
+
+Low Risk:
+- UI display logic (uses form state, not API field names)
+
+10. FINAL CONCLUSION
+-------------------
+The root cause is in the service layer where the backend payload is constructed with "subCategory" instead of "businessSubcategory". The form state and UI logic are correct; the issue is purely in the API service mapping.
+
+Key Issue: Line 308 in businessProfile.ts maps `data.subCategory || data.subcategory` to backend field `subCategory` instead of `businessSubcategory`.

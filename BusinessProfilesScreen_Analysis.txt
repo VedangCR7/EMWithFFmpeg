@@ -1,0 +1,405 @@
+BUSINESS PROFILES SCREEN - DEEP TECHNICAL & UI/UX ANALYSIS
+===============================================================
+
+1. COMPONENT STRUCTURE ANALYSIS
+===============================
+
+Component Hierarchy:
+--------------------
+BusinessProfilesScreen (Main Container)
+  SafeAreaView
+    LinearGradient (Background)
+      Header (View)
+        - Back Button (TouchableOpacity)
+        - Title (Text)
+        - Add Button (TouchableOpacity)
+      Business Profiles Container (View)
+        Skeleton Loading (View) [Conditional]
+        FlatList
+          BusinessCard (Memoized Component)
+            Lock Overlay (View) [Conditional for locked profiles]
+              Lock Badge (View)
+                - Status Icon (Icon)
+                - Lock Text (Text)
+                - Lock SubText (Text)
+                - Activate Button (TouchableOpacity) [Conditional]
+            Card Header (View)
+              Business Info With Logo (View)
+                Logo Container (View)
+                  - Business Logo (Image) or Placeholder (View)
+                Business Info (View)
+                  Name and Status (View)
+                    - Business Name (Text)
+                    - Subscription Status Badge (SubscriptionStatusBadge)
+                  - Business Category (Text) [Conditional]
+              Card Actions (View)
+                - Edit Button (TouchableOpacity)
+                - Delete Button (TouchableOpacity)
+            Description (Text) [Conditional]
+            Contact Info (View) [Conditional]
+              - Contact Items (Phone, Email, Address, Website)
+            Services Container (View) [Conditional]
+              - Services List (Service Tags)
+      Modals (Multiple)
+        - Success Modal
+        - Delete Confirmation Modal  
+        - Error Modal
+        - Payment Required Modal
+      Business Profile Form (Modal)
+      Bottom Sheet (For Add Profile)
+
+Separation of Concerns:
+-----------------------
+- UI Layer: JSX structure and styling
+- Logic Layer: Callback functions and event handlers
+- State Layer: React hooks for local state management
+- Data Layer: API service calls and context integration
+- Business Logic: Subscription management and payment processing
+
+Reusable Components:
+-------------------
+- BusinessCard: Memoized component for individual profile display
+- SubscriptionStatusBadge: Reusable status indicator
+- Modal components: Standardized modal patterns
+- Action buttons: Consistent button styling
+
+Conditional Rendering Blocks:
+-----------------------------
+1. Skeleton loading vs actual content (loading state)
+2. Lock overlay for inactive profiles
+3. Category display (subcategory/subCategory)
+4. Description display
+5. Contact information sections
+6. Services list display
+7. Modal visibility states
+8. Empty state vs profile list
+
+Business Profile Rendering:
+--------------------------
+- Profiles rendered via FlatList with keyExtractor using profile.id
+- Each profile mapped to BusinessCard component
+- Data flow: profiles state -> FlatList -> BusinessCard -> individual profile item
+- Props passed: item, theme, callbacks, subscription data, activation state
+
+2. LOCK CARD LOGIC ANALYSIS
+===========================
+
+Lock Condition Definition:
+--------------------------
+Primary lock condition: `const isLocked = !isEffectivelyActive`
+Where `isEffectivelyActive = isActive && !isPendingActivation`
+
+Lock Status Determination:
+--------------------------
+1. Backend Status: `item?.subscriptionStatus?.toUpperCase() === "ACTIVE"`
+2. Processing Status: `item?.subscriptionStatus?.toUpperCase() === "PROCESSING"`
+3. Pending Activation: `isActivationPending(item.id)` from context
+4. Final Lock State: Combined evaluation of backend status and pending state
+
+Conditional Rendering for Locked vs Active:
+-------------------------------------------
+Locked UI renders when `isLocked = true`:
+- Full-screen overlay with semi-transparent background
+- Lock badge centered in overlay
+- Different content based on specific status:
+  * PROCESSING: Hourglass icon + "Payment is processing" message
+  * PENDING ACTIVATION: Hourglass icon + "Activation in progress" message  
+  * INACTIVE: Lock icon + "Subscription Required" + Activate button
+
+Active UI renders when `isLocked = false`:
+- No overlay
+- Full card interactivity
+- All action buttons enabled
+
+User Interaction Restrictions:
+-----------------------------
+- TouchableOpacity disabled={isLocked} on main card
+- Edit button disabled={isLocked}
+- Delete button disabled={isLocked}
+- Card press handler blocked for locked profiles
+- Only "Activate Now" button remains functional for inactive profiles
+
+3. UI LAYOUT & DESIGN ANALYSIS
+===============================
+
+Visual Structure of Business Profile Card:
+-----------------------------------------
+Layout: Flex-based vertical layout
+- Card Header (horizontal flex row)
+  - Business Info With Logo (flex: 1)
+    - Logo Container (fixed width/height)
+    - Business Info (flex: 1)
+  - Card Actions (fixed width)
+- Description (optional)
+- Contact Info (vertical stack)
+- Services Container (optional)
+
+Sections Inside Card:
+-------------------
+1. Logo/Image Section (40x40px circular)
+2. Business Name + Status Badge (horizontal flex)
+3. Business Category (optional, below name)
+4. Action Buttons (Edit/Delete, top-right)
+5. Description (optional)
+6. Contact Information (phone, email, address, website)
+7. Services List (optional, max 3 displayed + "more" indicator)
+
+Lock Indicator Positioning:
+--------------------------
+- Absolute positioning overlay covering entire card
+- Centered lock badge with 80% width
+- Semi-transparent black background (rgba(0, 0, 0, 0.5))
+- zIndex: 10 to ensure overlay appears above all content
+
+Differences Between Locked and Unlocked Cards:
+----------------------------------------------
+Locked Cards:
+- Semi-transparent overlay covering entire card
+- Centered lock badge with status-specific content
+- Action buttons visually disabled (grayed out)
+- Card press interaction blocked
+- Edit/Delete buttons non-functional
+
+Unlocked Cards:
+- Full visibility of all content
+- Interactive card press
+- Functional action buttons
+- No overlay or visual obstruction
+
+Category Display on Locked Cards:
+--------------------------------
+- Category text is NOT hidden by lock overlay
+- Category remains visible through semi-transparent overlay
+- Category data: `item.subcategory || item.subCategory`
+- Positioned below business name, above description
+
+4. DATA FLOW & STATE MANAGEMENT
+===============================
+
+Data Source:
+-----------
+- Primary: `businessProfileService.getUserBusinessProfiles(userId)` API call
+- Fallback: Empty array if API fails
+- Mock data available for development (not used in production)
+
+State Storage:
+-------------
+- Local state: `profiles` useState hook
+- Subscription context: `useSubscription()` hook
+- Business profile context: `useBusinessProfile()` hook
+- Processing state: `processingProfiles` Set for UI loading states
+
+Active/Inactive Status Storage:
+-------------------------------
+- Backend: `subscriptionStatus` field in profile object
+- Context: `getBusinessProfileSubscription(profileId)` 
+- Activation pending: `isActivationPending(profileId)` from context
+- Processing: `processingProfiles` Set for payment processing
+
+State Update Flow:
+-----------------
+1. API call updates profiles state
+2. Subscription context updates via polling
+3. UI re-renders when state changes
+4. BusinessCard memoization controls re-render frequency
+5. Image refresh key forces logo re-rendering
+
+Centralized vs Per-Card Control:
+-------------------------------
+- Lock behavior: Centralized via subscriptionStatus field
+- Activation pending: Context-based (centralized)
+- Processing state: Per-card via Set data structure
+- UI updates: Automatic through React re-rendering
+
+5. ACTION HANDLING ANALYSIS
+===========================
+
+Available Actions on Business Cards:
+-----------------------------------
+1. View/Select: `handleProfileSelect()` - Main card press
+2. Edit: `handleEditProfile()` - Edit button press
+3. Delete: `handleDeleteProfile()` - Delete button press  
+4. Activate: `initiatePaymentForProfile()` - Payment flow initiation
+
+Action Button Conditional Rendering:
+-----------------------------------
+Edit Button:
+- Always rendered visually
+- Disabled when `isLocked = true`
+- Color changes to gray when disabled
+
+Delete Button:
+- Always rendered visually
+- Disabled when `isLocked = true`
+- Color changes to gray when disabled
+- Handler exists but blocked by disabled state
+
+Activate Button:
+- Only rendered for inactive profiles (not processing/pending)
+- Located inside lock overlay
+- Triggers payment flow
+
+Delete Action on Locked Profiles:
+--------------------------------
+- Delete button exists but is disabled
+- Delete handler `handleDeleteProfile()` is fully implemented
+- Deletion is blocked via `disabled={isLocked}` prop
+- No separate delete restriction logic beyond disabled state
+
+6. EXTENSIBILITY ANALYSIS (CRITICAL)
+====================================
+
+A. Showing Business Category on Locked Cards:
+---------------------------------------------
+Current State:
+- Category data IS available: `item.subcategory || item.subCategory`
+- Category IS visible through lock overlay (not hidden)
+- Category rendered at lines 762-764 in business info section
+- Positioned below business name, above description
+- Uses primary theme color: `theme.colors.primary`
+
+UI Space Availability:
+- Category currently displays in existing space
+- No layout conflicts with lock overlay
+- Semi-transparent overlay allows category visibility
+- No additional UI space needed
+
+Implementation Feasibility:
+- Category already visible on locked cards
+- No code changes required for category display
+- Category appears through lock overlay due to transparency
+
+B. Allowing Delete Action on Locked Profiles:
+---------------------------------------------
+Current Implementation:
+- Delete handler exists: `handleDeleteProfile()` at lines 463-483
+- Delete button rendered: lines 775-781
+- Delete button disabled: `disabled={isLocked}` at line 778
+- Full delete confirmation flow implemented
+
+Safe Insertion Points:
+1. Remove disabled prop from delete button (line 778)
+2. Add conditional logic to allow delete regardless of lock status
+3. Maintain existing delete confirmation modal flow
+4. Preserve existing error handling and success feedback
+
+Minimal Change Required:
+- Single line modification: `disabled={false}` or `disabled={isLocked && !allowDeleteOnLocked}`
+- No UI layout changes needed
+- Existing modal and API integration ready
+
+Tight Coupling Areas:
+- Lock overlay positioning (absolute fill)
+- Action button styling and disabled states
+- Memoization logic in BusinessCard component
+- Subscription status evaluation logic
+
+7. RISK & DEPENDENCY ANALYSIS
+==============================
+
+Highly Sensitive Code Areas:
+----------------------------
+1. Lock overlay rendering (lines 661-703) - Critical for user experience
+2. Subscription status evaluation (lines 621-646) - Core business logic
+3. Payment processing flow (lines 450-461) - Financial transactions
+4. Memoization comparison logic (lines 847-869) - Performance critical
+5. Context integration for activation pending (lines 624-631)
+
+Dependencies Between Lock Logic and UI Rendering:
+------------------------------------------------
+- Lock status determines overlay visibility
+- Lock status affects button disabled states
+- Lock status controls card press interaction
+- Subscription status polling affects lock state updates
+- Image refresh key affects re-rendering of locked cards
+
+Shared Components Impact:
+------------------------
+- SubscriptionStatusBadge: Used in BusinessCard
+- Modal components: Shared across application
+- Action button styling: Consistent across screens
+- Theme integration: Global styling system
+
+Areas That MUST NOT Be Changed:
+------------------------------
+1. Lock overlay structure and positioning
+2. Subscription status evaluation logic
+3. Payment processing integration
+4. Context provider integration
+5. Memoization logic for performance
+6. API service integration patterns
+
+Potential Side Effects of Modifications:
+----------------------------------------
+- Changing lock logic could break subscription flow
+- Modifying overlay could affect user interaction patterns
+- Altering action buttons could impact other screens
+- Changes to memoization could degrade performance
+- Theme integration changes could affect global styling
+
+8. SUMMARY
+===========
+
+Current Behavior of Locked Business Profile Card:
+------------------------------------------------
+- Semi-transparent black overlay covers entire card
+- Centered lock badge with status-specific messaging
+- Three lock states: Processing, Pending Activation, Subscription Required
+- Edit and Delete buttons visually disabled and non-functional
+- Card press interaction completely blocked
+- Category text visible through overlay
+- "Activate Now" button available only for inactive profiles
+
+What Is Visible vs Hidden:
+------------------------
+Visible through overlay:
+- Business logo/image
+- Business name
+- Subscription status badge
+- Business category
+- Description text
+- Contact information
+- Services list
+- Action buttons (visually, but disabled)
+
+Hidden/Blocked:
+- Card press interaction
+- Edit button functionality
+- Delete button functionality
+- Normal card hover/press effects
+
+Key Constraints in Current Implementation:
+-----------------------------------------
+1. Lock status determined by subscriptionStatus + activation pending
+2. All interactions blocked for locked profiles
+3. Delete functionality exists but disabled by lock state
+4. Category display already works on locked cards
+5. Payment flow tightly integrated with activation process
+6. Context-based state management for subscription status
+
+Safe Extension Zones:
+--------------------
+1. Delete button enablement: Single prop change on line 778
+2. Category display: Already functional, no changes needed
+3. Lock messaging: Text content in lock badge can be modified
+4. Action button styling: Colors and icons can be updated
+5. Modal content: Payment modal text and features can be enhanced
+
+High-Risk Areas to Avoid:
+--------------------------
+1. Lock overlay structure and positioning
+2. Subscription status evaluation logic
+3. Payment processing and activation flow
+4. Context provider integration
+5. Memoization and performance optimization
+6. API service integration patterns
+
+Extensibility Assessment:
+------------------------
+- Category display on locked cards: ALREADY FUNCTIONAL
+- Delete action on locked profiles: MINIMAL RISK (single line change)
+- Any modifications to lock behavior: HIGH RISK
+- Payment flow modifications: VERY HIGH RISK
+- UI styling changes: LOW TO MEDIUM RISK
+
+The current implementation is well-structured with clear separation of concerns, making targeted extensions feasible while maintaining system stability.

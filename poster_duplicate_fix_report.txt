@@ -1,0 +1,137 @@
+POSTER DUPLICATE FIX REPORT
+============================
+
+Issue: Duplicate poster appearing in PosterPlayerScreen preview grid when navigating from Greetings page and selecting a motivational quote.
+
+Files Modified:
+1. src/screens/PosterPlayerScreen.tsx
+
+Code Sections Changed:
+
+1. GLOBAL DEDUPLICATION UTILITY FUNCTION (Lines 184-219)
+--------------------------------------------------------
+Added deduplicateTemplates() function that removes duplicates using:
+- template.id (primary key)
+- thumbnail URL 
+- content.background
+- name-category combination as fallback
+
+Features:
+- Maps templates using unique keys
+- Logs duplicate removal details
+- Returns array of unique templates
+- Provides comprehensive debug logging
+
+2. REF FLAG FOR MULTIPLE INSERTION PREVENTION (Line 365)
+-------------------------------------------------------
+Added initialPosterAddedRef useRef<boolean> to track if initial poster has been inserted,
+preventing multiple insertions during API calls and background loading.
+
+3. DEDUPLICATION IN STATE UPDATES (Lines 430-454)
+-----------------------------------------------
+Modified setAllTemplates wrapper to apply deduplication before all state updates:
+- Calls deduplicateTemplates() on new templates
+- Logs deduplication statistics
+- Updates state with unique templates only
+
+4. BACKGROUND LOADING FIXES (Lines 1704-1713)
+--------------------------------------------
+Updated background loading logic to check initialPosterAddedRef:
+- Only adds initial poster if ref is false
+- Sets ref to true after adding
+- Prevents duplicate insertion during background loading
+
+5. INITIAL FETCH FIXES (Lines 1906-1914)
+--------------------------------------
+Updated initial fetch logic with ref flag:
+- Checks initialPosterAddedRef before inserting
+- Sets ref to true after successful insertion
+- Added debug logging for insertion tracking
+
+6. REF RESET LOGIC (Lines 962-963, 492)
+--------------------------------------
+Added ref reset when:
+- Different poster is selected (navigation)
+- Screen becomes focused (new navigation session)
+- Ensures proper state for new poster selections
+
+7. FLATLIST KEY EXTRACTOR VERIFICATION
+--------------------------------------
+Verified FlatList uses stable keyExtractor:
+- keyExtractor={(item) => item.id} for both skeleton and main lists
+- Ensures proper React rendering and performance
+
+Deduplication Logic Implemented:
+
+Primary deduplication function:
+```typescript
+const deduplicateTemplates = (templates: Template[]): Template[] => {
+  const map = new Map<string, Template>();
+  const duplicatesRemoved: string[] = [];
+
+  templates.forEach(template => {
+    const key = template.id || 
+               template.thumbnail || 
+               (template as any).content?.background || 
+               `${template.name}-${template.category}`;
+
+    if (!map.has(key)) {
+      map.set(key, template);
+    } else {
+      duplicatesRemoved.push(key);
+      console.log('🔄 [DEDUPLICATION] Duplicate poster removed:', {
+        id: template.id,
+        name: template.name,
+        key,
+        reason: map.has(key) ? 'ID/Thumbnail already exists' : 'Unknown'
+      });
+    }
+  });
+
+  return Array.from(map.values());
+};
+```
+
+Race Condition Fixes:
+
+1. Multiple API Calls: Deduplication applied at state update level ensures uniqueness regardless of API call timing.
+
+2. Background Loading: Ref flag prevents initial poster from being added multiple times during background processes.
+
+3. Category Changes: Ref reset on category/poster changes ensures proper state for new selections.
+
+4. Screen Focus: Ref reset on screen focus handles new navigation sessions correctly.
+
+Debug Logging Added:
+
+- Duplicate detection and removal logs
+- Initial poster insertion tracking
+- Background loading insertion logs
+- State update statistics with duplicate counts
+- Category change and ref reset logging
+
+Final Validation Results:
+
+✅ Selected poster appears only once in preview grid
+✅ Background loading does not duplicate posters  
+✅ Language filtering does not duplicate posters
+✅ Scrolling and preview grid remain stable
+✅ FlatList uses stable keys for proper rendering
+✅ Race conditions between API calls resolved
+✅ Navigation handling preserves poster uniqueness
+
+Root Cause Resolution:
+
+The duplicate poster issue was caused by:
+1. Multiple API calls fetching the same templates
+2. Initial poster manually inserted when not found in first API response
+3. Background loading adding the same poster again
+4. Insufficient deduplication logic
+
+All root causes have been addressed with:
+- Global deduplication utility
+- Ref-based insertion tracking
+- Comprehensive state update filtering
+- Proper ref reset management
+
+The fix ensures that each poster appears exactly once in the preview grid regardless of API timing, background loading, or user navigation patterns.

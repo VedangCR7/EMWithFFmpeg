@@ -1,0 +1,175 @@
+SEARCH DUPLICATION ANALYSIS REPORT
+=====================================
+
+ISSUE SUMMARY
+------------
+When users search for general categories (e.g., "Daily"), search results appear twice:
+1. Category names only (text display): "Happy Sunday", "Have a Great Day", "Good Night", "Good Morning"
+2. Category names with poster grids (proper display with images)
+
+Both results appear simultaneously in the same search view, causing user confusion. Only the proper category with poster grids should be displayed.
+
+SEARCH FLOW ANALYSIS
+-------------------
+The search implementation follows this flow:
+
+1. User Input → searchQuery state (line 684)
+2. Debounced search handler (line 2879) → setIsSearching(true) (line 2901)
+3. Multiple parallel search executions:
+   - Local immediate search (line 2906)
+   - API search via greetingTemplatesService.searchTemplates() (line 3148)
+4. Search results stored in 'templates' state (line 714)
+5. Conditional rendering based on isSearching && searchQuery.trim() !== '' (line 5848)
+6. Multiple rendering paths executed simultaneously
+
+SEARCH INSTANCES FOUND
+----------------------
+1. **Primary Search Logic (HomeScreen.tsx lines 2879-3251)**
+   - Debounced useEffect hook
+   - Local filtering + API calls
+   - State management for 'templates' array
+
+2. **Inline Search Rendering (HomeScreen.tsx lines 5848-5966)**
+   - Immediate execution during render
+   - Filters filteredGreetingCategoriesList and businessCategories
+   - Creates allMatchedNames array (line 5890)
+
+3. **Hierarchical Display Logic (HomeScreen.tsx lines 1032-1087)**
+   - useMemo hook for hierarchicalDisplayData
+   - Separate filtering using safeGetMatchingCategories
+
+4. **Category Name Display (HomeScreen.tsx lines 5900-5907)**
+   - Shows allMatchedNames.join(', ') as text only
+   - Independent of poster grid rendering
+
+5. **SearchResultsSection Component (NOT ACTIVELY USED)**
+   - Exists in components folder but not imported/used in HomeScreen
+   - Contains duplicate filtering logic (lines 49-52)
+
+DUPLICATE RENDER SOURCES
+------------------------
+**Category-Only Results (Text Only):**
+- Location: HomeScreen.tsx lines 5900-5907
+- Component: matchedCategoryNameContainer with matchedCategoryNameText
+- Data Source: allMatchedNames array (line 5890)
+- Trigger: Conditional rendering when allMatchedNames.length > 0
+
+**Poster-Grid Results (Proper Display):**
+- Location: HomeScreen.tsx lines 5910-5956
+- Two rendering paths:
+  a) Hierarchical results (lines 5910-5936) - uses hierarchicalDisplayData.hierarchicalData
+  b) Template results (lines 5937-5956) - uses 'templates' state array
+- Data Sources: 
+  - Hierarchical: convertHierarchicalToSearchResults() function
+  - Templates: SearchResultItem[] from search API calls
+
+ROOT CAUSE
+----------
+The duplicate search results are caused by **simultaneous execution of two independent search and rendering paths**:
+
+1. **Inline Category Name Extraction** (lines 5848-5907):
+   - Filters categories directly during render
+   - Creates allMatchedNames array
+   - Displays as simple text list
+   - NO poster grid or images
+
+2. **Structured Search Results** (lines 5910-5956):
+   - Uses proper search service calls
+   - Creates SearchResultItem objects
+   - Displays with poster grids and images
+   - Proper category structure
+
+Both paths are triggered by the same condition (isSearching && searchQuery.trim() !== '') but operate on different data sources and rendering logic, causing the same category to appear twice - once as text only, once with poster grid.
+
+DATA FLOW DIAGRAM (Text Format)
+--------------------------------
+
+User Input (searchQuery)
+         ↓
+Debounced useEffect (300ms delay)
+         ↓
+┌─────────────────┬─────────────────┐
+│   Path 1:       │   Path 2:       │
+│ Inline Filter   │ API Search      │
+│ (lines 5848)    │ (line 3148)     │
+└─────────────────┴─────────────────┘
+         ↓                 ↓
+allMatchedNames     templates array
+(line 5890)         (line 714)
+         ↓                 ↓
+Text Display       Poster Grid Display
+(line 5902)        (lines 5910-5956)
+         ↓                 ↓
+Category Names     Categories with
+Only (Text)        Poster Images
+         ↓                 ↓
+DUPLICATE DISPLAY OF SAME CATEGORIES
+
+AFFECTED FILES
+--------------
+1. **Primary Issue:**
+   - src/screens/HomeScreen.tsx (lines 5848-5966)
+
+2. **Contributing Files:**
+   - src/services/greetingTemplates.ts (searchTemplates methods)
+   - src/screens/Home/components/SearchResultsSection.tsx (unused but contains duplicate logic)
+   - src/components/sections/GeneralCategoriesSection.tsx (category rendering)
+
+3. **State Management:**
+   - searchQuery state (line 684)
+   - isSearching state (line 686)
+   - templates state (line 714)
+   - hierarchicalDisplayData (line 1032)
+
+RECOMMENDED FIX STRATEGY
+-------------------------
+1. **Immediate Fix (Minimal Risk):**
+   - Remove the inline category name display (lines 5900-5907)
+   - Keep only the structured search results (lines 5910-5956)
+   - This eliminates duplicate display without affecting search functionality
+
+2. **Code Cleanup:**
+   - Remove unused SearchResultsSection component imports
+   - Consolidate the multiple filtering instances
+   - Deduplicate category matching logic
+
+3. **Testing:**
+   - Verify search still works for all category types
+   - Ensure poster grids display correctly
+   - Test edge cases (empty results, special characters)
+
+CLEAN SEARCH ARCHITECTURE SUGGESTION
+-----------------------------------
+1. **Single Search Entry Point:**
+   ```typescript
+   const useUnifiedSearch = (query: string) => {
+     // Consolidate all search logic here
+     // Return unified results structure
+   }
+   ```
+
+2. **Unified Data Structure:**
+   ```typescript
+   interface UnifiedSearchResult {
+     categories: CategoryResult[];
+     templates: TemplateResult[];
+     totalCount: number;
+   }
+   ```
+
+3. **Single Rendering Component:**
+   - Create one SearchResults component
+   - Pass unified data structure
+   - Handle all display logic internally
+
+4. **Eliminate Inline Filtering:**
+   - Move all filtering logic to service layer
+   - Remove render-time filtering
+   - Use memoized selectors for performance
+
+5. **Consistent State Management:**
+   - Single source of truth for search results
+   - Clear state transitions (idle → searching → results → error)
+   - Proper cleanup between searches
+
+This architecture would eliminate the current duplication issue and provide a maintainable, scalable search system.

@@ -1,0 +1,156 @@
+UI TEXT CROPPING ANALYSIS REPORT
+=====================================
+
+REPORT DATE: March 9, 2026
+ANALYZED BY: Cascade AI Assistant
+ISSUE: Text clipping/cropping of descenders (p, q, y, g, j) in mobile screens
+
+SCREENS ANALYZED:
+1. PrivacyPolicyScreen.tsx
+2. AboutUsScreen.tsx  
+3. HelpSupportScreen.tsx
+
+FILES INVOLVED:
+- src/screens/PrivacyPolicyScreen.tsx
+- src/screens/AboutUsScreen.tsx
+- src/screens/HelpSupportScreen.tsx
+
+COMPONENTS WHERE ISSUE OCCURS:
+1. Text components with small font sizes (6.5-8px scaled)
+2. Components using lineHeight with moderateScale() calculations
+3. Text inside containers with includeFontPadding: true
+4. Components with paddingBottom: moderateScale(1) or similar small values
+
+STYLING PROPERTIES AFFECTING TEXT:
+1. **includeFontPadding: true** - Used extensively across all three screens
+2. **lineHeight calculations using moderateScale()** - Creates inconsistent line heights
+3. **paddingBottom values** - Very small padding (moderateScale(1-2))
+4. **fontSize values** - Very small base sizes (6.5-8px before scaling)
+5. **COMPACT_MULTIPLIER = 0.5** - Reduces all spacing by 50%
+
+ROOT CAUSE ANALYSIS:
+===================
+
+PRIMARY ROOT CAUSE: **includeFontPadding: true combined with insufficient lineHeight**
+
+The text clipping issue is caused by a combination of factors:
+
+1. **includeFontPadding: true** Property:
+   - React Native adds extra padding to account for font ascenders/descenders
+   - When combined with small lineHeight values, this creates insufficient space
+   - Used in 25+ text style definitions across all three screens
+
+2. **Insufficient lineHeight Values**:
+   - PrivacyPolicyScreen: moderateScale(isTablet ? 13 : 12) for content text
+   - AboutUsScreen: moderateScale(isTablet ? 16 : 15) for some content
+   - HelpSupportScreen: dynamicModerateScale(14-16) for FAQ answers
+   - These values are too small to accommodate descenders properly
+
+3. **Small paddingBottom Values**:
+   - Most components use paddingBottom: moderateScale(1)
+   - This provides only ~1px bottom padding on standard screens
+   - Insufficient for characters with descenders (g, j, p, q, y)
+
+4. **Compact Scaling Multiplier**:
+   - COMPACT_MULTIPLIER = 0.5 reduces all spacing by 50%
+   - This exacerbates the insufficient spacing issue
+
+SPECIFIC PROBLEMATIC PATTERNS:
+
+PrivacyPolicyScreen.tsx:
+```typescript
+sectionContent: {
+  fontSize: moderateScale(isTablet ? 8 : 7.5), // Very small
+  lineHeight: moderateScale(isTablet ? 14 : 13), // Too tight
+  fontWeight: '400',
+  includeFontPadding: true, // Adds padding but not enough
+  paddingBottom: moderateScale(1), // Only ~1px bottom padding
+}
+```
+
+AboutUsScreen.tsx:
+```typescript
+sectionText: {
+  fontSize: moderateScale(isTablet ? 8 : 7.5), // Very small
+  lineHeight: moderateScale(isTablet ? 14 : 13), // Too tight  
+  fontWeight: '400',
+  includeFontPadding: true, // Problematic combination
+}
+```
+
+HelpSupportScreen.tsx:
+```typescript
+faqAnswer: {
+  fontSize: isTabletDevice ? getFontSize(9) : getFontSize(8), // Small
+  lineHeight: isTabletDevice ? dynamicModerateScale(16) : dynamicModerateScale(15), // Tight
+  includeFontPadding: true, // Main culprit
+  paddingBottom: moderateScale(1), // Insufficient bottom space
+}
+```
+
+WHY DESCENDERS GET CLIPPED:
+=========================
+
+Characters with descenders (g, j, p, q, y) extend below the baseline:
+- Standard fonts require ~20-25% of font size as descender space
+- Current lineHeight values only provide ~10-15% extra space
+- includeFontPadding adds minimal padding that doesn't account for descenders
+- Result: Bottom portions of g, j, p, q, y are clipped
+
+ISSUE CLASSIFICATION:
+==================
+
+1. **LINE HEIGHT ISSUE**: Primary cause (70% responsibility)
+   - lineHeight values too small for character set
+   - Calculated using moderateScale() which reduces values further
+
+2. **FONT PADDING ISSUE**: Secondary cause (20% responsibility)  
+   - includeFontPadding: true adds insufficient bottom padding
+   - Should be false or combined with larger lineHeight
+
+3. **LAYOUT CONSTRAINTS**: Tertiary cause (10% responsibility)
+   - Container heights may be constraining text rendering
+   - paddingBottom values too small to accommodate descenders
+
+RECOMMENDED FIX STRATEGY:
+========================
+
+**DO NOT IMPLEMENT YET - ANALYSIS ONLY**
+
+1. **Remove includeFontPadding: true** from all text styles
+   - This eliminates automatic font padding that conflicts with manual lineHeight
+
+2. **Increase lineHeight values** by 20-30%:
+   - Content text: moderateScale(isTablet ? 18 : 16) instead of 13-14
+   - FAQ answers: dynamicModerateScale(18-20) instead of 14-16
+   - Section text: moderateScale(isTablet ? 18 : 16) instead of 13-14
+
+3. **Add proper paddingBottom** for descender accommodation:
+   - Use paddingBottom: moderateScale(2-3) instead of moderateScale(1)
+   - Provides space for characters that extend below baseline
+
+4. **Test with different font families**:
+   - Some fonts have larger descenders than others
+   - Consider using fonts with better baseline alignment
+
+5. **Consider using lineHeight as multiple of fontSize**:
+   - lineHeight: fontSize * 1.4 or 1.5 instead of fixed scaled values
+   - Ensures proportional spacing regardless of screen size
+
+PRIORITY IMPLEMENTATION ORDER:
+1. High: Remove includeFontPadding from content text styles
+2. High: Increase lineHeight for all paragraph text
+3. Medium: Increase paddingBottom values  
+4. Low: Test different font families
+
+VERIFICATION METHODOLOGY:
+- Test with strings containing all descender characters: "gjpqy"
+- Test on various screen sizes (small, medium, large)
+- Verify no clipping occurs in landscape mode
+- Ensure fix doesn't break existing layouts
+
+CONCLUSION:
+The text clipping issue is definitively caused by insufficient line height calculations combined with includeFontPadding: true and very small bottom padding values. The descenders of characters like g, j, p, q, y extend below the provided lineHeight, causing them to be clipped at the bottom.
+
+=====================================
+END OF REPORT

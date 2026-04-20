@@ -1,0 +1,113 @@
+Download Limit Analysis Report
+=============================
+
+📁 File: src/screens/PosterPreviewScreen.tsx
+
+🔍 DEEP ANALYSIS RESULTS
+
+1. Download Function Name
+   - Function: downloadPoster
+   - Location: Line 355
+   - Type: Async function
+
+2. Download Trigger Location
+   - Button: Download button in action buttons section
+   - Location: Line 685 (onPress={downloadPoster})
+   - Disabled when: isProcessing || isDownloadProcessing || isLimitReached
+
+3. Limit Validation Logic
+   - Location: Lines 366-373
+   - Variables Involved:
+     * isLimitReached (from useCentralizedDownload hook)
+     * isDownloadProcessing (from useCentralizedDownload hook)
+   
+   - Logic Structure:
+     ```typescript
+     if (isLimitReached) {
+       Alert.alert(
+         'Download Limit Reached',
+         'You have reached your daily download limit. Please try again tomorrow.'
+       );
+       return;
+     }
+     ```
+
+4. Current UI Handling Method
+   - Method: Alert.alert
+   - Title: 'Download Limit Reached'
+   - Message: 'You have reached your daily download limit. Please try again tomorrow.'
+   - Behavior: Blocking alert with OK button
+
+5. Variables Involved
+   - isLimitReached: Boolean from useCentralizedDownload hook
+   - isDownloadProcessing: Boolean from useCentralizedDownload hook
+   - isProcessing: Local state for UI loading
+   - selectedBusinessProfileId: From useBusinessProfile hook
+   - capturedImageUri: From route params
+
+6. Execution Flow Summary
+   1. User presses Download button (line 685)
+   2. downloadPoster function called (line 355)
+   3. Early checks:
+      - No capturedImageUri → Alert and return (line 357)
+      - isDownloadProcessing → console.log and return (line 361)
+      - isLimitReached → Alert.alert and return (line 367-373)
+   4. If limit not reached → Continue with download process
+   5. Backend API call via downloadContent() (line 410)
+   6. Save to gallery via CameraRoll.save() (line 426)
+   7. Success feedback via ToastAndroid/Alert (line 456-467)
+
+7. Risk Points (if replaced incorrectly)
+   - ⚠️ Breaking the early return pattern could allow downloads when limit reached
+   - ⚠️ Removing the return statement could cause multiple download attempts
+   - ⚠️ Changing the validation logic could bypass limit checks
+   - ⚠️ Modifying async flow could cause race conditions
+   - ⚠️ Affecting the isLimitReached variable dependency could break centralized limit tracking
+
+8. Safe Replacement Strategy
+   ✅ KEEP EXACTLY SAME:
+   - Validation condition: if (isLimitReached)
+   - Early return pattern: return after showing modal
+   - Variable dependencies: isLimitReached, isDownloadProcessing
+   - Function structure and async behavior
+   
+   ✅ REPLACE ONLY:
+   - Alert.alert() call with setShowDownloadLimitModal(true)
+   - Add modal component to JSX
+   - Add state variable for modal visibility
+   
+   ❌ DO NOT TOUCH:
+   - Backend API calls
+   - downloadContent function
+   - CameraRoll.save logic
+   - Any other validation logic
+   - Error handling
+
+9. Edge Cases Verified
+   - Multiple limit checks: Only one primary check (line 367)
+   - Different plan behavior: Handled by useCentralizedDownload hook
+   - Race conditions: isDownloadProcessing guard prevents double triggers
+   - State consistency: Limit state managed by centralized hook
+
+10. Integration Dependencies
+    - useCentralizedDownload hook provides limit state
+    - useBusinessProfile hook provides business profile ID
+    - Route params provide poster data
+    - No direct backend coupling in limit check
+
+📊 ANALYSIS SUMMARY
+
+✅ SAFE TO REPLACE: The Alert.alert call can be safely replaced with a modal
+✅ LOGIC STABLE: Download limit validation is centralized and well-structured
+✅ NO BACKEND IMPACT: Limit logic is frontend-only validation
+✅ CLEAR BOUNDARIES: Single point of replacement with minimal risk
+
+🎯 RECOMMENDED APPROACH
+
+1. Create DownloadLimitMessage component
+2. Add showDownloadLimitModal state variable
+3. Replace Alert.alert with setShowDownloadLimitModal(true)
+4. Keep the return statement exactly as is
+5. Render modal component in JSX
+
+This approach ensures zero regression while improving UX.

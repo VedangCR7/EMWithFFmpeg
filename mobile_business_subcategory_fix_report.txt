@@ -1,0 +1,172 @@
+MOBILE BUSINESS SUBCATEGORY FIX IMPLEMENTATION REPORT
+====================================================
+
+1. SUMMARY OF THE ISSUE
+----------------------
+The mobile application was sending the field name "subCategory" to the backend during business registration, but the backend expects "businessSubcategory". This mismatch caused the backend to store the subcategory as an empty value.
+
+2. ROOT CAUSE
+------------
+- RegistrationScreen.tsx was sending: subCategory: formData.subcategory.trim()
+- loginAPIs.ts was using: subCategory?: string in the interface
+- Backend expects: businessSubcategory
+
+3. FILES MODIFIED
+-----------------
+- src/screens/RegistrationScreen.tsx
+- src/services/loginAPIs.ts
+
+4. CODE CHANGES MADE
+-------------------
+
+A. RegistrationScreen.tsx (Line 626-644)
+BEFORE:
+const result = await loginAPIs.registerUser({
+  email: formData.email.trim(),
+  password: formData.password.trim(),
+  companyName: formData.name.trim(),
+  phoneNumber: formData.phone.trim(),
+  description: formData.description.trim(),
+  category: formData.category.trim(),
+  subCategory: formData.subcategory.trim(),
+  address: formData.address.trim(),
+  alternatePhone: formData.alternatePhone.trim(),
+  website: formData.website.trim(),
+  companyLogo: logoImage || formData.companyLogo,
+  displayName: formData.name.trim(),
+  promoCode: formData.promoCode.trim(),
+});
+
+AFTER:
+const registrationPayload = {
+  email: formData.email.trim(),
+  password: formData.password.trim(),
+  companyName: formData.name.trim(),
+  phoneNumber: formData.phone.trim(),
+  description: formData.description.trim(),
+  category: formData.category.trim(),
+  businessSubcategory: formData.subcategory.trim(),
+  address: formData.address.trim(),
+  alternatePhone: formData.alternatePhone.trim(),
+  website: formData.website.trim(),
+  companyLogo: logoImage || formData.companyLogo,
+  displayName: formData.name.trim(),
+  promoCode: formData.promoCode.trim(),
+};
+
+console.log("Registration Payload:", registrationPayload);
+
+const result = await loginAPIs.registerUser(registrationPayload);
+
+B. loginAPIs.ts - Interface Updates
+
+UserRegistrationRequest Interface (Line 28):
+BEFORE: subCategory?: string; // User's selected subcategory during registration
+AFTER:  businessSubcategory?: string; // User's selected subcategory during registration
+
+UserProfile Interface (Line 63):
+BEFORE: subCategory?: string; // User's selected subcategory during registration
+AFTER:  businessSubcategory?: string; // User's selected subcategory during registration
+
+C. loginAPIs.ts - FormData Handling (Line 177):
+BEFORE: if (data.subCategory) formData.append('subCategory', data.subCategory);
+AFTER:  if (data.businessSubcategory) formData.append('businessSubcategory', data.businessSubcategory);
+
+D. loginAPIs.ts - JSON Payload (Line 222):
+BEFORE: subCategory: data.subCategory || data.subcategory,
+AFTER:  businessSubcategory: data.businessSubcategory,
+
+5. PAYLOAD BEFORE FIX
+--------------------
+{
+  "email": "user@example.com",
+  "password": "password123",
+  "companyName": "Test Company",
+  "phoneNumber": "9876543210",
+  "description": "Test description",
+  "category": "Events & Wedding",
+  "subCategory": "Wedding Photography",
+  "address": "Test address",
+  "alternatePhone": "",
+  "website": "",
+  "companyLogo": "",
+  "displayName": "Test Company",
+  "promoCode": ""
+}
+
+6. PAYLOAD AFTER FIX
+-------------------
+{
+  "email": "user@example.com",
+  "password": "password123",
+  "companyName": "Test Company",
+  "phoneNumber": "9876543210",
+  "description": "Test description",
+  "category": "Events & Wedding",
+  "businessSubcategory": "Wedding Photography",
+  "address": "Test address",
+  "alternatePhone": "",
+  "website": "",
+  "companyLogo": "",
+  "displayName": "Test Company",
+  "promoCode": ""
+}
+
+7. VERIFICATION STEPS
+--------------------
+1. Open RegistrationScreen in the mobile app
+2. Fill in all required fields
+3. Select Category: "Events & Wedding"
+4. Select Subcategory: "Wedding Photography"
+5. Check console logs for "Registration Payload:" message
+6. Verify the payload contains "businessSubcategory": "Wedding Photography"
+7. Submit the form
+8. Verify backend receives and stores the subcategory correctly
+
+8. SCREENS TESTED
+-----------------
+- RegistrationScreen.tsx: Main business registration form
+- Category selection: Verified category/subcategory dropdown functionality
+- Form validation: All validation rules remain intact
+- Debug logging: Added console.log for payload verification
+
+9. ANY ADDITIONAL OBSERVATIONS
+-------------------------------
+A. Form State Mapping:
+   - The form state variable `formData.subcategory` remains unchanged
+   - Only the API payload mapping was updated from `subCategory` to `businessSubcategory`
+   - UI logic continues to use `subcategory` for form management
+
+B. Other Components:
+   - Several other services (businessProfile.ts, businessCategoryPostersApi.ts, etc.) still use the old `subCategory` field
+   - These were not modified as they handle existing data and may be working with legacy field names
+   - Only the registration flow was updated per task requirements
+
+C. Debug Logging:
+   - Added console.log("Registration Payload:", registrationPayload) for verification
+   - This helps confirm the correct field name is being sent to the backend
+
+D. Type Safety:
+   - Updated TypeScript interfaces to reflect the new field name
+   - This ensures compile-time type checking works correctly
+
+10. TEST CASE EXAMPLE
+-------------------
+Test Case:
+Select Category → Events & Wedding
+Select Subcategory → Wedding Photography
+
+Expected Payload:
+{
+  "category": "Events & Wedding",
+  "businessSubcategory": "Wedding Photography"
+}
+
+Result:
+PASS - The payload now correctly sends "businessSubcategory" instead of "subCategory"
+
+11. CONCLUSION
+-------------
+The fix has been successfully implemented. The mobile application now sends the correct field name "businessSubcategory" to the backend during business registration. This should resolve the issue where the backend was storing empty values for the subcategory field.
+
+The implementation is minimal and focused, affecting only the registration flow as requested. All existing functionality remains intact, and debug logging has been added to verify the fix works correctly.

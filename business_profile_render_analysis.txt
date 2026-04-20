@@ -1,0 +1,173 @@
+BUSINESS PROFILE RENDER ANALYSIS REPORT
+========================================
+
+1. SCREEN LOCATION
+------------------
+File Path: src/screens/BusinessProfilesScreen.tsx
+Component Name: BusinessProfilesScreen
+
+This is the main screen responsible for rendering business profile cards in a list format.
+
+2. DATA SOURCE
+--------------
+API / Firebase / Local State: API-based with local caching
+Function Responsible for Fetching Profiles: 
+- Primary: businessProfileService.getUserBusinessProfiles(userId) in loadBusinessProfiles()
+- API Endpoint: GET /api/mobile/business-profile/{userId}
+- Cache Service: Uses cacheService.getOrFetch() with 5-minute TTL
+- Fallback: Empty array if API fails
+
+The data flow is:
+API Response -> Cache Service -> BusinessProfilesScreen State -> FlatList Rendering
+
+3. PROFILE DATA STRUCTURE
+------------------------
+Business Profile Object Fields (from BusinessProfile interface):
+- id: string
+- name: string
+- description: string
+- category: string
+- subCategory?: string
+- subcategory?: string
+- address: string
+- phone: string
+- email: string
+- logo?: string
+- companyLogo?: string
+- services: string[]
+- createdAt: string
+- updatedAt: string
+
+FIELD INDICATING LOCKED/UNLOCKED STATE:
+- subscriptionStatus?: string // "ACTIVE", "NONE", "PENDING", "EXPIRED", "PROCESSING"
+- isSubscriptionActive?: boolean // true/false for quick checking
+- businessSubscriptionStatus?: string // "Active", "Inactive", "Expired" - Business-specific subscription
+
+LOCKED/UNLOCKED LOGIC (from BusinessCard component):
+- Unlocked: subscriptionStatus?.toUpperCase() === "ACTIVE"
+- Locked: subscriptionStatus is NOT "ACTIVE" (includes PENDING, EXPIRED, NONE, PROCESSING)
+- Additional State: isActivationPending() from context (frontend-only temporary state)
+
+4. CURRENT RENDERING LOGIC
+-------------------------
+How Profiles Are Rendered:
+- Uses FlatList component (line 988-1005)
+- Data Source: profiles state array
+- Renderer: renderBusinessCard() function
+- Key Extractor: item.id
+
+WHY THEY APPEAR IN CREATION ORDER:
+The sorting is explicitly implemented in loadBusinessProfiles() at lines 184-187:
+
+```javascript
+// Sort profiles by creation date - OLDEST first (so first profile created stays at index 0)
+const sortedProfiles = apiProfiles.sort((a, b) => 
+  new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+);
+```
+
+This ensures profiles are displayed in chronological order (oldest first), which is why
+Profile A (created first) appears before Profile B (created second).
+
+5. ROOT CAUSE
+------------
+Exact Reason Unlocked Profiles Are Not Appearing on Top:
+
+The current implementation sorts profiles ONLY by creation date (createdAt) in ascending order.
+There is NO sorting logic based on subscription status (locked/unlocked state).
+
+Current sorting logic:
+```javascript
+apiProfiles.sort((a, b) => 
+  new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+)
+```
+
+This completely ignores the subscriptionStatus field that determines whether a profile is locked or unlocked.
+
+6. RECOMMENDED SORTING STRATEGY (Analysis Only - No Code Change)
+-----------------------------------------------------------------
+
+WHERE SORTING SHOULD BE IMPLEMENTED:
+Optimal Location: In the loadBusinessProfiles() function after API response but before setProfiles()
+
+WHY THIS LOCATION IS OPTIMAL:
+1. Single Source of Truth: All profile data flows through this function
+2. Cache Efficiency: Sorted data gets cached, avoiding repeated sorting
+3. Performance: Sort once on data load, not on every render
+4. Simplicity: Minimal code changes required
+5. Consistency: All consumers of profiles state get sorted data
+
+RECOMMENDED SORTING LOGIC:
+```javascript
+// Sort by subscription status first (ACTIVE profiles on top), then by creation date
+const sortedProfiles = apiProfiles.sort((a, b) => {
+  // Get subscription status
+  const aActive = a.subscriptionStatus?.toUpperCase() === "ACTIVE";
+  const bActive = b.subscriptionStatus?.toUpperCase() === "ACTIVE";
+  
+  // If both have same subscription status, sort by creation date
+  if (aActive === bActive) {
+    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+  }
+  
+  // Active profiles come first
+  return aActive ? -1 : 1;
+});
+```
+
+This would result in:
+- All ACTIVE (unlocked) profiles at the top, sorted by creation date
+- All non-ACTIVE (locked) profiles at the bottom, sorted by creation date
+
+7. RISK ANALYSIS
+---------------
+Potential Issues Sorting Could Cause:
+
+LOW RISK:
+- Selection Logic: handleProfileSelect() uses profile.id, unaffected by order
+- Profile Deletion: Uses profile.id for filtering, unaffected by order
+- Profile Editing: Uses profile.id for lookup, unaffected by order
+
+MEDIUM RISK:
+- Active Profile State: BusinessProfileContext.initializeSelectedProfile() picks profiles[0]
+  - Current behavior: Selects oldest created profile
+  - After sorting: Would select oldest ACTIVE profile
+  - Impact: May change which profile is auto-selected on app load
+
+- Navigation to Editor: Uses selectedBusinessProfile from context, not index-based
+  - Minimal risk as context handles profile references correctly
+
+HIGH RISK:
+- User Expectation: Users accustomed to chronological order may be confused
+  - Mitigation: Clear communication about the change
+  - Consider adding visual separators between locked/unlocked sections
+
+- Backend Dependencies: If backend assumes chronological order for certain operations
+  - Mitigation: Verify all API calls use profile IDs, not array indices
+
+POLLING AND REFRESH LOGIC:
+- 5-minute polling refreshes entire profile list
+- Sorting logic would be re-applied on each refresh
+- No impact on polling mechanism
+
+8. FINAL CONCLUSION
+-------------------
+The business profiles are currently displayed in strict creation order because the loadBusinessProfiles() function sorts profiles only by createdAt field, completely ignoring the subscriptionStatus field that determines locked/unlocked state.
+
+The fix is straightforward: implement a two-level sorting algorithm that:
+1. Prioritizes ACTIVE (unlocked) profiles
+2. Maintains creation order within each group (unlocked/locked)
+
+The optimal implementation location is in loadBusinessProfiles() after API response but before setProfiles(), ensuring sorted data benefits all consumers and gets cached efficiently.
+
+This change would transform the current behavior:
+FROM: A, B, C, D (chronological order)
+TO: A, C (unlocked), B, D (locked)
+
+The risk level is LOW to MEDIUM, with the main consideration being the change in auto-selection behavior for the first active profile.
+
+========================================
+Report Generated: April 9, 2026
+Analysis Scope: Business Profile Screen Rendering Logic
+Status: ANALYSIS COMPLETE - No Code Changes Made

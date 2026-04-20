@@ -1,0 +1,202 @@
+================================================================================
+FLOW VALIDATION DEBUG ANALYSIS
+================================================================================
+
+Analysis Date: April 15, 2026
+Issue: Software Company buttons not rendering in HomeScreen flow
+Scope: Production Fix V2 debugging and resolution
+
+================================================================================
+CURRENT ISSUE ANALYSIS
+================================================================================
+
+## 1. Problem Identification
+
+From the logs provided, the key issue is:
+
+```
+?? FLOW VALIDATION CHECK V2: {
+  flowSource: 'HomeScreen', 
+  isSoftwareCompanyCategory: true, 
+  shouldShowSoftwareButtons: undefined,  // <-- PROBLEM: Should be true/false
+  normalizedCategory: 'software company', 
+  normalizedSubCategory: 'spa & wellness',  // <-- Business profile has different subcategory
+  categoryName: 'Software Company', 
+  templateSource: 'professional', 
+  originScreen: undefined, 
+  validationReason: 'BLOCKED'  // <-- Because shouldShowSoftwareButtons is undefined
+}
+```
+
+## 2. Root Cause Analysis
+
+### 2.1 Expected Behavior:
+- **HomeScreen + Software Company template** should show buttons
+- `flowSource: 'HomeScreen'` ? ?
+- `templateSource: 'professional'` ? ?
+- `normalizedCategory: 'software company'` ? ?
+- **Result**: `isHomeTemplateFlow` should be `true`
+
+### 2.2 Actual Problem:
+- `shouldShowSoftwareButtons` is evaluating to `undefined` instead of `true/false`
+- This suggests the `useMemo` is not returning a proper boolean value
+- The `Boolean()` wrapper should fix this
+
+### 2.3 Validation Logic Analysis:
+
+```typescript
+// CASE 2: HomeScreen Template Flow (This should be TRUE)
+const isHomeTemplateFlow =
+  flowSource === "HomeScreen" &&           // ? 'HomeScreen' === 'HomeScreen' = true
+  templateSource === "professional" &&      // ? 'professional' === 'professional' = true  
+  normalizedCategory.includes('software');  // ? 'software company'.includes('software') = true
+
+// Final calculation:
+const shouldShow = isSoftware && (         // ? true && (true || false || false) = true
+  isMyBusinessFlow ||                      // ? false
+  isHomeTemplateFlow ||                    // ? true
+  isHomeSubcategoryFlow                    // ? false
+);
+
+return Boolean(shouldShow);                 // ? Boolean(true) = true
+```
+
+## 3. Applied Fixes
+
+### 3.1 Fixed Boolean Return Value:
+```typescript
+// BEFORE: Could return undefined
+return isSoftware && (isMyBusinessFlow || isHomeTemplateFlow || isHomeSubcategoryFlow);
+
+// AFTER: Always returns boolean
+const shouldShow = isSoftware && (isMyBusinessFlow || isHomeTemplateFlow || isHomeSubcategoryFlow);
+return Boolean(shouldShow);
+```
+
+### 3.2 Added Debug Logging:
+```typescript
+// DEBUG: Log individual flow results
+console.log('?? FLOW VALIDATION DEBUG:', {
+  isSoftware,
+  isMyBusinessFlow,
+  isHomeTemplateFlow,
+  isHomeSubcategoryFlow,
+  finalResult: Boolean(shouldShow)
+});
+```
+
+## 4. Expected Results After Fix
+
+### 4.1 Flow Validation Should Show:
+```
+?? FLOW VALIDATION DEBUG: {
+  isSoftware: true,
+  isMyBusinessFlow: false,
+  isHomeTemplateFlow: true,        // <-- This should be true
+  isHomeSubcategoryFlow: false,
+  finalResult: true                // <-- This should be true
+}
+```
+
+### 4.2 Main Validation Should Show:
+```
+?? FLOW VALIDATION CHECK V2: {
+  flowSource: 'HomeScreen', 
+  isSoftwareCompanyCategory: true, 
+  shouldShowSoftwareButtons: true,  // <-- Should now be true
+  normalizedCategory: 'software company', 
+  normalizedSubCategory: 'spa & wellness',
+  categoryName: 'Software Company', 
+  templateSource: 'professional', 
+  originScreen: undefined, 
+  validationReason: 'ALLOWED'       // <-- Should now be ALLOWED
+}
+```
+
+## 5. Button Rendering Logic
+
+### 5.1 Current Rendering Condition:
+```typescript
+{/* FLOW + CATEGORY CONTROLLED: Safe button rendering */}
+{shouldShowSoftwareButtons && (
+  <View style={styles.serviceFilterContainer}>
+    {/* Software Company buttons */}
+  </View>
+)}
+```
+
+### 5.2 Expected Behavior:
+- `shouldShowSoftwareButtons` should be `true`
+- Buttons should render
+- No additional conditions blocking rendering
+
+## 6. Test Scenarios
+
+### 6.1 Current Test Case (HomeScreen + Software Company):
+- **Flow**: HomeScreen
+- **Category**: Software Company (template)
+- **Subcategory**: spa & wellness (from business profile)
+- **Expected Result**: Buttons should show via template flow
+- **Validation**: `isHomeTemplateFlow` should be `true`
+
+### 6.2 Other Test Cases:
+- **My Business + Software Company subcategory**: Should work via `isMyBusinessFlow`
+- **HomeScreen + Software Company subcategory**: Should work via `isHomeSubcategoryFlow`
+- **Other flows**: Should be blocked
+
+## 7. Production Impact
+
+### 7.1 Minimal Changes:
+- Only fixed the boolean return issue
+- Added debug logging (can be removed later)
+- No functional logic changes
+- No breaking changes
+
+### 7.2 Safety:
+- All existing logic preserved
+- Enhanced error handling with `Boolean()`
+- Better debugging capabilities
+- Production-safe implementation
+
+## 8. Next Steps
+
+### 8.1 Immediate Testing:
+1. Test HomeScreen + Software Company navigation
+2. Check debug logs for flow validation
+3. Verify buttons render correctly
+4. Test other flows to ensure no regression
+
+### 8.2 Production Monitoring:
+1. Monitor `shouldShowSoftwareButtons` values in production
+2. Track button rendering success rates
+3. Watch for any undefined values
+4. Validate all three flow cases work
+
+## 9. Troubleshooting Guide
+
+### 9.1 If Buttons Still Don't Show:
+1. Check `?? FLOW VALIDATION DEBUG` logs
+2. Verify `isHomeTemplateFlow` is `true`
+3. Check `shouldShowSoftwareButtons` is `true`
+4. Verify no CSS/display issues
+
+### 9.2 If Other Issues Occur:
+1. Check `activeRenderSource` is not interfering
+2. Verify no other conditions blocking buttons
+3. Check for any console errors
+4. Validate template loading is successful
+
+================================================================================
+CONCLUSION
+================================================================================
+
+## Root Cause: `shouldShowSoftwareButtons` was evaluating to `undefined`
+## Solution: Added `Boolean()` wrapper to ensure proper boolean return
+## Expected Result: HomeScreen + Software Company template flow should now work
+## Impact: Minimal, safe fix with enhanced debugging
+
+The fix should resolve the issue where Software Company buttons were not rendering in the HomeScreen flow, while preserving all other functionality.
+
+================================================================================
+FIX APPLIED - READY FOR TESTING
+================================================================================

@@ -1,0 +1,120 @@
+File: IndustryCategoryScreen.tsx
+
+1. Category Button Configuration
+
+| Category Name | Category ID | Tags Used For Filtering |
+|--------------|-------------|------------------------|
+| Website Development | website-dev | ['website'] |
+| Mobile App Development | mobile-app-dev | ['mobile'] |
+| Custom S/W Solutions | custom-software | ['software'] |
+| AI & Automation | ai-automation | ['ai'] |
+| IT Consulting & Support | it-consulting | ['consulting'] |
+| Software Development | software-dev | ['coding'] |
+
+Analysis: Category button configuration appears correct. Each button has distinct tags with no overlap between 'website' and 'mobile' tags.
+
+2. Poster Tag Structure
+
+Posters are received from API with the following structure:
+- API returns: BusinessCategoryPoster.tags: string[]
+- Frontend maps to: Template.tags: string[] (line 293)
+- Also maps to: Template.languages: string[] (line 292) - **This is a potential issue**
+
+Sample poster mapping (lines 283-295):
+```javascript
+const templates: Template[] = businessPosters
+  .map(poster => ({
+    id: poster.id,
+    name: poster.title || 'Industry Poster',
+    thumbnail: poster.thumbnail || poster.imageUrl,
+    thumbnailUrl: poster.thumbnail || poster.imageUrl,
+    category: poster.category || selectedIndustry,
+    downloads: poster.downloads || 0,
+    isDownloaded: false,
+    languages: poster.tags || [],        // ← PROBLEM: Same tags assigned to languages
+    tags: poster.tags || [],            // ← Correct assignment
+    description: poster.description,
+  }))
+```
+
+3. Filtering Logic Analysis
+
+Category filtering logic (lines 435-457):
+```javascript
+basePosters = basePosters.filter(poster => {
+  const posterTags = poster.tags || [];
+  
+  const matchesTag = selectedCategoryButton.tags.some(tag => {
+    const exactTagMatch = posterTags.some(posterTag => posterTag.toLowerCase() === tag.toLowerCase());
+    
+    if (exactTagMatch) {
+      console.log(`🔍 [MATCH DEBUG] Tag "${tag}" matched for poster "${poster.name}":`);
+      console.log(`   - Exact tag match: ${exactTagMatch}`);
+      console.log(`   - Poster tags: [${posterTags.join(', ')}]`);
+      return true;
+    }
+    return false;
+  });
+  
+  return matchesTag;
+});
+```
+
+Analysis: The filtering logic is correct and uses only poster.tags for category filtering.
+
+4. Selected Category Flow
+
+State management:
+- selectedCategory state (line 121): stores current category ID
+- Button onPress (lines 790-809): correctly sets selectedCategory with category.id
+- Category lookup (line 429): `const selectedCategoryButton = categoryButtons.find(btn => btn.id === selectedCategory);`
+
+Analysis: Category selection flow is working correctly.
+
+5. Debug Findings
+
+Based on the code analysis, here are the likely scenarios causing the bug:
+
+Scenario A: Incorrect API Tags
+- Posters from API may have incorrect or mixed tags
+- Example: A poster meant for "Mobile App Development" might have tags: ['website', 'mobile']
+- This would cause it to appear in both categories
+
+Scenario B: Tag Assignment Issue
+- Line 292: `languages: poster.tags || []` assigns the same tags to both languages and tags fields
+- While this shouldn't affect category filtering (which uses tags), it indicates potential data structure confusion
+
+Expected debug output for Mobile App Development selection:
+```
+🏷️ [CATEGORY FILTER] Filtering by category: Mobile App Development
+🏷️ [CATEGORY FILTER] Category tags: [mobile]
+🔍 [MATCH DEBUG] Tag "mobile" matched for poster "Poster Name":
+   - Exact tag match: true
+   - Poster tags: [mobile, website]  ← Problem: Multiple tags
+```
+
+6. Root Cause
+
+The root cause is likely **incorrect tagging in the backend API data**:
+
+**Primary Issue**: Posters intended for "Mobile App Development" category are being returned from the API with multiple tags including both 'mobile' and 'website'.
+
+**Evidence**:
+1. Category button configuration is correct with distinct tags
+2. Filtering logic is correct and uses exact tag matching
+3. Category selection flow is working properly
+4. The only remaining variable is the actual poster.tags data from API
+
+**Specific Problem**: 
+- Backend API is returning posters with tags like: ['website', 'mobile'] or ['website', 'mobile', 'app']
+- When user selects "Mobile App Development", the filtering logic finds posters with 'mobile' tag
+- But these same posters also have 'website' tag, so they would also appear under "Website Development"
+
+**Solution Required**:
+The backend API needs to ensure posters have accurate, single-category tags. For example:
+- Website Development posters should have: ['website']
+- Mobile App Development posters should have: ['mobile', 'app'] or just ['mobile']
+- No poster should have tags from multiple different categories
+
+**Secondary Issue**: 
+Line 292 assigns the same tags array to both `languages` and `tags` fields, which could cause confusion in language filtering later.

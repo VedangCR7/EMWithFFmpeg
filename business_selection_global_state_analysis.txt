@@ -1,0 +1,349 @@
+BUSINESS SELECTION GLOBAL STATE ANALYSIS
+=======================================
+
+1. SYSTEM OVERVIEW
+-----------------
+
+The React Native application implements a Business Category Poster Generator with the following flow:
+HomeScreen → PosterPlayerScreen → PosterEditorScreen → PosterPreviewScreen
+
+Current state management uses:
+- BusinessProfileContext for selected business profile
+- Local component state for business category selection
+- Navigation parameters for data flow between screens
+
+The goal is to implement a Global Business Selection State containing:
+- selectedBusinessCategory
+- selectedBusinessId
+
+2. CURRENT BUSINESS STATE ARCHITECTURE
+------------------------------------
+
+SELECTED BUSINESS PROFILE:
+✅ **Storage**: React Context (BusinessProfileContext)
+✅ **Location**: src/context/BusinessProfileContext.tsx
+✅ **Hook**: useBusinessProfile()
+✅ **AsyncStorage**: '@selected_business_profile' key
+✅ **Data Structure**: BusinessProfile { id, name, category, subscriptionStatus, ... }
+
+SELECTED BUSINESS CATEGORY:
+❌ **Storage**: Local component state only
+❌ **Location**: HomeScreen.tsx (line 682)
+❌ **Variable**: selectedCategory (useState<'business' | 'general'>)
+❌ **Scope**: Limited to HomeScreen component
+❌ **Persistence**: Not persisted across app sessions
+
+SELECTED BUSINESS ID:
+❌ **Storage**: Only available via selectedBusinessProfile.id
+❌ **Access**: Through BusinessProfileContext
+❌ **Independence**: Not standalone global state
+
+3. HOMESCREEN DROPDOWN ANALYSIS
+------------------------------
+
+BUSINESS CATEGORY SELECTION MECHANISM:
+- **Component**: BusinessCategoriesSection (extracted component)
+- **Handler**: handleBusinessCategoryPress() (lines 4154-4217)
+- **State Variable**: selectedCategory (useState) - NOT a dropdown, but tab selection
+- **Current Behavior**: 
+  - selectedCategory toggles between 'business' and 'general' tabs
+  - Business category selection happens via handleBusinessCategoryPress()
+  - No persistent global state for selected business category
+
+BUSINESS PROFILE DROPDOWN:
+- **Component**: Custom dropdown in HomeScreen
+- **State**: isBusinessProfileDropdownVisible (useState)
+- **Handler**: handleBusinessProfileSelect() (lines 3055-3067)
+- **Behavior**: Updates BusinessProfileContext via setSelectedBusinessProfile()
+
+KEY FINDING: There is NO traditional dropdown for business category selection in HomeScreen. 
+Business categories are displayed as cards in BusinessCategoriesSection component.
+
+4. BUSINESS CATEGORY DATA FLOW
+------------------------------
+
+CURRENT FLOW TRACE:
+HomeScreen (handleBusinessCategoryPress)
+  ↓ navigation.navigate('PosterPlayer', { businessCategory: category.name })
+PosterPlayerScreen (route.params.businessCategory)
+  ↓ [NOT FORWARDED TO PosterEditorScreen] ❌
+PosterEditorScreen (businessCategory UNAVAILABLE)
+
+MISSING DATA FLOW:
+- businessCategory parameter is lost between PosterPlayerScreen and PosterEditorScreen
+- No global state to maintain selected business category across screens
+- Each screen receives category via navigation params independently
+
+5. BUSINESS PROFILE DATA FLOW
+----------------------------
+
+BUSINESS PROFILE CONTEXT FLOW:
+BusinessProfileContext (global)
+  ↓ useBusinessProfile() hook
+  ↓ selectedBusinessProfile available in all screens
+
+ASYNC STORAGE PERSISTENCE:
+- Key: '@selected_business_profile'
+- Cross-session persistence
+- Automatic restoration on app launch
+
+API SYNCHRONIZATION:
+- Silent refresh from API on app start
+- Cache invalidation and updates
+- Real-time subscription status updates
+
+SCREEN ACCESS:
+✅ HomeScreen: useBusinessProfile()
+✅ PosterPlayerScreen: useBusinessProfile()
+✅ PosterEditorScreen: useBusinessProfile()
+✅ BusinessProfilesScreen: useBusinessProfile()
+
+6. STATE SYNCHRONIZATION RISKS
+------------------------------
+
+RISK 1: STALE LOCAL STATE
+- selectedCategory in HomeScreen is local useState
+- No synchronization with BusinessProfileContext
+- Can become out of sync with selected business profile
+
+RISK 2: NAVIGATION PARAMETER LOSS
+- businessCategory lost between PosterPlayerScreen and PosterEditorScreen
+- No fallback mechanism for missing category data
+- Validation logic fails due to missing category
+
+RISK 3: CONTEXT VS LOCAL STATE MISMATCH
+- BusinessProfileContext may have different category than HomeScreen local state
+- User changes profile via dropdown, but category selection remains unchanged
+- Inconsistent state across components
+
+RISK 4: APP RELOAD STATE LOSS
+- selectedCategory resets to 'business' on app reload
+- No persistence of user's last selected category type
+- Poor user experience on app restart
+
+7. GLOBAL STATE FEASIBILITY
+--------------------------
+
+PROPOSED GLOBAL STATE STRUCTURE:
+```typescript
+interface BusinessSelectionState {
+  selectedBusinessCategory: string | null;  // Business category name
+  selectedBusinessId: string | null;        // Business profile ID
+}
+```
+
+FEASIBILITY ANALYSIS:
+
+✅ **CONFLICT ASSESSMENT**: 
+- No conflicts with existing BusinessProfileContext
+- Complementary to existing profile state
+- Can extend existing context or create new context
+
+✅ **REDUNDANCY CHECK**:
+- selectedBusinessId duplicates selectedBusinessProfile.id (acceptable)
+- selectedBusinessCategory fills missing global state gap
+- No critical redundancy issues
+
+✅ **DEPENDENCY RISKS**:
+- Low risk: BusinessProfileContext is stable
+- Medium risk: Need to synchronize with existing profile selection
+- High risk: Navigation parameter flow changes required
+
+RECOMMENDED APPROACH: Extend BusinessProfileContext rather than create new context
+
+8. RECOMMENDED ARCHITECTURE
+--------------------------
+
+OPTION 1: EXTEND BUSINESSPROFILECONTEXT (RECOMMENDED)
+```typescript
+interface EnhancedBusinessProfileContextType {
+  // Existing
+  selectedBusinessProfile: BusinessProfile | null;
+  setSelectedBusinessProfile: (profile: BusinessProfile | null) => Promise<void>;
+  
+  // New global state
+  selectedBusinessCategory: string | null;
+  setSelectedBusinessCategory: (category: string | null) => void;
+  selectedBusinessId: string | null;  // Derived from selectedBusinessProfile.id
+}
+```
+
+ADVANTAGES:
+✅ Single source of truth for business-related state
+✅ Existing AsyncStorage infrastructure
+✅ Already integrated across all screens
+✅ Minimal architectural changes
+✅ Consistent with existing patterns
+
+DISADVANTAGES:
+❌ Larger context object
+❌ Mixed concerns (profile + category)
+
+OPTION 2: CREATE NEW BUSINESSSELECTIONCONTEXT
+```typescript
+interface BusinessSelectionContextType {
+  selectedBusinessCategory: string | null;
+  selectedBusinessId: string | null;
+  setBusinessSelection: (category: string, businessId: string) => void;
+}
+```
+
+ADVANTAGES:
+✅ Separation of concerns
+✅ Focused responsibility
+✅ Cleaner context boundaries
+
+DISADVANTAGES:
+❌ Context proliferation
+❌ Need to sync with BusinessProfileContext
+❌ More complex state management
+❌ Additional provider wrapping
+
+RECOMMENDATION: OPTION 1 - Extend BusinessProfileContext
+
+9. EDGE CASES
+------------
+
+EDGE CASE 1: USER CHANGES CATEGORY AFTER SELECTING POSTER
+- Current: No impact (category only used for navigation)
+- Proposed: Global state updates, but poster selection remains
+- Handling: Allow category change, show warning if poster doesn't match
+
+EDGE CASE 2: USER SWITCHES BUSINESS PROFILE
+- Current: BusinessProfileContext updates, category selection unchanged
+- Proposed: Both profile and category state update together
+- Handling: Sync category with new profile's category
+
+EDGE CASE 3: APP RELOADS WHILE EDITING POSTER
+- Current: selectedCategory resets to 'business'
+- Proposed: selectedBusinessCategory persists from AsyncStorage
+- Handling: Restore previous selection on app start
+
+EDGE CASE 4: MULTIPLE PROFILES WITH SAME CATEGORY
+- Current: Profile selection independent of category
+- Proposed: Category state may not uniquely identify profile
+- Handling: Use selectedBusinessId for profile identification
+
+EDGE CASE 5: ASYNC STORAGE RESTORATION DELAYS
+- Current: BusinessProfileContext handles loading states
+- Proposed: Need loading state for category selection
+- Handling: Show loading indicator until state restored
+
+EDGE CASE 6: NETWORK CONNECTIVITY ISSUES
+- Current: Profile context works offline with cached data
+- Proposed: Category state should work offline
+- Handling: Persist category state locally
+
+10. IMPLEMENTATION STRATEGY
+--------------------------
+
+PHASE 1: EXTEND BUSINESSPROFILECONTEXT
+1. Update BusinessProfileContext interface to include:
+   - selectedBusinessCategory: string | null
+   - setSelectedBusinessCategory: (category: string | null) => void
+   - selectedBusinessId: string | null (derived)
+
+2. Add AsyncStorage persistence:
+   - Key: '@selected_business_category'
+   - Load on context initialization
+   - Save on category change
+
+3. Update context provider to manage new state
+
+PHASE 2: UPDATE HOMESCREEN
+1. Replace local selectedCategory state with context state
+2. Update handleBusinessCategoryPress to set global category
+3. Remove useState for selectedCategory
+4. Add synchronization with profile selection
+
+PHASE 3: UPDATE POSTERPLAYERSCREEN
+1. Read businessCategory from context instead of route params
+2. Forward businessCategory to PosterEditorScreen
+3. Add context state listener for real-time updates
+
+PHASE 4: UPDATE POSTEREDITORSCREEN
+1. Access businessCategory from context
+2. Implement validation logic using global state
+3. Remove dependency on navigation params for category
+
+PHASE 5: UPDATE BUSINESSPROFILESSCREEN
+1. Update profile selection to also set global category
+2. Ensure synchronization between profile and category
+3. Handle profile-category mismatch scenarios
+
+PHASE 6: CLEANUP
+1. Remove redundant navigation parameters
+2. Update TypeScript types
+3. Add error handling for missing state
+4. Add loading states for context initialization
+
+SYNCronization POINTS:
+- HomeScreen: Category selection updates global state
+- BusinessProfilesScreen: Profile selection updates global category
+- Context: Derive selectedBusinessId from selectedBusinessProfile
+- Navigation: Remove businessCategory parameter dependencies
+
+DATA FLOW AFTER IMPLEMENTATION:
+User selects category in HomeScreen
+  ↓ setSelectedBusinessCategory() in context
+  ↓ AsyncStorage persistence
+  ↓ Context updates all subscribers
+  ↓ PosterPlayerScreen reads from context
+  ↓ PosterEditorScreen reads from context
+  ↓ Validation uses global category state
+
+11. CRITICAL IMPLEMENTATION CONSIDERATIONS
+------------------------------------------
+
+STATE CONSISTENCY:
+- Ensure selectedBusinessCategory matches selectedBusinessProfile.category when profile is selected
+- Add validation to prevent mismatched state
+- Provide fallback mechanisms for missing data
+
+PERFORMANCE OPTIMIZATION:
+- Minimize context re-renders with proper memoization
+- Use useCallback for context update functions
+- Batch state updates to prevent multiple re-renders
+
+ERROR HANDLING:
+- Handle AsyncStorage failures gracefully
+- Provide default values for missing state
+- Add error boundaries for context errors
+
+TYPE SAFETY:
+- Update TypeScript interfaces
+- Add proper null checks
+- Ensure type consistency across screens
+
+TESTING REQUIREMENTS:
+- Test state persistence across app reloads
+- Test category changes during poster editing
+- Test profile selection and category synchronization
+- Test edge cases with missing data
+
+12. MIGRATION RISKS
+-----------------
+
+RISK 1: BACKWARD COMPATIBILITY
+- Existing navigation parameter dependencies
+- Legacy code expecting route params
+- Solution: Gradual migration with fallback support
+
+RISK 2: DATA INTEGRITY
+- Existing users with cached profile data
+- Missing category data for existing profiles
+- Solution: Migration script to populate category data
+
+RISK 3: PERFORMANCE REGRESSION
+- Additional context subscriptions
+- Increased re-render frequency
+- Solution: Performance monitoring and optimization
+
+RISK 4: USER EXPERIENCE DISRUPTION
+- Changes to category selection behavior
+- Different state persistence patterns
+- Solution: User testing and gradual rollout
+
+=======================================
+END OF ANALYSIS
+=======================================

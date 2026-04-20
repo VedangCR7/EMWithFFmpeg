@@ -1,0 +1,590 @@
+BUSINESS PROFILE LOGO EMPTY STRING ANALYSIS REPORT
+================================================
+
+Date: April 10, 2026
+Analysis: Deep dive into why logo field is empty when creating business profiles
+
+================================================
+1. OVERVIEW OF BusinessProfileForm COMPONENT
+================================================
+
+The BusinessProfileForm component is responsible for collecting business profile data
+including the company logo. Key state variables:
+- formData: Contains form fields including companyLogo (initialized as empty string)
+- logoImage: Stores the local image URI for preview display
+- uploadingImage: Loading state during image upload
+
+The form uses a two-step approach:
+1. Image selection stores the local URI in formData.companyLogo
+2. Form submission handles logo differently for new vs existing profiles
+
+================================================
+2. IMAGE SELECTION FLOW
+================================================
+
+File: src/components/BusinessProfileForm.tsx
+Function: handleImageSelected (line 346)
+
+Flow:
+1. User selects image from gallery/camera via ImagePickerModal
+2. handleImageSelected receives imageUri (local file path like 'file://...' or 'content://...')
+3. setLogoImage(imageUri) - Updates preview state
+4. setShowImagePickerModal(false) - Closes picker modal
+
+CRITICAL LOGIC (lines 352-372):
+- IF editing existing profile (profile?.id exists):
+  - Immediately upload the image using businessProfileService.uploadImage()
+  - Set formData.companyLogo to the returned URL from upload
+  - Logo is uploaded before form submission
+
+- ELSE creating new profile:
+  - Store the local URI in formData.companyLogo directly
+  - Comment states: "For new profiles, we'll upload during form submission"
+  - Comment states: "It will be uploaded during profile creation"
+  - NO ACTUAL UPLOAD HAPPENS HERE - just stores local URI
+
+CODE SNIPPET:
+```typescript
+const handleImageSelected = async (imageUri: string) => {
+  setLogoImage(imageUri);
+  setShowImagePickerModal(false);
+
+  if (profile?.id) {
+    // Existing profile: upload immediately
+    const uploadResult = await businessProfileService.uploadImage(profile.id, 'logo', imageUri);
+    setFormData(prev => ({ ...prev, companyLogo: uploadResult.url }));
+  } else {
+    // New profile: store local URI
+    setFormData(prev => ({ ...prev, companyLogo: imageUri }));
+  }
+};
+```
+
+================================================
+3. STATE HANDLING FOR LOGO
+================================================
+
+Initial State (line 127-138):
+```typescript
+const [formData, setFormData] = useState<CreateBusinessProfileData>({
+  name: '',
+  description: '',
+  category: '',
+  subcategory: '',
+  address: '',
+  phone: '',
+  alternatePhone: '',
+  email: '',
+  website: '',
+  companyLogo: '',  // Initialized as empty string
+});
+```
+
+After Image Selection:
+- formData.companyLogo = local file URI (e.g., 'file:///storage/emulated/0/DCIM/...')
+- logoImage = same local file URI (for preview display)
+
+The state DOES get updated correctly when image is selected.
+The issue is NOT with state management - it's with how the state is used during submission.
+
+================================================
+4. API PAYLOAD CONSTRUCTION
+================================================
+
+File: src/components/BusinessProfileForm.tsx
+Function: handleSubmit (line 483)
+
+CRITICAL LOGIC (lines 496-518):
+```typescript
+const handleSubmit = async () => {
+  const validation = validateForm();
+  
+  if (!validation.isValid) {
+    return;
+  }
+
+  // CRITICAL CHECK: For new profiles with local file path logo
+  if (!profile && formData.companyLogo && businessProfileService.isLocalFilePath(formData.companyLogo)) {
+    try {
+      setUploadingImage(true);
+      
+      // STRIPS LOGO FROM PAYLOAD
+      const formDataWithoutLogo = { ...formData, companyLogo: '', logo: '' };
+      
+      // Submits form WITHOUT logo, passes logo URI separately
+      onSubmit(formDataWithoutLogo, formData.companyLogo);
+      
+    } catch (error) {
+      // error handling
+    } finally {
+      setUploadingImage(false);
+    }
+  } else {
+    // Submits full form data with logo
+    onSubmit(formData);
+  }
+};
+```
+
+ISSUE IDENTIFIED:
+- When creating a NEW profile with a local file path logo
+- The code INTENTIONALLY removes the logo from the payload (companyLogo: '', logo: '')
+- It passes the logo URI as a second parameter (pendingLogoUri)
+- This is based on the assumption that the logo will be uploaded AFTER profile creation
+
+File: src/screens/BusinessProfilesScreen.tsx
+Function: handleFormSubmit (line 560)
+
+```typescript
+const handleFormSubmit = useCallback(async (formData: any, pendingLogoUri?: string) => {
+  if (!editingProfile) {
+    setFormLoading(true);
+    try {
+      const newProfile = await businessProfileService.createBusinessProfile(formData);
+      
+      // Stores pending logo URI in AsyncStorage
+      if (pendingLogoUri) {
+        await AsyncStorage.setItem(`pending_logo_${newProfile.id}`, pendingLogoUri);
+      }
+      
+      // ... rest of the logic
+    } catch (error) {
+      // error handling
+    }
+  }
+}, [editingProfile, loadBusinessProfiles]);
+```
+
+File: src/services/businessProfile.ts
+Function: createBusinessProfile (line 266)
+
+```typescript
+async createBusinessProfile(data: CreateBusinessProfileData): Promise<BusinessProfile> {
+  const logoUrl = data.companyLogo || '';
+  
+  if (logoUrl && this.isLocalFilePath(logoUrl)) {
+    console.log('⚠️ [CREATE] Logo is a local file path, will send as-is (API should handle upload)');
+    // WARNING: API doesn't handle local file paths!
+  }
+  
+  const backendData: any = {
+    businessName,
+    ownerName,
+    email,
+    phone,
+    address,
+    category,
+    logo: logoUrl,        // This is EMPTY string for new profiles
+    companyLogo: logoUrl, // This is EMPTY string for new profiles
+    description: data.description || '',
+    website: data.website || ''
+  };
+  
+  const response = await api.post('/api/mobile/business-profile', backendData);
+  // ...
+}
+```
+
+API Request Format:
+- Method: POST
+- Endpoint: /api/mobile/business-profile
+- Content-Type: application/json
+- Body: JSON object with text fields only
+
+================================================
+5. EXACT REASON WHY LOGO IS EMPTY
+================================================
+
+ROOT CAUSE ANALYSIS:
+
+The logo is empty because of a BROKEN TWO-STEP UPLOAD FLOW:
+
+STEP 1 (Form Submission):
+- BusinessProfileForm.handleSubmit() checks if logo is a local file path
+- If YES, it REMOVES the logo from the payload (companyLogo: '', logo: '')
+- It stores the logo URI in AsyncStorage as `pending_logo_${profileId}`
+- It submits the form WITHOUT the logo to the backend
+
+STEP 2 (Intended Post-Creation Upload):
+- The code INTENDS to upload the logo after profile creation
+- However, THERE IS NO CODE that retrieves the pending logo from AsyncStorage
+- THERE IS NO CODE that uploads the logo after profile creation
+- The pending logo remains in AsyncStorage forever
+
+EVIDENCE:
+- Line 504 in BusinessProfileForm: Strips logo from payload
+- Line 566 in BusinessProfilesScreen: Stores pending logo in AsyncStorage
+- NO CODE found that retrieves `pending_logo_${profileId}`
+- NO CODE found that calls uploadImage() after profile creation
+
+The comment in line 502-503 states:
+"For new profiles, we need to create the profile first, then upload the image"
+But the implementation is INCOMPLETE - the "then upload the image" part is missing.
+
+================================================
+6. CODE SNIPPETS WHERE THE ISSUE OCCURS
+================================================
+
+LOCATION 1: BusinessProfileForm.tsx (lines 496-507)
+```typescript
+// For new profiles, upload image if it's a local file path
+if (!profile && formData.companyLogo && businessProfileService.isLocalFilePath(formData.companyLogo)) {
+  try {
+    setUploadingImage(true);
+    console.log('📤 [BUSINESS FORM] Uploading logo for new profile creation...');
+
+    // For new profiles, we need to create the profile first, then upload the image
+    // So we'll submit the form without the logo, then upload it after getting the profile ID
+    const formDataWithoutLogo = { ...formData, companyLogo: '', logo: '' };
+
+    console.log('✅ [BUSINESS FORM] Form validation passed, submitting to parent (without logo)');
+    onSubmit(formDataWithoutLogo, formData.companyLogo); // Pass original logo URI separately
+    // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    // BUG: Logo is stripped from payload but never uploaded later
+  } catch (error) {
+    console.error('❌ [BUSINESS FORM] Failed to prepare logo upload:', error);
+    Alert.alert('Upload Failed', 'Failed to prepare logo upload. Please try again.');
+  } finally {
+    setUploadingImage(false);
+  }
+}
+```
+
+LOCATION 2: BusinessProfilesScreen.tsx (lines 564-567)
+```typescript
+const newProfile = await businessProfileService.createBusinessProfile(formData);
+if (pendingLogoUri) {
+  await AsyncStorage.setItem(`pending_logo_${newProfile.id}`, pendingLogoUri);
+}
+// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+// BUG: Pending logo is stored but never retrieved or uploaded
+```
+
+LOCATION 3: businessProfile.ts (lines 296-300)
+```typescript
+let logoUrl = data.companyLogo || '';
+if (logoUrl && this.isLocalFilePath(logoUrl)) {
+  console.log('⚠️ [CREATE] Logo is a local file path, will send as-is (API should handle upload)');
+  // Note: If API doesn't handle local paths, we'd need to upload first
+  // For now, send it and let the API handle it
+  // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  // BUG: API doesn't handle local paths, and logoUrl is empty string anyway
+}
+```
+
+================================================
+7. RECOMMENDED FIX
+================================================
+
+The issue can be fixed using one of these approaches:
+
+APPROACH A: Upload Logo BEFORE Profile Creation (RECOMMENDED)
+-------------------------------------------------------------
+This approach is simpler and more reliable:
+
+1. Remove the two-step upload logic from BusinessProfileForm
+2. Always submit the form with the logo included
+3. Change the API to accept FormData instead of JSON
+4. Include the logo file in the FormData along with other fields
+5. Backend processes both profile creation and logo upload in one request
+
+PROS:
+- Single atomic operation - either both succeed or both fail
+- Simpler code flow
+- No pending state to manage
+- No cleanup needed
+
+CONS:
+- Requires backend API change to accept multipart/form-data
+- Slightly larger payload
+
+APPROACH B: Implement Complete Two-Step Upload (CURRENT INTENT)
+----------------------------------------------------------------
+Complete the existing two-step upload flow:
+
+1. Keep the current logic of stripping logo from initial request
+2. After profile creation succeeds, retrieve pending logo from AsyncStorage
+3. Upload the logo using businessProfileService.uploadImage()
+4. Update the profile with the uploaded logo URL
+5. Remove the pending logo from AsyncStorage
+
+PROS:
+- Keeps existing API contract (JSON for profile creation)
+- Separates concerns (profile creation vs file upload)
+
+CONS:
+- More complex code flow
+- Multiple API calls
+- Need to handle partial failures
+- Need cleanup logic for orphaned pending logos
+
+APPROACH C: Send Local File Path to Backend (NOT RECOMMENDED)
+-------------------------------------------------------------
+Send the local file path to backend and let backend handle upload.
+
+PROS:
+- Minimal frontend changes
+
+CONS:
+- Backend cannot access device local file system
+- Security risk
+- Not feasible for mobile apps
+
+================================================
+8. CORRECTED CODE EXAMPLE
+================================================
+
+RECOMMENDED IMPLEMENTATION (Approach A):
+
+File: src/components/BusinessProfileForm.tsx
+```typescript
+const handleSubmit = async () => {
+  console.log('🔍 [BUSINESS FORM] Register button clicked');
+  console.log('🔍 [BUSINESS FORM] Form data being submitted:', formData);
+
+  const validation = validateForm();
+
+  if (!validation.isValid) {
+    console.log('⚠️ [BUSINESS FORM] Validation failed:', validation.errors);
+    setValidationErrors(validation.errors);
+    setShowValidationModal(true);
+    return;
+  }
+
+  // SIMPLIFIED LOGIC: Always submit form with logo
+  // The service will handle local file path upload
+  console.log('✅ [BUSINESS FORM] Form validation passed, submitting to parent');
+  onSubmit(formData);
+};
+```
+
+File: src/services/businessProfile.ts
+```typescript
+async createBusinessProfile(data: CreateBusinessProfileData): Promise<BusinessProfile> {
+  try {
+    console.log('Creating business profile via API:', data.name);
+    
+    const currentUser = authService.getCurrentUser();
+    const ownerNameFromUser = currentUser?.name || currentUser?.companyName || currentUser?.displayName || currentUser?.firstName;
+    const ownerNameFallback = currentUser?.email
+      ? currentUser.email.split('@')[0]
+      : (data.name ? `${data.name} Owner` : 'Business Owner');
+    const ownerName = (ownerNameFromUser && ownerNameFromUser.trim()) || ownerNameFallback;
+
+    const businessName = (data.name || '').trim();
+    const email = (data.email || '').trim();
+    const phone = (data.phone || '').trim();
+    const category = (data.category || '').trim();
+    const address = (data.address || '').trim();
+
+    if (!businessName || !ownerName || !email || !phone || !category) {
+      throw new Error('Business name, owner name, email, phone, and category are required.');
+    }
+    
+    // Check if logo is a local file path
+    const logoUrl = data.companyLogo || '';
+    const isLocalLogo = logoUrl && this.isLocalFilePath(logoUrl);
+    
+    const resolvedSubcategory =
+      data.businessSubcategory ??
+      data.subCategory ??
+      data.subcategory;
+    
+    // If logo is a local file, use FormData for multipart upload
+    if (isLocalLogo) {
+      console.log('📤 [CREATE] Logo is local file, using FormData for upload');
+      
+      const formData = new FormData();
+      formData.append('businessName', businessName);
+      formData.append('ownerName', ownerName);
+      formData.append('email', email);
+      formData.append('phone', phone);
+      formData.append('address', address);
+      formData.append('category', category);
+      formData.append('description', data.description || '');
+      formData.append('website', data.website || '');
+      
+      if (resolvedSubcategory !== undefined) {
+        formData.append('businessSubcategory', resolvedSubcategory);
+      }
+      
+      // Append logo file
+      const filename = logoUrl.split('/').pop() || 'logo.jpg';
+      const fileExtension = filename.split('.').pop()?.toLowerCase() || 'jpg';
+      
+      let mimeType = 'image/jpeg';
+      if (fileExtension === 'png') mimeType = 'image/png';
+      else if (fileExtension === 'gif') mimeType = 'image/gif';
+      else if (fileExtension === 'webp') mimeType = 'image/webp';
+      
+      formData.append('logo', {
+        uri: logoUrl,
+        type: mimeType,
+        name: filename,
+      } as any);
+      
+      console.log('📤 Sending business profile with FormData');
+      const response = await api.post('/api/mobile/business-profile', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      if (response.data.success) {
+        console.log('✅ Business profile created via API:', response.data.data.id);
+        // ... rest of the response handling
+      }
+    } else {
+      // No logo or logo is already a URL - use JSON
+      console.log('📤 [CREATE] Using JSON payload (no local logo)');
+      
+      const backendData: any = {
+        businessName,
+        ownerName,
+        email,
+        phone,
+        address,
+        category,
+        logo: logoUrl,
+        companyLogo: logoUrl,
+        description: data.description || '',
+        website: data.website || ''
+      };
+      
+      if (resolvedSubcategory !== undefined) {
+        backendData.businessSubcategory = resolvedSubcategory;
+      }
+      
+      console.log('📤 Sending business profile data:', JSON.stringify(backendData, null, 2));
+      const response = await api.post('/api/mobile/business-profile', backendData);
+      
+      if (response.data.success) {
+        console.log('✅ Business profile created via API:', response.data.data.id);
+        // ... rest of the response handling
+      }
+    }
+    
+    // ... rest of the method
+  } catch (error) {
+    console.error('❌ Error creating business profile via API:', error);
+    throw new Error('Failed to create business profile');
+  }
+}
+```
+
+File: src/screens/BusinessProfilesScreen.tsx
+```typescript
+const handleFormSubmit = useCallback(async (formData: any, pendingLogoUri?: string) => {
+  if (!editingProfile) {
+    setFormLoading(true);
+    try {
+      const newProfile = await businessProfileService.createBusinessProfile(formData);
+      
+      // Remove pending logo handling - no longer needed
+      // The logo is now uploaded during profile creation
+      
+      const profileWithId = { ...formData, id: newProfile.id };
+      setPendingProfileData(profileWithId);
+      pendingProfileDataRef.current = profileWithId;
+      await AsyncStorage.setItem('pending_business_profile_data', JSON.stringify(profileWithId));
+      setShowPaymentModal(true);
+      setShowForm(false);
+      setShowBottomSheet(false);
+      loadBusinessProfiles();
+    } catch (error: any) {
+      setErrorMessage(error.message || 'Failed to create business profile.');
+      setShowErrorModal(true);
+    } finally {
+      setFormLoading(false);
+    }
+    return;
+  }
+
+  // ... existing update logic
+}, [editingProfile, loadBusinessProfiles]);
+```
+
+ALTERNATIVE IMPLEMENTATION (Approach B - Complete Two-Step):
+
+File: src/screens/BusinessProfilesScreen.tsx
+```typescript
+const handleFormSubmit = useCallback(async (formData: any, pendingLogoUri?: string) => {
+  if (!editingProfile) {
+    setFormLoading(true);
+    try {
+      const newProfile = await businessProfileService.createBusinessProfile(formData);
+      
+      // NEW: Upload pending logo after profile creation
+      if (pendingLogoUri) {
+        try {
+          console.log('📤 Uploading pending logo for profile:', newProfile.id);
+          const uploadResult = await businessProfileService.uploadImage(newProfile.id, 'logo', pendingLogoUri);
+          console.log('✅ Pending logo uploaded successfully:', uploadResult.url);
+          
+          // Update the profile with the uploaded logo URL
+          await businessProfileService.updateBusinessProfile(newProfile.id, {
+            companyLogo: uploadResult.url
+          });
+          
+          // Remove pending logo from storage
+          await AsyncStorage.removeItem(`pending_logo_${newProfile.id}`);
+        } catch (uploadError) {
+          console.error('❌ Failed to upload pending logo:', uploadError);
+          // Continue anyway - profile is created, just without logo
+        }
+      }
+      
+      const profileWithId = { ...formData, id: newProfile.id };
+      setPendingProfileData(profileWithId);
+      pendingProfileDataRef.current = profileWithId;
+      await AsyncStorage.setItem('pending_business_profile_data', JSON.stringify(profileWithId));
+      setShowPaymentModal(true);
+      setShowForm(false);
+      setShowBottomSheet(false);
+      loadBusinessProfiles();
+    } catch (error: any) {
+      setErrorMessage(error.message || 'Failed to create business profile.');
+      setShowErrorModal(true);
+    } finally {
+      setFormLoading(false);
+    }
+    return;
+  }
+
+  // ... existing update logic
+}, [editingProfile, loadBusinessProfiles]);
+```
+
+================================================
+9. FINAL CONCLUSION
+================================================
+
+ROOT CAUSE:
+The logo field is empty because the BusinessProfileForm implements a two-step upload
+flow that is INCOMPLETE. When creating a new profile with a local file path logo:
+
+1. The form STRIPS the logo from the payload (companyLogo: '', logo: '')
+2. It stores the logo URI in AsyncStorage as pending
+3. The backend receives an empty logo field
+4. The pending logo is NEVER retrieved or uploaded
+5. The logo remains in AsyncStorage forever, unused
+
+EVIDENCE:
+- BusinessProfileForm.tsx line 504: Intentionally removes logo from payload
+- BusinessProfilesScreen.tsx line 566: Stores pending logo but never retrieves it
+- No code found to upload logo after profile creation
+- Backend receives empty string for logo field
+
+RECOMMENDATION:
+Implement Approach A (FormData multipart upload) as it's simpler, more reliable,
+and provides atomic operation. If backend changes are not possible, implement
+Approach B (complete two-step upload) by adding the missing upload logic after
+profile creation.
+
+IMPACT:
+- All new business profiles created with a logo will have an empty logo field
+- Users must manually edit the profile to add the logo after creation
+- Pending logos accumulate in AsyncStorage, causing storage bloat
+
+PRIORITY: HIGH
+This is a critical bug affecting user experience and data integrity.

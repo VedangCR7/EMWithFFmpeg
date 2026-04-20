@@ -1,0 +1,437 @@
+BUSINESS REGISTRATION PAYMENT TRANSACTION ANALYSIS REPORT
+=========================================================
+
+DATE: 2026-03-04
+ANALYSIS: BUSINESS REGISTRATION PAYMENT WORKFLOW INVESTIGATION
+
+-----------------------------------------------------
+
+PROBLEM SUMMARY
+---------------
+
+**Current Issue:**
+Business registration payment failures (modal close) are NOT appearing in TransactionHistoryScreen, while subscription payment failures appear correctly.
+
+**Expected Behavior:**
+Both subscription and business registration payment failures should appear in TransactionHistoryScreen with status "FAILED".
+
+-----------------------------------------------------
+
+STEP 1 — BUSINESS REGISTRATION SCREEN LOCATION
+---------------------------------------------
+
+✅ IDENTIFIED: Business registration payment screen
+
+**Primary Screen:** src/screens/BusinessProfilesScreen.tsx
+- **Purpose:** Manage business profiles with payment for new profile creation
+- **Payment Trigger Function:** handlePayNow() (line 612)
+- **Razorpay Initialization:** Lines 671-738 (Razorpay options configuration)
+
+**Secondary Screen:** src/screens/MyBusinessScreen.tsx
+- **Purpose:** Display existing business profiles (no payment logic)
+- **Payment Functions:** None
+
+**Additional Screens Checked:**
+- ProfileScreen.tsx: User profile management (no business payment)
+- No BusinessRegistrationScreen.tsx found
+- No CreateBusinessProfileScreen.tsx found
+
+-----------------------------------------------------
+
+STEP 2 — COMPLETE BUSINESS REGISTRATION PAYMENT FLOW
+----------------------------------------------------
+
+**Workflow Diagram:**
+```
+User → Business Profile Form (BusinessProfilesScreen.tsx)
+    ↓
+handleFormSubmit() → Store form data → Show payment modal
+    ↓
+handlePayNow() → Create payment order API
+    ↓
+businessProfileService.createBusinessProfilePaymentOrder()
+    ↓
+POST /api/mobile/business-profile/create-payment-order
+    ↓
+RazorpayCheckout.open() → Modal opens
+    ↓
+Payment Success OR Payment Failure
+```
+
+**Detailed Flow Analysis:**
+
+1. **Form Submission (handleFormSubmit):**
+   - Line 762: New profiles trigger payment flow
+   - Line 765: Store pendingProfileData in AsyncStorage
+   - Line 767: Show payment modal, prevent profile creation
+
+2. **Payment Initiation (handlePayNow):**
+   - Line 612: Payment trigger function
+   - Line 629: Create payment order via API
+   - Line 635: Validate orderId exists
+   - Line 671-738: Configure Razorpay options
+
+3. **Razorpay Modal Opening:**
+   - Line 741: RazorpayCheckout.open(options)
+   - Line 660: handleRazorpaySuccess callback configured
+   - Line 733: modal.ondismiss callback configured
+
+-----------------------------------------------------
+
+STEP 3 — FAILURE HANDLING ANALYSIS
+----------------------------------
+
+❌ **CRITICAL ISSUE IDENTIFIED:** No failure reporting to backend
+
+**SubscriptionScreen.tsx (CORRECT):**
+```typescript
+// Lines 523-524
+if (orderDetails?.orderId) {
+  reportPaymentFailure(orderDetails.orderId, 'FAILED');
+}
+```
+
+**BusinessProfilesScreen.tsx (MISSING):**
+```typescript
+// Lines 733-736 - ONLY modal dismiss, no backend reporting
+modal: {
+  ondismiss: () => {
+    console.log('⚪ [BUSINESS PAY] Razorpay modal dismissed');
+    setIsProcessingPayment(false);
+  },
+}
+```
+
+**Error Handling (Lines 748-759):**
+```typescript
+} catch (error: any) {
+  console.error('❌ [BUSINESS PAY] Razorpay/open error:', error);
+  setErrorMessage(error.message || 'Payment failed. Please try again.');
+  setShowErrorModal(true);
+  setIsProcessingPayment(false);
+}
+```
+
+❌ **MISSING:** No call to POST /api/mobile/transactions/update-status
+❌ **MISSING:** No reportPaymentFailure() function
+❌ **MISSING:** No transaction recording for failures
+
+-----------------------------------------------------
+
+STEP 4 — SUCCESS FLOW ANALYSIS
+------------------------------
+
+✅ **SUCCESS FLOW IS CORRECTLY IMPLEMENTED**
+
+**Success Callback (handleRazorpaySuccess):**
+- Line 660: Defined with proper error handling
+- Line 663: Calls processBusinessProfilePaymentSuccess()
+
+**processBusinessProfilePaymentSuccess Function:**
+- Line 493: Calls businessProfileService.verifyBusinessProfilePayment()
+- Line 536: Records transaction via addTransaction()
+- Line 545: Uses plan: 'business_profile'
+- Line 547: Uses description: 'Business profile payment'
+
+**API Endpoint Used:**
+```typescript
+POST /api/mobile/business-profile/verify-payment
+```
+
+**Transaction Recording (SUCCESS):**
+```typescript
+await addTransaction({
+  paymentId: paymentResponse?.razorpay_payment_id || `pay_${Date.now()}`,
+  orderId: orderMeta.orderId || paymentResponse?.razorpay_order_id,
+  amount: resolvedAmount,
+  currency: orderMeta.currency || 'INR',
+  status: 'success',
+  plan: 'business_profile',
+  planName: 'Business Profile',
+  description: 'Business profile payment',
+  method: 'razorpay',
+  // ... metadata
+});
+```
+
+✅ **SUCCESS transactions appear correctly in TransactionHistoryScreen**
+
+-----------------------------------------------------
+
+STEP 5 — TRANSACTION TYPE ANALYSIS
+---------------------------------
+
+✅ **TRANSACTION TYPE IS CORRECT**
+
+**Business Profile Transactions:**
+- **Type:** 'business_profile'
+- **Plan:** 'business_profile'
+- **PlanName:** 'Business Profile'
+- **Description:** 'Business profile payment'
+
+**TransactionHistoryScreen Filtering (Line 171):**
+```typescript
+if (filter === 'business_profile') return transaction.type === 'business_profile';
+```
+
+✅ **Filtering logic correctly handles business_profile type**
+✅ **Filter chip available: "Business Profile"**
+
+-----------------------------------------------------
+
+STEP 6 — ORDER ID HANDLING ANALYSIS
+-----------------------------------
+
+✅ **ORDER ID HANDLING IS CONSISTENT**
+
+**Create Order API (Line 629):**
+```typescript
+const orderDetails = await businessProfileService.createBusinessProfilePaymentOrder({
+  amount: 1,
+  currency: 'INR',
+});
+```
+
+**Razorpay Options (Line 676):**
+```typescript
+order_id: orderDetails.orderId,
+```
+
+**Success Transaction Recording (Line 538-541):**
+```typescript
+orderId: orderMeta.orderId || paymentResponse?.razorpay_order_id,
+```
+
+✅ **Same orderId used throughout the flow**
+✅ **Proper fallback to razorpay_order_id**
+
+-----------------------------------------------------
+
+STEP 7 — TRANSACTION HISTORY FILTERING ANALYSIS
+-----------------------------------------------
+
+✅ **TRANSACTION HISTORY FILTERING IS CORRECT**
+
+**Filter Types Available (Line 59):**
+```typescript
+type FilterType = 'all' | 'success' | 'failed' | 'pending' | 'business_profile' | 'subscription';
+```
+
+**Filter Logic (Lines 169-174):**
+```typescript
+const filteredTransactions = transactions.filter(transaction => {
+  if (filter === 'all') return true;
+  if (filter === 'business_profile') return transaction.type === 'business_profile';
+  if (filter === 'subscription') return transaction.type === 'subscription';
+  return transaction.status === filter;
+});
+```
+
+**Filter Chips (Line 347):**
+```typescript
+{(['all', 'success', 'failed', 'pending', 'business_profile', 'subscription'] as FilterType[]).map((filterType) => (
+```
+
+✅ **Business profile transactions are correctly filtered**
+✅ **Failed business profile transactions would appear if recorded**
+
+-----------------------------------------------------
+
+STEP 8 — BUSINESS PROFILE API SERVICE ANALYSIS
+----------------------------------------------
+
+**Service File:** src/services/businessProfile.ts
+
+**Create Payment Order API (Line 659):**
+```typescript
+const response = await api.post('/api/mobile/business-profile/create-payment-order', payload);
+```
+
+**Verify Payment API (Line 727):**
+```typescript
+const response = await api.post('/api/mobile/business-profile/verify-payment', payload);
+```
+
+❌ **MISSING:** No update-status API equivalent
+❌ **MISSING:** No transaction recording service for failures
+
+**Transaction Interface (Lines 41-50):**
+```typescript
+export interface BusinessProfileTransaction {
+  id: string;
+  orderId: string;
+  paymentId: string;
+  amount: number;
+  currency: string;
+  status: 'success' | 'failed' | 'pending' | 'cancelled';
+  createdAt: string;
+  verifiedAt?: string;
+}
+```
+
+✅ **API service correctly handles success flow**
+❌ **API service missing failure reporting**
+
+-----------------------------------------------------
+
+ROOT CAUSE ANALYSIS
+-------------------
+
+**PRIMARY ROOT CAUSE:** 
+Business registration payment failures are NOT reported to the backend, so no transaction records are created for failed payments.
+
+**Comparison: Subscription vs Business Registration**
+
+| Aspect | SubscriptionScreen | BusinessProfilesScreen |
+|--------|-------------------|------------------------|
+| **Success Flow** | ✅ Records transaction | ✅ Records transaction |
+| **Failure Flow** | ✅ Calls reportPaymentFailure() | ❌ No failure reporting |
+| **Backend API** | POST /api/mobile/transactions/update-status | ❌ No equivalent call |
+| **Modal Dismiss** | ✅ Reports failure | ❌ Only resets UI state |
+| **Error Handling** | ✅ Reports failure | ❌ Only shows error modal |
+
+**Specific Missing Implementation:**
+
+1. **No reportPaymentFailure() function** in BusinessProfilesScreen.tsx
+2. **No POST /api/mobile/transactions/update-status** call for failures
+3. **No transaction recording** when payment fails
+4. **Modal ondismiss only resets UI state**, doesn't report to backend
+
+-----------------------------------------------------
+
+EXACT REASON WHY TRANSACTION HISTORY IS MISSING
+-----------------------------------------------
+
+**Business Registration Payment Failure Flow:**
+
+1. User opens Razorpay modal for business profile payment
+2. User closes modal (cancels payment)
+3. **BusinessProfilesScreen.tsx:**
+   - Line 733: modal.ondismiss called
+   - Line 735: setIsProcessingPayment(false)
+   - **NO backend reporting**
+   - **NO transaction recording**
+4. **Result:** No transaction record created
+5. **TransactionHistoryScreen:** No failed transaction to display
+
+**Subscription Payment Failure Flow (CORRECT):**
+
+1. User opens Razorpay modal for subscription
+2. User closes modal (cancels payment)
+3. **SubscriptionScreen.tsx:**
+   - Line 523: reportPaymentFailure(orderDetails.orderId, 'FAILED')
+   - Line 232: POST /api/mobile/transactions/update-status
+   - **Backend records failed transaction**
+4. **Result:** Transaction record created with status "FAILED"
+5. **TransactionHistoryScreen:** Displays failed transaction
+
+-----------------------------------------------------
+
+RECOMMENDED FIX (ANALYSIS ONLY)
+------------------------------
+
+**DO NOT IMPLEMENT - Analysis Only**
+
+**Required Changes:**
+
+1. **Add reportPaymentFailure() function to BusinessProfilesScreen.tsx:**
+```typescript
+const reportPaymentFailure = async (orderId: string, status: string) => {
+  try {
+    console.log('🔴 Reporting business payment failure to backend:', { orderId, status });
+    
+    fetch(`${api.defaults.baseURL}/api/mobile/transactions/update-status`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${await AsyncStorage.getItem('authToken')}`,
+      },
+      body: JSON.stringify({
+        orderId: orderId,
+        status: status
+      })
+    }).catch(error => {
+      console.warn('⚠️ Failed to report business payment status to backend:', error);
+    });
+  } catch (error) {
+    console.warn('⚠️ Error in reportPaymentFailure:', error);
+  }
+};
+```
+
+2. **Add failure reporting in modal ondismiss:**
+```typescript
+modal: {
+  ondismiss: () => {
+    console.log('⚪ [BUSINESS PAY] Razorpay modal dismissed');
+    setIsProcessingPayment(false);
+    // Add failure reporting
+    if (orderDetails?.orderId) {
+      reportPaymentFailure(orderDetails.orderId, 'FAILED');
+    }
+  },
+}
+```
+
+3. **Add failure reporting in catch block:**
+```typescript
+} catch (error: any) {
+  console.error('❌ [BUSINESS PAY] Razorpay/open error:', error);
+  // Add failure reporting
+  if (orderDetails?.orderId) {
+    reportPaymentFailure(orderDetails.orderId, 'FAILED');
+  }
+  setErrorMessage(error.message || 'Payment failed. Please try again.');
+  setShowErrorModal(true);
+  setIsProcessingPayment(false);
+}
+```
+
+4. **Add transaction recording for failures:**
+```typescript
+// In failure reporting, also record transaction locally
+await addTransaction({
+  paymentId: 'pay_failed_' + Date.now(),
+  orderId: orderDetails.orderId,
+  amount: resolvedAmount,
+  currency: 'INR',
+  status: 'failed',
+  plan: 'business_profile',
+  planName: 'Business Profile',
+  description: 'Business profile payment - Failed',
+  method: 'razorpay',
+  metadata: {
+    email: profileData.email,
+    contact: profileData.phone,
+    name: profileData.name,
+  },
+});
+```
+
+**Expected Outcome After Fix:**
+- Business registration payment failures would be recorded
+- Failed transactions would appear in TransactionHistoryScreen
+- Consistent behavior between subscription and business profile payments
+
+-----------------------------------------------------
+
+VERIFICATION SUMMARY
+-------------------
+
+✅ **Business registration screen located:** BusinessProfilesScreen.tsx
+✅ **Payment flow traced completely:** Form → Payment → Razorpay → Success/Failure
+✅ **Success flow verified:** Working correctly, transactions appear
+❌ **Failure flow identified:** Missing backend reporting
+✅ **Transaction type correct:** 'business_profile'
+✅ **OrderId handling consistent:** Same throughout flow
+✅ **TransactionHistory filtering correct:** Would show failed transactions if recorded
+✅ **API service verified:** Missing failure reporting endpoints
+
+**Root Cause:** Business registration payment failures are not reported to backend, so no transaction records are created for failed payments.
+
+**Impact:** Users see inconsistent behavior - subscription failures appear in history, business registration failures do not.
+
+-----------------------------------------------------
+
+END OF REPORT
+-------------

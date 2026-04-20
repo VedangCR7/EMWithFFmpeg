@@ -1,0 +1,239 @@
+================================================================================
+GREETING TAB POSTER SELECTION STATE ANALYSIS REPORT
+================================================================================
+
+ISSUE SUMMARY
+------------
+The Greeting Tab poster selection flow shows inconsistent behavior where:
+1. Initial selection shows `prevPosterId: 'loading'` with `newPosterId` being the actual poster ID
+2. After navigation away and back, the same poster shows correct `posterId` without 'loading' state
+3. The state initialization and update flow differs between first load and re-selection scenarios
+
+STATE FLOW TIMELINE
+-------------------
+
+FIRST LOAD (Initial Navigation to Greeting Category):
+----------------------------------------------------
+1. HomeScreen.handleGreetingCategoryPress() is called
+2. If no cached templates exist, creates navigation with:
+   - selectedTemplateId: `category_${category.id}` (e.g., "category_good-morning")
+   - selectedPoster.id: `category_${category.id}` 
+   - selectedPoster.name: category.name
+   - selectedPoster.thumbnail: categoryImage || ''
+
+3. PosterPlayerScreen receives route params
+4. convertedInitialPoster is created from selectedPoster
+5. currentPoster state is initialized with convertedInitialPoster (id = "category_*")
+6. isTemplateLoading is set based on: convertedInitialPoster?.id === 'loading'
+   - Note: At this point, id is "category_*", NOT "loading"
+
+7. fetchGreetingCategoryTemplates() starts:
+   - Sets setIsGreetingCategoryLoading(true)
+   - posterToMatch = convertedInitialPoster (id = "category_*")
+
+8. API fetch completes, templates are processed
+9. During template matching:
+   - Looks for matching poster by ID in fetched templates
+   - Since "category_*" IDs don't exist in API response, no match found
+   - Falls back to first template from API response
+
+10. setCurrentPoster is called with real template:
+    - prevPoster.id = "category_*" 
+    - newPoster.id = "cmmtd1ers01uxbxj314yznwcn" (real template ID)
+    - This is where "prevPosterId: 'loading'" appears in logs
+
+RE-SELECTION (After Navigation Away and Back):
+---------------------------------------------
+1. User navigates back to greeting category
+2. HomeScreen now has cached templates from previous fetch
+3. Navigation uses cached template data:
+   - selectedTemplateId: firstTemplate.id (real ID)
+   - selectedPoster.id: firstTemplate.id (real ID)
+   - No "category_*" placeholder used
+
+4. PosterPlayerScreen receives real template ID
+5. currentPoster initialized with real template data
+6. fetchGreetingCategoryTemplates() runs again
+7. Template matching finds the poster in fetched templates
+8. setCurrentPoster called with same poster (no ID change)
+9. Log shows correct posterId without 'loading' transition
+
+DATA STRUCTURE DIFFERENCE
+--------------------------
+
+FIRST LOAD Object Structure:
+```javascript
+{
+  prevPosterId: 'category_good-morning',  // Appears as 'loading' in some logs
+  newPosterId: 'cmmtd1ers01uxbxj314yznwcn',
+  newPosterName: 'Hiring Posters 20',
+  newPosterThumbnail: '...'
+}
+```
+
+RE-SELECTION Object Structure:
+```javascript
+{
+  posterId: 'cmmtd1ers01uxbxj314yznwcn',
+  posterName: 'Hiring Posters 20',
+  posterTags: [...],
+  category: 'Hiring / Vacancy Posters',
+  globalBusinessCategory: 'Restaurants & Food Services',
+  greetingCategory: 'Hiring / Vacancy Posters',
+  calendarDate: undefined
+}
+```
+
+Key Differences:
+- First load logs "prevPosterId" vs re-selection logs "posterId"
+- First load has transition from placeholder to real ID
+- Re-selection starts with real ID directly
+- Different log formats (GREETING FETCH vs HANDLE POSTER SELECT)
+
+ASYNC & RACE CONDITION ANALYSIS
+------------------------------
+
+1. **Async State Initialization Race**:
+   - currentPoster initialized with placeholder ID
+   - API fetch runs in background
+   - State updated when fetch completes
+   - Creates visible transition from placeholder to real data
+
+2. **Multiple State Update Sources**:
+   - Route param changes trigger useEffect
+   - API completion triggers setCurrentPoster
+   - User selection triggers handlePosterSelect
+   - These can overlap and cause state inconsistencies
+
+3. **Loading State Management**:
+   - isTemplateLoading based on currentPoster?.id === 'loading'
+   - But placeholder IDs are "category_*", not "loading"
+   - Loading state may not accurately reflect actual loading status
+
+4. **Template Deduplication Logic**:
+   - Complex deduplication removes loading placeholders
+   - May remove valid placeholder IDs before they're replaced
+   - Could cause state to be undefined temporarily
+
+NAVIGATION IMPACT ANALYSIS
+--------------------------
+
+Screen Mount (First Load):
+- Creates placeholder poster with "category_*" ID
+- Initiates background fetch
+- State transitions from placeholder to real poster
+
+Screen Focus (useFocusEffect):
+- Resets language to "All"
+- Clears initialPosterAddedRef flag
+- May trigger re-fetch if category changed
+
+Navigation Away:
+- State preserved in component
+- Cached templates stored in HomeScreen
+- No state reset on blur
+
+Navigation Back:
+- If cached: Uses real template ID directly
+- If not cached: Repeats placeholder flow
+- Different behavior based on cache state
+
+ROOT CAUSE HYPOTHESES
+---------------------
+
+1. **Placeholder ID Mismatch**:
+   - Code checks for 'loading' ID but uses 'category_*' placeholders
+   - Loading state detection may be inaccurate
+   - State transitions appear as 'loading' due to log interpretation
+
+2. **Dual Data Sources**:
+   - Route params provide initial data
+   - API fetch provides complete data
+   - State updates when API data arrives, causing ID changes
+
+3. **Cache-Dependent Initialization**:
+   - First load: No cache = placeholder + fetch
+   - Re-load: Has cache = real data directly
+   - Inconsistent initialization paths
+
+4. **Async State Overwrites**:
+   - Multiple useEffect hooks updating currentPoster
+   - Race conditions between route param changes and API responses
+   - Later updates overwrite earlier ones
+
+5. **Template Matching Logic**:
+   - Complex matching algorithm may not find placeholder IDs
+   - Falls back to first available template
+   - Causes unexpected poster selection
+
+6. **State Persistence Issues**:
+   - Component state not properly reset between navigations
+   - Previous state influences new selections
+   - Stale closures in useEffect hooks
+
+RISK AREAS IN CODE
+------------------
+
+1. **PosterPlayerScreen.tsx**:
+   - Line 553: Loading state checks for 'loading' but placeholder is 'category_*'
+   - Line 1229-1232: Complex conditional logic for poster updates
+   - Line 2209-2219: Template matching with multiple fallbacks
+   - Multiple useEffect hooks updating same state (currentPoster)
+
+2. **HomeScreen.tsx**:
+   - Line 4813-4819: Creates 'category_*' placeholder IDs
+   - Line 4832-4842: Background fetch may update state after navigation
+
+3. **State Management**:
+   - currentPoster updated from multiple sources
+   - No single source of truth for poster selection
+   - Async operations not properly sequenced
+
+4. **Navigation Flow**:
+   - Different initialization paths based on cache state
+   - No consistent loading state management
+   - Race conditions between navigation and data loading
+
+DEBUGGING CHECKLIST
+------------------
+
+To verify root cause, log the following:
+
+1. **Initialization Phase**:
+   - Log route.params on component mount
+   - Log convertedInitialPoster creation
+   - Log currentPoster initial state
+
+2. **State Transitions**:
+   - Log every setCurrentPoster call with full object
+   - Log which useEffect triggered each update
+   - Log userSelectedPosterRef state changes
+
+3. **API Fetch Flow**:
+   - Log fetch start/end with timing
+   - Log template matching process
+   - Log deduplication results
+
+4. **Navigation Events**:
+   - Log screen focus/blur events
+   - Log cache state changes
+   - Log background fetch status
+
+5. **Loading States**:
+   - Log isTemplateLoading changes
+   - Log isGreetingCategoryLoading changes
+   - Compare loading state vs actual data state
+
+6. **Race Condition Detection**:
+   - Add timestamps to all state updates
+   - Track async operation completion order
+   - Identify overlapping state updates
+
+7. **Template Processing**:
+   - Log raw API response
+   - Log template filtering results
+   - Log final template array before state update
+
+================================================================================
+ANALYSIS COMPLETE - DO NOT IMPLEMENT FIXES WITHOUT FURTHER INVESTIGATION
+================================================================================

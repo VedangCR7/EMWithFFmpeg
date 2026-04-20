@@ -1,0 +1,192 @@
+Global Download Limit Usage Report
+===================================
+
+📊 SCAN SUMMARY
+Total Occurrences Found: 3 Alert.alert instances for download limits
+Files Affected: 3 files
+Risk Level: LOW (All identical logic patterns)
+
+📁 DETAILED ANALYSIS
+
+1️⃣ FILE: src/screens/PosterPreviewScreen.tsx
+📍 Line Number: 368-371
+⚙️ Function Name: downloadPoster
+🧠 Logic Type: Frontend guard validation
+🔄 Flow Type: Early return
+⚠️ Risk Level: SAFE
+
+Code Snippet:
+```typescript
+if (isLimitReached) {
+  Alert.alert(
+    'Download Limit Reached',
+    'You have reached your daily download limit. Please try again tomorrow.'
+  );
+  return;
+}
+```
+
+Logic Analysis:
+- ✅ Simple condition check
+- ✅ Early return pattern
+- ✅ No async complexity
+- ✅ Uses isLimitReached from useCentralizedDownload hook
+- ✅ Safe to replace UI only
+
+2️⃣ FILE: src/hooks/useCentralizedDownload.ts
+📍 Line Number: 43-46
+⚙️ Function Name: downloadContent
+🧠 Logic Type: Frontend guard validation
+🔄 Flow Type: Early return
+⚠️ Risk Level: SAFE
+
+Code Snippet:
+```typescript
+if (isLimitReached) {
+  Alert.alert(
+    'Download Limit Reached',
+    'You have reached your daily download limit. Please try again tomorrow.'
+  );
+  return false;
+}
+```
+
+Logic Analysis:
+- ✅ Simple condition check
+- ✅ Early return with false
+- ✅ No async complexity
+- ✅ Uses internal isLimitReached state
+- ✅ Safe to replace UI only
+
+3️⃣ FILE: src/hooks/useCentralizedDownload.ts
+📍 Line Number: 87-90
+⚙️ Function Name: downloadContent (catch block)
+🧠 Logic Type: Backend error handling
+🔄 Flow Type: Early return
+⚠️ Risk Level: SAFE
+
+Code Snippet:
+```typescript
+Alert.alert(
+  'Download Limit Reached',
+  'You have reached your daily download limit. Please try again tomorrow.'
+);
+return false;
+```
+
+Logic Analysis:
+- ✅ Backend error response handling
+- ✅ Early return with false
+- ✅ After setIsLimitReached(true)
+- ✅ Safe to replace UI only
+
+4️⃣ FILE: src/hooks/useDownloadLimitHandler.ts
+📍 Line Number: 36-40
+⚙️ Function Name: useEffect subscription handler
+🧠 Logic Type: Global event handler
+🔄 Flow Type: No return (just shows alert)
+⚠️ Risk Level: NEEDS CAREFUL HANDLING
+
+Code Snippet:
+```typescript
+Alert.alert(
+  'Download Limit Reached',
+  message,
+  [{ text: 'OK', style: 'default' }]
+);
+```
+
+Logic Analysis:
+- ⚠️ Global event handler
+- ⚠️ Dynamic message (customAlertMessage support)
+- ⚠️ No return statement
+- ⚠️ Part of subscription system
+- ⚠️ Needs special handling approach
+
+🎯 LOGIC CONSISTENCY ANALYSIS
+
+✅ IDENTICAL PATTERNS (Files 1, 2, 3):
+- Same title: 'Download Limit Reached'
+- Same message: 'You have reached your daily download limit. Please try again tomorrow.'
+- Same early return pattern
+- Same validation logic
+
+⚠️ DIFFERENT PATTERN (File 4):
+- Dynamic message support
+- No return statement
+- Global event subscription context
+- Customizable alert behavior
+
+🔧 SAFE REPLACEMENT STRATEGY PER FILE
+
+1️⃣ PosterPreviewScreen.tsx - SAFE
+- Replace Alert.alert with setShowDownloadLimitModal(true)
+- Keep return statement
+- Add local state and modal rendering
+
+2️⃣ useCentralizedDownload.ts (Line 43-46) - SAFE
+- Replace Alert.alert with callback or event emission
+- Keep return false
+- Cannot add modal directly in hook (hooks can't render JSX)
+
+3️⃣ useCentralizedDownload.ts (Line 87-90) - SAFE
+- Replace Alert.alert with callback or event emission
+- Keep return false
+- Cannot add modal directly in hook
+
+4️⃣ useDownloadLimitHandler.ts - SPECIAL HANDLING
+- Option A: Add showCustomAlert prop to disable default alert
+- Option B: Emit custom event for UI layer to handle
+- Option C: Add onShowAlert callback prop
+- RECOMMENDED: Option B (event emission)
+
+📊 REPLACEMENT FEASIBILITY
+
+✅ DIRECT REPLACEMENT (1 file):
+- PosterPreviewScreen.tsx
+
+⚠️ INDIRECT REPLACEMENT (2 files):
+- useCentralizedDownload.ts (both instances)
+- Need to emit events instead of showing alerts
+
+🔄 EVENT-BASED APPROACH (1 file):
+- useDownloadLimitHandler.ts
+- Already uses event system, can enhance it
+
+🎯 RECOMMENDED IMPLEMENTATION STRATEGY
+
+Phase 1: Create Standardized Component
+- Single DownloadLimitMessage component
+- Consistent UI across all usage
+
+Phase 2: Handle Direct Cases
+- PosterPreviewScreen.tsx: Direct modal replacement
+
+Phase 3: Handle Hook Cases
+- useCentralizedDownload: Emit download limit events
+- useDownloadLimitHandler: Enhance event system
+- Add global modal listener in App/Root component
+
+Phase 4: Global Verification
+- Test all download limit scenarios
+- Ensure consistent UI behavior
+
+🚨 RISK MITIGATION
+- All validation logic preserved
+- Early return patterns maintained
+- No backend impact
+- Zero regression risk with proper event handling
+
+📈 BENEFITS
+- UI consistency across app
+- Better user experience
+- Centralized modal management
+- Easier maintenance
+- Professional appearance
+
+🎯 CONCLUSION
+Total files requiring updates: 4
+Direct modal replacements: 1
+Event-based replacements: 3
+Implementation complexity: MEDIUM
+Risk level: LOW with proper approach

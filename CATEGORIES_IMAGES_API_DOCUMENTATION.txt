@@ -1,0 +1,740 @@
+MARKETBRAND MOBILE APP - CATEGORIES & IMAGES API DOCUMENTATION
+============================================================================
+
+SECTION 1 — BUSINESS CATEGORY APIs
+============================================================================
+
+--------------------------------
+API NAME: Get Business Categories
+ENDPOINT: /api/mobile/business-categories/business
+METHOD: GET
+USED IN SCREEN: BusinessProfileForm, HomeScreen, RegistrationScreen
+REQUEST STRUCTURE:
+- Headers: Authorization: Bearer ${token}
+- Query Parameters: None
+- Request Body: None
+
+RESPONSE JSON SAMPLE:
+{
+  "success": true,
+  "data": {
+    "categories": [
+      {
+        "id": "cat_123",
+        "name": "Retail & Lifestyle Store",
+        "description": "Retail businesses including fashion, electronics, home goods",
+        "icon": "store_icon.png",
+        "imageUrl": "/uploads/icons/retail.png",
+        "parentCategoryName": null,
+        "subCategories": [
+          {
+            "id": "sub_456",
+            "name": "Eyewear Shop",
+            "parentCategoryName": "Retail & Lifestyle Store"
+          },
+          {
+            "id": "sub_457", 
+            "name": "Fashion Boutique",
+            "parentCategoryName": "Retail & Lifestyle Store"
+          }
+        ],
+        "slug": "retail-lifestyle",
+        "color": "#FF5722",
+        "posterCount": 150,
+        "videoCount": 75,
+        "totalContent": 225,
+        "sortOrder": 1,
+        "createdAt": "2024-01-01T00:00:00Z",
+        "isParent": true
+      },
+      {
+        "id": "cat_124",
+        "name": "Eyewear Shop",
+        "description": "Eyewear and optical accessories store",
+        "icon": "eyewear_icon.png",
+        "imageUrl": "/uploads/icons/eyewear.png",
+        "parentCategoryName": "Retail & Lifestyle Store",
+        "slug": "eyewear-shop",
+        "color": "#2196F3",
+        "posterCount": 80,
+        "videoCount": 40,
+        "totalContent": 120,
+        "sortOrder": 2,
+        "createdAt": "2024-01-01T00:00:00Z",
+        "isParent": false
+      }
+    ]
+  }
+}
+
+DESCRIPTION: Fetches all business categories with parent-child relationships. Categories with null parentCategoryName are main categories, others are subcategories with parentCategoryName field indicating the parent.
+--------------------------------
+
+--------------------------------
+API NAME: Get Home Business Categories
+ENDPOINT: /api/mobile/business-categories/home
+METHOD: GET
+USED IN SCREEN: HomeScreen
+REQUEST STRUCTURE:
+- Headers: Authorization: Bearer ${token}
+- Query Parameters: None
+- Request Body: None
+
+RESPONSE JSON SAMPLE:
+{
+  "success": true,
+  "data": {
+    "categories": [
+      {
+        "id": "cat_123",
+        "name": "Retail & Lifestyle Store",
+        "description": "Retail businesses including fashion, electronics",
+        "icon": "store_icon.png",
+        "imageUrl": "/uploads/icons/retail.png",
+        "parentCategoryName": null,
+        "subCategories": [],
+        "slug": "retail-lifestyle",
+        "color": "#FF5722",
+        "posterCount": 150,
+        "videoCount": 75,
+        "totalContent": 225
+      }
+    ]
+  }
+}
+
+DESCRIPTION: Fetches business categories specifically formatted for home screen display. Falls back to main business categories endpoint if this fails.
+--------------------------------
+
+--------------------------------
+API NAME: Get Categories (Alias)
+ENDPOINT: /api/v1/categories
+METHOD: GET
+USED IN SCREEN: Various screens (fallback endpoint)
+REQUEST STRUCTURE:
+- Headers: Authorization: Bearer ${token}
+- Query Parameters: None
+- Request Body: None
+
+RESPONSE JSON SAMPLE:
+{
+  "success": true,
+  "categories": [
+    {
+      "id": "cat_123",
+      "name": "Retail & Lifestyle Store",
+      "description": "Retail businesses including fashion, electronics",
+      "parentCategoryName": null
+    }
+  ]
+}
+
+DESCRIPTION: Alternative endpoint for fetching categories. Used as fallback when main endpoints fail.
+--------------------------------
+
+============================================================================
+
+SECTION 2 — GENERAL CATEGORY APIs
+============================================================================
+
+--------------------------------
+API NAME: Get Greeting Categories
+ENDPOINT: /api/mobile/greetings/categories
+METHOD: GET
+USED IN SCREEN: HomeScreen, GreetingTemplatesScreen
+REQUEST STRUCTURE:
+- Headers: Authorization: Bearer ${token}
+- Query Parameters: None
+- Request Body: None
+
+RESPONSE JSON SAMPLE:
+{
+  "success": true,
+  "data": {
+    "categories": [
+      {
+        "id": "greet_001",
+        "name": "Festival Greetings",
+        "description": "Festival and celebration greeting templates",
+        "icon": "festival_icon.png",
+        "color": "#FF9800",
+        "parentCategoryName": null,
+        "count": 25,
+        "imageCount": 15,
+        "videoCount": 10
+      },
+      {
+        "id": "greet_002",
+        "name": "Birthday Wishes",
+        "description": "Birthday greeting card templates",
+        "icon": "birthday_icon.png", 
+        "color": "#E91E63",
+        "parentCategoryName": null,
+        "count": 30,
+        "imageCount": 20,
+        "videoCount": 10
+      },
+      {
+        "id": "greet_003",
+        "name": "Business Greetings",
+        "description": "Professional business greeting templates",
+        "icon": "business_icon.png",
+        "color": "#2196F3",
+        "parentCategoryName": "Corporate",
+        "count": 20,
+        "imageCount": 12,
+        "videoCount": 8
+      }
+    ]
+  }
+}
+
+DESCRIPTION: Fetches greeting template categories with parent-child relationships. Categories can have parentCategoryName for hierarchical organization.
+--------------------------------
+
+============================================================================
+
+SECTION 3 — IMAGE/POSTER APIs
+============================================================================
+
+--------------------------------
+API NAME: Get Posters by Category
+ENDPOINT: /api/mobile/posters/category/{category}
+METHOD: GET
+USED IN SCREEN: PosterPlayerScreen, HomeScreen, BusinessProfilesScreen
+REQUEST STRUCTURE:
+- Headers: Authorization: Bearer ${token}
+- Query Parameters: 
+  - limit: number (optional, default: 200)
+- Request Body: None
+
+RESPONSE JSON SAMPLE:
+{
+  "success": true,
+  "data": {
+    "posters": [
+      {
+        "id": "poster_001",
+        "title": "Summer Sale Banner",
+        "description": "Eye-catching summer sale promotional poster",
+        "category": "Retail & Lifestyle Store",
+        "thumbnail": "/uploads/thumbnails/summer_sale_thumb.jpg",
+        "thumbnailUrl": "/uploads/thumbnails/summer_sale_thumb.jpg",
+        "imageUrl": "/uploads/posters/summer_sale.jpg",
+        "downloadUrl": "/downloads/posters/summer_sale.jpg",
+        "downloads": 1250,
+        "isPremium": false,
+        "tags": ["sale", "summer", "retail", "promotion"],
+        "createdAt": "2024-01-15T10:30:00Z",
+        "updatedAt": "2024-01-15T10:30:00Z"
+      },
+      {
+        "id": "poster_002", 
+        "title": "Fashion Collection Launch",
+        "description": "New fashion collection announcement poster",
+        "category": "Retail & Lifestyle Store",
+        "thumbnail": "/uploads/thumbnails/fashion_launch_thumb.jpg",
+        "thumbnailUrl": "/uploads/thumbnails/fashion_launch_thumb.jpg",
+        "imageUrl": "/uploads/posters/fashion_launch.jpg",
+        "downloadUrl": "/downloads/posters/fashion_launch.jpg",
+        "downloads": 890,
+        "isPremium": true,
+        "tags": ["fashion", "launch", "collection", "new"],
+        "createdAt": "2024-01-10T14:20:00Z",
+        "updatedAt": "2024-01-10T14:20:00Z"
+      }
+    ],
+    "category": "Retail & Lifestyle Store",
+    "total": 2
+  },
+  "message": "Posters fetched successfully"
+}
+
+DESCRIPTION: Fetches posters for a specific business category. Supports pagination with limit parameter. Returns posters with thumbnail, image, and download URLs.
+--------------------------------
+
+--------------------------------
+API NAME: Get User Category Posters
+ENDPOINT: /api/mobile/posters/category/{category}
+METHOD: GET
+USED IN SCREEN: PosterPlayerScreen (via floating button), HomeScreen
+REQUEST STRUCTURE:
+- Headers: Authorization: Bearer ${token}
+- Query Parameters:
+  - limit: number (optional, default: 200)
+- Request Body: None
+
+RESPONSE JSON SAMPLE:
+{
+  "success": true,
+  "data": {
+    "posters": [
+      {
+        "id": "poster_003",
+        "title": "Business Profile Banner",
+        "description": "Professional business profile promotional poster",
+        "category": "Eyewear Shop",
+        "thumbnail": "/uploads/thumbnails/business_profile_thumb.jpg",
+        "imageUrl": "/uploads/posters/business_profile.jpg", 
+        "downloadUrl": "/downloads/posters/business_profile.jpg",
+        "downloads": 450,
+        "isPremium": false,
+        "tags": ["business", "profile", "professional"],
+        "createdAt": "2024-01-12T09:15:00Z",
+        "updatedAt": "2024-01-12T09:15:00Z"
+      }
+    ],
+    "category": "Eyewear Shop",
+    "total": 1
+  }
+}
+
+DESCRIPTION: Fetches posters for user's specific business category (from their business profile). Determines category from user's selected business profile or registration data.
+--------------------------------
+
+--------------------------------
+API NAME: Get Calendar Posters by Date
+ENDPOINT: /api/mobile/calendar/posters/{date}
+METHOD: GET
+USED IN SCREEN: HomeScreen (calendar section)
+REQUEST STRUCTURE:
+- Headers: Authorization: Bearer ${token}
+- Query Parameters: None
+- Request Body: None
+
+RESPONSE JSON SAMPLE:
+{
+  "success": true,
+  "data": {
+    "posters": [
+      {
+        "id": "cal_poster_001",
+        "name": "Diwali Celebration",
+        "title": "Happy Diwali",
+        "description": "Festival of lights celebration poster",
+        "thumbnail": "/uploads/thumbnails/diwali_thumb.jpg",
+        "imageUrl": "/uploads/posters/diwali.jpg",
+        "category": "Festival",
+        "downloads": 2100,
+        "isDownloaded": false,
+        "tags": ["diwali", "festival", "lights", "celebration"],
+        "date": "2024-10-31",
+        "festivalName": "Diwali",
+        "festivalEmoji": "🪔",
+        "createdAt": "2024-01-01T00:00:00Z",
+        "updatedAt": "2024-01-01T00:00:00Z"
+      }
+    ],
+    "date": "2024-10-31",
+    "total": 1
+  },
+  "message": "Posters fetched successfully"
+}
+
+DESCRIPTION: Fetches calendar-specific posters for a given date. Returns festival-themed posters with date and festival information.
+--------------------------------
+
+--------------------------------
+API NAME: Get Calendar Posters by Month
+ENDPOINT: /api/mobile/calendar/posters/month/{year}/{month}
+METHOD: GET
+USED IN SCREEN: HomeScreen (calendar section)
+REQUEST STRUCTURE:
+- Headers: Authorization: Bearer ${token}
+- Query Parameters: None
+- Request Body: None
+
+RESPONSE JSON SAMPLE:
+{
+  "success": true,
+  "data": {
+    "posters": {
+      "2024-10-31": [
+        {
+          "id": "cal_poster_001",
+          "name": "Diwali Celebration",
+          "title": "Happy Diwali",
+          "description": "Festival of lights celebration poster",
+          "thumbnail": "/uploads/thumbnails/diwali_thumb.jpg",
+          "imageUrl": "/uploads/posters/diwali.jpg",
+          "category": "Festival",
+          "downloads": 2100,
+          "isDownloaded": false,
+          "tags": ["diwali", "festival", "lights"],
+          "date": "2024-10-31",
+          "festivalName": "Diwali",
+          "festivalEmoji": "🪔"
+        }
+      ],
+      "2024-11-01": [
+        {
+          "id": "cal_poster_002",
+          "name": "New Month Start",
+          "title": "Welcome November",
+          "description": "Beginning of month celebration poster",
+          "thumbnail": "/uploads/thumbnails/november_thumb.jpg",
+          "imageUrl": "/uploads/posters/november.jpg",
+          "category": "General",
+          "downloads": 800,
+          "isDownloaded": false,
+          "tags": ["november", "month", "welcome"],
+          "date": "2024-11-01"
+        }
+      ]
+    },
+    "month": 10,
+    "year": 2024,
+    "total": 2
+  },
+  "message": "Posters fetched successfully"
+}
+
+DESCRIPTION: Fetches all calendar posters for an entire month, grouped by date. Useful for calendar view with multiple dates.
+--------------------------------
+
+--------------------------------
+API NAME: Get Featured Content
+ENDPOINT: /api/mobile/home/featured
+METHOD: GET
+USED IN SCREEN: HomeScreen
+REQUEST STRUCTURE:
+- Headers: Authorization: Bearer ${token}
+- Query Parameters:
+  - limit: number (optional, default: 10)
+  - active: boolean (optional, filter active content only)
+- Request Body: None
+
+RESPONSE JSON SAMPLE:
+{
+  "success": true,
+  "data": [
+    {
+      "id": "featured_001",
+      "title": "Summer Mega Sale",
+      "description": "Biggest sale of the season with up to 50% off",
+      "imageUrl": "/uploads/featured/summer_mega.jpg",
+      "thumbnailUrl": "/uploads/featured/summer_mega_thumb.jpg",
+      "videoUrl": "/uploads/videos/summer_promo.mp4",
+      "link": "/promotion/summer-sale",
+      "type": "promotion",
+      "priority": 1,
+      "isActive": true,
+      "createdAt": "2024-01-15T00:00:00Z",
+      "updatedAt": "2024-01-15T00:00:00Z"
+    },
+    {
+      "id": "featured_002",
+      "title": "New Template Collection",
+      "description": "Check out our latest professional templates",
+      "imageUrl": "/uploads/featured/new_templates.jpg",
+      "thumbnailUrl": "/uploads/featured/new_templates_thumb.jpg",
+      "type": "banner",
+      "priority": 2,
+      "isActive": true,
+      "createdAt": "2024-01-10T00:00:00Z",
+      "updatedAt": "2024-01-10T00:00:00Z"
+    }
+  ]
+}
+
+DESCRIPTION: Fetches featured banners, promotions, and highlights for home screen display. Supports filtering by active status and priority.
+--------------------------------
+
+--------------------------------
+API NAME: Get Professional Templates
+ENDPOINT: /api/mobile/home/templates
+METHOD: GET
+USED IN SCREEN: HomeScreen, TemplateGalleryScreen
+REQUEST STRUCTURE:
+- Headers: Authorization: Bearer ${token}
+- Query Parameters:
+  - limit: number (optional, default: 20)
+  - category: string (optional)
+  - language: string (optional)
+- Request Body: None
+
+RESPONSE JSON SAMPLE:
+{
+  "success": true,
+  "data": [
+    {
+      "id": "template_001",
+      "name": "Business Presentation",
+      "description": "Professional business presentation template",
+      "thumbnail": "/uploads/templates/business_pres_thumb.jpg",
+      "previewUrl": "/uploads/previews/business_pres.mp4",
+      "category": "Business",
+      "subcategory": "Presentation",
+      "downloads": 1500,
+      "views": 3200,
+      "isDownloaded": false,
+      "isPremium": true,
+      "tags": ["business", "presentation", "professional"],
+      "fileSize": 2048576,
+      "createdAt": "2024-01-05T00:00:00Z",
+      "updatedAt": "2024-01-05T00:00:00Z"
+    }
+  ]
+}
+
+DESCRIPTION: Fetches professional templates for home screen. Supports filtering by category, language, and pagination.
+--------------------------------
+
+--------------------------------
+API NAME: Get Video Content
+ENDPOINT: /api/mobile/home/video-content
+METHOD: GET
+USED IN SCREEN: HomeScreen, VideoPlayerScreen
+REQUEST STRUCTURE:
+- Headers: Authorization: Bearer ${token}
+- Query Parameters:
+  - limit: number (optional, default: 20)
+  - category: string (optional)
+  - language: string (optional)
+- Request Body: None
+
+RESPONSE JSON SAMPLE:
+{
+  "success": true,
+  "data": [
+    {
+      "id": "video_001",
+      "title": "Product Showcase Video",
+      "description": "Professional product showcase video template",
+      "thumbnail": "/uploads/videos/product_show_thumb.jpg",
+      "videoUrl": "/uploads/videos/product_show.mp4",
+      "duration": 30,
+      "category": "Marketing",
+      "language": "English",
+      "languages": ["English", "Spanish"],
+      "views": 850,
+      "downloads": 320,
+      "isDownloaded": false,
+      "isPremium": true,
+      "tags": ["product", "showcase", "marketing"],
+      "fileSize": 5242880,
+      "createdAt": "2024-01-08T00:00:00Z",
+      "updatedAt": "2024-01-08T00:00:00Z"
+    }
+  ]
+}
+
+DESCRIPTION: Fetches video content templates for home screen. Includes duration, language support, and file size information.
+--------------------------------
+
+--------------------------------
+API NAME: Get General Templates
+ENDPOINT: /api/mobile/templates
+METHOD: GET
+USED IN SCREEN: TemplateGalleryScreen, PosterEditorScreen
+REQUEST STRUCTURE:
+- Headers: Authorization: Bearer ${token}
+- Query Parameters:
+  - type: 'daily' | 'festival' | 'special' | 'all' (optional)
+  - category: 'free' | 'premium' | 'all' (optional)
+  - language: string (optional)
+  - search: string (optional)
+  - page: number (optional)
+  - limit: number (optional)
+- Request Body: None
+
+RESPONSE JSON SAMPLE:
+{
+  "success": true,
+  "data": {
+    "templates": [
+      {
+        "id": "template_002",
+        "name": "Modern Event Flyer",
+        "description": "Clean and professional event flyer template",
+        "imageUrl": "/uploads/templates/event_flyer.jpg",
+        "thumbnailUrl": "/uploads/templates/event_flyer_thumb.jpg",
+        "category": "free",
+        "type": "daily",
+        "language": "English",
+        "tags": ["flyer", "event", "modern"],
+        "createdAt": "2024-01-01T00:00:00Z",
+        "updatedAt": "2024-01-01T00:00:00Z"
+      }
+    ],
+    "total": 150,
+    "page": 1,
+    "limit": 20
+  }
+}
+
+DESCRIPTION: Fetches general templates with extensive filtering options. Supports pagination, search, and filtering by type, category, and language.
+--------------------------------
+
+--------------------------------
+API NAME: Get Greeting Templates
+ENDPOINT: /api/mobile/greetings/templates
+METHOD: GET
+USED IN SCREEN: GreetingTemplatesScreen, GreetingEditorScreen
+REQUEST STRUCTURE:
+- Headers: Authorization: Bearer ${token}
+- Query Parameters:
+  - category: string (optional)
+  - language: string (optional)
+  - isPremium: boolean (optional)
+  - search: string (optional)
+  - limit: number (optional)
+- Request Body: None
+
+RESPONSE JSON SAMPLE:
+{
+  "success": true,
+  "data": {
+    "templates": [
+      {
+        "id": "greeting_001",
+        "name": "Birthday Celebration",
+        "thumbnail": "/uploads/greetings/birthday_thumb.jpg",
+        "category": "Birthday Wishes",
+        "content": {
+          "text": "Happy Birthday!",
+          "background": "/uploads/backgrounds/birthday_bg.jpg",
+          "stickers": ["cake", "balloons"],
+          "emojis": ["🎂", "🎈"],
+          "layout": "vertical"
+        },
+        "downloads": 890,
+        "isDownloaded": false,
+        "isPremium": false,
+        "categoryId": "greet_002"
+      }
+    ],
+    "total": 45,
+    "page": 1,
+    "limit": 20
+  }
+}
+
+DESCRIPTION: Fetches greeting templates with customizable content. Returns structured content with text, background, stickers, and layout information.
+--------------------------------
+
+============================================================================
+
+SECTION 4 — IMAGE UPLOAD APIs
+============================================================================
+
+--------------------------------
+API NAME: Upload Business Profile Image
+ENDPOINT: /api/mobile/business-profile/{profileId}/upload
+METHOD: POST
+USED IN SCREEN: BusinessProfilesScreen, BusinessProfileForm
+REQUEST STRUCTURE:
+- Headers: 
+  - Authorization: Bearer ${token}
+  - Content-Type: multipart/form-data
+- Request Body: FormData with file field
+  - file: Image file with uri, type, name
+
+RESPONSE JSON SAMPLE:
+{
+  "success": true,
+  "data": {
+    "url": "/uploads/business-profiles/logo_123.jpg",
+    "message": "Image uploaded successfully"
+  },
+  "message": "Business profile image uploaded successfully"
+}
+
+DESCRIPTION: Uploads business profile images (logo or banner). Supports image file upload with multipart form data.
+--------------------------------
+
+--------------------------------
+API NAME: Upload Profile Image
+ENDPOINT: /api/mobile/users/{userId}/upload-logo
+METHOD: POST
+USED IN SCREEN: ProfileScreen, RegistrationScreen
+REQUEST STRUCTURE:
+- Headers:
+  - Authorization: Bearer ${token}
+  - Content-Type: multipart/form-data
+- Request Body: FormData with logo field
+  - logo: Image file with uri, type, name
+
+RESPONSE JSON SAMPLE:
+{
+  "success": true,
+  "data": {
+    "user": {
+      "id": "user_123",
+      "email": "user@example.com",
+      "logo": "/uploads/users/logo_456.jpg",
+      "updatedAt": "2024-01-15T10:30:00Z"
+    }
+  },
+  "message": "Profile image uploaded successfully"
+}
+
+DESCRIPTION: Uploads user profile logo/image. Updates user profile with uploaded image URL.
+--------------------------------
+
+--------------------------------
+API NAME: Download Poster Tracking
+ENDPOINT: /api/mobile/downloads/track
+METHOD: POST
+USED IN SCREEN: PosterPlayerScreen, TemplateGalleryScreen
+REQUEST STRUCTURE:
+- Headers: Authorization: Bearer ${token}
+- Request Body:
+  - mobileUserId: string
+  - resourceId: string
+  - resourceType: 'POSTER' | 'TEMPLATE' | 'VIDEO' | 'GREETING'
+  - fileUrl: string
+
+RESPONSE JSON SAMPLE:
+{
+  "success": true,
+  "data": {
+    "tracked": true,
+    "downloadCount": 1251
+  },
+  "message": "Download tracked successfully"
+}
+
+DESCRIPTION: Tracks poster/template downloads for analytics. Does not actually download file but records download action.
+--------------------------------
+
+============================================================================
+
+API USAGE SUMMARY:
+============================================================================
+
+BUSINESS CATEGORIES:
+- BusinessProfileForm → businessCategoriesService.getBusinessCategories()
+- HomeScreen → businessCategoriesService.getHomeBusinessCategories()
+- RegistrationScreen → businessCategoriesService.getCategories()
+
+GENERAL CATEGORIES:
+- HomeScreen → greetingTemplatesService.getCategories()
+- GreetingTemplatesScreen → greetingTemplatesService.getCategories()
+
+IMAGE/POSTER FETCHING:
+- PosterPlayerScreen → businessCategoryPostersApi.getPostersByCategory()
+- HomeScreen → businessCategoryPostersApi.getUserCategoryPosters()
+- HomeScreen → calendarApi.getPostersByDate()
+- HomeScreen → homeApi.getFeaturedContent()
+- TemplateGalleryScreen → templatesBannersApi.getTemplates()
+- GreetingTemplatesScreen → greetingTemplatesService.getTemplates()
+
+IMAGE UPLOAD:
+- BusinessProfileForm → businessProfileService.uploadImage()
+- ProfileScreen → authApi.uploadProfileImage()
+
+CATEGORY-WISE FETCHING:
+- businessCategoryPostersApi.getPostersByCategory(category) → Category-specific posters
+- businessCategoryPostersApi.getUserCategoryPosters() → User's business category posters
+- calendarApi.getPostersByDate(date) → Date-specific calendar posters
+- templatesBannersApi.getTemplates({category}) → Category-filtered templates
+- greetingTemplatesService.getTemplates({category}) → Category-filtered greeting templates
+
+============================================================================
+
+DOCUMENTATION GENERATED: February 2025
+BASE URL: https://eventmarketersbackend.onrender.com
+AUTHENTICATION: Bearer token required for all endpoints
+CACHE STRATEGY: Multi-level caching with React Query + AsyncStorage
+============================================================================
