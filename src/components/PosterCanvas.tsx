@@ -106,9 +106,9 @@ const PosterCanvas: React.FC<PosterCanvasProps> = ({
         );
       }
       
-      // Apply template-specific text colors for footer elements (same as visible canvas)
+      // Apply template-specific text colors for footer elements only if user hasn't set a custom color
       let textColor = layer.style?.color || '#FFFFFF';
-      if (['footerCompanyName', 'phone', 'email', 'website', 'category', 'address', 'services'].includes(layer.fieldType || '')) {
+      if (['footerCompanyName', 'phone', 'email', 'website', 'category', 'address', 'services'].includes(layer.fieldType || '') && !layer.style?.color) {
         const textColors = {
           'business': '#ffffff',
           'event': '#ffffff',

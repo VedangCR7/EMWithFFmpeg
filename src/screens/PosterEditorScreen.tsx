@@ -2308,6 +2308,21 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     }));
   }, [selectedLayer]);
 
+  // Apply text color (selected layer or all text when none selected)
+  const applyTextColor = useCallback((color: string) => {
+    setLayers(prev => prev.map(layer => {
+      if (layer.type !== 'text') {
+        return layer;
+      }
+      if (selectedLayer) {
+        return layer.id === selectedLayer
+          ? { ...layer, style: { ...layer.style, color } }
+          : layer;
+      }
+      return { ...layer, style: { ...layer.style, color } };
+    }));
+  }, [selectedLayer]);
+
   // Update selectedFontSize when a layer is selected
   useEffect(() => {
     if (selectedLayer) {
@@ -3485,6 +3500,41 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                           {size}
                         </Text>
                       </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Text Color Section */}
+                <View style={styles.textColorControlsContainer}>
+                  <View style={styles.textColorHeader}>
+                    <Icon name="palette" size={getResponsiveIconSize()} color="#667eea" />
+                    <View style={styles.textColorHeaderTextGroup}>
+                      <Text style={styles.textColorLabel}>TEXT COLOR</Text>
+                      {!selectedLayer && (
+                        <Text style={styles.textColorHelperText}>No layer selected — applies to all text</Text>
+                      )}
+                    </View>
+                  </View>
+                  <View style={styles.colorPalette}>
+                    {[
+                      '#000000', // Black
+                      '#FFFFFF', // White
+                      '#FF0000', // Red
+                      '#00FF00', // Green
+                      '#0000FF', // Blue
+                      '#FFA500', // Orange
+                      '#800080', // Purple
+                      '#808080', // Gray
+                    ].map(color => (
+                      <TouchableOpacity
+                        key={color}
+                        style={[
+                          styles.colorSwatch,
+                          { backgroundColor: color },
+                          color === '#FFFFFF' && styles.whiteSwatchBorder
+                        ]}
+                        onPress={() => applyTextColor(color)}
+                      />
                     ))}
                   </View>
                 </View>
@@ -6062,6 +6112,58 @@ const styles = StyleSheet.create({
   fontSizeButtonTextActive: {
     color: '#ffffff',
     fontWeight: '700',
+  },
+  // Text Color Controls
+  textColorControlsContainer: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: moderateScale(6),
+    padding: isLandscape
+      ? (isTablet ? moderateScale(10) : moderateScale(8))
+      : (isUltraSmallScreen ? moderateScale(8) : isSmallScreen ? moderateScale(8) : isTablet ? moderateScale(10) : moderateScale(8)),
+    marginBottom: moderateScale(8),
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  textColorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: moderateScale(6),
+    gap: moderateScale(4),
+  },
+  textColorHeaderTextGroup: {
+    flexDirection: 'column',
+  },
+  textColorLabel: {
+    fontSize: isLandscape
+      ? (isTablet ? moderateScale(12) : moderateScale(11))
+      : (isUltraSmallScreen ? moderateScale(10) : isSmallScreen ? moderateScale(10.5) : isTablet ? moderateScale(12) : moderateScale(11)),
+    fontWeight: '700',
+    color: '#333333',
+  },
+  textColorHelperText: {
+    fontSize: moderateScale(8.5),
+    color: '#888888',
+  },
+  colorPalette: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+    gap: isUltraSmallScreen ? moderateScale(3) : moderateScale(4),
+  },
+  colorSwatch: {
+    width: isUltraSmallScreen ? moderateScale(28) : isSmallScreen ? moderateScale(30) : moderateScale(32),
+    height: isUltraSmallScreen ? moderateScale(28) : isSmallScreen ? moderateScale(30) : moderateScale(32),
+    borderRadius: moderateScale(16),
+    borderWidth: 2,
+    borderColor: '#e9ecef',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  whiteSwatchBorder: {
+    borderColor: '#cccccc',
   },
   // Font Family Section
   fontFamilySection: {
