@@ -5534,7 +5534,7 @@ const HomeScreen: React.FC = React.memo(() => {
 
 
           {/* Business Ethics Section - Hidden when searching */}
-          {!isSearching && searchQuery.trim() === '' && businessEthicsTemplates.length > 0 && (
+          {!isSearching && searchQuery.trim() === '' && (businessEthicsTemplates.length > 0 || greetingSectionsLoadedRef.current) && businessEthicsTemplates.length > 0 && (
             <View style={styles.templatesSection}>
               <View style={styles.sectionHeader}>
                 <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
@@ -5594,7 +5594,7 @@ const HomeScreen: React.FC = React.memo(() => {
           )}
 
           {/* Social Media Growth Section - Hidden when searching */}
-          {!isSearching && searchQuery.trim() === '' && socialMediaGrowthTemplates.length > 0 && (
+          {!isSearching && searchQuery.trim() === '' && (socialMediaGrowthTemplates.length > 0 || greetingSectionsLoadedRef.current) && socialMediaGrowthTemplates.length > 0 && (
             <View style={styles.templatesSection}>
               <View style={styles.sectionHeader}>
                 <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
@@ -5624,7 +5624,7 @@ const HomeScreen: React.FC = React.memo(() => {
           )}
 
           {/* Money and Finance Section - Hidden when searching */}
-          {!isSearching && searchQuery.trim() === '' && moneyAndFinanceTemplates.length > 0 && (
+          {!isSearching && searchQuery.trim() === '' && (moneyAndFinanceTemplates.length > 0 || greetingSectionsLoadedRef.current) && moneyAndFinanceTemplates.length > 0 && (
             <View style={styles.templatesSection}>
               <View style={styles.sectionHeader}>
                 <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
@@ -5654,7 +5654,7 @@ const HomeScreen: React.FC = React.memo(() => {
           )}
 
           {/* Business Legend Quote Section - Hidden when searching */}
-          {!isSearching && searchQuery.trim() === '' && businessLegendQuoteTemplates.length > 0 && (
+          {!isSearching && searchQuery.trim() === '' && (businessLegendQuoteTemplates.length > 0 || greetingSectionsLoadedRef.current) && businessLegendQuoteTemplates.length > 0 && (
             <View style={styles.templatesSection}>
               <View style={styles.sectionHeader}>
                 <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
@@ -5684,7 +5684,7 @@ const HomeScreen: React.FC = React.memo(() => {
           )}
 
           {/* Business Marketing Tips Section - Hidden when searching */}
-          {!isSearching && searchQuery.trim() === '' && businessMarketingTipsTemplates.length > 0 && (
+          {!isSearching && searchQuery.trim() === '' && (businessMarketingTipsTemplates.length > 0 || greetingSectionsLoadedRef.current) && businessMarketingTipsTemplates.length > 0 && (
             <View style={styles.templatesSection}>
               <View style={styles.sectionHeader}>
                 <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
@@ -5714,7 +5714,7 @@ const HomeScreen: React.FC = React.memo(() => {
           )}
 
           {/* Business Quotes Section - Hidden when searching */}
-          {!isSearching && searchQuery.trim() === '' && businessQuotesTemplates.length > 0 && (
+          {!isSearching && searchQuery.trim() === '' && (businessQuotesTemplates.length > 0 || greetingSectionsLoadedRef.current) && businessQuotesTemplates.length > 0 && (
             <View style={styles.templatesSection}>
               <View style={styles.sectionHeader}>
                 <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
