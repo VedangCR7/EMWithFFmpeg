@@ -186,7 +186,7 @@ const TemplateCard: React.FC<TemplateCardProps> = React.memo(({ item, cardWidth,
       >
         <View style={[styles.templateImageContainer, { height: cardWidth }]}>
           <OptimizedImage
-            uri={item.thumbnail}
+            uri={getThumbnailUrl(item.thumbnail)}
             style={styles.templateImage}
             resizeMode="cover"
             mode="thumbnail"
@@ -261,7 +261,7 @@ const BusinessCategoryCardItem: React.FC<BusinessCategoryCardItemProps> = React.
           <View style={styles.businessCategoryImageSection}>
             {displayImage ? (
               <OptimizedImage
-                uri={displayImage}
+                uri={getThumbnailUrl(displayImage)}
                 style={styles.businessCategoryImage}
                 resizeMode="cover"
                 mode="thumbnail"
@@ -393,7 +393,7 @@ const VideoTemplateCard: React.FC<VideoTemplateCardProps> = React.memo(({ item, 
       >
         <View style={[styles.templateImageContainer, { height: cardWidth }]}>
           <OptimizedImage
-            uri={item.thumbnail}
+            uri={getThumbnailUrl(item.thumbnail)}
             style={styles.templateImage}
             resizeMode="cover"
             mode="thumbnail"
@@ -457,7 +457,7 @@ const GreetingCategoryCard: React.FC<GreetingCategoryCardProps> = React.memo(({ 
         <View style={styles.businessCategoryImageSection}>
           {categoryImage ? (
             <OptimizedImage
-              uri={categoryImage}
+              uri={getThumbnailUrl(categoryImage)}
               style={styles.businessCategoryImage}
               resizeMode="cover"
               mode="thumbnail"
@@ -530,9 +530,10 @@ interface GreetingCardProps {
   searchQuery?: string;
   navigation: any;
   onCardPress?: (template: any) => void;
+  getThumbnailUrl?: (url: string) => string;
 }
 
-const GreetingCard: React.FC<GreetingCardProps> = React.memo(({ item, cardWidth, theme, categoryTemplates, searchQuery, navigation, onCardPress }) => {
+const GreetingCard: React.FC<GreetingCardProps> = React.memo(({ item, cardWidth, theme, categoryTemplates, searchQuery, navigation, onCardPress, getThumbnailUrl }) => {
   // Pre-compute related templates to avoid filtering on every press
   const relatedTemplates = useMemo(() => {
     return categoryTemplates.filter(t => t.id !== item.id);
@@ -596,7 +597,7 @@ const GreetingCard: React.FC<GreetingCardProps> = React.memo(({ item, cardWidth,
       >
         <View style={[styles.templateImageContainer, { height: cardWidth }]}>
           <OptimizedImage
-            uri={item.thumbnail}
+            uri={getThumbnailUrl ? getThumbnailUrl(item.thumbnail) : item.thumbnail}
             style={styles.templateImage}
             resizeMode="cover"
             mode="thumbnail"
@@ -659,6 +660,47 @@ const convertBusinessPosterToTemplate = (poster: any, categoryName: string): Tem
     isDownloaded: false,
     tags: normalizedTags,
   };
+};
+
+// Optimized Cloudinary URL helper function (same as HorizontalFestivalCalendar)
+const getOptimizedCloudinaryUrl = (url: string, width: number = 200): string => {
+  if (!url || !url.includes('res.cloudinary.com')) return url;
+  
+  // For Cloudinary URLs, add optimized transformation
+  if (url.includes('/upload/')) {
+    try {
+      const [prefix, remainder] = url.split('/upload/');
+      if (!remainder) {
+        return url;
+      }
+      
+      const parts = remainder.split('/');
+      
+      // Find the version number (starts with 'v' followed by digits)
+      let versionIndex = -1;
+      for (let i = 0; i < parts.length; i++) {
+        if (/^v\d+/.test(parts[i])) {
+          versionIndex = i;
+          break;
+        }
+      }
+      
+      if (versionIndex >= 0) {
+        // Extract everything from version onwards
+        const versionAndPath = parts.slice(versionIndex).join('/');
+        
+        // Use optimized transformation for thumbnails
+        const transformation = `f_auto,q_auto:eco,c_fill,w_${width},dpr_auto`;
+        const optimizedUrl = `${prefix}/upload/${transformation}/${versionAndPath}`;
+        
+        return optimizedUrl;
+      }
+    } catch (error) {
+      // Fall through to return original URL
+    }
+  }
+  
+  return url;
 };
 
 const HomeScreen: React.FC = React.memo(() => {
@@ -731,6 +773,28 @@ const HomeScreen: React.FC = React.memo(() => {
       }))
     };
   }, []);
+
+  // Memoized optimized URL functions for different image sizes
+  const getThumbnailUrl = useCallback((url: string) => {
+    return getOptimizedCloudinaryUrl(url, 200);
+  }, []);
+
+  const getBannerUrl = useCallback((url: string) => {
+    return getOptimizedCloudinaryUrl(url, 800);
+  }, []);
+
+  const getCarouselUrl = useCallback((url: string) => {
+    return getOptimizedCloudinaryUrl(url, 400);
+  }, []);
+
+  const getAvatarUrl = useCallback((url: string) => {
+    return getOptimizedCloudinaryUrl(url, 150);
+  }, []);
+
+  const getModalUrl = useCallback((url: string) => {
+    return getOptimizedCloudinaryUrl(url, 400);
+  }, []);
+
   // --- End Relocated Block ---
 
 
@@ -3092,6 +3156,17 @@ const HomeScreen: React.FC = React.memo(() => {
     setSelectedTemplate(null);
   }, []);
 
+  // Handler for greeting template card press
+  const onCardPress = useCallback((template: Template) => {
+    navigation.navigate('PosterPlayer', {
+      selectedTemplateId: template.id,
+      selectedPoster: template,
+      relatedPosters: [],
+      searchQuery: searchQuery,
+      templateSource: 'greeting',
+    });
+  }, [navigation, searchQuery]);
+
   // Customer Support handlers
   const openCustomerSupportModal = useCallback(() => {
     setIsCustomerSupportModalVisible(true);
@@ -3405,7 +3480,7 @@ const HomeScreen: React.FC = React.memo(() => {
       >
         <View style={styles.bannerContainer}>
           <OptimizedImage
-            uri={bannerImageUrl}
+            uri={getBannerUrl(bannerImageUrl)}
             style={styles.bannerImage}
             resizeMode="cover"
             mode="thumbnail"
@@ -3521,11 +3596,13 @@ const HomeScreen: React.FC = React.memo(() => {
       item={item}
       cardWidth={cardWidth}
       theme={theme}
-      categoryTemplates={businessEthicsCategoryTemplates}
+      categoryTemplates={businessEthicsTemplates}
       searchQuery="business ethics"
       navigation={navigation}
+      onCardPress={onCardPress}
+      getThumbnailUrl={getThumbnailUrl}
     />
-  ), [navigation, theme, cardWidth, businessEthicsCategoryTemplates]);
+  ), [businessEthicsTemplates, cardWidth, theme, navigation, onCardPress, getThumbnailUrl]);
 
   const successMindsetCategoryTemplates = useMemo(() =>
     successMindsetTemplatesRaw.length > 0 ? successMindsetTemplatesRaw : successMindsetTemplates,
@@ -3539,8 +3616,9 @@ const HomeScreen: React.FC = React.memo(() => {
       categoryTemplates={successMindsetCategoryTemplates}
       searchQuery="success mindset"
       navigation={navigation}
+      getThumbnailUrl={getThumbnailUrl}
     />
-  ), [navigation, theme, cardWidth, successMindsetCategoryTemplates]);
+  ), [navigation, theme, cardWidth, successMindsetCategoryTemplates, getThumbnailUrl]);
 
   const socialMediaGrowthCategoryTemplates = useMemo(() =>
     socialMediaGrowthTemplatesRaw.length > 0 ? socialMediaGrowthTemplatesRaw : socialMediaGrowthTemplates,
@@ -3554,8 +3632,9 @@ const HomeScreen: React.FC = React.memo(() => {
       categoryTemplates={socialMediaGrowthCategoryTemplates}
       searchQuery="social media growth"
       navigation={navigation}
+      getThumbnailUrl={getThumbnailUrl}
     />
-  ), [navigation, theme, cardWidth, socialMediaGrowthCategoryTemplates]);
+  ), [navigation, theme, cardWidth, socialMediaGrowthCategoryTemplates, getThumbnailUrl]);
 
   const moneyAndFinanceCategoryTemplates = useMemo(() =>
     moneyAndFinanceTemplatesRaw.length > 0 ? moneyAndFinanceTemplatesRaw : moneyAndFinanceTemplates,
@@ -3569,8 +3648,9 @@ const HomeScreen: React.FC = React.memo(() => {
       categoryTemplates={moneyAndFinanceCategoryTemplates}
       searchQuery="money and finance"
       navigation={navigation}
+      getThumbnailUrl={getThumbnailUrl}
     />
-  ), [navigation, theme, cardWidth, moneyAndFinanceCategoryTemplates]);
+  ), [navigation, theme, cardWidth, moneyAndFinanceCategoryTemplates, getThumbnailUrl]);
 
   const businessLegendQuoteCategoryTemplates = useMemo(() =>
     businessLegendQuoteTemplatesRaw.length > 0 ? businessLegendQuoteTemplatesRaw : businessLegendQuoteTemplates,
@@ -3584,8 +3664,9 @@ const HomeScreen: React.FC = React.memo(() => {
       categoryTemplates={businessLegendQuoteCategoryTemplates}
       searchQuery="business legend quote"
       navigation={navigation}
+      getThumbnailUrl={getThumbnailUrl}
     />
-  ), [navigation, theme, cardWidth, businessLegendQuoteCategoryTemplates]);
+  ), [navigation, theme, cardWidth, businessLegendQuoteCategoryTemplates, getThumbnailUrl]);
 
   const businessMarketingTipsCategoryTemplates = useMemo(() =>
     businessMarketingTipsTemplatesRaw.length > 0 ? businessMarketingTipsTemplatesRaw : businessMarketingTipsTemplates,
@@ -3599,8 +3680,9 @@ const HomeScreen: React.FC = React.memo(() => {
       categoryTemplates={businessMarketingTipsCategoryTemplates}
       searchQuery="business marketing tips"
       navigation={navigation}
+      getThumbnailUrl={getThumbnailUrl}
     />
-  ), [navigation, theme, cardWidth, businessMarketingTipsCategoryTemplates]);
+  ), [navigation, theme, cardWidth, businessMarketingTipsCategoryTemplates, getThumbnailUrl]);
 
   const businessQuotesCategoryTemplates = useMemo(() =>
     businessQuotesTemplatesRaw.length > 0 ? businessQuotesTemplatesRaw : businessQuotesTemplates,
@@ -3614,8 +3696,9 @@ const HomeScreen: React.FC = React.memo(() => {
       categoryTemplates={businessQuotesCategoryTemplates}
       searchQuery="business quotes"
       navigation={navigation}
+      getThumbnailUrl={getThumbnailUrl}
     />
-  ), [navigation, theme, cardWidth, businessQuotesCategoryTemplates]);
+  ), [navigation, theme, cardWidth, businessQuotesCategoryTemplates, getThumbnailUrl]);
 
 
 
@@ -3886,7 +3969,7 @@ const HomeScreen: React.FC = React.memo(() => {
       >
         <View style={styles.upcomingEventModalImageContainer}>
           <OptimizedImage
-            uri={template.thumbnail}
+            uri={getModalUrl(template.thumbnail)}
             style={styles.upcomingEventModalImage}
             resizeMode="cover"
           />
@@ -3939,7 +4022,7 @@ const HomeScreen: React.FC = React.memo(() => {
       >
         <View style={styles.upcomingEventModalImageContainer}>
           <OptimizedImage
-            uri={video.thumbnail}
+            uri={getModalUrl(video.thumbnail)}
             style={styles.upcomingEventModalImage}
             resizeMode="cover"
           />
@@ -3992,7 +4075,7 @@ const HomeScreen: React.FC = React.memo(() => {
       >
         <View style={styles.upcomingEventModalImageContainer}>
           <OptimizedImage
-            uri={featured.thumbnailUrl || featured.imageUrl}
+            uri={getModalUrl(featured.thumbnailUrl || featured.imageUrl)}
             style={styles.upcomingEventModalImage}
             resizeMode="cover"
             mode="thumbnail"
@@ -4058,7 +4141,7 @@ const HomeScreen: React.FC = React.memo(() => {
         <View style={styles.upcomingEventModalImageContainer}>
           {displayImage ? (
             <OptimizedImage
-              uri={displayImage}
+              uri={getModalUrl(displayImage)}
               style={styles.upcomingEventModalImage}
               resizeMode="cover"
             />
@@ -4781,7 +4864,7 @@ const HomeScreen: React.FC = React.memo(() => {
         style={[styles.featuredCarouselCard, { width: '100%', height: featuredCarouselItemHeight }]}
       >
         <OptimizedImage
-          uri={item.imageUrl}
+          uri={getCarouselUrl(item.imageUrl)}
           style={[styles.featuredCarouselImage, { width: '100%', height: '100%' }]}
           resizeMode="cover"
           mode="full"
@@ -4970,7 +5053,7 @@ const HomeScreen: React.FC = React.memo(() => {
                         <View style={styles.businessProfileDropdownAvatar}>
                           {profileLogo ? (
                             <OptimizedImage
-                              uri={profileLogo}
+                              uri={getAvatarUrl(profileLogo)}
                               style={styles.businessProfileDropdownAvatarImage}
                               resizeMode="cover"
                               cacheKey={`business_profile_${profile.id}`}
@@ -5058,7 +5141,7 @@ const HomeScreen: React.FC = React.memo(() => {
                 <View style={[styles.userAvatar, { backgroundColor: theme.colors.primary }]}>
                   {userAvatarUri ? (
                     <OptimizedImage
-                      uri={userAvatarUri}
+                      uri={getAvatarUrl(userAvatarUri)}
                       style={styles.userAvatarImage}
                       resizeMode="cover"
                       cacheKey={`user_avatar_${selectedBusinessProfile?.id || 'personal'}_${userAvatarUri?.slice(-20) || 'default'}`}
@@ -5668,7 +5751,7 @@ const HomeScreen: React.FC = React.memo(() => {
                 <>
                   <View style={styles.modalImageContainer}>
                     <OptimizedImage
-                      uri={selectedTemplate.thumbnail}
+                      uri={getModalUrl(selectedTemplate.thumbnail)}
                       style={styles.modalImage}
                       resizeMode="cover"
                     />
