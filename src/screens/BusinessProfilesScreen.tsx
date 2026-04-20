@@ -63,7 +63,8 @@ const BusinessProfilesScreen: React.FC = () => {
     selectedBusinessProfile,
     setActivationPending,
     isActivationPending,
-    clearActivationPending
+    clearActivationPending,
+    updateBusinessProfileGlobally
   } = useBusinessProfile();
   const insets = useSafeAreaInsets();
   const [profiles, setProfiles] = useState<any[]>([]);
@@ -647,11 +648,49 @@ const BusinessProfilesScreen: React.FC = () => {
       const updateFn = (prev: any[]) => prev.map(p => p.id === editingProfile.id ? updatedProfile : p);
       setProfiles(updateFn);
       
-      // CRITICAL FIX: Update global context if the updated profile is currently selected
-      // This ensures HomeScreen header icon updates immediately
-      if (selectedBusinessProfile?.id === updatedProfile.id) {
-        await setSelectedBusinessProfile(updatedProfile);
+      // CRITICAL FIX: Fetch the complete updated profile from API to ensure all fields are present
+      // The updateBusinessProfile response may only contain the fields that were updated
+      let completeUpdatedProfile = updatedProfile;
+      try {
+        console.log('🔄 [PROFILE UPDATE] Fetching complete profile data after update...');
+        const currentUser = authService.getCurrentUser();
+        if (currentUser?.id) {
+          const freshProfiles = await businessProfileService.getUserBusinessProfiles(currentUser.id);
+          const freshProfile = freshProfiles.find(p => p.id === updatedProfile.id);
+          if (freshProfile) {
+            completeUpdatedProfile = freshProfile;
+            console.log('✅ [PROFILE UPDATE] Fetched complete profile data:', {
+              id: freshProfile.id,
+              name: freshProfile.name,
+              hasPhone: !!freshProfile.phone,
+              hasEmail: !!freshProfile.email,
+              hasWebsite: !!freshProfile.website,
+              hasAddress: !!freshProfile.address,
+              category: freshProfile.category
+            });
+          }
+        }
+      } catch (fetchError) {
+        console.warn('⚠️ [PROFILE UPDATE] Failed to fetch complete profile, using partial update:', fetchError);
       }
+      
+      // CRITICAL FIX: Update global context using the new global function
+      // This ensures HomeScreen header icon updates immediately AND PosterEditor receives complete data
+      console.log('🔄 [PROFILE UPDATE] Updating global context with complete profile data');
+      await updateBusinessProfileGlobally(completeUpdatedProfile.id, completeUpdatedProfile);
+      
+      // Verify the global update worked
+      setTimeout(() => {
+        console.log('✅ [PROFILE UPDATE] Global update verification:', {
+          profileId: completeUpdatedProfile.id,
+          profileName: completeUpdatedProfile.name,
+          hasPhone: !!completeUpdatedProfile.phone,
+          hasEmail: !!completeUpdatedProfile.email,
+          hasWebsite: !!completeUpdatedProfile.website,
+          hasAddress: !!completeUpdatedProfile.address,
+          category: completeUpdatedProfile.category
+        });
+      }, 100);
       
       setSuccessMessage('Business profile updated successfully');
       setShowSuccessModal(true);

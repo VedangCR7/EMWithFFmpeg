@@ -20,6 +20,8 @@ interface BusinessProfileContextType {
   setActivationPending: (profileId: string, isPending: boolean) => void;
   isActivationPending: (profileId: string) => boolean;
   clearActivationPending: (profileId: string) => void;
+  // Global profile update function
+  updateBusinessProfileGlobally: (profileId: string, updatedProfile: BusinessProfile) => Promise<void>;
 }
 
 const BusinessProfileContext = createContext<BusinessProfileContextType | undefined>(undefined);
@@ -61,6 +63,7 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
     });
   }, []);
 
+  
   // Clear cache helper
   const clearProfileCache = useCallback(async () => {
     try {
@@ -320,7 +323,7 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
         if (!prev && !enrichedProfile) return prev;
         if (!prev && enrichedProfile) return enrichedProfile;
         if (!enrichedProfile) return null;
-        if (prev.id === enrichedProfile.id && JSON.stringify(prev) === JSON.stringify(enrichedProfile)) {
+        if (prev?.id === enrichedProfile.id && JSON.stringify(prev) === JSON.stringify(enrichedProfile)) {
           return prev; // No change needed
         }
         return enrichedProfile;
@@ -358,6 +361,67 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
       console.error(' [BUSINESS PROFILE CONTEXT] Error saving selected profile:', error);
     }
   }, [clearProfileCache]);
+
+  // Global function to update business profile data across the entire app
+  // This ensures that when any profile is updated, all components receive the latest data
+  const updateBusinessProfileGlobally = useCallback(async (profileId: string, updatedProfile: BusinessProfile) => {
+    if (!profileId || !updatedProfile) {
+      console.warn(' [BUSINESS PROFILE CONTEXT] updateBusinessProfileGlobally called with invalid parameters');
+      return;
+    }
+
+    console.log(` [BUSINESS PROFILE CONTEXT] Updating profile globally:`, {
+      profileId,
+      profileName: updatedProfile.name,
+      isCurrentlySelected: selectedBusinessProfile?.id === profileId
+    });
+
+    // CRITICAL: If this profile is currently selected, update the selected profile
+    if (selectedBusinessProfile?.id === profileId) {
+      console.log(` [BUSINESS PROFILE CONTEXT] Updating selected profile with complete data`);
+      
+      // Fetch business subscription status for the updated profile
+      let businessSubscriptionStatus: string | null = null;
+      try {
+        console.log(`[BUSINESS PROFILE CONTEXT] Fetching business subscription status for updated profile ${profileId}...`);
+        const subscriptionResponse = await subscriptionApi.getBusinessProfileSubscriptionStatus(profileId);
+        
+        if (subscriptionResponse.success && subscriptionResponse.data) {
+          businessSubscriptionStatus = subscriptionResponse.data.status === 'active' ? 'Active' : 
+                                     subscriptionResponse.data.status === 'expired' ? 'Expired' : 
+                                     subscriptionResponse.data.status === 'cancelled' ? 'Cancelled' : 
+                                     subscriptionResponse.data.status === 'pending' ? 'Pending' : 'Inactive';
+          
+          console.log(`[BUSINESS PROFILE CONTEXT] Business subscription status for updated profile: ${businessSubscriptionStatus}`);
+        }
+      } catch (subscriptionError: any) {
+        console.error(`[BUSINESS PROFILE CONTEXT] Failed to fetch business subscription status for updated profile:`, subscriptionError.message);
+        businessSubscriptionStatus = null;
+      }
+
+      // Create enriched profile with business subscription data
+      const enrichedProfile = {
+        ...updatedProfile,
+        businessSubscriptionStatus: businessSubscriptionStatus || undefined,
+      };
+
+      // Update the selected profile with complete data
+      await setSelectedBusinessProfile(enrichedProfile);
+      
+      console.log(` [BUSINESS PROFILE CONTEXT] Global profile update completed:`, {
+        profileId: enrichedProfile.id,
+        profileName: enrichedProfile.name,
+        hasPhone: !!enrichedProfile.phone,
+        hasEmail: !!enrichedProfile.email,
+        hasWebsite: !!enrichedProfile.website,
+        hasAddress: !!enrichedProfile.address,
+        category: enrichedProfile.category,
+        businessSubscriptionStatus: enrichedProfile.businessSubscriptionStatus
+      });
+    } else {
+      console.log(` [BUSINESS PROFILE CONTEXT] Profile ${profileId} is not currently selected, no context update needed`);
+    }
+  }, [selectedBusinessProfile, setSelectedBusinessProfile]);
 
   // Set business category independently
   const setSelectedBusinessCategory = useCallback(async (category: string | null) => {
@@ -438,6 +502,8 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
     setActivationPending,
     isActivationPending,
     clearActivationPending,
+    // Global profile update function
+    updateBusinessProfileGlobally,
   }), [
     selectedBusinessProfile,
     setSelectedBusinessProfile,
@@ -448,6 +514,7 @@ export const BusinessProfileProvider: React.FC<BusinessProfileProviderProps> = (
     setActivationPending,
     isActivationPending,
     clearActivationPending,
+    updateBusinessProfileGlobally,
   ]);
 
   return (

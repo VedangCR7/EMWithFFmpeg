@@ -2085,7 +2085,7 @@ const ProfileScreen: React.FC = () => {
             {renderMenuItem('feedback', 'Feedback', 'Share your feedback and suggestions', () => navigation.navigate('FeedbackScreen' as never))}
             {renderMenuItem('help', 'Help & Support', 'Get help and contact support', () => navigation.navigate('HelpSupport' as never))}
             {renderMenuItem('privacy-tip', 'Privacy Policy', 'Read our privacy policy', () => navigation.navigate('PrivacyPolicy' as never))}
-            {renderMenuItem('info', 'About App', 'Version 1.0.0', () => navigation.navigate('AboutUs'))}
+            {renderMenuItem('info', 'About App', 'Version 1.1.0', () => navigation.navigate('AboutUs'))}
           </View>
 
           {/* Share App Section */}
@@ -2229,7 +2229,7 @@ const ProfileScreen: React.FC = () => {
             color: theme.colors.textSecondary,
             fontSize: getFontSize(8),
             marginTop: dynamicModerateScale(14),
-          }]}>Version 1.0.0</Text>
+          }]}>Version 1.1</Text>
         </ScrollView>
       </LinearGradient>
 
