@@ -787,8 +787,15 @@ const HomeScreen: React.FC = React.memo(() => {
     return getOptimizedCloudinaryUrl(url, 400);
   }, []);
 
-  const getAvatarUrl = useCallback((url: string) => {
-    return getOptimizedCloudinaryUrl(url, 150);
+  const getAvatarUrl = useCallback((url: string, profile?: any) => {
+    const optimizedUrl = getOptimizedCloudinaryUrl(url, 150);
+    // Add cache-busting parameter using profile updatedAt or logo URL to invalidate cache when profile updates
+    const cacheBustParam = profile?.updatedAt || profile?.logo || profile?.companyLogo;
+    if (cacheBustParam) {
+      const separator = optimizedUrl.includes('?') ? '&' : '?';
+      return `${optimizedUrl}${separator}v=${encodeURIComponent(cacheBustParam)}`;
+    }
+    return optimizedUrl;
   }, []);
 
   const getModalUrl = useCallback((url: string) => {
@@ -5065,10 +5072,10 @@ const HomeScreen: React.FC = React.memo(() => {
                         <View style={styles.businessProfileDropdownAvatar}>
                           {profileLogo ? (
                             <OptimizedImage
-                              uri={getAvatarUrl(profileLogo)}
+                              uri={getAvatarUrl(profileLogo, profile)}
                               style={styles.businessProfileDropdownAvatarImage}
                               resizeMode="cover"
-                              cacheKey={`business_profile_${profile.id}`}
+                              cacheKey={`business_profile_${profile.id}_${profile.updatedAt || profile.logo || profile.companyLogo || 'default'}`}
                             />
                           ) : (
                             <Text style={styles.businessProfileDropdownAvatarText}>{initials}</Text>
@@ -5153,11 +5160,11 @@ const HomeScreen: React.FC = React.memo(() => {
                 <View style={[styles.userAvatar, { backgroundColor: theme.colors.primary }]}>
                   {userAvatarUri ? (
                     <OptimizedImage
-                      uri={getAvatarUrl(userAvatarUri)}
+                      uri={getAvatarUrl(userAvatarUri, selectedBusinessProfile)}
                       style={styles.userAvatarImage}
                       resizeMode="cover"
-                      cacheKey={`user_avatar_${selectedBusinessProfile?.id || 'personal'}_${userAvatarUri?.slice(-20) || 'default'}`}
-                      key={`avatar_${selectedBusinessProfile?.id || 'personal'}_${userAvatarUri?.slice(-20) || 'default'}`}
+                      cacheKey={`user_avatar_${selectedBusinessProfile?.id || 'personal'}_${selectedBusinessProfile?.updatedAt || userAvatarUri?.slice(-20) || 'default'}`}
+                      key={`avatar_${selectedBusinessProfile?.id || 'personal'}_${selectedBusinessProfile?.updatedAt || userAvatarUri?.slice(-20) || 'default'}`}
                     />
                   ) : (
                     <Text style={styles.userAvatarText}>{userInitials}</Text>

@@ -646,6 +646,13 @@ const BusinessProfilesScreen: React.FC = () => {
       const updatedProfile = await businessProfileService.updateBusinessProfile(editingProfile.id, formData);
       const updateFn = (prev: any[]) => prev.map(p => p.id === editingProfile.id ? updatedProfile : p);
       setProfiles(updateFn);
+      
+      // CRITICAL FIX: Update global context if the updated profile is currently selected
+      // This ensures HomeScreen header icon updates immediately
+      if (selectedBusinessProfile?.id === updatedProfile.id) {
+        await setSelectedBusinessProfile(updatedProfile);
+      }
+      
       setSuccessMessage('Business profile updated successfully');
       setShowSuccessModal(true);
       setShowForm(false);
