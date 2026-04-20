@@ -5,8 +5,8 @@
  * Displays horizontal list of business category cards
  */
 
-import React, { useCallback, useMemo } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useCallback, useMemo, useRef, useEffect } from 'react';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { BusinessCategory } from '../../services/businessCategoriesService';
 import OptimizedImage from '../OptimizedImage';
 import LinearGradient from 'react-native-linear-gradient';
@@ -52,6 +52,66 @@ const BusinessCategoryCardItem: React.FC<BusinessCategoryCardItemProps> = React.
       return null;
     }, [previewTemplates, item]);
 
+    // Determine if images are still loading for this category
+    const isImageLoading = useMemo(() => {
+      // If previewTemplates is undefined, it means images are still being fetched
+      // If previewTemplates is an empty array, it means fetch completed but no images found
+      return previewTemplates === undefined;
+    }, [previewTemplates]);
+
+    // Skeleton loader component for loading state
+    const SkeletonLoader = useCallback(() => {
+      const shimmerAnim = useRef(new Animated.Value(0)).current;
+
+      useEffect(() => {
+        const shimmerAnimation = Animated.loop(
+          Animated.sequence([
+            Animated.timing(shimmerAnim, {
+              toValue: 1,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+            Animated.timing(shimmerAnim, {
+              toValue: 0,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+          ])
+        );
+        shimmerAnimation.start();
+
+        return () => shimmerAnimation.stop();
+      }, [shimmerAnim]);
+
+      const shimmerTranslateX = shimmerAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [-cardWidth * 1.5, cardWidth * 1.5],
+      });
+
+      return (
+        <View
+          style={[
+            styles.businessCategoryImage,
+            {
+              backgroundColor: '#f0f0f0',
+              borderRadius: moderateScale(8),
+              overflow: 'hidden',
+            }
+          ]}
+        >
+          {/* Shimmer animation overlay */}
+          <Animated.View
+            style={[
+              styles.skeletonShimmer,
+              {
+                transform: [{ translateX: shimmerTranslateX }],
+              },
+            ]}
+          />
+        </View>
+      );
+    }, [cardWidth]);
+
     return (
       <TouchableOpacity
         activeOpacity={0.85}
@@ -76,6 +136,8 @@ const BusinessCategoryCardItem: React.FC<BusinessCategoryCardItemProps> = React.
                 mode="thumbnail"
                 cacheKey={`category_${item.id}`}
               />
+            ) : isImageLoading ? (
+              <SkeletonLoader />
             ) : (
               <View
                 style={[
@@ -361,6 +423,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
     textTransform: 'uppercase',
+  },
+  skeletonShimmer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
   },
 });
 
