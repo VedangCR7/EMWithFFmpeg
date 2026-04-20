@@ -3651,7 +3651,7 @@ const HomeScreen: React.FC = React.memo(() => {
       categoryTemplates={socialMediaGrowthCategoryTemplates}
       searchQuery="social media growth"
       navigation={navigation}
-      getThumbnailUrl={getThumbnailUrl}
+      getThumbnailUrl={getThumbnailUrl} 
     />
   ), [navigation, theme, cardWidth, socialMediaGrowthCategoryTemplates, getThumbnailUrl]);
 
