@@ -3167,6 +3167,18 @@ const HomeScreen: React.FC = React.memo(() => {
     });
   }, [navigation, searchQuery]);
 
+  // Handler for Business Ethics template card press - specific fix for grid preview issue
+  const onBusinessEthicsCardPress = useCallback((template: Template) => {
+    navigation.navigate('PosterPlayer', {
+      selectedTemplateId: template.id,
+      selectedPoster: template,
+      relatedPosters: businessEthicsTemplates.filter(t => t.id !== template.id),
+      searchQuery: 'business ethics',
+      templateSource: 'greeting',
+      greetingCategory: 'business ethics',
+    });
+  }, [navigation, businessEthicsTemplates]);
+
   // Customer Support handlers
   const openCustomerSupportModal = useCallback(() => {
     setIsCustomerSupportModalVisible(true);
@@ -3599,10 +3611,10 @@ const HomeScreen: React.FC = React.memo(() => {
       categoryTemplates={businessEthicsTemplates}
       searchQuery="business ethics"
       navigation={navigation}
-      onCardPress={onCardPress}
+      onCardPress={onBusinessEthicsCardPress}
       getThumbnailUrl={getThumbnailUrl}
     />
-  ), [businessEthicsTemplates, cardWidth, theme, navigation, onCardPress, getThumbnailUrl]);
+  ), [businessEthicsTemplates, cardWidth, theme, navigation, onBusinessEthicsCardPress, getThumbnailUrl]);
 
   const successMindsetCategoryTemplates = useMemo(() =>
     successMindsetTemplatesRaw.length > 0 ? successMindsetTemplatesRaw : successMindsetTemplates,

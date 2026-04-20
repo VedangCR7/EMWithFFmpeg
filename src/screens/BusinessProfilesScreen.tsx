@@ -1142,14 +1142,16 @@ const BusinessProfilesScreen: React.FC = () => {
             >
               <View style={[styles.successModalContainer, { backgroundColor: theme.colors.surface }]}>
                 <View style={styles.successModalHeader}>
-                  <View style={[styles.successIconContainer, { backgroundColor: `${theme.colors.primary}20` }]}>
-                    <Icon name="check-circle" size={Math.min(screenWidth * 0.08, 32)} color={theme.colors.primary} />
+                  <View style={styles.centerHeaderContent}>
+                    <View style={[styles.successIconContainer, { backgroundColor: `${theme.colors.primary}20` }]}>
+                      <Icon name="check-circle" size={Math.min(screenWidth * 0.08, 32)} color={theme.colors.primary} />
+                    </View>
+                    <Text 
+                      style={[styles.successModalTitle, { color: theme.colors.text }]}
+                    >
+                      Success
+                    </Text>
                   </View>
-                  <Text 
-                    style={[styles.successModalTitle, { color: theme.colors.text }]}
-                  >
-                    Success
-                  </Text>
                   <TouchableOpacity 
                     style={[styles.closeModalButton, { backgroundColor: theme.colors.inputBackground }]}
                     onPress={() => setShowSuccessModal(false)}
@@ -1710,24 +1712,24 @@ const styles = StyleSheet.create({
     minHeight: Math.min(screenWidth * 0.1, 40),
     position: 'relative',
   },
+  centerHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+  },
   successIconContainer: {
     width: Math.min(screenWidth * 0.1, 40),
     height: Math.min(screenWidth * 0.1, 40),
     borderRadius: Math.min(screenWidth * 0.05, 20),
     alignItems: 'center',
     justifyContent: 'center',
-    position: 'absolute',
-    left: 0,
-    zIndex: 1,
+    marginRight: Math.min(screenWidth * 0.03, 12),
   },
   successModalTitle: {
     fontSize: Math.min(screenWidth * 0.042, 16),
     fontWeight: '700',
-    position: 'absolute',
-    left: 0,
-    right: 0,
     textAlign: 'center',
-    zIndex: 0,
   },
   successModalContent: {
     paddingVertical: Math.min(screenHeight * 0.02, 16),
