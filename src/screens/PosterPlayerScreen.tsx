@@ -47,9 +47,20 @@ const LANGUAGE_KEYWORDS: Record<string, string[]> = {
  * Normalizes tags by splitting combined words and cleaning them
  * Handles cases like "websitedevelopment" -> ["website", "development"]
  */
+// Memoization cache for normalizeTags to avoid repeated expensive operations
+const normalizeTagsCache = new Map<string, string[]>();
+
 const normalizeTags = (tags: string[]): string[] => {
   if (!Array.isArray(tags)) {
     return [];
+  }
+
+  // Create cache key from sorted tags
+  const cacheKey = tags.slice().sort().join('|');
+  
+  // Return cached result if available
+  if (normalizeTagsCache.has(cacheKey)) {
+    return normalizeTagsCache.get(cacheKey)!;
   }
 
   const normalizedTags: string[] = [];
@@ -116,7 +127,8 @@ const normalizeTags = (tags: string[]): string[] => {
   // Remove duplicates while preserving order
   const uniqueTags = Array.from(new Set(normalizedTags));
   
-  console.log(`[TAG NORMALIZATION] Input: [${tags.join(', ')}] -> Output: [${uniqueTags.join(', ')}]`);
+  // Cache the result
+  normalizeTagsCache.set(cacheKey, uniqueTags);
   
   return uniqueTags;
 };
@@ -130,23 +142,12 @@ const tagsMatchCategory = (templateTags: string[], categoryTags: string[]): bool
   const normalizedTemplateTags = normalizeTags(templateTags);
   const normalizedCategoryTags = normalizeTags(categoryTags);
 
-  console.log(`[TAG MATCHING] Template tags: [${normalizedTemplateTags.join(', ')}]`);
-  console.log(`[TAG MATCHING] Category tags: [${normalizedCategoryTags.join(', ')}]`);
-
   // STRICT EXACT MATCHING ONLY - no substring matching
   const matchedTags = normalizedTemplateTags.filter(templateTag => 
     normalizedCategoryTags.includes(templateTag)
   );
 
   const hasMatch = matchedTags.length > 0;
-
-  console.log(`[TAG MATCHING] Matched tags: [${matchedTags.join(', ')}] -> Has match: ${hasMatch}`);
-
-  if (!hasMatch && templateTags.length > 0 && categoryTags.length > 0) {
-    console.warn(`[TAG MATCHING] NO MATCH FOUND - This may indicate tag normalization issues`);
-    console.warn(`[TAG MATCHING] Original template tags: [${templateTags.join(', ')}]`);
-    console.warn(`[TAG MATCHING] Original category tags: [${categoryTags.join(', ')}]`);
-  }
 
   return hasMatch;
 };
@@ -183,7 +184,18 @@ const extractLanguagesFromTags = (tags: unknown): string[] => {
   return Array.from(new Set(matchedLanguages));
 };
 
+// Memoization cache for mergeTemplateLanguages to avoid repeated expensive operations
+const mergeTemplateLanguagesCache = new Map<string, Template>();
+
 const mergeTemplateLanguages = (template: Template): Template => {
+  // Create cache key from template id and relevant properties
+  const cacheKey = `${template.id}|${template.languages?.join(',') || ''}|${template.tags?.join(',') || ''}`;
+  
+  // Return cached result if available
+  if (mergeTemplateLanguagesCache.has(cacheKey)) {
+    return mergeTemplateLanguagesCache.get(cacheKey)!;
+  }
+
   const existingLanguages = Array.isArray(template.languages)
     ? template.languages
       .filter((language): language is string => typeof language === 'string' && language.trim().length > 0)
@@ -194,10 +206,15 @@ const mergeTemplateLanguages = (template: Template): Template => {
   const languagesFromTags = extractLanguagesFromTags(tags);
   const mergedLanguages = Array.from(new Set([...existingLanguages, ...languagesFromTags]));
 
-  return {
+  const result = {
     ...template,
     languages: mergedLanguages,
   };
+
+  // Cache the result
+  mergeTemplateLanguagesCache.set(cacheKey, result);
+  
+  return result;
 };
 
 const templateContainsLanguage = (template: Template, languageId: string): boolean => {
@@ -1291,18 +1308,9 @@ const PosterPlayerScreen: React.FC = () => {
     const category = (currentPoster?.category || initialPoster?.category || '').trim().toLowerCase();
     const globalCategory = (globalBusinessCategory || '').trim().toLowerCase();
     
-    console.log('?? [SOFTWARE COMPANY DETECTION]', {
-      currentPosterCategory: currentPoster?.category,
-      initialPosterCategory: initialPoster?.category,
-      globalBusinessCategory: globalBusinessCategory,
-      normalizedCategory: category,
-      normalizedGlobalCategory: globalCategory,
-      activeCategoryRef: activeCategoryRef.current
-    });
-
+    
     if (!category && !globalCategory) {
-      console.log('?? [SOFTWARE COMPANY DETECTION] No category found');
-      return false;
+            return false;
     }
 
     // Check for multiple variations of "software company"
@@ -1320,13 +1328,7 @@ const PosterPlayerScreen: React.FC = () => {
     const globalMatches = globalCategory ? softwareCompanyVariations.some(variation => globalCategory.includes(variation)) : false;
     const result = posterMatches || globalMatches;
 
-    console.log('?? [SOFTWARE COMPANY DETECTION RESULT]', {
-      posterMatches,
-      globalMatches,
-      isSoftwareCompany: result,
-      variations: softwareCompanyVariations
-    });
-
+    
     return result;
   }, [currentPoster, initialPoster, globalBusinessCategory]);
 
@@ -1334,15 +1336,6 @@ const PosterPlayerScreen: React.FC = () => {
   const shouldShowSoftwareButtons = useMemo(() => {
     // FIX: Ensure isSoftwareCompanyCategory is available before using it
     const isSoftware = isSoftwareCompanyCategory;
-
-    // DEBUG: Direct log to see if this function is being called
-    console.log('🔍 [SHOULDSHOW DEBUG]', {
-      flowSource,
-      templateSource,
-      categoryName,
-      isSoftware,
-      isSoftwareCompanyCategory
-    });
 
     // CASE 1: My Business Flow
     const isMyBusinessFlow =
@@ -1397,17 +1390,7 @@ const PosterPlayerScreen: React.FC = () => {
     globalBusinessCategory
   ]);
 
-  const templateMatchesServiceFilter = useCallback((template: Template) => {
-    if (!isEventPlannerCategory || !selectedServiceFilter) return true;
-    const keywords = serviceFilterKeywords[selectedServiceFilter] || [];
-    const templateTags = Array.isArray(template.tags) ? template.tags : [];
-
-    // Use standardized exact matching system
-    const matches = tagsMatchCategory(templateTags, keywords);
-
-    return matches;
-  }, [isEventPlannerCategory, selectedServiceFilter, serviceFilterKeywords]);
-
+  
   // Function to fetch templates for a specific service filter
   const fetchEventPlannerTemplates = useCallback(async () => {
     if (!isEventPlannerCategory) return;
@@ -1488,12 +1471,12 @@ const PosterPlayerScreen: React.FC = () => {
     }
   }, [isEventPlannerCategory, serviceFilterTemplates, serviceFilterKeywords]);
 
-  // SINGLE SOURCE: Fetch EventPlanner templates only when profile source is active
+  // SINGLE SOURCE: Fetch EventPlanner templates for both profile and template sources
   useEffect(() => {
-    if (activeRenderSource === 'profile' && isEventPlannerCategory && !serviceFilterTemplates['eventplanner']) {
-      console.log('SINGLE SOURCE: EventPlanner profile detected, fetching templates...');
+    if ((activeRenderSource === 'profile' || activeRenderSource === 'template') && isEventPlannerCategory && !serviceFilterTemplates['eventplanner']) {
+      console.log('SINGLE SOURCE: EventPlanner detected, fetching templates...');
       fetchEventPlannerTemplates();
-    } else if (isEventPlannerCategory && activeRenderSource !== 'profile') {
+    } else if (isEventPlannerCategory && activeRenderSource !== 'profile' && activeRenderSource !== 'template') {
       console.log('SINGLE SOURCE: Skipping EventPlanner fetch - active source:', activeRenderSource);
     }
   }, [activeRenderSource, isEventPlannerCategory, fetchEventPlannerTemplates, serviceFilterTemplates]);
@@ -1591,34 +1574,33 @@ const PosterPlayerScreen: React.FC = () => {
     // EVENT PLANNER: Filter by service keywords using standardized exact matching
     if (isEventPlannerCategory && selectedServiceFilter && serviceFilterTemplates['eventplanner']) {
       const eventPlannerTemplates = serviceFilterTemplates['eventplanner'];
-      const templatesWithLanguages = eventPlannerTemplates.map(t => mergeTemplateLanguages(t));
       const keywords = serviceFilterKeywords[selectedServiceFilter] || [];
-      const filteredByTags = templatesWithLanguages.filter(template => {
+      
+      // Filter first, then process only matching templates
+      const filteredByTags = eventPlannerTemplates.filter(template => {
         const templateTags = Array.isArray(template.tags) ? template.tags : [];
         return tagsMatchCategory(templateTags, keywords);
       });
 
+      // Apply language filtering to already filtered templates
       if (selectedLanguage === 'all') {
-        return filteredByTags.slice(0, 6);
+        return filteredByTags.slice(0, 6).map(t => mergeTemplateLanguages(t));
       }
 
       const languageFiltered = filteredByTags.filter(template => {
-        const matches = templateContainsLanguage(template, selectedLanguage);
-        return matches;
+        return templateContainsLanguage(template, selectedLanguage);
       });
 
-      return languageFiltered.slice(0, 6);
+      return languageFiltered.slice(0, 6).map(t => mergeTemplateLanguages(t));
     }
 
     // SOFTWARE COMPANY: Initial display or category filtering
     if (isSoftwareCompanyCategory) {
       const softwareTemplates = serviceFilterTemplates.softwarecompany || allTemplates;
-      const templatesWithLanguages = softwareTemplates.map(t => mergeTemplateLanguages(t));
 
       // INITIAL DISPLAY: Show first 6 templates when no category selected
       if (!selectedSoftwareCategory) {
-        console.log('[SOFTWARE COMPANY] Initial display - showing first 6 templates');
-        return templatesWithLanguages.slice(0, 6);
+        return softwareTemplates.slice(0, 6).map(t => mergeTemplateLanguages(t));
       }
 
       // CATEGORY FILTERING: Filter by selected category
@@ -1628,33 +1610,26 @@ const PosterPlayerScreen: React.FC = () => {
         return [];
       }
       
-      // Filter by category tags
-      const filteredByCategory = templatesWithLanguages.filter(template => {
+      // Filter first, then process only matching templates
+      const filteredByCategory = softwareTemplates.filter(template => {
         const templateTags = Array.isArray(template.tags) ? template.tags : [];
         return tagsMatchCategory(templateTags, selectedCategoryButton.tags);
       });
 
-      // Filter by language if not 'all'
+      // Apply language filtering to already filtered templates
       if (selectedLanguage === 'all') {
-        return filteredByCategory.slice(0, 6);
+        return filteredByCategory.slice(0, 6).map(t => mergeTemplateLanguages(t));
       }
 
       const filteredByLanguage = filteredByCategory.filter(template => {
         return templateContainsLanguage(template, selectedLanguage);
       });
 
-      return filteredByLanguage.slice(0, 6);
+      return filteredByLanguage.slice(0, 6).map(t => mergeTemplateLanguages(t));
     }
 
     // Ensure all templates have languages merged before filtering
     const templatesWithLanguages = allTemplates.map(t => mergeTemplateLanguages(t));
-
-    // If "All" is selected, return ALL templates without any language filtering
-    if (selectedLanguage === 'all') {
-      const filtered = templatesWithLanguages.filter(templateMatchesServiceFilter);
-
-      return filtered;
-    }
 
     // Filter by language - if no matches, return empty array
     const languageFiltered = templatesWithLanguages.filter(template => {
@@ -1667,12 +1642,18 @@ const PosterPlayerScreen: React.FC = () => {
       return [];
     }
 
-    // Then apply service filter if applicable
-    const serviceFiltered = languageFiltered.filter(templateMatchesServiceFilter);
+    // Inline service filter logic to avoid callback dependency
+    const serviceFiltered = isEventPlannerCategory && selectedServiceFilter
+      ? languageFiltered.filter(template => {
+          const keywords = serviceFilterKeywords[selectedServiceFilter] || [];
+          const templateTags = Array.isArray(template.tags) ? template.tags : [];
+          return tagsMatchCategory(templateTags, keywords);
+        })
+      : languageFiltered;
 
     // Return service-filtered results (even if empty, don't fallback to all templates)
     return serviceFiltered;
-  }, [serviceFilterTemplates, isEventPlannerCategory, selectedServiceFilter, serviceFilterKeywords, selectedLanguage, templateMatchesServiceFilter, isSoftwareCompanyCategory, selectedSoftwareCategory, softwareCategoryButtons, allTemplates]);
+  }, [serviceFilterTemplates, isEventPlannerCategory, selectedServiceFilter, serviceFilterKeywords, selectedLanguage, isSoftwareCompanyCategory, selectedSoftwareCategory, softwareCategoryButtons, allTemplates]);
 
   // Preload images for better scrolling performance
   const preloadImages = useCallback((posters: Template[], startIndex: number = 0, count: number = 20) => {
@@ -4368,7 +4349,7 @@ const PosterPlayerScreen: React.FC = () => {
         )}
 
         {/* SINGLE SOURCE: Event Planner buttons based on activeRenderSource */}
-        {activeRenderSource === 'profile' && isEventPlannerCategory && (
+        {(activeRenderSource === 'profile' || activeRenderSource === 'template') && isEventPlannerCategory && (
           <View style={styles.serviceFilterContainer}>
             {['generator', 'decorators', 'sound', 'mandap'].map(filterKey => {
               const isActive = selectedServiceFilter === filterKey;
