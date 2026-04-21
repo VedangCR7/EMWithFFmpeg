@@ -3412,7 +3412,10 @@ const HomeScreen: React.FC = React.memo(() => {
       setIsBusinessCategoriesHighlighted(false);
       highlightTimeoutRef.current = null;
     }, 3000);
-  }, []);
+
+    // Open the Business Categories modal (same as View More button)
+    handleViewAllBusinessCategories();
+  }, [handleViewAllBusinessCategories]);
 
   const handleViewAllGeneralCategories = useCallback(() => {
     navigation.navigate('GreetingTemplates');
