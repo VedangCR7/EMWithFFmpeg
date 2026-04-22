@@ -1569,6 +1569,12 @@ const PosterPlayerScreen: React.FC = () => {
     }
   }, [activeRenderSource, isSoftwareCompanyCategory, fetchSoftwareCompanyTemplates, serviceFilterTemplates]);
 
+  // Helper function to determine if 6-poster limit should be applied
+  const shouldApplySixPosterLimit = useMemo(() => {
+    // Apply 6-poster limit ONLY for Business Categories from HomeScreen
+    return type === 'business' && posterLimit === 6;
+  }, [type, posterLimit]);
+
   const filteredPosters = useMemo(() => {
 
     // EVENT PLANNER: Filter by service keywords using standardized exact matching
@@ -1584,23 +1590,26 @@ const PosterPlayerScreen: React.FC = () => {
 
       // Apply language filtering to already filtered templates
       if (selectedLanguage === 'all') {
-        return filteredByTags.slice(0, 6).map(t => mergeTemplateLanguages(t));
+        const result = filteredByTags.map(t => mergeTemplateLanguages(t));
+        return shouldApplySixPosterLimit ? result.slice(0, 6) : result;
       }
 
       const languageFiltered = filteredByTags.filter(template => {
         return templateContainsLanguage(template, selectedLanguage);
       });
 
-      return languageFiltered.slice(0, 6).map(t => mergeTemplateLanguages(t));
+      const result = languageFiltered.map(t => mergeTemplateLanguages(t));
+      return shouldApplySixPosterLimit ? result.slice(0, 6) : result;
     }
 
     // SOFTWARE COMPANY: Initial display or category filtering
     if (isSoftwareCompanyCategory) {
       const softwareTemplates = serviceFilterTemplates.softwarecompany || allTemplates;
 
-      // INITIAL DISPLAY: Show first 6 templates when no category selected
+      // INITIAL DISPLAY: Show templates (limited only if from Business Categories)
       if (!selectedSoftwareCategory) {
-        return softwareTemplates.slice(0, 6).map(t => mergeTemplateLanguages(t));
+        const result = softwareTemplates.map(t => mergeTemplateLanguages(t));
+        return shouldApplySixPosterLimit ? result.slice(0, 6) : result;
       }
 
       // CATEGORY FILTERING: Filter by selected category
@@ -1618,14 +1627,16 @@ const PosterPlayerScreen: React.FC = () => {
 
       // Apply language filtering to already filtered templates
       if (selectedLanguage === 'all') {
-        return filteredByCategory.slice(0, 6).map(t => mergeTemplateLanguages(t));
+        const result = filteredByCategory.map(t => mergeTemplateLanguages(t));
+        return shouldApplySixPosterLimit ? result.slice(0, 6) : result;
       }
 
       const filteredByLanguage = filteredByCategory.filter(template => {
         return templateContainsLanguage(template, selectedLanguage);
       });
 
-      return filteredByLanguage.slice(0, 6).map(t => mergeTemplateLanguages(t));
+      const result = filteredByLanguage.map(t => mergeTemplateLanguages(t));
+      return shouldApplySixPosterLimit ? result.slice(0, 6) : result;
     }
 
     // Ensure all templates have languages merged before filtering
@@ -1653,7 +1664,7 @@ const PosterPlayerScreen: React.FC = () => {
 
     // Return service-filtered results (even if empty, don't fallback to all templates)
     return serviceFiltered;
-  }, [serviceFilterTemplates, isEventPlannerCategory, selectedServiceFilter, serviceFilterKeywords, selectedLanguage, isSoftwareCompanyCategory, selectedSoftwareCategory, softwareCategoryButtons, allTemplates]);
+  }, [serviceFilterTemplates, isEventPlannerCategory, selectedServiceFilter, serviceFilterKeywords, selectedLanguage, isSoftwareCompanyCategory, selectedSoftwareCategory, softwareCategoryButtons, allTemplates, shouldApplySixPosterLimit]);
 
   // Preload images for better scrolling performance
   const preloadImages = useCallback((posters: Template[], startIndex: number = 0, count: number = 20) => {

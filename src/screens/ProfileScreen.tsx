@@ -2229,7 +2229,7 @@ const ProfileScreen: React.FC = () => {
             color: theme.colors.textSecondary,
             fontSize: getFontSize(8),
             marginTop: dynamicModerateScale(14),
-          }]}>Version 1.1</Text>
+          }]}>Version 1.2</Text>
         </ScrollView>
       </LinearGradient>
 
