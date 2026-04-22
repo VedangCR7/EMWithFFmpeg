@@ -79,6 +79,7 @@ interface TemplateCardProps {
   cardWidth: number;
   theme: any;
   onPress: (template: Template) => void;
+  getThumbnailUrl: (url: string) => string;
 }
 
 // Search result item interfaces
@@ -119,7 +120,7 @@ interface HierarchicalSearchItem {
   data: any;
 }
 
-const TemplateCard: React.FC<TemplateCardProps> = React.memo(({ item, cardWidth, theme, onPress }) => {
+const TemplateCard: React.FC<TemplateCardProps> = React.memo(({ item, cardWidth, theme, onPress, getThumbnailUrl }) => {
   const scaleAnim = React.useRef(new Animated.Value(1)).current;
   const animationRef = React.useRef<Animated.CompositeAnimation | null>(null);
 
@@ -324,9 +325,10 @@ interface VideoTemplateCardProps {
   theme: any;
   playIconSize: number;
   onPress: () => void;
+  getThumbnailUrl: (url: string) => string;
 }
 
-const VideoTemplateCard: React.FC<VideoTemplateCardProps> = React.memo(({ item, cardWidth, theme, playIconSize, onPress }) => {
+const VideoTemplateCard: React.FC<VideoTemplateCardProps> = React.memo(({ item, cardWidth, theme, playIconSize, onPress, getThumbnailUrl }) => {
   const scaleAnim = React.useRef(new Animated.Value(1)).current;
   const animationRef = React.useRef<Animated.CompositeAnimation | null>(null);
 
@@ -1216,6 +1218,7 @@ const HomeScreen: React.FC = React.memo(() => {
                           item={poster}
                           cardWidth={120}
                           theme={theme}
+                          getThumbnailUrl={getThumbnailUrl}
                           onPress={() => {
                             // Handle poster press
                             navigation.navigate('PosterPlayer', {
@@ -3553,6 +3556,7 @@ const HomeScreen: React.FC = React.memo(() => {
                   item={template}
                   cardWidth={cardWidth}
                   theme={theme}
+                  getThumbnailUrl={getThumbnailUrl}
                   onPress={handleTemplatePress}
                 />
               )}
@@ -3588,10 +3592,11 @@ const HomeScreen: React.FC = React.memo(() => {
         cardWidth={cardWidth}
         theme={theme}
         playIconSize={playIconSize}
+        getThumbnailUrl={getThumbnailUrl}
         onPress={handleVideoCardPress}
       />
     );
-  }, [theme, cardWidth, playIconSize, handleVideoCardPress]);
+  }, [theme, cardWidth, playIconSize, handleVideoCardPress, getThumbnailUrl]);
 
   // Carousel card dimensions with spacing
   const SCREEN_WIDTH = screenWidth;
