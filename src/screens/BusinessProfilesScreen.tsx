@@ -25,6 +25,7 @@ import api from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BusinessProfileForm from '../components/BusinessProfileForm';
 import BottomSheet from '../components/BottomSheet';
+import SuccessModal from '../components/SuccessModal';
 import RazorpayCheckout from 'react-native-razorpay';
 import { getProductionRazorpayKey, RAZORPAY_CONFIG } from '../config/razorpayConfig';
 import { useSubscription } from '../contexts/SubscriptionContext';
@@ -1170,59 +1171,11 @@ const BusinessProfilesScreen: React.FC = () => {
         </BottomSheet>
 
         {/* Success Modal */}
-        <Modal
+        <SuccessModal
           visible={showSuccessModal}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={() => setShowSuccessModal(false)}
-          statusBarTranslucent={true}
-        >
-          <TouchableOpacity 
-            style={styles.modalOverlay}
-            activeOpacity={1}
-            onPress={() => setShowSuccessModal(false)}
-          >
-            <TouchableOpacity 
-              activeOpacity={1}
-              onPress={() => {}} // Prevent closing when tapping inside modal
-            >
-              <View style={[styles.successModalContainer, { backgroundColor: theme.colors.surface }]}>
-                <View style={styles.successModalHeader}>
-                  <View style={styles.centerHeaderContent}>
-                    <View style={[styles.successIconContainer, { backgroundColor: `${theme.colors.primary}20` }]}>
-                      <Icon name="check-circle" size={Math.min(screenWidth * 0.08, 32)} color={theme.colors.primary} />
-                    </View>
-                    <Text 
-                      style={[styles.successModalTitle, { color: theme.colors.text }]}
-                    >
-                      Success
-                    </Text>
-                  </View>
-                  <TouchableOpacity 
-                    style={[styles.closeModalButton, { backgroundColor: theme.colors.inputBackground }]}
-                    onPress={() => setShowSuccessModal(false)}
-                    activeOpacity={0.7}
-                  >
-                    <Icon name="close" size={Math.min(screenWidth * 0.06, 24)} color={theme.colors.textSecondary} />
-                  </TouchableOpacity>
-                </View>
-                
-                <View style={styles.successModalContent}>
-                  <Text style={[styles.successModalMessage, { color: theme.colors.text }]}>
-                    {successMessage}
-                  </Text>
-                </View>
-                
-                <TouchableOpacity 
-                  style={[styles.successModalButton, { backgroundColor: theme.colors.primary }]}
-                  onPress={() => setShowSuccessModal(false)}
-                >
-                  <Text style={styles.successModalButtonText}>OK</Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </Modal>
+          message={successMessage}
+          onClose={() => setShowSuccessModal(false)}
+        />
 
         {/* Delete Confirmation Modal */}
         <Modal
@@ -1724,87 +1677,11 @@ const styles = StyleSheet.create({
     fontSize: Math.min(screenWidth * 0.023, 9),
     fontWeight: '500',
   },
-  // Success Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  successModalContainer: {
-    borderRadius: Math.min(screenWidth * 0.05, 20),
-    padding: Math.min(screenWidth * 0.04, 16),
-    width: '100%',
-    maxWidth: Math.min(screenWidth * 0.88, 380),
-    minWidth: Math.min(screenWidth * 0.78, 300),
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 20,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 40,
-    elevation: 25,
-    alignSelf: 'center',
-  },
-  successModalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: Math.min(screenHeight * 0.015, 12),
-    paddingBottom: Math.min(screenHeight * 0.01, 8),
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-    minHeight: Math.min(screenWidth * 0.1, 40),
-    position: 'relative',
-  },
-  centerHeaderContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-  },
-  successIconContainer: {
-    width: Math.min(screenWidth * 0.1, 40),
-    height: Math.min(screenWidth * 0.1, 40),
-    borderRadius: Math.min(screenWidth * 0.05, 20),
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: Math.min(screenWidth * 0.03, 12),
-  },
-  successModalTitle: {
-    fontSize: Math.min(screenWidth * 0.042, 16),
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  successModalContent: {
-    paddingVertical: Math.min(screenHeight * 0.02, 16),
-    marginBottom: Math.min(screenHeight * 0.02, 16),
-    paddingHorizontal: Math.min(screenWidth * 0.02, 16),
-  },
-  successModalMessage: {
-    fontSize: Math.min(screenWidth * 0.035, 14),
-    lineHeight: Math.min(screenWidth * 0.05, 20),
-    textAlign: 'center',
-    opacity: 0.9,
-  },
-  successModalButton: {
-    borderRadius: Math.min(screenWidth * 0.025, 10),
-    paddingVertical: Math.min(screenHeight * 0.015, 12),
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  successModalButtonText: {
-    fontSize: Math.min(screenWidth * 0.038, 15),
-    fontWeight: '600',
-    color: '#ffffff',
   },
   // Delete Modal Styles (matching login screen error modal)
   deleteModalContainer: {

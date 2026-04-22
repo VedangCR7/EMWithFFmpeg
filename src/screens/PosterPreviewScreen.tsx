@@ -10,6 +10,7 @@ import {
   Image,
   Platform,
   ToastAndroid,
+  PermissionsAndroid,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -28,6 +29,101 @@ import { subscribeToShowDownloadLimitModal } from '../utils/downloadLimitEvents'
 import DownloadLimitMessage from '../components/DownloadLimitMessage';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+
+/**
+ * Universal Storage Permission Handler
+ * Handles storage permissions for all Android versions (API 26-34)
+ */
+const requestStoragePermission = async (): Promise<boolean> => {
+  if (Platform.OS !== 'android') {
+    return true; // iOS handles permissions automatically
+  }
+
+  try {
+    // Android 13+ (API 33+) - Use new media permissions
+    if (Platform.Version >= 33) {
+      console.log('🔍 [PERMISSION] Android 13+ detected, requesting READ_MEDIA_IMAGES');
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES,
+        {
+          title: 'Storage Permission Required',
+          message: 'EventMarketers needs access to your storage to save posters to your gallery.',
+          buttonNeutral: 'Ask Me Later',
+          buttonNegative: 'Cancel', 
+          buttonPositive: 'OK',
+        }
+      );
+      
+      console.log('📋 [PERMISSION] READ_MEDIA_IMAGES result:', granted);
+      return granted === PermissionsAndroid.RESULTS.GRANTED;
+    }
+    
+    // Android 10-12 (API 29-32) - Scoped Storage era
+    if (Platform.Version >= 29) {
+      console.log('🔍 [PERMISSION] Android 10-12 detected, requesting WRITE_EXTERNAL_STORAGE');
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+        {
+          title: 'Storage Permission Required',
+          message: 'EventMarketers needs access to your storage to save posters to your gallery.',
+          buttonNeutral: 'Ask Me Later',
+          buttonNegative: 'Cancel',
+          buttonPositive: 'OK',
+        }
+      );
+      
+      console.log('📋 [PERMISSION] WRITE_EXTERNAL_STORAGE result:', granted);
+      return granted === PermissionsAndroid.RESULTS.GRANTED;
+    }
+    
+    // Android 8-9 (API 26-28) - Legacy storage
+    console.log('🔍 [PERMISSION] Android 8-9 detected, requesting WRITE_EXTERNAL_STORAGE');
+    const granted = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+      {
+        title: 'Storage Permission Required',
+        message: 'EventMarketers needs access to your storage to save posters to your gallery.',
+        buttonNeutral: 'Ask Me Later',
+        buttonNegative: 'Cancel',
+        buttonPositive: 'OK',
+      }
+    );
+    
+    console.log('📋 [PERMISSION] WRITE_EXTERNAL_STORAGE result:', granted);
+    return granted === PermissionsAndroid.RESULTS.GRANTED;
+    
+  } catch (err) {
+    console.error('❌ [PERMISSION] Storage permission error:', err);
+    return false;
+  }
+};
+
+/**
+ * Check if storage permission is already granted
+ */
+const checkStoragePermission = async (): Promise<boolean> => {
+  if (Platform.OS !== 'android') {
+    return true;
+  }
+
+  try {
+    // Android 13+ (API 33+)
+    if (Platform.Version >= 33) {
+      const result = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES);
+      console.log('🔍 [PERMISSION] READ_MEDIA_IMAGES check result:', result);
+      return result;
+    }
+    
+    // Android 8-12 (API 26-32)
+    const result = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE);
+    console.log('🔍 [PERMISSION] WRITE_EXTERNAL_STORAGE check result:', result);
+    return result;
+    
+  } catch (err) {
+    console.error('❌ [PERMISSION] Permission check error:', err);
+    return false;
+  }
+};
 
 // Compact spacing multiplier to reduce all spacing (50% reduction)
 const COMPACT_MULTIPLIER = 0.5;
@@ -323,6 +419,22 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
 
     if (normalizedUri.startsWith('data:image') || normalizedUri.startsWith('http')) {
       try {
+        // CHECK STORAGE PERMISSION before saving for sharing
+        console.log('???? [PERMISSION] Checking storage permission for sharing...');
+        const hasPermission = await checkStoragePermission();
+        
+        if (!hasPermission) {
+          console.log('???? [PERMISSION] Permission not granted for sharing, requesting...');
+          const permissionGranted = await requestStoragePermission();
+          
+          if (!permissionGranted) {
+            console.log('???? [PERMISSION] Storage permission denied for sharing');
+            return null; // Cannot save for sharing without permission
+          }
+        }
+        
+        console.log('???? [PERMISSION] Storage permission granted for sharing, saving...');
+        
         const savedUri = await CameraRoll.save(normalizedUri, {
           type: 'photo',
           album: 'EventMarketers',
@@ -411,13 +523,34 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
        // selectedTemplateId = template ID from editor (HAS THE ID WE NEED) ✅
        // selectedImage.templateId = template ID from image object (MISSING) ❌
        
-       // 🔍 KEY INSIGHT: selectedImage only has uri/title/description, no ID fields
+       // KEY INSIGHT: selectedImage only has uri/title/description, no ID fields
        // We must use selectedTemplateId as the correct resource ID
        const correctResourceId = selectedTemplateId;
        
-       // � CRITICAL FIX: Handle uploaded templates without resourceId
+       // CRITICAL FIX: Handle uploaded templates without resourceId
        if (!correctResourceId) {
-         console.log('📱 [UPLOADED TEMPLATE] No resourceId found - saving directly to gallery');
+         console.log('???? [UPLOADED TEMPLATE] No resourceId found - saving directly to gallery');
+         
+         // CHECK STORAGE PERMISSION before saving
+         console.log('???? [PERMISSION] Checking storage permission for uploaded template...');
+         const hasPermission = await checkStoragePermission();
+         
+         if (!hasPermission) {
+           console.log('???? [PERMISSION] Permission not granted, requesting...');
+           const permissionGranted = await requestStoragePermission();
+           
+           if (!permissionGranted) {
+             console.log('???? [PERMISSION] Storage permission denied by user');
+             Alert.alert(
+               'Permission Required',
+               'Storage permission is required to save posters to your gallery. Please enable it in your device settings.',
+               [{ text: 'OK' }]
+             );
+             return;
+           }
+         }
+         
+         console.log('???? [PERMISSION] Storage permission granted, saving to gallery...');
          
          // Save directly to gallery without calling download API
          await CameraRoll.save(capturedImageUri, {
@@ -425,7 +558,7 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
            album: 'EventMarketers'
          });
          
-         console.log('✅ [UPLOADED TEMPLATE] Image saved to gallery directly');
+         console.log('???? [UPLOADED TEMPLATE] Image saved to gallery directly');
          
          // Save poster information to local storage
          try {
@@ -489,6 +622,27 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
        const posterCategory = selectedImage.title?.toLowerCase().includes('event') ? 'Events' : 'General';
        
        console.log('✅ Download API successful, now saving to gallery...');
+       
+       // 🔐 CHECK STORAGE PERMISSION before saving
+       console.log('🔐 [PERMISSION] Checking storage permission for downloaded poster...');
+       const hasPermission = await checkStoragePermission();
+       
+       if (!hasPermission) {
+         console.log('🔐 [PERMISSION] Permission not granted, requesting...');
+         const permissionGranted = await requestStoragePermission();
+         
+         if (!permissionGranted) {
+           console.log('❌ [PERMISSION] Storage permission denied by user');
+           Alert.alert(
+             'Permission Required',
+             'Storage permission is required to save posters to your gallery. Please enable it in your device settings.',
+             [{ text: 'OK' }]
+           );
+           return;
+         }
+       }
+       
+       console.log('✅ [PERMISSION] Storage permission granted, saving to gallery...');
        
        // AFTER successful API call, save to gallery
        await CameraRoll.save(capturedImageUri, {

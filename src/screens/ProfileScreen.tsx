@@ -41,6 +41,7 @@ import downloadedPostersService from '../services/downloadedPosters';
 import downloadTrackingService from '../services/downloadTracking';
 import ImagePickerModal from '../components/ImagePickerModal';
 import ComingSoonModal from '../components/ComingSoonModal';
+import SuccessModal from '../components/SuccessModal';
 import { API_CONFIG } from '../constants/api';
 
 // Compact spacing multiplier to reduce all spacing (matching HomeScreen)
@@ -2507,91 +2508,11 @@ const ProfileScreen: React.FC = () => {
       </Modal>
 
       {/* Success Modal */}
-      <Modal
+      <SuccessModal
         visible={showSuccessModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowSuccessModal(false)}
-        statusBarTranslucent={true}
-      >
-        <TouchableOpacity 
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowSuccessModal(false)}
-        >
-          <TouchableOpacity 
-            activeOpacity={1}
-            onPress={() => {}} // Prevent closing when tapping inside modal
-          >
-            <View style={[styles.successModalContainer, { 
-              backgroundColor: theme.colors.surface,
-              borderRadius: dynamicModerateScale(16),
-              padding: dynamicModerateScale(16),
-            }]}>
-              <View style={[styles.successModalHeader, {
-                marginBottom: dynamicModerateScale(10),
-              }]}>
-                <View style={[styles.successIconContainer, { 
-                  backgroundColor: `${theme.colors.primary}20`,
-                  width: dynamicModerateScale(42),
-                  height: dynamicModerateScale(42),
-                  borderRadius: dynamicModerateScale(21),
-                  marginBottom: dynamicModerateScale(6),
-                }]}>
-                  <Icon name="check-circle" size={getIconSize(22)} color={theme.colors.primary} />
-                </View>
-                <Text 
-                  style={[styles.successModalTitle, { 
-                    color: theme.colors.text,
-                    fontSize: getFontSize(14),
-                  }]}
-                >
-                  Success
-                </Text>
-                <TouchableOpacity 
-                  style={[styles.closeModalButton, { 
-                    backgroundColor: theme.colors.inputBackground,
-                    width: dynamicModerateScale(24),
-                    height: dynamicModerateScale(24),
-                    borderRadius: dynamicModerateScale(12),
-                    top: dynamicModerateScale(-5),
-                    right: dynamicModerateScale(-5),
-                  }]}
-                  onPress={() => setShowSuccessModal(false)}
-                  activeOpacity={0.7}
-                >
-                  <Icon name="close" size={getIconSize(16)} color={theme.colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
-              
-              <View style={[styles.successModalContent, {
-                marginBottom: dynamicModerateScale(12),
-              }]}>
-                <Text style={[styles.successModalMessage, { 
-                  color: theme.colors.text,
-                  fontSize: getFontSize(10),
-                  lineHeight: dynamicModerateScale(16),
-                }]}>
-                  {successMessage}
-                </Text>
-              </View>
-              
-              <TouchableOpacity 
-                style={[styles.successModalButton, { 
-                  backgroundColor: theme.colors.primary,
-                  paddingVertical: dynamicModerateScale(9),
-                  borderRadius: dynamicModerateScale(10),
-                }]}
-                onPress={() => setShowSuccessModal(false)}
-              >
-                <Text style={[styles.successModalButtonText, {
-                  fontSize: getFontSize(10),
-                }]}>OK</Text>
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
+        message={successMessage}
+        onClose={() => setShowSuccessModal(false)}
+      />
 
       {/* Sign Out Confirmation Modal */}
       <Modal
@@ -3420,39 +3341,6 @@ const styles = StyleSheet.create({
   categoryOptionTextSelected: {
     fontWeight: '600',
   },
-  // Success Modal Styles
-  successModalContainer: {
-    width: screenWidth * 0.88,
-    maxWidth: 380,
-    borderRadius: moderateScale(16),
-    padding: moderateScale(16),
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: moderateScale(3),
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: moderateScale(6),
-    elevation: moderateScale(6),
-  },
-  successModalHeader: {
-    alignItems: 'center',
-    marginBottom: moderateScale(12),
-    position: 'relative',
-  },
-  successIconContainer: {
-    width: moderateScale(48),
-    height: moderateScale(48),
-    borderRadius: moderateScale(24),
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: moderateScale(8),
-  },
-  successModalTitle: {
-    fontSize: moderateScale(16),
-    fontWeight: '700',
-    textAlign: 'center',
-  },
   closeModalButton: {
     position: 'absolute',
     top: moderateScale(-6),
@@ -3462,32 +3350,6 @@ const styles = StyleSheet.create({
     borderRadius: moderateScale(13),
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  successModalContent: {
-    marginBottom: moderateScale(14),
-  },
-  successModalMessage: {
-    fontSize: moderateScale(12),
-    textAlign: 'center',
-    lineHeight: moderateScale(18),
-  },
-  successModalButton: {
-    paddingVertical: moderateScale(10),
-    borderRadius: moderateScale(10),
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: moderateScale(1),
-    },
-    shadowOpacity: 0.08,
-    shadowRadius: moderateScale(3),
-    elevation: moderateScale(2),
-  },
-  successModalButtonText: {
-    color: '#FFFFFF',
-    fontSize: moderateScale(12),
-    fontWeight: '600',
   },
   
   // Sign Out Modal Styles

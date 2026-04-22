@@ -363,11 +363,20 @@ const LoginScreen: React.FC = ({ navigation }: any) => {
                 </Text>
               </View>
               
-              {/* Buttons Layout - Two buttons horizontally aligned */}
-              <View style={styles.errorModalButtonsContainer}>
+              {/* Buttons Layout - Centered for single button, spaced for two buttons */}
+              <View style={[
+                styles.errorModalButtonsContainer,
+                (errorMessage.includes('registration') || errorMessage.includes('register') || (errorMessage.includes('resource') && errorMessage.includes('not found'))) 
+                  ? {} 
+                  : { justifyContent: 'center' }
+              ]}>
                 {/* Cancel Button */}
                 <TouchableOpacity 
-                  style={[styles.errorModalCancelButton, { backgroundColor: theme.colors.inputBackground }]}
+                  style={[
+                    styles.errorModalCancelButton, 
+                    { backgroundColor: theme.colors.inputBackground },
+                    !(errorMessage.includes('registration') || errorMessage.includes('register') || (errorMessage.includes('resource') && errorMessage.includes('not found'))) && { flex: undefined, paddingHorizontal: screenWidth * 0.08 }
+                  ]}
                   onPress={() => setShowErrorModal(false)}
                 >
                   <Text style={[styles.errorModalCancelButtonText, { color: theme.colors.textSecondary }]}>Cancel</Text>
@@ -393,16 +402,7 @@ const LoginScreen: React.FC = ({ navigation }: any) => {
                   </TouchableOpacity>
                 )}
                 
-                {/* OK Button - shown for non-registration errors */}
-                {!(errorMessage.includes('registration') || errorMessage.includes('register') || (errorMessage.includes('resource') && errorMessage.includes('not found'))) && (
-                  <TouchableOpacity 
-                    style={[styles.errorModalButton, { backgroundColor: '#ff4444' }]}
-                    onPress={() => setShowErrorModal(false)}
-                  >
-                    <Text style={styles.errorModalButtonText}>OK</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
+                              </View>
             </View>
           </TouchableOpacity>
         </TouchableOpacity>
