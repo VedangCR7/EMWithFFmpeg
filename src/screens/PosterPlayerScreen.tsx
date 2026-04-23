@@ -562,6 +562,9 @@ const PosterPlayerScreen: React.FC = () => {
     type,
   } = route.params;
 
+  // ✅ SEARCH FLOW LOCK: Highest priority lock to isolate search flow
+  const isSearchFlow = route.params?.templateSource === 'search';
+
   // Add debug log for received parameters
   console.log("PosterPlayerScreen received params:", {
     type,
@@ -831,9 +834,11 @@ const PosterPlayerScreen: React.FC = () => {
       if (shouldProtectTemplates) {
         console.log('SINGLE SOURCE: PROTECTING navigation templates from being cleared');
       } else {
-        // Clear templates and filters
-        setAllTemplates([]);
-        allTemplatesRef.current = [];
+        // Clear templates and filters - PROTECT SEARCH FLOW
+        if (!isSearchFlow) {
+          setAllTemplates([]);
+          allTemplatesRef.current = [];
+        }
       }
       
       setServiceFilterTemplates({});
@@ -901,6 +906,23 @@ const PosterPlayerScreen: React.FC = () => {
       allTemplatesRef.current = initialTemplates;
     }
   }, [hasNavigationTemplates, initialTemplates]);
+
+  // ✅ SEARCH FLOW: Handle relatedPosters from search navigation
+  useEffect(() => {
+    // Only handle search flow with relatedPosters - FINAL SOURCE
+    if (isSearchFlow && route.params?.relatedPosters?.length > 0) {
+      console.log('SEARCH FLOW: Setting templates from relatedPosters:', route.params.relatedPosters.length);
+      setAllTemplates(route.params.relatedPosters);
+      allTemplatesRef.current = route.params.relatedPosters;
+      
+      // Set current category properly using activeCategoryRef
+      if (route.params?.categoryName) {
+        activeCategoryRef.current = { type: 'business', value: route.params.categoryName };
+        console.log('SEARCH FLOW: Set active category to:', route.params.categoryName);
+      }
+      return; // Skip other template loading logic
+    }
+  }, [isSearchFlow, route.params?.relatedPosters, route.params?.categoryName]);
 
   // Helper to detect placeholder posters
   const isPlaceholderPoster = useCallback((poster: any): boolean => {
@@ -1105,9 +1127,11 @@ const PosterPlayerScreen: React.FC = () => {
     if (globalBusinessProfile?.id !== prevProfileRef.current?.id) {
       console.log('🔄 [POSTER PLAYER] Profile changed, forcing template refresh...');
       
-      // Reset template state to trigger re-fetch
-      setAllTemplatesState([]);
-      allTemplatesRef.current = [];
+      // Reset template state to trigger re-fetch - PROTECT SEARCH FLOW
+      if (!isSearchFlow) {
+        setAllTemplatesState([]);
+        allTemplatesRef.current = [];
+      }
       
       // Update previous profile reference
       prevProfileRef.current = globalBusinessProfile;
@@ -1878,6 +1902,12 @@ const PosterPlayerScreen: React.FC = () => {
 
   // Fetch business category posters when global business category is provided
   useEffect(() => {
+    // ✅ SKIP BUSINESS FETCH FOR SEARCH FLOW
+    if (isSearchFlow) {
+      console.log('🚫 [BUSINESS FETCH] Skipped — search flow is active');
+      return;
+    }
+
     if (!globalBusinessCategory) {
       return;
     }
@@ -1904,9 +1934,11 @@ const PosterPlayerScreen: React.FC = () => {
     if (isCategoryChanged) {
       console.log('PRODUCTION FIX: Category changed from', prevCategoryRef.current, 'to', globalBusinessCategory, '-> resetting state');
       
-      // SAFE RESET (only internal state, no UI changes)
-      setAllTemplates([]);
-      allTemplatesRef.current = [];
+      // SAFE RESET (only internal state, no UI changes) - PROTECT SEARCH FLOW
+      if (!isSearchFlow) {
+        setAllTemplates([]);
+        allTemplatesRef.current = [];
+      }
       setServiceFilterTemplates({});
       
       // Optional safe resets (only if functions exist)
@@ -2008,6 +2040,12 @@ const PosterPlayerScreen: React.FC = () => {
               return;
             }
 
+            // PROTECT SEARCH FLOW: Don't override search templates
+            if (isSearchFlow) {
+              console.log('🚫 [BUSINESS FETCH] Skipped setting templates - search flow is active');
+              return;
+            }
+
             setAllTemplates(ensuredTemplates);
 
             // Try to find the initialPoster (the one that was clicked) in the loaded templates
@@ -2089,8 +2127,10 @@ const PosterPlayerScreen: React.FC = () => {
       return;
     }
 
-    // Clear allTemplates immediately to prevent showing old posters in grid
-    setAllTemplates([]);
+    // Clear allTemplates immediately to prevent showing old posters in grid - PROTECT SEARCH FLOW
+    if (!isSearchFlow) {
+      setAllTemplates([]);
+    }
 
     // Reset language to "All" when switching to different greeting category
     if (activeCategoryRef.current.type !== 'greeting' || activeCategoryRef.current.value !== greetingCategory) {
@@ -2623,11 +2663,11 @@ const PosterPlayerScreen: React.FC = () => {
                   activeCategoryRef: activeCategoryRef.current
                 });
 
-                // Only set templates if this category is still active
-                if (activeCategoryRef.current.type === 'greeting' && activeCategoryRef.current.value === currentCategory) {
+                // Only set templates if this category is still active and NOT in search flow
+                if (activeCategoryRef.current.type === 'greeting' && activeCategoryRef.current.value === currentCategory && !isSearchFlow) {
                   setAllTemplates(nextTemplates);
                 } else {
-                  console.log('⚠️ [GREETING BACKGROUND LOAD] Skipped setting allTemplates - category changed during background load.');
+                  console.log('⚠️ [GREETING BACKGROUND LOAD] Skipped setting allTemplates - category changed during background load or search flow is active.');
                 }
               }
             } catch (error) {
@@ -2865,6 +2905,12 @@ const PosterPlayerScreen: React.FC = () => {
             return;
           }
 
+          // PROTECT SEARCH FLOW: Don't override search templates
+          if (isSearchFlow) {
+            console.log('🚫 [GREETING FETCH] Skipped setting templates - search flow is active');
+            return;
+          }
+
           console.log('🔍 [GREETING FETCH] About to set allTemplates:', {
             uniqueTemplatesCount: uniqueTemplates.length,
             uniqueTemplateIds: uniqueTemplates.map(t => t.id),
@@ -3057,8 +3103,10 @@ const PosterPlayerScreen: React.FC = () => {
       return;
     }
 
-    // Clear allTemplates immediately to prevent showing old posters in grid
-    setAllTemplates([]);
+    // Clear allTemplates immediately to prevent showing old posters in grid - PROTECT SEARCH FLOW
+    if (!isSearchFlow) {
+      setAllTemplates([]);
+    }
     // Reset language to "All" when switching to different calendar date
     if (activeCategoryRef.current.type !== 'calendar' || activeCategoryRef.current.value !== calendarDate) {
       console.log('🔄 Calendar date changed → resetting language to ALL');
@@ -3119,6 +3167,12 @@ const PosterPlayerScreen: React.FC = () => {
                 activeCategoryType: activeCategoryRef.current.type,
                 activeCategoryValue: activeCategoryRef.current.value
               });
+              return;
+            }
+
+            // PROTECT SEARCH FLOW: Don't override search templates
+            if (isSearchFlow) {
+              console.log('🚫 [CALENDAR FETCH] Skipped setting templates - search flow is active');
               return;
             }
 

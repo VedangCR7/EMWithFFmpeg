@@ -127,7 +127,7 @@ const LoginScreen: React.FC = ({ navigation }: any) => {
   };
 
   const handleSignIn = useCallback(async () => {
-    if (!email || !password) {
+    if (!email?.trim() || !password?.trim()) {
       setErrorMessage('Please fill in all fields');
       setShowErrorModal(true);
       return;
@@ -353,7 +353,7 @@ const LoginScreen: React.FC = ({ navigation }: any) => {
               <Text 
                 style={[styles.errorModalTitle, { color: theme.colors.text }]}
               >
-                {errorMessage.includes('registration') || errorMessage.includes('register') || errorMessage.includes('resource') && errorMessage.includes('not found') ? 'Registration Required' : 'Error'}
+                {errorMessage.includes('registration') || errorMessage.includes('register') || errorMessage.includes('resource') && errorMessage.includes('not found') ? 'Registration Required' : 'Failed'}
               </Text>
               
               {/* Message */}
@@ -379,7 +379,7 @@ const LoginScreen: React.FC = ({ navigation }: any) => {
                   ]}
                   onPress={() => setShowErrorModal(false)}
                 >
-                  <Text style={[styles.errorModalCancelButtonText, { color: theme.colors.textSecondary }]}>Cancel</Text>
+                  <Text style={[styles.errorModalCancelButtonText, { color: theme.colors.textSecondary }]}>Ok</Text>
                 </TouchableOpacity>
                 
                 {/* Register Now Button - shown for registration errors and resource not found errors */}

@@ -1088,15 +1088,15 @@ const HomeScreen: React.FC = React.memo(() => {
   // Track if animations have been initialized
   const animationsInitializedRef = useRef(false);
 
-  // New category filtering function - matches both name and parentCategoryName
+  // New category filtering function - matches both name and parentCategoryName with prefix matching only
   const filterCategories = useCallback((categories: any[], searchQuery: string) => {
     if (!searchQuery || searchQuery.trim() === '') return [];
     
     const query = searchQuery.toLowerCase().trim();
     
     return categories.filter(category =>
-      category?.name?.toLowerCase().includes(query) ||
-      category?.parentCategoryName?.toLowerCase().includes(query)
+      category?.name?.toLowerCase().startsWith(query) ||
+      category?.parentCategoryName?.toLowerCase().startsWith(query)
     );
   }, []);
 
@@ -1134,7 +1134,7 @@ const HomeScreen: React.FC = React.memo(() => {
     return groupCategoriesByParent(memoizedSearchResults);
   }, [memoizedSearchResults, groupCategoriesByParent]);
 
-  // Render search results with category headers and poster grids
+  // Render search results with horizontal layout - category title above horizontal list
   const renderSearchResults = useCallback(() => {
     if (!isSearching && searchQuery.trim() === '') return null;
 
@@ -1158,6 +1158,28 @@ const HomeScreen: React.FC = React.memo(() => {
       );
     }
 
+    // Render poster item for horizontal lists
+    const renderPosterItem = ({ item: poster, category }: { item: any; category: any }) => {
+      return (
+        <TemplateCard
+          item={poster}
+          cardWidth={120}
+          theme={theme}
+          getThumbnailUrl={getThumbnailUrl}
+          onPress={() => {
+            // Handle poster press with proper category context and related posters
+            navigation.navigate('PosterPlayer', {
+              selectedTemplateId: poster.id,  // ✅ PRIMARY DATA - ID as source of truth
+              selectedPoster: poster,          // ✅ OPTIONAL - UI only
+              categoryName: category.name,     // ✅ PASS CATEGORY NAME
+              relatedPosters: category.posters, // ✅ PASS RELATED POSTERS FROM SAME CATEGORY
+              templateSource: 'search',        // ✅ MARK AS SEARCH FLOW
+            });
+          }}
+        />
+      );
+    };
+
     return (
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
         {Object.entries(groupedResults).map(([parentName, categories]) => (
@@ -1175,7 +1197,7 @@ const HomeScreen: React.FC = React.memo(() => {
               {parentName}
             </Text>
 
-            {/* Child Categories */}
+            {/* Child Categories with horizontal lists */}
             {categories.map(category => (
               <View key={category.id} style={{ marginBottom: 20 }}>
                 {/* Child Category Header */}
@@ -1204,32 +1226,18 @@ const HomeScreen: React.FC = React.memo(() => {
                   </Text>
                 </View>
 
-                {/* Poster Grid */}
+                {/* Horizontal Poster List */}
                 {category.posters.length > 0 ? (
                   <FlatList
                     data={category.posters}
                     horizontal
                     showsHorizontalScrollIndicator={false}
                     keyExtractor={(poster, index) => `${category.id}-${poster.id || index}`}
-                    renderItem={({ item: poster }) => {
-                      // Use TemplateCard for both business and general posters
-                      return (
-                        <TemplateCard
-                          item={poster}
-                          cardWidth={120}
-                          theme={theme}
-                          getThumbnailUrl={getThumbnailUrl}
-                          onPress={() => {
-                            // Handle poster press
-                            navigation.navigate('PosterPlayer', {
-                              selectedTemplateId: poster.id,  // ✅ PRIMARY DATA - ID as source of truth
-                              selectedPoster: poster,          // ✅ OPTIONAL - UI only
-                              relatedPosters: [],
-                            });
-                          }}
-                        />
-                      );
-                    }}
+                    renderItem={({ item: poster }) => renderPosterItem({ item: poster, category })}
+                    initialNumToRender={5}
+                    maxToRenderPerBatch={5}
+                    windowSize={3}
+                    removeClippedSubviews={true}
                     contentContainerStyle={{ paddingHorizontal: 16 }}
                   />
                 ) : (
@@ -1249,7 +1257,7 @@ const HomeScreen: React.FC = React.memo(() => {
         ))}
       </ScrollView>
     );
-  }, [isSearching, searchQuery, groupedResults, theme, navigation]);
+  }, [isSearching, searchQuery, groupedResults, theme, navigation, getThumbnailUrl]);
 
   
 
@@ -2948,6 +2956,9 @@ const HomeScreen: React.FC = React.memo(() => {
     return hierarchicalData.categories.flatMap(category => category.images);
   }, []);
 
+  // Request control to prevent overlapping searches
+  const requestIdRef = useRef(0);
+
   // Clean search implementation - single pipeline
   useEffect(() => {
     // Reset immediately if search is empty
@@ -2957,9 +2968,20 @@ const HomeScreen: React.FC = React.memo(() => {
       return;
     }
 
+    // Only trigger search after 3 characters
+    if (searchQuery.trim().length < 3) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
     // Debounce search execution
     const timeoutId = setTimeout(async () => {
       if (searchQuery.trim() === '') return;
+
+      // Generate new request ID
+      requestIdRef.current += 1;
+      const currentId = requestIdRef.current;
 
       setIsSearching(true);
 
@@ -2970,57 +2992,85 @@ const HomeScreen: React.FC = React.memo(() => {
 
         // Fetch posters for each matched category
         const fetchPostersForCategories = async () => {
-          const results: SearchCategoryResult[] = [];
+          // Allow ALL matching categories (no limit)
+          // Performance controlled by parallel API calls and result limiting
 
-          // Business categories
-          for (const category of matchingBusinessCategories) {
+          // Parallel API calls for business categories
+          const businessPromises = matchingBusinessCategories.map(async (category) => {
             try {
-              const response = await businessCategoryPostersApi.getPostersByCategory(category.name, 50);
-              const posters = response.success && response.data?.posters ? response.data.posters : [];
+              const response = await businessCategoryPostersApi.getPostersByCategory(category.name, 10); // Limited to 10 results per category
+              const posters = response.success && response.data?.posters ? response.data.posters.slice(0, 10) : [];
               
-              results.push({
+              return {
                 id: category.id,
                 name: category.name,
-                type: 'business',
+                type: 'business' as const,
                 posters,
                 parentCategoryName: category.parentCategoryName
-              });
+              };
             } catch (error) {
               if (__DEV__) devWarn(`Failed to fetch business category ${category.name}:`, error);
+              return null;
             }
-          }
+          });
 
-          // General categories  
-          for (const category of matchingGeneralCategories) {
+          // Parallel API calls for general categories
+          const generalPromises = matchingGeneralCategories.map(async (category) => {
             try {
               const templates = await greetingTemplatesService.searchTemplates(category.name);
+              const limitedTemplates = (templates || []).slice(0, 10); // Limited to 10 results per category
               
-              results.push({
+              return {
                 id: category.id,
                 name: category.name,
-                type: 'general',
-                posters: templates || [],
+                type: 'general' as const,
+                posters: limitedTemplates,
                 parentCategoryName: category.parentCategoryName
-              });
+              };
             } catch (error) {
               if (__DEV__) devWarn(`Failed to fetch general category ${category.name}:`, error);
+              return null;
             }
-          }
+          });
 
-          return results;
+          // Execute all API calls in parallel
+          const [businessResults, generalResults] = await Promise.all([
+            Promise.all(businessPromises),
+            Promise.all(generalPromises)
+          ]);
+
+          // Filter out null results and combine
+          const validBusinessResults = businessResults.filter(result => result !== null);
+          const validGeneralResults = generalResults.filter(result => result !== null);
+
+          return [...validBusinessResults, ...validGeneralResults];
         };
 
         const results = await fetchPostersForCategories();
+
+        // Check if this is still the latest request
+        if (currentId !== requestIdRef.current) {
+          return; // Ignore outdated response
+        }
+
         setSearchResults(results);
 
       } catch (error) {
+        // Check if this is still the latest request
+        if (currentId !== requestIdRef.current) {
+          return; // Ignore outdated response
+        }
+
         if (__DEV__) devError('Search error:', error);
         setSearchResults([]);
       } finally {
-        setIsSearching(false);
+        // Check if this is still the latest request
+        if (currentId === requestIdRef.current) {
+          setIsSearching(false);
+        }
       }
 
-    }, 300); // 300ms debounce
+    }, 500); // 500ms debounce for better performance
 
     return () => clearTimeout(timeoutId);
   }, [searchQuery, businessCategories, filteredGreetingCategoriesList, filterCategories]);

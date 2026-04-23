@@ -43,23 +43,27 @@ const AppNavigator = () => {
       authUser = user;
       clearTimeout(timeout);
 
-      logger.log('🔔 AppNavigator: Auth state changed:', user ? '✅ User logged in' : '❌ User logged out');
-      if (user) {
-        refreshSubscription().catch(e => logger.error('❌ Error preloading subscription:', e));
-        refreshTransactions().catch(e => logger.error('❌ Error preloading transactions:', e));
+      logger.log('AppNavigator: Auth state changed:', user ? ' User logged in' : ' User logged out');
+      
+      // NAVIGATION SAFETY: Only consider user authenticated if they have valid data
+      const isValidUser = user && user.email && user.id;
+      
+      if (isValidUser) {
+        refreshSubscription().catch(e => logger.error(' Error preloading subscription:', e));
+        refreshTransactions().catch(e => logger.error(' Error preloading transactions:', e));
       }
 
       const elapsedTime = Date.now() - startTime;
       const remainingTime = Math.max(0, MIN_SPLASH_TIME - elapsedTime);
 
       setTimeout(() => {
-        setIsAuthenticated(!!authUser);
+        setIsAuthenticated(!!isValidUser);
         setIsLoading(false);
       }, remainingTime);
     });
 
     authService.initialize().catch((error) => {
-      logger.error('❌ AppNavigator: Error initializing auth service:', error);
+      logger.error(' AppNavigator: Error initializing auth service:', error);
       authStateReceived = true;
       clearTimeout(timeout);
       setTimeout(() => {

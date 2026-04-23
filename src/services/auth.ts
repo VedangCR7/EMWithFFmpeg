@@ -23,44 +23,74 @@ class AuthService {
   // Load stored user from AsyncStorage
   private async loadStoredUser() {
     try {
-      console.log('🔄 Loading stored user from AsyncStorage...');
+      console.log('Loading stored user from AsyncStorage...');
       
       // Check for regular user only
       const storedUser = await AsyncStorage.getItem('currentUser');
       const authToken = await AsyncStorage.getItem('authToken');
       
-      console.log('📦 AsyncStorage check - User:', storedUser ? 'Found' : 'Not found');
+      console.log('AsyncStorage check - User:', storedUser ? 'Found' : 'Not found');
       if (__DEV__) {
-        console.log('📦 AsyncStorage check - Token:', authToken ? 'Found' : 'Not found');
+        console.log('AsyncStorage check - Token:', authToken ? 'Found' : 'Not found');
       }
       
       // Print the full token for debugging
       if (authToken) {
         if (__DEV__) {
-          console.log('🔑 FULL AUTH TOKEN:', authToken);
-          console.log('🔑 TOKEN LENGTH:', authToken.length);
+          console.log('FULL AUTH TOKEN:', authToken);
+          console.log('TOKEN LENGTH:', authToken.length);
         }
       }
       
-      if (storedUser && authToken) {
-        this.currentUser = JSON.parse(storedUser);
-        console.log('✅ Loaded stored user:', this.currentUser.id || this.currentUser.uid);
-        console.log('✅ User email:', this.currentUser.email);
-        if (__DEV__) {
-          console.log('✅ Token length:', authToken.length);
+      // STRICT VALIDATION: Only restore session if BOTH valid token AND valid user exist
+      if (storedUser && authToken && authToken.length > 10) {
+        try {
+          const parsedUser = JSON.parse(storedUser);
+          
+          // Additional validation: Ensure user has required fields
+          if (parsedUser && parsedUser.email && parsedUser.id) {
+            this.currentUser = parsedUser;
+            console.log('Loaded stored user:', this.currentUser.id || this.currentUser.uid);
+            console.log('User email:', this.currentUser.email);
+            if (__DEV__) {
+              console.log('Token length:', authToken.length);
+            }
+            
+            // Mark as initialized and notify auth state listeners
+            this.isInitialized = true;
+            this.notifyAuthStateListeners(this.currentUser);
+            return;
+          } else {
+            console.log('Invalid user data structure - clearing and requiring login');
+          }
+        } catch (parseError) {
+          console.log('Failed to parse stored user data - clearing and requiring login');
         }
-        
-        // Mark as initialized and notify auth state listeners
-        this.isInitialized = true;
-        this.notifyAuthStateListeners(this.currentUser);
-      } else {
-        console.log('ℹ️ No stored user or token found - user needs to login');
-        // Mark as initialized and notify with null to indicate no user
-        this.isInitialized = true;
-        this.notifyAuthStateListeners(null);
       }
+      
+      // If we reach here, either data is invalid or missing
+      console.log('No valid stored user or token found - user needs to login');
+      
+      // Clear any invalid data to prevent future issues
+      if (storedUser || authToken) {
+        console.log('Clearing invalid auth data');
+        await AsyncStorage.multiRemove(['currentUser', 'authToken', 'refreshToken', 'userData']);
+      }
+      
+      // Mark as initialized and notify with null to indicate no user
+      this.isInitialized = true;
+      this.notifyAuthStateListeners(null);
+      
     } catch (error) {
-      console.error('❌ Error loading stored user:', error);
+      console.error('Error loading stored user:', error);
+      
+      // Clear any potentially corrupted data
+      try {
+        await AsyncStorage.multiRemove(['currentUser', 'authToken', 'refreshToken', 'userData']);
+      } catch (clearError) {
+        console.error('Error clearing corrupted data:', clearError);
+      }
+      
       // Mark as initialized and notify with null on error to show login screen
       this.isInitialized = true;
       this.notifyAuthStateListeners(null);
@@ -305,16 +335,26 @@ class AuthService {
       const authToken = await AsyncStorage.getItem('authToken');
       const isGoogleUser = this.currentUser?.providerId === 'google';
       
-      // STEP 2: Clear critical local data FIRST for instant UI update
+      // STEP 2: Ensure full Google logout to prevent auto-login
+      if (isGoogleUser) {
+        try {
+          await GoogleSignin.signOut();
+          await GoogleSignin.revokeAccess();
+          console.log('✅ Google sign out completed');
+        } catch (googleError) {
+          console.error('❌ Error during Google sign out:', googleError);
+        }
+      }
+      
+      // STEP 3: Clear critical local data FIRST for instant UI update
       this.currentUser = null;
       
-      // STEP 3: Notify listeners immediately (triggers navigation to login screen)
-      this.notifyAuthStateListeners(null);
-      
-      // STEP 4: Clear AsyncStorage in batch (much faster than individual removes)
+      // STEP 4: Clear ALL auth state properly
       const keysToRemove = [
         'currentUser',
         'authToken',
+        'refreshToken',
+        'userData',
         'user',
         'isDemoUser',
         'user_likes',
@@ -335,9 +375,12 @@ class AuthService {
       
       await AsyncStorage.multiRemove(keysToRemove);
       
-      // STEP 5: Background cleanup (API logout with token, Google sign out, cache clearing)
+      // STEP 5: Notify listeners AFTER clearing storage to prevent race conditions
+      this.notifyAuthStateListeners(null);
+      
+      // STEP 6: Background cleanup (API logout with token, cache clearing)
       // Don't await these - let them run in background
-      this.performBackgroundCleanup(authToken, isGoogleUser);
+      this.performBackgroundCleanup(authToken);
       
       console.log('✅ Sign out completed - user navigated to login');
     } catch (error) {
@@ -357,7 +400,7 @@ class AuthService {
   }
 
   // Perform background cleanup after sign out (non-blocking)
-  private performBackgroundCleanup(authToken: string | null, isGoogleUser: boolean): void {
+  private performBackgroundCleanup(authToken: string | null): void {
     // Run in background without awaiting - user already navigated away
     setTimeout(async () => {
       try {
@@ -378,11 +421,6 @@ class AuthService {
               }
             })()
           );
-        }
-        
-        // Google sign out
-        if (isGoogleUser) {
-          cleanupTasks.push(GoogleSignin.signOut().catch(() => {}));
         }
         
         // Clear all service caches
@@ -513,21 +551,10 @@ class AuthService {
       console.log('✅ Auth service initialized successfully');
       console.log('Current user:', this.currentUser ? `${this.currentUser.email} (${this.currentUser.id})` : 'None');
       
-      // Check if user is already signed in with Google
-      try {
-        const currentUser = await GoogleSignin.getCurrentUser();
-        const isGoogleSignedIn = !!currentUser;
-        if (isGoogleSignedIn && !this.currentUser) {
-          console.log('🔄 User is signed in with Google but not in local storage, attempting to restore session...');
-          try {
-            await this.signInWithGoogle();
-          } catch (error) {
-            console.error('❌ Failed to restore Google session:', error);
-          }
-        }
-      } catch (googleError) {
-        console.error('⚠️ Error checking Google sign-in status:', googleError);
-      }
+      // DISABLED: Auto Google session restore to prevent unintended login
+      // Users must explicitly click Google Sign-In to authenticate
+      // This prevents automatic login after sign out
+      console.log('ℹ️ Google auto-restore disabled - users must explicitly sign in');
     } catch (error) {
       console.error('❌ Error initializing auth service:', error);
       throw error; // Re-throw to let AppNavigator handle it
