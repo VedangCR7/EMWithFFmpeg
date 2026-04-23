@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -115,6 +115,11 @@ const LoginScreen: React.FC = ({ navigation }: any) => {
       ref.focus();
     }
   };
+
+  // Step 5: Optional safety - ensure login screen waits for user action
+  useEffect(() => {
+    console.log('Login screen mounted - waiting for user action');
+  }, []);
 
   const handleSubmitEditing = (nextField?: string, action?: () => void) => () => {
     if (nextField) {

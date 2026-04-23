@@ -25,6 +25,15 @@ class AuthService {
     try {
       console.log('Loading stored user from AsyncStorage...');
       
+      // STEP 0: Check if user explicitly logged out - prevent auto-restore
+      const isLoggedOut = await AsyncStorage.getItem('isLoggedOut');
+      
+      if (isLoggedOut === 'true') {
+        console.log('🚫 User explicitly logged out - skipping auto login');
+        this.notifyAuthStateListeners(null);
+        return;
+      }
+      
       // Check for regular user only
       const storedUser = await AsyncStorage.getItem('currentUser');
       const authToken = await AsyncStorage.getItem('authToken');
@@ -174,6 +183,11 @@ class AuthService {
         
         this.currentUser = userData;
         await this.saveUserToStorage(userData, response.data.token);
+        
+        // STEP 3: Remove logout flag since user is now explicitly registered/logged in
+        await AsyncStorage.removeItem('isLoggedOut');
+        console.log('✅ Logout flag cleared - user explicitly registered');
+        
         this.notifyAuthStateListeners(this.currentUser);
         
         return { success: true, user: userData };
@@ -218,6 +232,11 @@ class AuthService {
         
         this.currentUser = userData;
         await this.saveUserToStorage(userData, response.data.token);
+        
+        // STEP 3: Remove logout flag since user is now explicitly logged in
+        await AsyncStorage.removeItem('isLoggedOut');
+        console.log('✅ Logout flag cleared - user explicitly logged in');
+        
         this.notifyAuthStateListeners(this.currentUser);
         
         console.log('✅ Email sign-in successful via API:', userData.id);
@@ -284,6 +303,11 @@ class AuthService {
         
         this.currentUser = userData;
         await this.saveUserToStorage(userData, response.data.token);
+        
+        // STEP 3: Remove logout flag since user is now explicitly logged in
+        await AsyncStorage.removeItem('isLoggedOut');
+        console.log('✅ Logout flag cleared - user explicitly logged in');
+        
         this.notifyAuthStateListeners(this.currentUser);
         
         console.log('✅ Google sign-in successful via API:', userData.id);
@@ -375,6 +399,10 @@ class AuthService {
       
       await AsyncStorage.multiRemove(keysToRemove);
       
+      // STEP 4.5: Set logout flag to prevent auto-restore on next app launch
+      await AsyncStorage.setItem('isLoggedOut', 'true');
+      console.log('🚫 Logout flag set - preventing auto-restore');
+      
       // STEP 5: Notify listeners AFTER clearing storage to prevent race conditions
       this.notifyAuthStateListeners(null);
       
@@ -390,6 +418,11 @@ class AuthService {
         this.currentUser = null;
         const keysToRemove = ['currentUser', 'authToken', 'user', 'isDemoUser'];
         await AsyncStorage.multiRemove(keysToRemove);
+        
+        // STEP 4.5: Also set logout flag in error scenario
+        await AsyncStorage.setItem('isLoggedOut', 'true');
+        console.log('🚫 Logout flag set even in error scenario');
+        
         this.notifyAuthStateListeners(null);
         console.log('✅ Local cleanup completed despite error');
       } catch (cleanupError) {

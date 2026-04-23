@@ -2463,6 +2463,18 @@ const TodaysPickScreen: React.FC = () => {
   }, [navigation, originScreen]);
 
   const navigateToPosterEditor = useCallback(() => {
+    // ✅ Safe fallback values for required parameters
+    const finalCategoryName = currentPoster.category || "TODAYS_PICK";
+    const finalPosterCategory = currentPoster.category || "GENERAL";
+    
+    console.log('🔧 [TODAYS PICK] Navigation params:', {
+      finalCategoryName,
+      finalPosterCategory,
+      hasProfile: !!selectedBusinessProfile,
+      profileName: selectedBusinessProfile?.name,
+      profileCategory: selectedBusinessProfile?.category
+    });
+
     navigation.navigate('PosterEditor', {
       selectedImage: {
         uri: getHighQualityImageUrl(currentPoster),
@@ -2471,8 +2483,15 @@ const TodaysPickScreen: React.FC = () => {
       },
       selectedLanguage: selectedLanguage,
       selectedTemplateId: currentPoster.id,
+      posterCategory: finalPosterCategory,
+      type: "general",
+      categoryName: finalCategoryName,
+
+      // ✅ CRITICAL FIX
+      businessProfile: selectedBusinessProfile,
+      businessCategory: selectedBusinessProfile?.category || undefined,
     });
-  }, [navigation, currentPoster, selectedLanguage, getHighQualityImageUrl]);
+  }, [navigation, currentPoster, selectedLanguage, getHighQualityImageUrl, selectedBusinessProfile]);
 
   const handleNextPress = useCallback(() => {
     if (businessCategory) {
