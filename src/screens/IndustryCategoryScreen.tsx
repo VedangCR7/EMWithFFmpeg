@@ -21,7 +21,10 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 
 import LazyFullImage from '../components/LazyFullImage';
 import { useTheme } from '../context/ThemeContext';
+import { useBusinessProfile } from '../context/BusinessProfileContext';
 import businessCategoryPostersApi from '../services/businessCategoryPostersApi';
+import businessProfileService, { BusinessProfile } from '../services/businessProfile';
+import authService from '../services/auth';
 import { Template } from '../services/dashboard';
 
 interface RelatedPosterItemProps {
@@ -101,6 +104,27 @@ const IndustryCategoryScreen: React.FC = () => {
   const navigation = useNavigation<IndustryCategoryScreenNavigationProp>();
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
+  const { selectedBusinessProfile } = useBusinessProfile();
+  
+  // Business profile state
+  const [userBusinessProfiles, setUserBusinessProfiles] = useState<BusinessProfile[]>([]);
+
+  // Load user business profiles
+  useEffect(() => {
+    const loadBusinessProfiles = async () => {
+      try {
+        const currentUserId = authService.getCurrentUser()?.id;
+        if (!currentUserId) return;
+
+        const profiles = await businessProfileService.getUserBusinessProfiles(currentUserId);
+        setUserBusinessProfiles(profiles);
+      } catch (error) {
+        console.error('Error loading business profiles:', error);
+      }
+    };
+
+    loadBusinessProfiles();
+  }, []);
 
   const [dimensions, setDimensions] = useState(() => {
     const { width, height } = Dimensions.get('window');
@@ -399,6 +423,31 @@ const IndustryCategoryScreen: React.FC = () => {
   const navigateToPosterEditor = useCallback(() => {
     if (!selectedPoster) return;
 
+    // ✅ Safe fallback values for required parameters
+    const finalCategoryName = selectedPoster.category || "INDUSTRY";
+    const finalPosterCategory = selectedPoster.category || "BUSINESS";
+
+    // ✅ GET USER BUSINESS PROFILES
+    const profiles = userBusinessProfiles || [];
+    
+    // ✅ SELECT DEFAULT PROFILE
+    let profileToUse = selectedBusinessProfile;
+    let categoryToUse = selectedBusinessProfile?.category || null;
+    
+    if (!profileToUse && profiles.length > 0) {
+      profileToUse = profiles[0]; // default
+      categoryToUse = profiles[0]?.category || null;
+    }
+
+    console.log('🔧 [INDUSTRY CATEGORY] Navigation params:', {
+      finalCategoryName,
+      finalPosterCategory,
+      posterName: selectedPoster.name,
+      hasProfile: !!profileToUse,
+      profileName: profileToUse?.name,
+      profilesCount: profiles.length
+    });
+
     navigation.navigate('PosterEditor', {
       selectedImage: {
         uri: getHighQualityImageUrl(selectedPoster),
@@ -407,8 +456,15 @@ const IndustryCategoryScreen: React.FC = () => {
       },
       selectedLanguage: selectedLanguage,
       selectedTemplateId: selectedPoster.id,
+      posterCategory: finalPosterCategory,
+      type: "business",
+      categoryName: finalCategoryName,
+
+      // ✅ CRITICAL FIX
+      businessProfile: profileToUse,
+      businessCategory: categoryToUse || undefined,
     });
-  }, [navigation, selectedPoster, selectedLanguage, getHighQualityImageUrl]);
+  }, [navigation, selectedPoster, selectedLanguage, getHighQualityImageUrl, selectedBusinessProfile, userBusinessProfiles]);
 
   const languages = [
     { id: 'all', name: 'All' },

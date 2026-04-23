@@ -571,6 +571,18 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
   const navigateToPosterEditor = useCallback(() => {
     if (!selectedPoster) return;
 
+    // ✅ Safe fallback values for required parameters
+    const finalCategoryName = selectedPoster.category || "BUSINESS";
+    const finalPosterCategory = selectedPoster.category || "BUSINESS";
+    
+    console.log('🔧 [MY BUSINESS POSTER PLAYER] Navigation params:', {
+      finalCategoryName,
+      finalPosterCategory,
+      hasProfile: !!selectedBusinessProfile,
+      profileName: selectedBusinessProfile?.name,
+      profileCategory: selectedBusinessProfile?.category
+    });
+
     navigation.navigate('PosterEditor', {
       selectedImage: {
         uri: getHighQualityImageUrl(selectedPoster),
@@ -579,7 +591,13 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
       },
       selectedLanguage: selectedLanguage,
       selectedTemplateId: selectedPoster.id,
-      selectedBusinessProfile: selectedBusinessProfile,
+      posterCategory: finalPosterCategory,
+      type: "business",
+      categoryName: finalCategoryName,
+
+      // ✅ CRITICAL FIX
+      businessProfile: selectedBusinessProfile,
+      businessCategory: selectedBusinessProfile?.category || undefined,
     });
   }, [navigation, selectedPoster, selectedLanguage, selectedBusinessProfile, getHighQualityImageUrl]);
 

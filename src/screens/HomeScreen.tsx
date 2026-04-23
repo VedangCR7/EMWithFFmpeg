@@ -1168,12 +1168,19 @@ const HomeScreen: React.FC = React.memo(() => {
           getThumbnailUrl={getThumbnailUrl}
           onPress={() => {
             // Handle poster press with proper category context and related posters
+            // Check if this is a business category from search
+            const isBusinessCategoryFromSearch = category.type === 'business';
+            // Check if this is a general category from search
+            const isGeneralCategoryFromSearch = category.type === 'general';
+            
             navigation.navigate('PosterPlayer', {
               selectedTemplateId: poster.id,  // ✅ PRIMARY DATA - ID as source of truth
               selectedPoster: poster,          // ✅ OPTIONAL - UI only
               categoryName: category.name,     // ✅ PASS CATEGORY NAME
               relatedPosters: category.posters, // ✅ PASS RELATED POSTERS FROM SAME CATEGORY
               templateSource: 'search',        // ✅ MARK AS SEARCH FLOW
+              isBusinessCategoryFromSearch,   // ✅ ADD BUSINESS FLAG
+              isGeneralCategoryFromSearch,    // ✅ ADD GENERAL FLAG
             });
           }}
         />

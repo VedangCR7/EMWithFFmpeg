@@ -560,19 +560,29 @@ const PosterPlayerScreen: React.FC = () => {
     calendarDate,
     templateSource,
     type,
+    isBusinessCategoryFromSearch,
+    isGeneralCategoryFromSearch,
   } = route.params;
 
   // ✅ SEARCH FLOW LOCK: Highest priority lock to isolate search flow
   const isSearchFlow = route.params?.templateSource === 'search';
+  
+  // ✅ BUSINESS FROM SEARCH DETECTION: Detect business category from search flow
+  const isBusinessFromSearch = route.params?.isBusinessCategoryFromSearch === true;
+  
+  // ✅ GENERAL FROM SEARCH DETECTION: Detect general category from search flow
+  const isGeneralFromSearch = route.params?.isGeneralCategoryFromSearch === true;
 
   // Add debug log for received parameters
-  console.log("PosterPlayerScreen received params:", {
+  console.log('PosterPlayerScreen received params:', {
     type,
     categoryName,
     templateSource,
     hasSelectedPoster: !!initialPoster,
     hasRelatedPosters: !!initialRelatedPosters?.length,
     relatedPostersCount: initialRelatedPosters?.length || 0,
+    isBusinessFromSearch,
+    isGeneralFromSearch,
     // DEBUG: HomeScreen Software Company specific
     isHomeScreenSoftwareFlow: type === 'business' && categoryName === 'Software Company' && templateSource === 'professional'
   });
@@ -593,6 +603,8 @@ const PosterPlayerScreen: React.FC = () => {
     selectedBusinessCategory: globalBusinessCategory,
     selectedBusinessProfile: globalBusinessProfile,
     selectedBusinessId: globalBusinessId,
+    setSelectedBusinessCategory,
+    setSelectedBusinessProfile,
     isLoading: isContextLoading
   } = useBusinessProfile();
 
@@ -737,6 +749,11 @@ const PosterPlayerScreen: React.FC = () => {
     const templateCategory = (currentPoster?.category || initialPoster?.category || '').trim();
     const profileCategory = globalBusinessProfile?.category || globalBusinessProfile?.subCategory || globalBusinessProfile?.subcategory;
     
+    // ✅ GENERAL FROM SEARCH: Force template source for general search
+    if (isGeneralFromSearch) {
+      return 'template';
+    }
+    
     if (templateSource === 'professional' && templateCategory && templateCategory !== 'General') {
       return 'template';
     }
@@ -756,7 +773,8 @@ const PosterPlayerScreen: React.FC = () => {
     globalBusinessProfile,
     globalBusinessCategory,
     currentPoster?.category,
-    initialPoster?.category
+    initialPoster?.category,
+    isGeneralFromSearch
   ]);
 
   // FLOW SOURCE IDENTIFIER: Normalize flow source for validation
@@ -834,8 +852,8 @@ const PosterPlayerScreen: React.FC = () => {
       if (shouldProtectTemplates) {
         console.log('SINGLE SOURCE: PROTECTING navigation templates from being cleared');
       } else {
-        // Clear templates and filters - PROTECT SEARCH FLOW
-        if (!isSearchFlow) {
+        // Clear templates and filters - PROTECT SEARCH FLOW AND GENERAL FROM SEARCH
+        if (!isSearchFlow && !isGeneralFromSearch) {
           setAllTemplates([]);
           allTemplatesRef.current = [];
         }
@@ -912,6 +930,33 @@ const PosterPlayerScreen: React.FC = () => {
     // Only handle search flow with relatedPosters - FINAL SOURCE
     if (isSearchFlow && route.params?.relatedPosters?.length > 0) {
       console.log('SEARCH FLOW: Setting templates from relatedPosters:', route.params.relatedPosters.length);
+      
+      // 🎯 BUSINESS FROM SEARCH: Apply 6-image limit for business categories
+      if (isBusinessFromSearch) {
+        console.log('BUSINESS FROM SEARCH: Applying 6-image limit');
+        setAllTemplates(route.params.relatedPosters.slice(0, 6));
+        allTemplatesRef.current = route.params.relatedPosters.slice(0, 6);
+        
+        // Set current category properly using activeCategoryRef
+        if (route.params?.categoryName) {
+          activeCategoryRef.current = { type: 'business', value: route.params.categoryName };
+          console.log('BUSINESS SEARCH FLOW: Set active category to:', route.params.categoryName);
+        }
+        return; // Skip other template loading logic
+      }
+      
+      // 🎯 GENERAL FROM SEARCH: Ignore relatedPosters and fetch full category data
+      if (isGeneralFromSearch) {
+        console.log('GENERAL FROM SEARCH: Ignoring relatedPosters, will fetch full category data');
+        // Set current category properly using activeCategoryRef
+        if (route.params?.categoryName) {
+          activeCategoryRef.current = { type: 'greeting', value: route.params.categoryName };
+          console.log('GENERAL SEARCH FLOW: Set active category to:', route.params.categoryName);
+        }
+        return; // Skip other template loading logic - will fetch full data
+      }
+      
+      // 🎯 OTHER SEARCH FLOWS: Use relatedPosters as-is
       setAllTemplates(route.params.relatedPosters);
       allTemplatesRef.current = route.params.relatedPosters;
       
@@ -922,7 +967,156 @@ const PosterPlayerScreen: React.FC = () => {
       }
       return; // Skip other template loading logic
     }
-  }, [isSearchFlow, route.params?.relatedPosters, route.params?.categoryName]);
+  }, [isSearchFlow, route.params?.relatedPosters, route.params?.categoryName, isBusinessFromSearch, isGeneralFromSearch]);
+
+  // ✅ GENERAL FROM SEARCH: Prevent multiple fetches
+  const hasFetchedGeneralRef = useRef(false);
+
+  // ✅ GENERAL FROM SEARCH: Use existing working greeting category fetch
+  useEffect(() => {
+    // Only handle general category from search
+    if (isGeneralFromSearch && route.params?.categoryName && !hasFetchedGeneralRef.current) {
+      console.log('GENERAL FROM SEARCH: Using existing fetchGreetingCategoryTemplates for:', route.params.categoryName);
+      
+      // Prevent multiple fetches
+      hasFetchedGeneralRef.current = true;
+      
+      // ✅ 1. SET CATEGORY FOR EXISTING FLOW
+      const category = route.params.categoryName;
+      
+      // ✅ 2. SET ACTIVE CATEGORY REF (IMPORTANT)
+      activeCategoryRef.current = {
+        type: 'greeting',
+        value: category,
+      };
+      
+      // ✅ 3. RESET BUSINESS STATE FOR GENERAL SEARCH
+      setSelectedBusinessCategory(null);
+      setSelectedBusinessProfile(null);
+      setSelectedSoftwareCategory(null);
+      
+      // ✅ 4. TRIGGER EXISTING WORKING FUNCTION
+      // Call the same comprehensive fetch logic as HomeScreen flow
+      const fetchFullCategoryData = async () => {
+        try {
+          setIsPosterLoading(true);
+          setIsGreetingCategoryLoading(true);
+          
+          // Use the same logic as the working greeting category fetch
+          const posterToMatch = convertedInitialPoster;
+          if (!posterToMatch) {
+            console.warn('⚠️ [GENERAL FROM SEARCH] No poster to match, using category only');
+            // Still proceed with category-based fetch
+          }
+
+          // Normalize category name for search (like the working function does)
+          const normalizedGreetingCategory = category.toLowerCase()
+            .replace(/[&]/g, 'and')
+            .replace(/[^a-z0-9\s]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+          // Generate search variations for better matching (e.g., "hiring/vacancy" -> ["hiring", "vacancy", "hiring vacancy"])
+          const categoryWords = normalizedGreetingCategory.split(/\s+/).filter(word => word.length > 0);
+          const searchVariations = [
+            category.toLowerCase(),
+            normalizedGreetingCategory,
+            ...categoryWords, // Individual words
+            categoryWords.join(' '), // Combined words
+          ].filter((v, i, arr) => arr.indexOf(v) === i); // Remove duplicates
+
+          // 🔥 COMPREHENSIVE API APPROACH: Same as working HomeScreen flow
+          // First, get initial batch quickly (50 items) for fast initial render
+          const initialLimit = 50;
+
+          const searchPromises = [
+            greetingTemplatesService.getTemplates({ category: category, limit: initialLimit }),
+            greetingTemplatesService.searchTemplates(category, undefined, initialLimit),
+            greetingTemplatesService.searchTemplates(normalizedGreetingCategory, undefined, initialLimit),
+            // Also search with individual words for better matching
+            ...searchVariations.slice(0, 3).map(variation =>
+              greetingTemplatesService.searchTemplates(variation, undefined, initialLimit)
+            ),
+          ];
+
+          const searchResults = await Promise.all(searchPromises);
+          const [categoryTemplates, searchTemplatesOriginal, searchTemplatesNormalized, ...variationResults] = searchResults;
+
+          // Combine all search results and remove duplicates efficiently
+          const allSearchResults = [
+            ...searchTemplatesOriginal,
+            ...searchTemplatesNormalized,
+            ...variationResults.flat() // Flatten variation results
+          ];
+          const combinedTemplates = [...categoryTemplates, ...allSearchResults];
+
+          // Use Set for faster duplicate removal
+          const uniqueTemplatesMap = new Map<string, any>();
+          combinedTemplates.forEach(template => {
+            if (template?.id && !uniqueTemplatesMap.has(template.id)) {
+              uniqueTemplatesMap.set(template.id, template);
+            }
+          });
+          const allTemplates = Array.from(uniqueTemplatesMap.values());
+
+          // Optimized filtering: be more lenient to catch all related templates
+          const filteredTemplates = allTemplates.filter(template => {
+            const templateAny = template as any;
+            const templateTags = Array.isArray(templateAny.tags) ? templateAny.tags : [];
+
+            // Quick category match check first (fastest)
+            if (template.category) {
+              const templateCategoryLower = template.category.toLowerCase();
+              // Check if category matches original, normalized, or any word
+              if (templateCategoryLower.includes(category.toLowerCase()) ||
+                templateCategoryLower.includes(normalizedGreetingCategory) ||
+                categoryWords.some(word => templateCategoryLower.includes(word))) {
+                return true;
+              }
+            }
+
+            // Then check tags (only if category didn't match)
+            if (templateTags.length > 0) {
+              return templateTags.some((tag: string) => {
+                if (typeof tag !== 'string') return false;
+                const tagLower = tag.toLowerCase();
+                // Check if tag matches original, normalized, or any word
+                return tagLower.includes(category.toLowerCase()) ||
+                  tagLower.includes(normalizedGreetingCategory) ||
+                  categoryWords.some(word => tagLower.includes(word) || word.includes(tagLower));
+              });
+            }
+
+            return false;
+          });
+
+          // Use filtered templates if available, otherwise fall back to all templates
+          const templatesToUse = filteredTemplates.length > 0
+            ? filteredTemplates.slice(0, initialLimit)
+            : allTemplates.slice(0, initialLimit);
+
+          console.log('GENERAL FROM SEARCH: Fetched', templatesToUse.length, 'templates from comprehensive API');
+          
+          // Set templates if we have valid data
+          if (templatesToUse.length > 0) {
+            setAllTemplates(templatesToUse);
+            allTemplatesRef.current = templatesToUse;
+            console.log('GENERAL FROM SEARCH: Set', templatesToUse.length, 'templates using comprehensive approach');
+          } else {
+            console.warn('GENERAL FROM SEARCH: No templates found, preserving existing data');
+          }
+          
+        } catch (error) {
+          console.error('GENERAL FROM SEARCH: Error in comprehensive fetch:', error);
+        } finally {
+          setIsPosterLoading(false);
+          setIsGreetingCategoryLoading(false);
+        }
+      };
+      
+      fetchFullCategoryData();
+    }
+  }, [isGeneralFromSearch, route.params?.categoryName, convertedInitialPoster]);
 
   // Helper to detect placeholder posters
   const isPlaceholderPoster = useCallback((poster: any): boolean => {
@@ -1104,9 +1298,10 @@ const PosterPlayerScreen: React.FC = () => {
 
   // Determine if we should show subscription message instead of language buttons
   // Only for business categories coming from HomeScreen (templateSource: 'professional' and global business category available)
+  // OR business categories from search
   const shouldShowSubscriptionMessage = useMemo(() => {
-    return templateSource === 'professional' && !!globalBusinessCategory;
-  }, [templateSource, globalBusinessCategory]);
+    return (templateSource === 'professional' && !!globalBusinessCategory) || isBusinessFromSearch;
+  }, [templateSource, globalBusinessCategory, isBusinessFromSearch]);
   const preloadedImagesRef = useRef<Set<string>>(new Set());
 
   // State for service filter specific templates
@@ -1127,8 +1322,8 @@ const PosterPlayerScreen: React.FC = () => {
     if (globalBusinessProfile?.id !== prevProfileRef.current?.id) {
       console.log('🔄 [POSTER PLAYER] Profile changed, forcing template refresh...');
       
-      // Reset template state to trigger re-fetch - PROTECT SEARCH FLOW
-      if (!isSearchFlow) {
+      // Reset template state to trigger re-fetch - PROTECT SEARCH FLOW AND GENERAL FROM SEARCH
+      if (!isSearchFlow && !isGeneralFromSearch) {
         setAllTemplatesState([]);
         allTemplatesRef.current = [];
       }
@@ -1595,9 +1790,9 @@ const PosterPlayerScreen: React.FC = () => {
 
   // Helper function to determine if 6-poster limit should be applied
   const shouldApplySixPosterLimit = useMemo(() => {
-    // Apply 6-poster limit ONLY for Business Categories from HomeScreen
-    return type === 'business' && posterLimit === 6;
-  }, [type, posterLimit]);
+    // Apply 6-poster limit for Business Categories from HomeScreen AND business from search
+    return (type === 'business' && posterLimit === 6) || isBusinessFromSearch;
+  }, [type, posterLimit, isBusinessFromSearch]);
 
   const filteredPosters = useMemo(() => {
 
@@ -1902,9 +2097,15 @@ const PosterPlayerScreen: React.FC = () => {
 
   // Fetch business category posters when global business category is provided
   useEffect(() => {
-    // ✅ SKIP BUSINESS FETCH FOR SEARCH FLOW
-    if (isSearchFlow) {
-      console.log('🚫 [BUSINESS FETCH] Skipped — search flow is active');
+    // ✅ SKIP BUSINESS FETCH FOR SEARCH FLOW (but allow general from search to proceed)
+    if (isSearchFlow && !isGeneralFromSearch) {
+      console.log('🚫 [BUSINESS FETCH] Skipped — search flow is active (not general from search)');
+      return;
+    }
+
+    // ✅ BLOCK BUSINESS FETCH FOR GENERAL FROM SEARCH
+    if (isGeneralFromSearch) {
+      console.log('🚫 [BUSINESS FETCH] Skipped — general from search is active');
       return;
     }
 
@@ -1934,8 +2135,8 @@ const PosterPlayerScreen: React.FC = () => {
     if (isCategoryChanged) {
       console.log('PRODUCTION FIX: Category changed from', prevCategoryRef.current, 'to', globalBusinessCategory, '-> resetting state');
       
-      // SAFE RESET (only internal state, no UI changes) - PROTECT SEARCH FLOW
-      if (!isSearchFlow) {
+      // SAFE RESET (only internal state, no UI changes) - PROTECT SEARCH FLOW AND GENERAL FROM SEARCH
+      if (!isSearchFlow && !isGeneralFromSearch) {
         setAllTemplates([]);
         allTemplatesRef.current = [];
       }
@@ -2127,8 +2328,8 @@ const PosterPlayerScreen: React.FC = () => {
       return;
     }
 
-    // Clear allTemplates immediately to prevent showing old posters in grid - PROTECT SEARCH FLOW
-    if (!isSearchFlow) {
+    // Clear allTemplates immediately to prevent showing old posters in grid - PROTECT SEARCH FLOW AND GENERAL FROM SEARCH
+    if (!isSearchFlow && !isGeneralFromSearch) {
       setAllTemplates([]);
     }
 
@@ -3103,8 +3304,8 @@ const PosterPlayerScreen: React.FC = () => {
       return;
     }
 
-    // Clear allTemplates immediately to prevent showing old posters in grid - PROTECT SEARCH FLOW
-    if (!isSearchFlow) {
+    // Clear allTemplates immediately to prevent showing old posters in grid - PROTECT SEARCH FLOW AND GENERAL FROM SEARCH
+    if (!isSearchFlow && !isGeneralFromSearch) {
       setAllTemplates([]);
     }
     // Reset language to "All" when switching to different calendar date
@@ -4042,6 +4243,43 @@ const PosterPlayerScreen: React.FC = () => {
     console.log(' Current poster ID:', currentPoster?.id);
     console.log(' Current ID state:', currentId);
     
+    // ✅ Safe fallback values
+    const finalCategoryName =
+      route.params?.categoryName ||
+      currentPoster?.category ||
+      activeCategoryRef.current?.value ||
+      null;
+
+    const finalPosterCategory =
+      currentPoster?.category ||
+      route.params?.posterCategory ||
+      posterInfo.category ||
+      "GENERAL";
+
+    // ✅ Ensure profile exists
+    let profileToUse = globalBusinessProfile;
+    let categoryToUse = globalBusinessCategory;
+
+    if (!profileToUse) {
+      const profiles = userBusinessProfiles || [];
+
+      if (profiles.length > 0) {
+        profileToUse = profiles[0];
+        categoryToUse = profiles[0]?.category || null;
+        console.log('🔧 [POSTER PLAYER] Auto-selected default profile for IndustryCategory flow:', profiles[0]?.name);
+      }
+    }
+
+    console.log('🔧 [POSTER PLAYER] Navigation params with fallbacks:', {
+      finalCategoryName,
+      finalPosterCategory,
+      hasProfile: !!profileToUse,
+      profileName: profileToUse?.name,
+      originalCategoryName: categoryName,
+      originalPosterCategory: posterInfo.category
+    });
+
+    // ✅ FINAL NAVIGATION
     navigation.navigate('PosterEditor', {
       selectedImage: {
         uri: getHighQualityImageUrl(currentPoster),
@@ -4051,9 +4289,13 @@ const PosterPlayerScreen: React.FC = () => {
       selectedLanguage: selectedLanguage,
       selectedTemplateId: finalTemplateId,  // Use validated real template ID
       selectedTemplate: JSON.stringify(currentPoster),
-      posterCategory: posterInfo.category,
-      type: type,
-      categoryName: categoryName
+      posterCategory: finalPosterCategory,
+      type: type ?? "general",
+      categoryName: finalCategoryName,
+
+      // ✅ PASS SAFE VALUES (with auto-default)
+      businessProfile: profileToUse ?? null,
+      businessCategory: categoryToUse ?? null,
     });
   }, [navigation, currentPoster, selectedLanguage, getHighQualityImageUrl, type, categoryName, currentId, safeGetPosterInfo]);
 

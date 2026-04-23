@@ -378,6 +378,8 @@ interface PosterEditorScreenProps {
       selectedBusinessProfile?: any;
       type?: "business" | "greeting" | "calendar" | "featured";
       categoryName?: string;
+      businessProfile?: any;
+      businessCategory?: string;
     };
   };
 }
@@ -385,20 +387,33 @@ interface PosterEditorScreenProps {
 const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
   const navigation = useNavigation<NavigationProp<MainStackParamList>>();
   const insets = useSafeAreaInsets();
-  const { selectedImage, selectedLanguage, selectedTemplateId, selectedTemplate: initialTemplate, posterCategory, type, categoryName } = route.params;
+  const { selectedImage, selectedLanguage, selectedTemplateId, selectedTemplate: initialTemplate, posterCategory, type, categoryName, businessProfile, businessCategory } = route.params;
+  
+  // ✅ ADD SAFE FALLBACK
+  const activeBusinessProfile =
+    route.params?.businessProfile ?? selectedBusinessProfile ?? null;
+
+  const activeBusinessCategory =
+    route.params?.businessCategory ?? selectedBusinessCategory ?? null;
   
   // Add verification log for received parameters
   console.log("🎨 PosterEditorScreen received params:", {
     type,
     categoryName,
-    posterCategory
+    posterCategory,
+    receivedBusinessProfile: !!businessProfile,
+    receivedBusinessCategory: !!businessCategory,
+    contextBusinessProfile: !!selectedBusinessProfile,
+    contextBusinessCategory: !!selectedBusinessCategory,
+    finalBusinessProfile: !!activeBusinessProfile,
+    finalBusinessCategory: !!activeBusinessCategory
   });
   const { isSubscribed, checkPremiumAccess, refreshSubscription, isSubscriptionActive } = useSubscription();
   const { isDarkMode, theme } = useTheme();
   const { selectedBusinessProfile, selectedBusinessCategory, selectedBusinessId, isLoading: isContextLoading } = useBusinessProfile();
   
   // Get business subscription status for modal display
-  const businessStatus = selectedBusinessProfile?.businessSubscriptionStatus;
+  const businessStatus = activeBusinessProfile?.businessSubscriptionStatus;
   
   // State for dynamic dimensions to handle orientation changes
   const [dimensions, setDimensions] = useState(() => {
@@ -490,9 +505,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
   
   // Check if the selected business profile has an active subscription
   // CRITICAL FIX: Remove mixed subscription logic - use ONLY business profile subscription status
-  const isActive = selectedBusinessProfile?.subscriptionStatus?.toUpperCase() === "ACTIVE";
-
-  const activeBusinessProfile = selectedBusinessProfile;
+  const isActive = activeBusinessProfile?.subscriptionStatus?.toUpperCase() === "ACTIVE";
 
   // Enforce subscription locking: if business profile is selected but inactive, block usage
   useEffect(() => {
@@ -2686,20 +2699,20 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
             
             // CRITICAL: Business Profile Debug Logging
             console.log("===== BUSINESS PROFILE DEBUG =====");
-            console.log("Selected Business Profile:", selectedBusinessProfile);
-            console.log("Subscription Status:", selectedBusinessProfile?.subscriptionStatus);
+            console.log("Selected Business Profile:", activeBusinessProfile);
+            console.log("Subscription Status:", activeBusinessProfile?.subscriptionStatus);
             console.log("==================================");
             
             // Safe guards - ensure business profile exists
-            if (!selectedBusinessProfile) {
+            if (!activeBusinessProfile) {
               console.log(":x: [POSTER EDITOR] Validation failed - No business profile selected");
               setShowPremiumTemplateModal(true);
               return;
             }
             
-            if (selectedBusinessProfile.subscriptionStatus !== "ACTIVE") {
+            if (activeBusinessProfile.subscriptionStatus !== "ACTIVE") {
               console.log(":x: [POSTER EDITOR] Validation failed - Subscription not active", {
-                subscriptionStatus: selectedBusinessProfile.subscriptionStatus
+                subscriptionStatus: activeBusinessProfile.subscriptionStatus
               });
               setShowPremiumTemplateModal(true);
               return;
@@ -2708,28 +2721,28 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
             // Validate business category if business type
             if (type === "business") {
               console.log(":mag: [POSTER EDITOR] Validating business category", {
-                businessProfileCategory: selectedBusinessProfile.category,
+                businessProfileCategory: activeBusinessProfile?.category,
                 selectedTemplate: selectedTemplate
               });
               
-              // Parse template object to get actual category
+              // Extract template category from selected template
               let templateCategory = null;
               try {
-                const templateObj = typeof selectedTemplate === 'string' ? JSON.parse(selectedTemplate) : selectedTemplate;
-                templateCategory = templateObj?.category || templateObj;
-              } catch (e) {
-                templateCategory = selectedTemplate; // fallback to string value
+                const template = JSON.parse(selectedTemplate || "{}");
+                templateCategory = template.category || template.type || null;
+              } catch (error) {
+                console.error("Error parsing template:", error);
               }
               
               // Business category validation - compare profile category with template category
-              if (!selectedBusinessProfile.category || !templateCategory || selectedBusinessProfile.category.toLowerCase() !== templateCategory.toLowerCase()) {
+              if (!activeBusinessProfile?.category || !templateCategory || activeBusinessProfile.category.toLowerCase() !== templateCategory.toLowerCase()) {
                 console.log(":x: [POSTER EDITOR] Validation failed - Business category mismatch", {
-                  businessProfileCategory: selectedBusinessProfile.category,
+                  businessProfileCategory: activeBusinessProfile?.category,
                   templateCategory: templateCategory
                 });
                 setCategoryData({
                   templateCategory,
-                  businessCategory: selectedBusinessProfile.category
+                  businessCategory: activeBusinessProfile?.category
                 });
                 setShowCategoryAccessModal(true);
                 return;
@@ -2737,13 +2750,13 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
             }
             
             // Strict subscription validation using only business profile subscription status
-            if (selectedBusinessProfile.subscriptionStatus !== "ACTIVE") {
+            if (activeBusinessProfile.subscriptionStatus !== "ACTIVE") {
               console.log(":x: [POSTER EDITOR] Access Denied: Subscription inactive", {
-                subscriptionStatus: selectedBusinessProfile.subscriptionStatus
+                subscriptionStatus: activeBusinessProfile.subscriptionStatus
               });
               Alert.alert(
                 "Subscription Required",
-                `Your business profile subscription is ${selectedBusinessProfile.subscriptionStatus}. Please activate your subscription to access this feature.`,
+                `Your business profile subscription is ${activeBusinessProfile.subscriptionStatus}. Please activate your subscription to access this feature.`,
                 [
                   { text: "Cancel", style: "cancel" },
                   { text: "Upgrade", onPress: () => navigation.navigate('BusinessProfiles' as any) }
