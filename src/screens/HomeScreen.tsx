@@ -2997,6 +2997,55 @@ const HomeScreen: React.FC = React.memo(() => {
         const matchingBusinessCategories = filterCategories(businessCategories, searchQuery);
         const matchingGeneralCategories = filterCategories(filteredGreetingCategoriesList, searchQuery);
 
+        // ✅ CREATE SEARCHABLE GREETING CATEGORIES
+        const greetingSearchCategories: SearchCategoryResult[] = [
+          {
+            id: 'business_ethics',
+            name: 'Business Ethics',
+            type: 'general',
+            posters: businessEthicsTemplates.slice(0, 10),
+          },
+          {
+            id: 'success_mindset',
+            name: 'Success Mindset',
+            type: 'general',
+            posters: successMindsetTemplates.slice(0, 10),
+          },
+          {
+            id: 'social_media_growth',
+            name: 'Social Media Growth',
+            type: 'general',
+            posters: socialMediaGrowthTemplates.slice(0, 10),
+          },
+          {
+            id: 'business_legend_quote',
+            name: 'Business Legend Quote',
+            type: 'general',
+            posters: businessLegendQuoteTemplates.slice(0, 10),
+          },
+          {
+            id: 'business_marketing_tips',
+            name: 'Business Marketing Tips',
+            type: 'general',
+            posters: businessMarketingTipsTemplates.slice(0, 10),
+          },
+          {
+            id: 'money_and_finance',
+            name: 'Money and Finance',
+            type: 'general',
+            posters: moneyAndFinanceTemplates.slice(0, 10),
+          },
+          {
+            id: 'business_quotes',
+            name: 'Business Quotes',
+            type: 'general',
+            posters: businessQuotesTemplates.slice(0, 10),
+          },
+        ];
+
+        // ✅ APPLY SAME FILTER LOGIC TO GREETING CATEGORIES
+        const filteredGreetingCategories = filterCategories(greetingSearchCategories, searchQuery);
+
         // Fetch posters for each matched category
         const fetchPostersForCategories = async () => {
           // Allow ALL matching categories (no limit)
@@ -3050,7 +3099,8 @@ const HomeScreen: React.FC = React.memo(() => {
           const validBusinessResults = businessResults.filter(result => result !== null);
           const validGeneralResults = generalResults.filter(result => result !== null);
 
-          return [...validBusinessResults, ...validGeneralResults];
+          // ✅ MERGE WITH EXISTING RESULTS
+          return [...validBusinessResults, ...validGeneralResults, ...filteredGreetingCategories];
         };
 
         const results = await fetchPostersForCategories();
@@ -3080,7 +3130,7 @@ const HomeScreen: React.FC = React.memo(() => {
     }, 500); // 500ms debounce for better performance
 
     return () => clearTimeout(timeoutId);
-  }, [searchQuery, businessCategories, filteredGreetingCategoriesList, filterCategories]);
+  }, [searchQuery, businessCategories, filteredGreetingCategoriesList, filterCategories, businessEthicsTemplates, successMindsetTemplates, socialMediaGrowthTemplates, businessLegendQuoteTemplates, businessMarketingTipsTemplates, moneyAndFinanceTemplates, businessQuotesTemplates]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
