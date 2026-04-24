@@ -705,6 +705,75 @@ const getOptimizedCloudinaryUrl = (url: string, width: number = 200): string => 
   return url;
 };
 
+// RecentSearchList Component
+interface RecentSearchListProps {
+  recentSearches: string[];
+  onSelectSearch: (search: string) => void;
+  onClearAll: () => void;
+  theme: any;
+}
+
+const RecentSearchList: React.FC<RecentSearchListProps> = React.memo(({
+  recentSearches,
+  onSelectSearch,
+  onClearAll,
+  theme
+}) => {
+  {__DEV__ && console.log('🔍 RecentSearchList rendered with:', { recentSearches, length: recentSearches.length })}
+  
+  if (recentSearches.length === 0) {
+    return (
+      <View style={[styles.recentSearchesContainer, { backgroundColor: theme.colors.cardBackground }]}>
+        <View style={styles.recentSearchesHeader}>
+          <Text style={[styles.recentSearchesTitle, { color: theme.colors.text }]}>
+            Recent Searches
+          </Text>
+        </View>
+        <Text style={[styles.recentSearchText, { color: theme.colors.textSecondary, textAlign: 'center', paddingVertical: 16 }]}>
+          No recent searches yet
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.recentSearchesContainer, { backgroundColor: theme.colors.cardBackground }]}>
+      <View style={styles.recentSearchesHeader}>
+        <Text style={[styles.recentSearchesTitle, { color: theme.colors.text }]}>
+          Recent Searches
+        </Text>
+        <TouchableOpacity
+          onPress={onClearAll}
+          style={styles.clearAllButton}
+        >
+          <Text style={[styles.clearAllText, { color: theme.colors.primary }]}>
+            Clear All
+          </Text>
+        </TouchableOpacity>
+      </View>
+      <View style={styles.recentSearchesList}>
+        {recentSearches.map((search, index) => (
+          <TouchableOpacity
+            key={`${search}-${index}`}
+            style={[styles.recentSearchItem, { borderBottomColor: theme.colors.border }]}
+            onPress={() => onSelectSearch(search)}
+          >
+            <Icon
+              name="history"
+              size={16}
+              color={theme.colors.textSecondary}
+              style={styles.recentSearchIcon}
+            />
+            <Text style={[styles.recentSearchText, { color: theme.colors.text }]}>
+              {search}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+});
+
 const HomeScreen: React.FC = React.memo(() => {
   const { isDarkMode, theme } = useTheme();
   const { isSubscriptionActive, refreshSubscription } = useSubscription();
@@ -729,6 +798,10 @@ const HomeScreen: React.FC = React.memo(() => {
   const [isSearchBarVisible, setIsSearchBarVisible] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchCategoryResult[]>([]);
+  
+  // Recent searches state
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [isSearchInputFocused, setIsSearchInputFocused] = useState(false);
 
   // Business categories state
   const [businessCategories, setBusinessCategories] = useState<BusinessCategory[]>([]);
@@ -3111,6 +3184,11 @@ const HomeScreen: React.FC = React.memo(() => {
         }
 
         setSearchResults(results);
+        
+        // Save recent search when results are successfully fetched
+        if (results.length > 0) {
+          saveRecentSearch(searchQuery);
+        }
 
       } catch (error) {
         // Check if this is still the latest request
@@ -3131,6 +3209,68 @@ const HomeScreen: React.FC = React.memo(() => {
 
     return () => clearTimeout(timeoutId);
   }, [searchQuery, businessCategories, filteredGreetingCategoriesList, filterCategories, businessEthicsTemplates, successMindsetTemplates, socialMediaGrowthTemplates, businessLegendQuoteTemplates, businessMarketingTipsTemplates, moneyAndFinanceTemplates, businessQuotesTemplates]);
+
+  // Recent searches AsyncStorage functions
+  const loadRecentSearches = useCallback(async () => {
+    try {
+      {__DEV__ && console.log('🔍 Loading recent searches from AsyncStorage...')}
+      const stored = await AsyncStorage.getItem('RECENT_SEARCHES');
+      {__DEV__ && console.log('🔍 AsyncStorage result:', stored)}
+      if (stored) {
+        const searches = JSON.parse(stored);
+        const validSearches = Array.isArray(searches) ? searches : [];
+        {__DEV__ && console.log('🔍 Setting recent searches:', validSearches)}
+        setRecentSearches(validSearches);
+      } else {
+        {__DEV__ && console.log('🔍 No recent searches found in AsyncStorage')}
+        setRecentSearches([]);
+      }
+    } catch (error) {
+      console.warn('Failed to load recent searches:', error);
+      setRecentSearches([]);
+    }
+  }, []);
+
+  const saveRecentSearch = useCallback(async (query: string) => {
+    if (!query || query.trim().length < 3) return;
+    
+    const trimmedQuery = query.trim();
+    
+    try {
+      setRecentSearches(prev => {
+        const filtered = prev.filter(search => search !== trimmedQuery);
+        const updated = [trimmedQuery, ...filtered].slice(0, 5);
+        
+        AsyncStorage.setItem('RECENT_SEARCHES', JSON.stringify(updated))
+          .catch(error => console.warn('Failed to save recent searches:', error));
+        
+        return updated;
+      });
+    } catch (error) {
+      console.warn('Failed to save recent search:', error);
+    }
+  }, []);
+
+  const clearRecentSearches = useCallback(async () => {
+    try {
+      await AsyncStorage.removeItem('RECENT_SEARCHES');
+      setRecentSearches([]);
+    } catch (error) {
+      console.warn('Failed to clear recent searches:', error);
+    }
+  }, []);
+
+  const selectRecentSearch = useCallback((search: string) => {
+    {__DEV__ && console.log('🔍 Selected recent search:', search)}
+    setSearchQuery(search);
+    setIsSearchInputFocused(false);
+    // The search will be triggered automatically by the useEffect that watches searchQuery
+  }, []);
+
+  // Load recent searches on component mount
+  useEffect(() => {
+    loadRecentSearches();
+  }, [loadRecentSearches]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -3401,6 +3541,7 @@ const HomeScreen: React.FC = React.memo(() => {
         setSearchQuery('');
         setIsSearching(false);
         setSearchResults([]);
+        setIsSearchInputFocused(false);
         return false;
       }
     });
@@ -5352,6 +5493,14 @@ const HomeScreen: React.FC = React.memo(() => {
                 autoFocus={true}
                 returnKeyType="search"
                 blurOnSubmit={true}
+                onFocus={() => {
+                  {__DEV__ && console.log('🔍 Search input focused')}
+                  setIsSearchInputFocused(true);
+                }}
+                onBlur={() => {
+                  {__DEV__ && console.log('🔍 Search input blurred')}
+                  setIsSearchInputFocused(false);
+                }}
               />
               {searchQuery.length > 0 && (
                 <TouchableOpacity
@@ -5613,6 +5762,7 @@ const HomeScreen: React.FC = React.memo(() => {
           </View> */}
 
 
+          
           
           {/* Unified Search Results - Shown only when searching */}
           {renderSearchResults()}
@@ -6543,6 +6693,35 @@ const HomeScreen: React.FC = React.memo(() => {
         </View>
       </Modal>
 
+      {/* Recent Searches Overlay - Shown when search input is focused and empty */}
+      {isSearchBarVisible && isSearchInputFocused && searchQuery.trim() === '' && (
+        <>
+          {__DEV__ && console.log('🔍 Recent Searches Debug:', {
+            isSearchBarVisible,
+            isSearchInputFocused,
+            searchQuery: searchQuery.trim(),
+            recentSearchesLength: recentSearches.length,
+            recentSearches
+          })}
+          <TouchableOpacity 
+            style={styles.recentSearchesOverlay}
+            activeOpacity={1}
+            onPress={() => setIsSearchInputFocused(false)}
+          >
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={e => e.stopPropagation()}
+            >
+              <RecentSearchList
+                recentSearches={recentSearches}
+                onSelectSearch={selectRecentSearch}
+                onClearAll={clearRecentSearches}
+                theme={theme}
+              />
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </>
+      )}
 
     </SafeAreaView>
   );
@@ -7839,6 +8018,65 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(14),
     fontWeight: '600',
     marginBottom: moderateScale(6),
+  },
+
+  // Recent Searches Styles
+  recentSearchesOverlay: {
+    position: 'absolute',
+    top: moderateScale(100), // Position below header
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)', // Semi-transparent backdrop
+  },
+  recentSearchesContainer: {
+    marginHorizontal: moderateScale(16),
+    marginTop: moderateScale(8),
+    borderRadius: moderateScale(12),
+    padding: moderateScale(16),
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: moderateScale(2),
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: moderateScale(4),
+    elevation: 3,
+  },
+  recentSearchesHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: moderateScale(12),
+  },
+  recentSearchesTitle: {
+    fontSize: moderateScale(14),
+    fontWeight: '600',
+  },
+  clearAllButton: {
+    paddingVertical: moderateScale(4),
+    paddingHorizontal: moderateScale(8),
+  },
+  clearAllText: {
+    fontSize: moderateScale(12),
+    fontWeight: '500',
+  },
+  recentSearchesList: {
+    gap: moderateScale(2),
+  },
+  recentSearchItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: moderateScale(8),
+    paddingHorizontal: moderateScale(4),
+    borderBottomWidth: 1,
+  },
+  recentSearchIcon: {
+    marginRight: moderateScale(12),
+  },
+  recentSearchText: {
+    fontSize: moderateScale(14),
+    flex: 1,
   },
 
 });
