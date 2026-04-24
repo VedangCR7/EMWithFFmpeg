@@ -165,7 +165,7 @@ const PrivacyPolicyScreen = () => {
   });
 
   const getBulletStyle = () => ({
-    marginRight: dynamicModerateScale(4),
+    marginRight: dynamicModerateScale(8), // Updated to 8-10 spacing requirement
   });
 
   // Hoverable Card Component with professional smooth animations and gradient border
@@ -378,25 +378,25 @@ const PrivacyPolicyScreen = () => {
       backgroundColor: 'rgba(102, 126, 234, 0.08)',
       borderLeftWidth: 2,
       borderLeftColor: '#667eea',
-      alignItems: 'center',
+      alignItems: 'flex-start', // Changed from 'center' to 'flex-start' for better alignment with text
       // Dynamic spacing applied inline
     },
     bullet: {
-      fontSize: moderateScale(isTablet ? 9 : 8), // Fixed text size
-      color: '#667eea',
-      fontWeight: '600',
-      lineHeight: moderateScale(isTablet ? 9 * 1.45 : 8 * 1.45),
-      includeFontPadding: false,
-      paddingBottom: moderateScale(3),
+      width: moderateScale(isTablet ? 8 : 7), // Custom bullet size: 7-9
+      height: moderateScale(isTablet ? 8 : 7), // Custom bullet size: 7-9
+      borderRadius: moderateScale(isTablet ? 4 : 3.5), // Half of size for circle
+      backgroundColor: '#333', // Dark color for visibility
+      marginTop: moderateScale(isTablet ? 5 : 4), // Further adjusted to align with even larger text
       // Dynamic spacing applied inline
     },
     bulletText: {
-      fontSize: moderateScale(isTablet ? 8 : 7.5), // Fixed text size
-      lineHeight: moderateScale(isTablet ? 8 * 1.4 : 7.5 * 1.4),
+      fontSize: moderateScale(isTablet ? 11 : 10), // Further increased to 11/10 for enhanced readability
+      lineHeight: moderateScale(isTablet ? 11 * 1.4 : 10 * 1.4), // Adjusted line height to match new font size
       fontWeight: '400', // Explicitly set to normal weight for content
       flex: 1,
       includeFontPadding: false,
       paddingBottom: moderateScale(2),
+      // Top padding removed - View-based bullets align properly
     },
     highlight: {
       fontWeight: '400', // Explicitly set to normal weight for content subheadings
@@ -423,9 +423,9 @@ const PrivacyPolicyScreen = () => {
       // Dynamic spacing applied inline
     },
     contactText: {
-      fontSize: moderateScale(isTablet ? 8 : 7.5), // Fixed text size
+      fontSize: moderateScale(isTablet ? 11 : 10), // Further increased to 11/10 for enhanced readability
       textAlign: 'center',
-      lineHeight: moderateScale(isTablet ? 8 * 1.4 : 7.5 * 1.4),
+      lineHeight: moderateScale(isTablet ? 11 * 1.4 : 10 * 1.4), // Adjusted line height to match new font size
       fontWeight: '400', // Explicitly set to normal weight for content
       includeFontPadding: false,
       paddingBottom: moderateScale(2),
@@ -435,8 +435,8 @@ const PrivacyPolicyScreen = () => {
       color: '#667eea',
       textDecorationLine: 'underline',
       fontWeight: '700',
-      fontSize: moderateScale(isTablet ? 10 : 9), // Fixed text size
-      lineHeight: moderateScale(isTablet ? 10 * 1.45 : 9 * 1.45),
+      fontSize: moderateScale(isTablet ? 13 : 12), // Further increased to 13/12 for enhanced readability
+      lineHeight: moderateScale(isTablet ? 13 * 1.45 : 12 * 1.45), // Adjusted line height to match new font size
       includeFontPadding: false,
     },
     heroSection: {
@@ -635,7 +635,7 @@ const PrivacyPolicyScreen = () => {
               paddingHorizontal: dynamicModerateScale(6),
               borderRadius: dynamicModerateScale(6),
             }]}>
-              <Text style={[styles.bullet, { marginRight: dynamicModerateScale(4) }]}>•</Text>
+              <View style={[styles.bullet, { marginRight: dynamicModerateScale(8) }]} />
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>Name and email address</Text>
             </View>
             <View style={[styles.bulletPoint, {
@@ -645,7 +645,7 @@ const PrivacyPolicyScreen = () => {
               paddingHorizontal: dynamicModerateScale(6),
               borderRadius: dynamicModerateScale(6),
             }]}>
-              <Text style={[styles.bullet, { marginRight: dynamicModerateScale(4) }]}>•</Text>
+              <View style={[styles.bullet, { marginRight: dynamicModerateScale(8) }]} />
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>Profile information and preferences</Text>
             </View>
             <View style={[styles.bulletPoint, {
@@ -655,7 +655,7 @@ const PrivacyPolicyScreen = () => {
               paddingHorizontal: dynamicModerateScale(6),
               borderRadius: dynamicModerateScale(6),
             }]}>
-              <Text style={[styles.bullet, { marginRight: dynamicModerateScale(4) }]}>•</Text>
+              <View style={[styles.bullet, { marginRight: dynamicModerateScale(8) }]} />
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>Payment and billing information (processed securely through Razorpay)</Text>
             </View>
 
@@ -675,7 +675,7 @@ const PrivacyPolicyScreen = () => {
               paddingHorizontal: dynamicModerateScale(6),
               borderRadius: dynamicModerateScale(6),
             }]}>
-              <Text style={[styles.bullet, { marginRight: dynamicModerateScale(4) }]}>•</Text>
+              <View style={[styles.bullet, { marginRight: dynamicModerateScale(8) }]} />
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>App usage patterns and features accessed</Text>
             </View>
             <View style={[styles.bulletPoint, {
@@ -685,7 +685,7 @@ const PrivacyPolicyScreen = () => {
               paddingHorizontal: dynamicModerateScale(6),
               borderRadius: dynamicModerateScale(6),
             }]}>
-              <Text style={[styles.bullet, { marginRight: dynamicModerateScale(4) }]}>•</Text>
+              <View style={[styles.bullet, { marginRight: dynamicModerateScale(8) }]} />
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>Device information (model, operating system, unique identifiers)</Text>
             </View>
             <View style={[styles.bulletPoint, {
@@ -695,7 +695,7 @@ const PrivacyPolicyScreen = () => {
               paddingHorizontal: dynamicModerateScale(6),
               borderRadius: dynamicModerateScale(6),
             }]}>
-              <Text style={[styles.bullet, { marginRight: dynamicModerateScale(4) }]}>•</Text>
+              <View style={[styles.bullet, { marginRight: dynamicModerateScale(8) }]} />
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>Crash reports and performance data</Text>
             </View>
 
@@ -715,7 +715,7 @@ const PrivacyPolicyScreen = () => {
               paddingHorizontal: dynamicModerateScale(6),
               borderRadius: dynamicModerateScale(6),
             }]}>
-              <Text style={[styles.bullet, { marginRight: dynamicModerateScale(4) }]}>•</Text>
+              <View style={[styles.bullet, { marginRight: dynamicModerateScale(8) }]} />
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>Business profiles and marketing content you create</Text>
             </View>
             <View style={[styles.bulletPoint, {
@@ -725,7 +725,7 @@ const PrivacyPolicyScreen = () => {
               paddingHorizontal: dynamicModerateScale(6),
               borderRadius: dynamicModerateScale(6),
             }]}>
-              <Text style={[styles.bullet, { marginRight: dynamicModerateScale(4) }]}>•</Text>
+              <View style={[styles.bullet, { marginRight: dynamicModerateScale(8) }]} />
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>Images, videos, and other media you upload</Text>
             </View>
           </HoverableCard>
@@ -751,27 +751,27 @@ const PrivacyPolicyScreen = () => {
               We use the information we collect to:
             </Text>
             <View style={[styles.bulletPoint, getBulletPointStyle()]}>
-              <Text style={[styles.bullet, getBulletStyle()]}>•</Text>
+              <View style={[styles.bullet, getBulletStyle()]} />
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>Provide, maintain, and improve our Service</Text>
             </View>
             <View style={[styles.bulletPoint, getBulletPointStyle()]}>
-              <Text style={[styles.bullet, getBulletStyle()]}>•</Text>
+              <View style={[styles.bullet, getBulletStyle()]} />
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>Process payments and manage subscriptions</Text>
             </View>
             <View style={[styles.bulletPoint, getBulletPointStyle()]}>
-              <Text style={[styles.bullet, getBulletStyle()]}>•</Text>
+              <View style={[styles.bullet, getBulletStyle()]} />
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>Send you important updates and notifications</Text>
             </View>
             <View style={[styles.bulletPoint, getBulletPointStyle()]}>
-              <Text style={[styles.bullet, getBulletStyle()]}>•</Text>
+              <View style={[styles.bullet, getBulletStyle()]} />
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>Provide customer support and respond to inquiries</Text>
             </View>
             <View style={[styles.bulletPoint, getBulletPointStyle()]}>
-              <Text style={[styles.bullet, getBulletStyle()]}>•</Text>
+              <View style={[styles.bullet, getBulletStyle()]} />
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>Analyze usage patterns to enhance user experience</Text>
             </View>
             <View style={[styles.bulletPoint, getBulletPointStyle()]}>
-              <Text style={[styles.bullet, getBulletStyle()]}>•</Text>
+              <View style={[styles.bullet, getBulletStyle()]} />
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>Ensure security and prevent fraud</Text>
             </View>
           </HoverableCard>
@@ -797,19 +797,19 @@ const PrivacyPolicyScreen = () => {
               We do not sell, trade, or otherwise transfer your personal information to third parties, except:
             </Text>
             <View style={[styles.bulletPoint, getBulletPointStyle()]}>
-              <Text style={[styles.bullet, getBulletStyle()]}>•</Text>
+              <View style={[styles.bullet, getBulletStyle()]} />
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>With payment processors (Razorpay) for transaction processing</Text>
             </View>
             <View style={[styles.bulletPoint, getBulletPointStyle()]}>
-              <Text style={[styles.bullet, getBulletStyle()]}>•</Text>
+              <View style={[styles.bullet, getBulletStyle()]} />
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>With cloud service providers for data storage and processing</Text>
             </View>
             <View style={[styles.bulletPoint, getBulletPointStyle()]}>
-              <Text style={[styles.bullet, getBulletStyle()]}>•</Text>
+              <View style={[styles.bullet, getBulletStyle()]} />
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>When required by law or to protect our rights and safety</Text>
             </View>
             <View style={[styles.bulletPoint, getBulletPointStyle()]}>
-              <Text style={[styles.bullet, getBulletStyle()]}>•</Text>
+              <View style={[styles.bullet, getBulletStyle()]} />
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>With your explicit consent</Text>
             </View>
           </HoverableCard>
@@ -836,19 +836,19 @@ const PrivacyPolicyScreen = () => {
               access, alteration, disclosure, or destruction. This includes:
             </Text>
             <View style={[styles.bulletPoint, getBulletPointStyle()]}>
-              <Text style={[styles.bullet, getBulletStyle()]}>•</Text>
+              <View style={[styles.bullet, getBulletStyle()]} />
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>Encryption of sensitive data in transit and at rest</Text>
             </View>
             <View style={[styles.bulletPoint, getBulletPointStyle()]}>
-              <Text style={[styles.bullet, getBulletStyle()]}>•</Text>
+              <View style={[styles.bullet, getBulletStyle()]} />
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>Secure authentication and authorization systems</Text>
             </View>
             <View style={[styles.bulletPoint, getBulletPointStyle()]}>
-              <Text style={[styles.bullet, getBulletStyle()]}>•</Text>
+              <View style={[styles.bullet, getBulletStyle()]} />
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>Regular security audits and updates</Text>
             </View>
             <View style={[styles.bulletPoint, getBulletPointStyle()]}>
-              <Text style={[styles.bullet, getBulletStyle()]}>•</Text>
+              <View style={[styles.bullet, getBulletStyle()]} />
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>Access controls and monitoring</Text>
             </View>
           </HoverableCard>
@@ -874,19 +874,19 @@ const PrivacyPolicyScreen = () => {
               You have the right to:
             </Text>
             <View style={[styles.bulletPoint, getBulletPointStyle()]}>
-              <Text style={[styles.bullet, getBulletStyle()]}>•</Text>
+              <View style={[styles.bullet, getBulletStyle()]} />
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>Access and update your personal information</Text>
             </View>
             <View style={[styles.bulletPoint, getBulletPointStyle()]}>
-              <Text style={[styles.bullet, getBulletStyle()]}>•</Text>
+              <View style={[styles.bullet, getBulletStyle()]} />
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>Opt-out of marketing communications</Text>
             </View>
             <View style={[styles.bulletPoint, getBulletPointStyle()]}>
-              <Text style={[styles.bullet, getBulletStyle()]}>•</Text>
+              <View style={[styles.bullet, getBulletStyle()]} />
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>Request a copy of your data</Text>
             </View>
             <View style={[styles.bulletPoint, getBulletPointStyle()]}>
-              <Text style={[styles.bullet, getBulletStyle()]}>•</Text>
+              <View style={[styles.bullet, getBulletStyle()]} />
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>Withdraw consent for data processing</Text>
             </View>
           </HoverableCard>
@@ -936,20 +936,19 @@ const PrivacyPolicyScreen = () => {
               Our Service integrates with third-party services including:
             </Text>
             <View style={[styles.bulletPoint, getBulletPointStyle()]}>
-              <Text style={[styles.bullet, getBulletStyle()]}>•</Text>
+              <View style={[styles.bullet, getBulletStyle()]} />
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>Razorpay for payment processing</Text>
             </View>
             <View style={[styles.bulletPoint, getBulletPointStyle()]}>
-              <Text style={[styles.bullet, getBulletStyle()]}>•</Text>
+              <View style={[styles.bullet, getBulletStyle()]} />
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>Google Fonts for typography</Text>
             </View>
             <View style={[styles.bulletPoint, getBulletPointStyle()]}>
-              <Text style={[styles.bullet, getBulletStyle()]}>•</Text>
+              <View style={[styles.bullet, getBulletStyle()]} />
               <Text style={[styles.bulletText, { color: theme.colors.text }]}>Cloud storage providers</Text>
             </View>
-            <Text style={[styles.sectionContent, getContentStyle(), { 
+            <Text style={[styles.bulletText, { 
               color: theme.colors.text,
-              lineHeight: isTabletDevice ? dynamicModerateScale(14) : dynamicModerateScale(13),
               paddingBottom: dynamicModerateScale(1),
             }]}>
               These services have their own privacy policies, which we encourage you to review.

@@ -999,9 +999,15 @@ const PosterPlayerScreen: React.FC = () => {
         value: category,
       };
       
-      // ✅ 3. RESET BUSINESS STATE FOR GENERAL SEARCH
+      // ✅ 3. RESET BUSINESS STATE FOR GENERAL SEARCH (PRESERVE BUSINESS PROFILE)
+      console.log('🔍 [GENERAL SEARCH] Preserving business profile:', {
+        currentProfile: globalBusinessProfile?.name,
+        profileId: globalBusinessProfile?.id,
+        category: category
+      });
       setSelectedBusinessCategory(null);
-      setSelectedBusinessProfile(null);
+      // ❌ DO NOT RESET BUSINESS PROFILE - Preserve for PosterEditorScreen
+      // setSelectedBusinessProfile(null);
       setSelectedSoftwareCategory(null);
       
       // ✅ 4. TRIGGER EXISTING WORKING FUNCTION
@@ -3799,10 +3805,10 @@ const PosterPlayerScreen: React.FC = () => {
       const templatesWithLanguages = allTemplates.map(t => mergeTemplateLanguages(t));
 
       setCurrentPoster(previousPoster => {
-        // PROTECTION: Don't override if we already have a real poster from API
-        if (currentPoster?.id && !currentPoster.id.startsWith('greeting_category_')) {
-          console.log(' [ALL TEMPLATES] Skipping override - real poster already set:', currentPoster.id);
-          return;
+        // ✅ FIXED: Allow language changes - only protect if user manually selected poster via swipe/click
+        if (currentPoster?.id && !currentPoster.id.startsWith('greeting_category_') && userSelectedPosterRef.current) {
+          console.log(' [ALL TEMPLATES] Skipping override - user manually selected poster:', currentPoster.id);
+          return previousPoster;
         }
 
         const resolvedPrevious = previousPoster
@@ -3810,8 +3816,8 @@ const PosterPlayerScreen: React.FC = () => {
           : null;
 
         // CRITICAL: Preserve poster if it was set by greeting fetch (real backend poster)
-        // Don't override with first template if we already have a real poster
-        if (previousPoster && !previousPoster.id.startsWith('greeting_category_') && !previousPoster.id.startsWith('business_category_')) {
+        // Don't override with first template if we already have a real poster AND user didn't manually select language
+        if (previousPoster && !previousPoster.id.startsWith('greeting_category_') && !previousPoster.id.startsWith('business_category_') && !userManuallySelectedLanguageRef.current) {
           console.log(' [ALL TEMPLATES] Preserving real poster from greeting fetch:', previousPoster.id);
           return resolvedPrevious || previousPoster;
         }
@@ -3850,10 +3856,10 @@ const PosterPlayerScreen: React.FC = () => {
     const templatesWithLanguages = allTemplates.map(t => mergeTemplateLanguages(t));
 
     setCurrentPoster(previousPoster => {
-      // PROTECTION: Don't override if we already have a real poster from API
-      if (currentPoster?.id && !currentPoster.id.startsWith('greeting_category_')) {
-        console.log(' [LANGUAGE FILTER] Skipping override - real poster already set:', currentPoster.id);
-        return;
+      // ✅ FIXED: Allow language changes - only protect if user manually selected poster via swipe/click
+      if (currentPoster?.id && !currentPoster.id.startsWith('greeting_category_') && userSelectedPosterRef.current) {
+        console.log(' [LANGUAGE FILTER] Skipping override - user manually selected poster:', currentPoster.id);
+        return previousPoster;
       }
 
       const resolvedPrevious = previousPoster
@@ -3861,8 +3867,8 @@ const PosterPlayerScreen: React.FC = () => {
         : null;
 
       // CRITICAL: Preserve poster if it was set by greeting fetch (real backend poster)
-      // Don't override with language-filtered template if we already have a real poster
-      if (previousPoster && !previousPoster.id.startsWith('greeting_category_') && !previousPoster.id.startsWith('business_category_')) {
+      // Don't override with language-filtered template if we already have a real poster AND user didn't manually select language
+      if (previousPoster && !previousPoster.id.startsWith('greeting_category_') && !previousPoster.id.startsWith('business_category_') && !userManuallySelectedLanguageRef.current) {
         console.log(' [LANGUAGE FILTER] Preserving real poster from greeting fetch:', previousPoster.id);
         // Only preserve if it matches the language filter, otherwise allow language override
         if (resolvedPrevious && templateContainsLanguage(resolvedPrevious, selectedLanguage)) {
@@ -4294,6 +4300,16 @@ const PosterPlayerScreen: React.FC = () => {
     let profileToUse = globalBusinessProfile;
     let categoryToUse = globalBusinessCategory;
 
+    // 🔍 [BUSINESS PROFILE] Log profile being passed to PosterEditor
+    console.log('🔍 [POSTER PLAYER] Passing business profile to PosterEditor:', {
+      profileName: profileToUse?.name,
+      profileId: profileToUse?.id,
+      categoryName: categoryToUse,
+      isGeneralFromSearch,
+      templateSource,
+      currentPosterCategory: currentPoster?.category
+    });
+
     if (!profileToUse) {
       const profiles = userBusinessProfiles || [];
 
@@ -4324,14 +4340,14 @@ const PosterPlayerScreen: React.FC = () => {
       selectedTemplateId: finalTemplateId,  // Use validated real template ID
       selectedTemplate: JSON.stringify(currentPoster),
       posterCategory: finalPosterCategory,
-      type: type ?? "general",
+      type: type ? type : (isBusinessCategoryFromSearch ? "business" : "general"),
       categoryName: finalCategoryName,
 
       // ✅ PASS SAFE VALUES (with auto-default)
       businessProfile: profileToUse ?? null,
       businessCategory: categoryToUse ?? null,
     });
-  }, [navigation, currentPoster, selectedLanguage, getHighQualityImageUrl, type, categoryName, currentId, safeGetPosterInfo]);
+  }, [navigation, currentPoster, selectedLanguage, getHighQualityImageUrl, type, categoryName, currentId, safeGetPosterInfo, isBusinessCategoryFromSearch]);
 
   const handleNextPress = useCallback(() => {
     // ✅ SAFETY: Use ID as primary validation

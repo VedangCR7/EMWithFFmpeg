@@ -459,6 +459,7 @@ const IndustryCategoryScreen: React.FC = () => {
       posterCategory: finalPosterCategory,
       type: "business",
       categoryName: finalCategoryName,
+      source: "IndustryCategoryScreen", // ✅ ADD SOURCE IDENTIFIER
 
       // ✅ CRITICAL FIX
       businessProfile: profileToUse,

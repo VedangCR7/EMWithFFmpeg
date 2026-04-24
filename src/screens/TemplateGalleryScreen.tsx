@@ -19,6 +19,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MainStackParamList } from '../navigation/types';
 import { useTheme } from '../context/ThemeContext';
+import { useBusinessProfile } from '../context/BusinessProfileContext';
 import ImagePickerModal from '../components/ImagePickerModal';
 import OptimizedImage from '../components/OptimizedImage';
 import ComingSoonModal from '../components/ComingSoonModal';
@@ -63,6 +64,7 @@ const responsiveFontSize = {
 
 const TemplateGalleryScreen: React.FC = () => {
   const { theme, isDarkMode } = useTheme();
+  const { selectedBusinessProfile } = useBusinessProfile();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<StackNavigationProp<MainStackParamList>>();
   const [imagePickerVisible, setImagePickerVisible] = useState(false);
@@ -136,6 +138,8 @@ const TemplateGalleryScreen: React.FC = () => {
     await saveUploadedPhotos(updatedPhotos);
     
     // Navigate to PosterEditor screen with the selected image
+    console.log("🔧 [TEMPLATE GALLERY] Navigating with businessProfile:", selectedBusinessProfile);
+    
     navigation.navigate('PosterEditor', {
       selectedImage: {
         uri: imageUri,
@@ -143,6 +147,15 @@ const TemplateGalleryScreen: React.FC = () => {
         description: 'Your uploaded photo',
       },
       selectedLanguage: 'English',
+      selectedTemplateId: undefined,
+      posterCategory: selectedBusinessProfile?.category || 'Custom',
+      type: selectedBusinessProfile ? "business" : "custom",
+      categoryName: selectedBusinessProfile?.category || 'Custom Upload',
+      source: "TemplateGallery",
+      
+      // ✅ CRITICAL: Pass business profile like working flow
+      businessProfile: selectedBusinessProfile,
+      businessCategory: selectedBusinessProfile?.category || undefined,
     } as any);
   };
 
@@ -153,6 +166,8 @@ const TemplateGalleryScreen: React.FC = () => {
 
   // Handle photo press from gallery
   const handlePhotoPress = (photo: UploadedPhoto) => {
+    console.log("🔧 [TEMPLATE GALLERY] Photo press navigating with businessProfile:", selectedBusinessProfile);
+    
     navigation.navigate('PosterEditor', {
       selectedImage: {
         uri: photo.uri,
@@ -160,6 +175,15 @@ const TemplateGalleryScreen: React.FC = () => {
         description: 'Your uploaded photo',
       },
       selectedLanguage: 'English',
+      selectedTemplateId: undefined,
+      posterCategory: selectedBusinessProfile?.category || 'Custom',
+      type: selectedBusinessProfile ? "business" : "custom",
+      categoryName: selectedBusinessProfile?.category || 'Custom Upload',
+      source: "TemplateGallery",
+      
+      // ✅ CRITICAL: Pass business profile like working flow
+      businessProfile: selectedBusinessProfile,
+      businessCategory: selectedBusinessProfile?.category || undefined,
     } as any);
   };
 

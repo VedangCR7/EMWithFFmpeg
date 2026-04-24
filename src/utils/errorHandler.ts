@@ -33,7 +33,7 @@ export const getUserFriendlyError = (error: any): string => {
       return "You are not authorized to perform this action.";
     case 404:
       // Not Found
-      return "The requested resource was not found.";
+      return "Registration required";
     case 429:
       // Too Many Requests - rate limiting
       return "Too many attempts. Please wait and try again.";

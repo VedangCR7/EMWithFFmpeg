@@ -102,6 +102,7 @@ const LoginScreen: React.FC = ({ navigation }: any) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [errorType, setErrorType] = useState<'empty' | 'invalid_email' | 'invalid_password' | 'generic'>('generic');
   const [showPassword, setShowPassword] = useState(false);
   const inputRefs = useRef<Record<string, TextInput | null>>({});
 
@@ -131,9 +132,41 @@ const LoginScreen: React.FC = ({ navigation }: any) => {
     }
   };
 
+  // Centralized modal content mapping
+  const getModalContent = useCallback((type: typeof errorType) => {
+    switch (type) {
+      case 'empty':
+        return {
+          title: 'Missing Information',
+          message: 'Please enter email and password',
+          icon: 'info' as const
+        };
+      case 'invalid_email':
+        return {
+          title: 'Incorrect Email',
+          message: 'Please check your email',
+          icon: 'info' as const
+        };
+      case 'invalid_password':
+        return {
+          title: 'Incorrect Password',
+          message: 'Try again',
+          icon: 'info' as const
+        };
+      case 'generic':
+      default:
+        return {
+          title: 'Failed',
+          message: errorMessage,
+          icon: 'info' as const
+        };
+    }
+  }, [errorMessage]);
+
   const handleSignIn = useCallback(async () => {
     if (!email?.trim() || !password?.trim()) {
-      setErrorMessage('Please fill in all fields');
+      setErrorType('empty');
+      setErrorMessage('Please enter email and password');
       setShowErrorModal(true);
       return;
     }
@@ -160,8 +193,28 @@ const LoginScreen: React.FC = ({ navigation }: any) => {
       console.error('❌ Sign in error:', error);
       console.error('❌ Error response:', error.response?.data);
       console.error('❌ Error status:', error.response?.status);
-      const message = getUserFriendlyError(error);
-      setErrorMessage(message);
+      
+      // Enhanced error type detection
+      const status = error?.response?.status;
+      const backendMessage = error?.response?.data?.message || '';
+      const lowerMessage = backendMessage.toLowerCase();
+      
+      if (status === 401) {
+        // Try to distinguish between email and password errors
+        if (lowerMessage.includes('email') || lowerMessage.includes('user')) {
+          setErrorType('invalid_email');
+          setErrorMessage('Please check your email');
+        } else {
+          setErrorType('invalid_password');
+          setErrorMessage('Try again');
+        }
+      } else {
+        // Use existing error handler for other cases
+        const message = getUserFriendlyError(error);
+        setErrorType('generic');
+        setErrorMessage(message);
+      }
+      
       setShowErrorModal(true);
     } finally {
       setIsLoading(false);
@@ -349,64 +402,38 @@ const LoginScreen: React.FC = ({ navigation }: any) => {
                 </TouchableOpacity>
               </View>
               
-              {/* Warning icon centered at top */}
-              <View style={[styles.errorIconContainer, { backgroundColor: '#ffaa0030' }]}>
-                <Icon name="warning-amber" size={Math.min(screenWidth * 0.08, 32)} color="#ffaa00" />
+              {/* Info icon centered at top */}
+              <View style={[styles.errorIconContainer, { backgroundColor: '#2196F330' }]}>
+                <Icon name="info" size={Math.min(screenWidth * 0.08, 32)} color="#2196F3" />
               </View>
               
               {/* Title */}
               <Text 
                 style={[styles.errorModalTitle, { color: theme.colors.text }]}
               >
-                {errorMessage.includes('registration') || errorMessage.includes('register') || errorMessage.includes('resource') && errorMessage.includes('not found') ? 'Registration Required' : 'Failed'}
+                {getModalContent(errorType).title}
               </Text>
               
               {/* Message */}
               <View style={styles.errorModalContent}>
                 <Text style={[styles.errorModalMessage, { color: theme.colors.textSecondary }]}>
-                  {errorMessage.includes('registration') || errorMessage.includes('register') || errorMessage.includes('resource') && errorMessage.includes('not found') ? 'Please register first to continue.' : errorMessage}
+                  {getModalContent(errorType).message}
                 </Text>
               </View>
               
-              {/* Buttons Layout - Centered for single button, spaced for two buttons */}
-              <View style={[
-                styles.errorModalButtonsContainer,
-                (errorMessage.includes('registration') || errorMessage.includes('register') || (errorMessage.includes('resource') && errorMessage.includes('not found'))) 
-                  ? {} 
-                  : { justifyContent: 'center' }
-              ]}>
-                {/* Cancel Button */}
+              {/* Buttons Layout - Simplified for login errors */}
+              <View style={[styles.errorModalButtonsContainer, { justifyContent: 'center' }]}>
+                {/* OK Button */}
                 <TouchableOpacity 
                   style={[
                     styles.errorModalCancelButton, 
                     { backgroundColor: theme.colors.inputBackground },
-                    !(errorMessage.includes('registration') || errorMessage.includes('register') || (errorMessage.includes('resource') && errorMessage.includes('not found'))) && { flex: undefined, paddingHorizontal: screenWidth * 0.08 }
+                    { flex: undefined, paddingHorizontal: screenWidth * 0.08 }
                   ]}
                   onPress={() => setShowErrorModal(false)}
                 >
-                  <Text style={[styles.errorModalCancelButtonText, { color: theme.colors.textSecondary }]}>Ok</Text>
+                  <Text style={[styles.errorModalCancelButtonText, { color: theme.colors.textSecondary }]}>OK</Text>
                 </TouchableOpacity>
-                
-                {/* Register Now Button - shown for registration errors and resource not found errors */}
-                {(errorMessage.includes('registration') || errorMessage.includes('register') || (errorMessage.includes('resource') && errorMessage.includes('not found'))) && (
-                  <TouchableOpacity 
-                    style={[styles.errorModalRegisterButton]}
-                    onPress={() => {
-                      setShowErrorModal(false);
-                      navigation.navigate('Registration');
-                    }}
-                  >
-                    <LinearGradient
-                      colors={['#4A90E2', '#357ABD']}
-                      style={styles.errorModalRegisterButtonGradient}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                    >
-                      <Text style={styles.errorModalRegisterButtonText}>Register Now</Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
-                )}
-                
                               </View>
             </View>
           </TouchableOpacity>

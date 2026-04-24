@@ -26,6 +26,7 @@ export type MainStackParamList = {
     categoryName?: string;
     businessProfile?: any;
     businessCategory?: string;
+    source?: string;
   };
   PosterPlayer: {
     selectedPoster: any;

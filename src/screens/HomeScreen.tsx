@@ -1254,6 +1254,7 @@ const HomeScreen: React.FC = React.memo(() => {
               templateSource: 'search',        // ✅ MARK AS SEARCH FLOW
               isBusinessCategoryFromSearch,   // ✅ ADD BUSINESS FLAG
               isGeneralCategoryFromSearch,    // ✅ ADD GENERAL FLAG
+              type: isBusinessCategoryFromSearch ? 'business' : undefined, // ✅ ADD TYPE FOR BUSINESS CATEGORIES
             });
           }}
         />
@@ -1726,25 +1727,25 @@ const HomeScreen: React.FC = React.memo(() => {
         if (cachedGreetings && cachedGreetings.length > 0) {
           const greetingUpdates: any = {
             businessEthics: cachedGreetings[0] && Array.isArray(cachedGreetings[0]) && cachedGreetings[0].length > 0
-              ? { display: cachedGreetings[0].slice(0, 3), raw: cachedGreetings[0] }
+              ? { display: cachedGreetings[0].slice(0, 10), raw: cachedGreetings[0] }
               : { display: [], raw: [] },
             successMindset: cachedGreetings[1] && Array.isArray(cachedGreetings[1]) && cachedGreetings[1].length > 0
-              ? { display: cachedGreetings[1].slice(0, 3), raw: cachedGreetings[1] }
+              ? { display: cachedGreetings[1].slice(0, 10), raw: cachedGreetings[1] }
               : { display: [], raw: [] },
             socialMediaGrowth: cachedGreetings[2] && Array.isArray(cachedGreetings[2]) && cachedGreetings[2].length > 0
-              ? { display: cachedGreetings[2].slice(0, 3), raw: cachedGreetings[2] }
+              ? { display: cachedGreetings[2].slice(0, 10), raw: cachedGreetings[2] }
               : { display: [], raw: [] },
             moneyAndFinance: cachedGreetings[3] && Array.isArray(cachedGreetings[3]) && cachedGreetings[3].length > 0
-              ? { display: cachedGreetings[3].slice(0, 3), raw: cachedGreetings[3] }
+              ? { display: cachedGreetings[3].slice(0, 10), raw: cachedGreetings[3] }
               : { display: [], raw: [] },
             businessLegendQuote: cachedGreetings[4] && Array.isArray(cachedGreetings[4]) && cachedGreetings[4].length > 0
-              ? { display: cachedGreetings[4].slice(0, 3), raw: cachedGreetings[4] }
+              ? { display: cachedGreetings[4].slice(0, 10), raw: cachedGreetings[4] }
               : { display: [], raw: [] },
             businessMarketingTips: cachedGreetings[5] && Array.isArray(cachedGreetings[5]) && cachedGreetings[5].length > 0
-              ? { display: cachedGreetings[5].slice(0, 3), raw: cachedGreetings[5] }
+              ? { display: cachedGreetings[5].slice(0, 10), raw: cachedGreetings[5] }
               : { display: [], raw: [] },
             businessQuotes: cachedGreetings[6] && Array.isArray(cachedGreetings[6]) && cachedGreetings[6].length > 0
-              ? { display: cachedGreetings[6].slice(0, 3), raw: cachedGreetings[6] }
+              ? { display: cachedGreetings[6].slice(0, 10), raw: cachedGreetings[6] }
               : { display: [], raw: [] },
           };
 
@@ -2053,28 +2054,28 @@ const HomeScreen: React.FC = React.memo(() => {
               }
             }
 
-            // Handle greeting sections responses - Set first 3 items immediately
+            // Handle greeting sections responses - Set first 10 items immediately
             const greetingUpdates = {
               businessEthics: businessEthicsResponse.status === 'fulfilled' && businessEthicsResponse.value.length > 0
-                ? { display: businessEthicsResponse.value.slice(0, 3), raw: businessEthicsResponse.value }
+                ? { display: businessEthicsResponse.value.slice(0, 10), raw: businessEthicsResponse.value }
                 : { display: [], raw: [] },
               successMindset: successMindsetResponse.status === 'fulfilled' && successMindsetResponse.value.length > 0
-                ? { display: successMindsetResponse.value.slice(0, 3), raw: successMindsetResponse.value }
+                ? { display: successMindsetResponse.value.slice(0, 10), raw: successMindsetResponse.value }
                 : { display: [], raw: [] },
               socialMediaGrowth: socialMediaGrowthResponse.status === 'fulfilled' && socialMediaGrowthResponse.value.length > 0
-                ? { display: socialMediaGrowthResponse.value.slice(0, 3), raw: socialMediaGrowthResponse.value }
+                ? { display: socialMediaGrowthResponse.value.slice(0, 10), raw: socialMediaGrowthResponse.value }
                 : { display: [], raw: [] },
               moneyAndFinance: moneyAndFinanceResponse.status === 'fulfilled' && moneyAndFinanceResponse.value.length > 0
-                ? { display: moneyAndFinanceResponse.value.slice(0, 3), raw: moneyAndFinanceResponse.value }
+                ? { display: moneyAndFinanceResponse.value.slice(0, 10), raw: moneyAndFinanceResponse.value }
                 : { display: [], raw: [] },
               businessLegendQuote: businessLegendQuoteResponse.status === 'fulfilled' && businessLegendQuoteResponse.value.length > 0
-                ? { display: businessLegendQuoteResponse.value.slice(0, 3), raw: businessLegendQuoteResponse.value }
+                ? { display: businessLegendQuoteResponse.value.slice(0, 10), raw: businessLegendQuoteResponse.value }
                 : { display: [], raw: [] },
               businessMarketingTips: businessMarketingTipsResponse.status === 'fulfilled' && businessMarketingTipsResponse.value.length > 0
-                ? { display: businessMarketingTipsResponse.value.slice(0, 3), raw: businessMarketingTipsResponse.value }
+                ? { display: businessMarketingTipsResponse.value.slice(0, 10), raw: businessMarketingTipsResponse.value }
                 : { display: [], raw: [] },
               businessQuotes: businessQuotesResponse.status === 'fulfilled' && businessQuotesResponse.value.length > 0
-                ? { display: businessQuotesResponse.value.slice(0, 3), raw: businessQuotesResponse.value }
+                ? { display: businessQuotesResponse.value.slice(0, 10), raw: businessQuotesResponse.value }
                 : { display: [], raw: [] },
             };
 
@@ -3127,8 +3128,9 @@ const HomeScreen: React.FC = React.memo(() => {
           // Parallel API calls for business categories
           const businessPromises = matchingBusinessCategories.map(async (category) => {
             try {
-              const response = await businessCategoryPostersApi.getPostersByCategory(category.name, 10); // Limited to 10 results per category
-              const posters = response.success && response.data?.posters ? response.data.posters.slice(0, 10) : [];
+              const businessLimit = 6; // Business categories show 6 items
+              const response = await businessCategoryPostersApi.getPostersByCategory(category.name, businessLimit);
+              const posters = response.success && response.data?.posters ? response.data.posters.slice(0, businessLimit) : [];
               
               return {
                 id: category.id,
@@ -3146,8 +3148,9 @@ const HomeScreen: React.FC = React.memo(() => {
           // Parallel API calls for general categories
           const generalPromises = matchingGeneralCategories.map(async (category) => {
             try {
+              const generalLimit = 10; // General categories show 10 items
               const templates = await greetingTemplatesService.searchTemplates(category.name);
-              const limitedTemplates = (templates || []).slice(0, 10); // Limited to 10 results per category
+              const limitedTemplates = (templates || []).slice(0, generalLimit); // Limited to 10 results per category
               
               return {
                 id: category.id,
@@ -5457,13 +5460,7 @@ const HomeScreen: React.FC = React.memo(() => {
 
             {/* Header Actions */}
             <View style={styles.headerActions}>
-              {apiLoading && (
-                <View style={styles.apiLoadingIndicator}>
-                  <ActivityIndicator size="small" color="#4CAF50" />
-                  <Text style={styles.apiLoadingText}>Loading...</Text>
-                </View>
-              )}
-
+              
               {/* Search Button */}
               <TouchableOpacity
                 style={[styles.headerActionButton, { backgroundColor: theme.colors.cardBackground }]}

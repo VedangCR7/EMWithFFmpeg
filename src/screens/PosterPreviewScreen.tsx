@@ -757,7 +757,7 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
       minHeight: dynamicModerateScale(28),
     },
     editButtonText: {
-      color: theme?.colors?.textSecondary || '#666666',
+      color: '#ffffff',
       fontSize: dynamicModerateScale(8.5),
       fontWeight: '600' as const,
     },
@@ -881,6 +881,7 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
              {/* Action Buttons */}
        <View style={[
          styles.actionContainer, 
+         themeStyles.actionContainer,
          { 
            paddingBottom: Math.max(insets.bottom + responsiveSpacing.xs, responsiveSpacing.md)
          }
@@ -926,10 +927,10 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
         </View>
         
         <TouchableOpacity
-          style={[styles.editButton, { marginBottom: moderateScale(3) }]}
+          style={[styles.editButton, themeStyles.editButton, { marginBottom: moderateScale(3) }]}
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.editButtonText}>Back to Editor</Text>
+          <Text style={themeStyles.editButtonText}>Back to Editor</Text>
         </TouchableOpacity>
       </View>
       
@@ -1266,9 +1267,7 @@ const styles = StyleSheet.create({
   actionContainer: {
     paddingHorizontal: moderateScale(4),
     paddingTop: moderateScale(4),
-    backgroundColor: '#ffffff',
     borderTopWidth: 0.5,
-    borderTopColor: '#e9ecef',
     // paddingBottom will be set dynamically with safe area
   },
   actionButtons: {
@@ -1312,14 +1311,11 @@ const styles = StyleSheet.create({
     paddingVertical: moderateScale(8),
     paddingHorizontal: moderateScale(8),
     borderRadius: moderateScale(6),
-    backgroundColor: '#f8f9fa',
     borderWidth: 1,
-    borderColor: '#e9ecef',
     alignItems: 'center',
     minHeight: moderateScale(40),
   },
   editButtonText: {
-    color: '#666666',
     fontSize: moderateScale(10),
     fontWeight: 600,
   },

@@ -387,7 +387,7 @@ interface PosterEditorScreenProps {
 const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
   const navigation = useNavigation<NavigationProp<MainStackParamList>>();
   const insets = useSafeAreaInsets();
-  const { selectedImage, selectedLanguage, selectedTemplateId, selectedTemplate: initialTemplate, posterCategory, type, categoryName, businessProfile, businessCategory } = route.params;
+  const { selectedImage, selectedLanguage, selectedTemplateId, selectedTemplate: initialTemplate, posterCategory, type, categoryName, businessProfile, businessCategory, source } = route.params;
   
   // ✅ ADD SAFE FALLBACK
   const activeBusinessProfile =
@@ -406,7 +406,14 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     contextBusinessProfile: !!selectedBusinessProfile,
     contextBusinessCategory: !!selectedBusinessCategory,
     finalBusinessProfile: !!activeBusinessProfile,
-    finalBusinessCategory: !!activeBusinessCategory
+    finalBusinessCategory: !!activeBusinessCategory,
+    // 🔍 [BUSINESS PROFILE] Detailed profile info
+    businessProfileName: businessProfile?.name,
+    businessProfileId: businessProfile?.id,
+    contextProfileName: selectedBusinessProfile?.name,
+    contextProfileId: selectedBusinessProfile?.id,
+    finalProfileName: activeBusinessProfile?.name,
+    finalProfileId: activeBusinessProfile?.id
   });
   const { isSubscribed, checkPremiumAccess, refreshSubscription, isSubscriptionActive } = useSubscription();
   const { isDarkMode, theme } = useTheme();
@@ -2718,11 +2725,12 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
               return;
             }
             
-            // Validate business category if business type
-            if (type === "business") {
+            // Validate business category if business type (but skip if coming from MyBusinessPosterPlayer or IndustryCategoryScreen)
+            if (type === "business" && source !== "MyBusinessPosterPlayer" && source !== "IndustryCategoryScreen") {
               console.log(":mag: [POSTER EDITOR] Validating business category", {
                 businessProfileCategory: activeBusinessProfile?.category,
-                selectedTemplate: selectedTemplate
+                selectedTemplate: selectedTemplate,
+                source: source
               });
               
               // Extract template category from selected template
@@ -2747,6 +2755,10 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                 setShowCategoryAccessModal(true);
                 return;
               }
+            } else if (type === "business" && (source === "MyBusinessPosterPlayer" || source === "IndustryCategoryScreen")) {
+              console.log(":mag: [POSTER EDITOR] Skipping business category validation - from " + source, {
+                source: source
+              });
             }
             
             // Strict subscription validation using only business profile subscription status

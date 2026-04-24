@@ -594,6 +594,7 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
       posterCategory: finalPosterCategory,
       type: "business",
       categoryName: finalCategoryName,
+      source: "MyBusinessPosterPlayer", // ✅ ADD SOURCE IDENTIFIER
 
       // ✅ CRITICAL FIX
       businessProfile: selectedBusinessProfile,
@@ -648,6 +649,19 @@ const MyBusinessPosterPlayerScreen: React.FC = () => {
       return false;
     });
   }, [posters, selectedLanguage, isEventPlannerCategory, selectedServiceFilter, serviceFilterTemplates, serviceFilterKeywords]);
+
+  // Update selected poster when language filter changes
+  useEffect(() => {
+    if (filteredPosters && filteredPosters.length > 0) {
+      // If current selected poster doesn't match the language filter, update it to first matching poster
+      if (!selectedPoster || !filteredPosters.some(p => p.id === selectedPoster.id)) {
+        setSelectedPoster(filteredPosters[0]);
+      }
+    } else if (selectedLanguage !== 'all' && filteredPosters.length === 0) {
+      // If language filter results in no posters, keep current poster but don't change it
+      console.log(`No posters found for language: ${selectedLanguage}`);
+    }
+  }, [selectedLanguage, filteredPosters, selectedPoster]);
 
   // Calculate current poster index in filtered posters
   const currentPosterIndex = useMemo(() => {
