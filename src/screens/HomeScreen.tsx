@@ -5275,6 +5275,8 @@ const HomeScreen: React.FC = React.memo(() => {
               top: businessProfileDropdownPosition.top,
               left: dropdownLeft,
               width: dropdownWidth,
+              backgroundColor: theme.colors.background,
+              borderColor: theme.colors.border,
             },
           ]}
         >
@@ -5291,7 +5293,10 @@ const HomeScreen: React.FC = React.memo(() => {
                 No business profiles yet.
               </Text>
               <TouchableOpacity
-                style={styles.businessProfileDropdownManageButton}
+                style={[
+                  styles.businessProfileDropdownManageButton,
+                  { backgroundColor: theme.colors.primary },
+                ]}
                 onPress={() => {
                   closeBusinessProfileDropdown();
                   navigation.navigate('BusinessProfiles');
@@ -5321,6 +5326,10 @@ const HomeScreen: React.FC = React.memo(() => {
                       style={[
                         styles.businessProfileDropdownItem,
                         isActive && styles.businessProfileDropdownItemActive,
+                        {
+                          backgroundColor: theme.colors.background,
+                          borderColor: theme.colors.border,
+                        },
                       ]}
                       onPress={() => handleBusinessProfileSelect(profile.id)}
                     >
@@ -5334,7 +5343,7 @@ const HomeScreen: React.FC = React.memo(() => {
                               cacheKey={`business_profile_${profile.id}_${profile.updatedAt || profile.logo || profile.companyLogo || 'default'}`}
                             />
                           ) : (
-                            <Text style={styles.businessProfileDropdownAvatarText}>{initials}</Text>
+                            <Text style={[styles.businessProfileDropdownAvatarText, { color: theme.colors.primary }]}>{initials}</Text>
                           )}
                         </View>
                         <View style={styles.businessProfileDropdownTextContainer}>
@@ -5368,7 +5377,10 @@ const HomeScreen: React.FC = React.memo(() => {
                 })}
               </ScrollView>
               <TouchableOpacity
-                style={styles.businessProfileDropdownManageButton}
+                style={[
+                  styles.businessProfileDropdownManageButton,
+                  { backgroundColor: theme.colors.primary },
+                ]}
                 onPress={() => {
                   closeBusinessProfileDropdown();
                   navigation.navigate('BusinessProfiles');
@@ -6125,24 +6137,30 @@ const HomeScreen: React.FC = React.memo(() => {
         onRequestClose={closeGeneralCategoriesModal}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.upcomingEventsModalContent}>
+          <View style={[
+            styles.upcomingEventsModalContent,
+            { backgroundColor: theme.colors.background }
+          ]}>
             <LinearGradient
-              colors={['#f5f5f5', '#ffffff']}
+              colors={[theme.colors.background, theme.colors.cardBackground]}
               style={styles.upcomingEventsModalGradient}
             >
               <View style={styles.upcomingEventsModalHeader}>
                 <View style={styles.upcomingEventsModalTitleContainer}>
-                  <Text style={styles.upcomingEventsModalTitle}>General Categories</Text>
+                  <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>General Categories</Text>
                 </View>
                 <TouchableOpacity
                   style={styles.upcomingEventsCloseButton}
                   onPress={closeGeneralCategoriesModal}
                 >
-                  <Text style={styles.upcomingEventsCloseButtonText}>×</Text>
+                  <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>×</Text>
                 </TouchableOpacity>
               </View>
             </LinearGradient>
-            <View style={styles.upcomingEventsModalBody}>
+            <View style={[
+              styles.upcomingEventsModalBody,
+              { backgroundColor: theme.colors.background }
+            ]}>
               <FlatList
                 key={`general-categories-modal-${generalCategoryModalColumns}-${filteredGreetingCategoriesList.length}`}
                 data={filteredGreetingCategoriesList}
@@ -6202,24 +6220,30 @@ const HomeScreen: React.FC = React.memo(() => {
         onRequestClose={closeVideosModal}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.upcomingEventsModalContent}>
+          <View style={[
+            styles.upcomingEventsModalContent,
+            { backgroundColor: theme.colors.background }
+          ]}>
             <LinearGradient
-              colors={['#f5f5f5', '#ffffff']}
+              colors={[theme.colors.background, theme.colors.cardBackground]}
               style={styles.upcomingEventsModalGradient}
             >
               <View style={styles.upcomingEventsModalHeader}>
                 <View style={styles.upcomingEventsModalTitleContainer}>
-                  <Text style={styles.upcomingEventsModalTitle}>Video Content</Text>
+                  <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>Video Content</Text>
                 </View>
                 <TouchableOpacity
                   style={styles.upcomingEventsCloseButton}
                   onPress={closeVideosModal}
                 >
-                  <Text style={styles.upcomingEventsCloseButtonText}>×</Text>
+                  <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>×</Text>
                 </TouchableOpacity>
               </View>
             </LinearGradient>
-            <View style={styles.upcomingEventsModalBody}>
+            <View style={[
+              styles.upcomingEventsModalBody,
+              { backgroundColor: theme.colors.background }
+            ]}>
               <FlatList
                 key={`videos-modal-${videoContent.length}`}
                 data={videoContent}
@@ -6254,7 +6278,10 @@ const HomeScreen: React.FC = React.memo(() => {
             activeOpacity={1}
             onPress={closeCustomerSupportModal}
           >
-            <View style={styles.customerSupportModalContent}>
+            <View style={[
+              styles.customerSupportModalContent,
+              { backgroundColor: theme.colors.background }
+            ]}>
               {/* Customer Support Image - Positioned at top */}
               <View style={styles.customerSupportImageContainer}>
                 <Image
@@ -6266,52 +6293,82 @@ const HomeScreen: React.FC = React.memo(() => {
 
               {/* Close Button - Overlaps the image */}
               <TouchableOpacity
-                style={styles.customerSupportCloseButton}
+                style={[
+                  styles.customerSupportCloseButton,
+                  { backgroundColor: theme.colors.background }
+                ]}
                 onPress={closeCustomerSupportModal}
                 activeOpacity={0.7}
               >
-                <Text style={styles.customerSupportCloseButtonText}>×</Text>
+                <Text style={[styles.customerSupportCloseButtonText, { color: theme.colors.text }]}>×</Text>
               </TouchableOpacity>
 
               {/* Contact Options */}
               <View style={styles.customerSupportOptionsContainer}>
                 {/* WhatsApp Option */}
                 <TouchableOpacity
-                  style={styles.customerSupportOptionButton}
+                  style={[
+                    styles.customerSupportOptionButton,
+                    {
+                      backgroundColor: theme.colors.cardBackground,
+                      borderColor: theme.colors.border,
+                    }
+                  ]}
                   onPress={handleWhatsAppPress}
                   activeOpacity={0.7}
                 >
-                  <View style={styles.customerSupportOptionIconContainer}>
-                    <MaterialCommunityIcons name="whatsapp" size={moderateScale(24)} color="#009688" />
+                  <View style={[
+                    styles.customerSupportOptionIconContainer,
+                    { backgroundColor: `${theme.colors.primary}15` }
+                  ]}>
+                    <MaterialCommunityIcons name="whatsapp" size={moderateScale(24)} color={theme.colors.primary} />
                   </View>
-                  <Text style={styles.customerSupportOptionText}>WhatsApp Us</Text>
-                  <Icon name="chevron-right" size={moderateScale(24)} color="#009688" />
+                  <Text style={[styles.customerSupportOptionText, { color: theme.colors.text }]}>WhatsApp Us</Text>
+                  <Icon name="chevron-right" size={moderateScale(24)} color={theme.colors.primary} />
                 </TouchableOpacity>
 
                 {/* Phone Option */}
                 <TouchableOpacity
-                  style={styles.customerSupportOptionButton}
+                  style={[
+                    styles.customerSupportOptionButton,
+                    {
+                      backgroundColor: theme.colors.cardBackground,
+                      borderColor: theme.colors.border,
+                    }
+                  ]}
                   onPress={handlePhonePress}
                   activeOpacity={0.7}
                 >
-                  <View style={styles.customerSupportOptionIconContainer}>
-                    <Icon name="phone" size={moderateScale(24)} color="#009688" />
+                  <View style={[
+                    styles.customerSupportOptionIconContainer,
+                    { backgroundColor: `${theme.colors.primary}15` }
+                  ]}>
+                    <Icon name="phone" size={moderateScale(24)} color={theme.colors.primary} />
                   </View>
-                  <Text style={styles.customerSupportOptionText}>Call Our Team</Text>
-                  <Icon name="chevron-right" size={moderateScale(24)} color="#009688" />
+                  <Text style={[styles.customerSupportOptionText, { color: theme.colors.text }]}>Call Our Team</Text>
+                  <Icon name="chevron-right" size={moderateScale(24)} color={theme.colors.primary} />
                 </TouchableOpacity>
 
                 {/* Email Option */}
                 <TouchableOpacity
-                  style={styles.customerSupportOptionButton}
+                  style={[
+                    styles.customerSupportOptionButton,
+                    {
+                      backgroundColor: theme.colors.cardBackground,
+                      borderColor: theme.colors.border,
+                    }
+                  ]}
                   onPress={handleEmailPress}
                   activeOpacity={0.7}
                 >
-                  <View style={styles.customerSupportOptionIconContainer}>
-                    <Icon name="email" size={moderateScale(24)} color="#009688" />
+                  <View style={[
+                    styles.customerSupportOptionIconContainer,
+                    { backgroundColor: `${theme.colors.primary}15` }
+                  ]}>
+                    <Icon name="email" size={moderateScale(24)} color={theme.colors.primary} />
                   </View>
-                  <Text style={styles.customerSupportOptionText}>Email Us</Text>
-                  <Icon name="chevron-right" size={moderateScale(24)} color="#009688" />
+                  <Text style={[styles.customerSupportOptionText, { color: theme.colors.text }]}>Email Us</Text>
+                  <Icon name="chevron-right" size={moderateScale(24)} color={theme.colors.primary} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -6335,24 +6392,30 @@ const HomeScreen: React.FC = React.memo(() => {
         onRequestClose={closeBusinessEthicsModal}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.upcomingEventsModalContent}>
+          <View style={[
+            styles.upcomingEventsModalContent,
+            { backgroundColor: theme.colors.background }
+          ]}>
             <LinearGradient
-              colors={['#f5f5f5', '#ffffff']}
+              colors={[theme.colors.background, theme.colors.cardBackground]}
               style={styles.upcomingEventsModalGradient}
             >
               <View style={styles.upcomingEventsModalHeader}>
                 <View style={styles.upcomingEventsModalTitleContainer}>
-                  <Text style={styles.upcomingEventsModalTitle}>Business Ethics</Text>
+                  <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>Business Ethics</Text>
                 </View>
                 <TouchableOpacity
                   style={styles.upcomingEventsCloseButton}
                   onPress={closeBusinessEthicsModal}
                 >
-                  <Text style={styles.upcomingEventsCloseButtonText}>×</Text>
+                  <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>×</Text>
                 </TouchableOpacity>
               </View>
             </LinearGradient>
-            <View style={styles.upcomingEventsModalBody}>
+            <View style={[
+              styles.upcomingEventsModalBody,
+              { backgroundColor: theme.colors.background }
+            ]}>
               <FlatList
                 key={`businessethics-modal-${businessEthicsTemplatesRaw.length > 0 ? businessEthicsTemplatesRaw.length : businessEthicsTemplates.length}`}
                 data={businessEthicsTemplatesRaw.length > 0 ? businessEthicsTemplatesRaw : businessEthicsTemplates}
@@ -6382,24 +6445,30 @@ const HomeScreen: React.FC = React.memo(() => {
         onRequestClose={closeSuccessMindsetModal}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.upcomingEventsModalContent}>
+          <View style={[
+            styles.upcomingEventsModalContent,
+            { backgroundColor: theme.colors.background }
+          ]}>
             <LinearGradient
-              colors={['#f5f5f5', '#ffffff']}
+              colors={[theme.colors.background, theme.colors.cardBackground]}
               style={styles.upcomingEventsModalGradient}
             >
               <View style={styles.upcomingEventsModalHeader}>
                 <View style={styles.upcomingEventsModalTitleContainer}>
-                  <Text style={styles.upcomingEventsModalTitle}>Success Mindset</Text>
+                  <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>Success Mindset</Text>
                 </View>
                 <TouchableOpacity
                   style={styles.upcomingEventsCloseButton}
                   onPress={closeSuccessMindsetModal}
                 >
-                  <Text style={styles.upcomingEventsCloseButtonText}>×</Text>
+                  <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>×</Text>
                 </TouchableOpacity>
               </View>
             </LinearGradient>
-            <View style={styles.upcomingEventsModalBody}>
+            <View style={[
+              styles.upcomingEventsModalBody,
+              { backgroundColor: theme.colors.background }
+            ]}>
               <FlatList
                 key={`successmindset-modal-${successMindsetTemplatesRaw.length > 0 ? successMindsetTemplatesRaw.length : successMindsetTemplates.length}`}
                 data={successMindsetTemplatesRaw.length > 0 ? successMindsetTemplatesRaw : successMindsetTemplates}
@@ -6429,24 +6498,30 @@ const HomeScreen: React.FC = React.memo(() => {
         onRequestClose={closeSocialMediaGrowthModal}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.upcomingEventsModalContent}>
+          <View style={[
+            styles.upcomingEventsModalContent,
+            { backgroundColor: theme.colors.background }
+          ]}>
             <LinearGradient
-              colors={['#f5f5f5', '#ffffff']}
+              colors={[theme.colors.background, theme.colors.cardBackground]}
               style={styles.upcomingEventsModalGradient}
             >
               <View style={styles.upcomingEventsModalHeader}>
                 <View style={styles.upcomingEventsModalTitleContainer}>
-                  <Text style={styles.upcomingEventsModalTitle}>Social Media Growth</Text>
+                  <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>Social Media Growth</Text>
                 </View>
                 <TouchableOpacity
                   style={styles.upcomingEventsCloseButton}
                   onPress={closeSocialMediaGrowthModal}
                 >
-                  <Text style={styles.upcomingEventsCloseButtonText}>×</Text>
+                  <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>×</Text>
                 </TouchableOpacity>
               </View>
             </LinearGradient>
-            <View style={styles.upcomingEventsModalBody}>
+            <View style={[
+              styles.upcomingEventsModalBody,
+              { backgroundColor: theme.colors.background }
+            ]}>
               <FlatList
                 key={`socialmediagrowth-modal-${socialMediaGrowthTemplatesRaw.length > 0 ? socialMediaGrowthTemplatesRaw.length : socialMediaGrowthTemplates.length}`}
                 data={socialMediaGrowthTemplatesRaw.length > 0 ? socialMediaGrowthTemplatesRaw : socialMediaGrowthTemplates}
@@ -6476,24 +6551,30 @@ const HomeScreen: React.FC = React.memo(() => {
         onRequestClose={closeMoneyAndFinanceModal}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.upcomingEventsModalContent}>
+          <View style={[
+            styles.upcomingEventsModalContent,
+            { backgroundColor: theme.colors.background }
+          ]}>
             <LinearGradient
-              colors={['#f5f5f5', '#ffffff']}
+              colors={[theme.colors.background, theme.colors.cardBackground]}
               style={styles.upcomingEventsModalGradient}
             >
               <View style={styles.upcomingEventsModalHeader}>
                 <View style={styles.upcomingEventsModalTitleContainer}>
-                  <Text style={styles.upcomingEventsModalTitle}>Money and Finance</Text>
+                  <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>Money and Finance</Text>
                 </View>
                 <TouchableOpacity
                   style={styles.upcomingEventsCloseButton}
                   onPress={closeMoneyAndFinanceModal}
                 >
-                  <Text style={styles.upcomingEventsCloseButtonText}>×</Text>
+                  <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>×</Text>
                 </TouchableOpacity>
               </View>
             </LinearGradient>
-            <View style={styles.upcomingEventsModalBody}>
+            <View style={[
+              styles.upcomingEventsModalBody,
+              { backgroundColor: theme.colors.background }
+            ]}>
               <FlatList
                 key={`moneyandfinance-modal-${moneyAndFinanceTemplatesRaw.length > 0 ? moneyAndFinanceTemplatesRaw.length : moneyAndFinanceTemplates.length}`}
                 data={moneyAndFinanceTemplatesRaw.length > 0 ? moneyAndFinanceTemplatesRaw : moneyAndFinanceTemplates}
@@ -6523,24 +6604,30 @@ const HomeScreen: React.FC = React.memo(() => {
         onRequestClose={closeBusinessLegendQuoteModal}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.upcomingEventsModalContent}>
+          <View style={[
+            styles.upcomingEventsModalContent,
+            { backgroundColor: theme.colors.background }
+          ]}>
             <LinearGradient
-              colors={['#f5f5f5', '#ffffff']}
+              colors={[theme.colors.background, theme.colors.cardBackground]}
               style={styles.upcomingEventsModalGradient}
             >
               <View style={styles.upcomingEventsModalHeader}>
                 <View style={styles.upcomingEventsModalTitleContainer}>
-                  <Text style={styles.upcomingEventsModalTitle}>Business Legend Quote</Text>
+                  <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>Business Legend Quote</Text>
                 </View>
                 <TouchableOpacity
                   style={styles.upcomingEventsCloseButton}
                   onPress={closeBusinessLegendQuoteModal}
                 >
-                  <Text style={styles.upcomingEventsCloseButtonText}>×</Text>
+                  <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>×</Text>
                 </TouchableOpacity>
               </View>
             </LinearGradient>
-            <View style={styles.upcomingEventsModalBody}>
+            <View style={[
+              styles.upcomingEventsModalBody,
+              { backgroundColor: theme.colors.background }
+            ]}>
               <FlatList
                 key={`businesslegendquote-modal-${businessLegendQuoteTemplatesRaw.length > 0 ? businessLegendQuoteTemplatesRaw.length : businessLegendQuoteTemplates.length}`}
                 data={businessLegendQuoteTemplatesRaw.length > 0 ? businessLegendQuoteTemplatesRaw : businessLegendQuoteTemplates}
@@ -6570,24 +6657,30 @@ const HomeScreen: React.FC = React.memo(() => {
         onRequestClose={closeBusinessMarketingTipsModal}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.upcomingEventsModalContent}>
+          <View style={[
+            styles.upcomingEventsModalContent,
+            { backgroundColor: theme.colors.background }
+          ]}>
             <LinearGradient
-              colors={['#f5f5f5', '#ffffff']}
+              colors={[theme.colors.background, theme.colors.cardBackground]}
               style={styles.upcomingEventsModalGradient}
             >
               <View style={styles.upcomingEventsModalHeader}>
                 <View style={styles.upcomingEventsModalTitleContainer}>
-                  <Text style={styles.upcomingEventsModalTitle}>Business Marketing Tips</Text>
+                  <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>Business Marketing Tips</Text>
                 </View>
                 <TouchableOpacity
                   style={styles.upcomingEventsCloseButton}
                   onPress={closeBusinessMarketingTipsModal}
                 >
-                  <Text style={styles.upcomingEventsCloseButtonText}>×</Text>
+                  <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>×</Text>
                 </TouchableOpacity>
               </View>
             </LinearGradient>
-            <View style={styles.upcomingEventsModalBody}>
+            <View style={[
+              styles.upcomingEventsModalBody,
+              { backgroundColor: theme.colors.background }
+            ]}>
               <FlatList
                 key={`businessmarketingtips-modal-${businessMarketingTipsTemplatesRaw.length > 0 ? businessMarketingTipsTemplatesRaw.length : businessMarketingTipsTemplates.length}`}
                 data={businessMarketingTipsTemplatesRaw.length > 0 ? businessMarketingTipsTemplatesRaw : businessMarketingTipsTemplates}
@@ -6617,24 +6710,30 @@ const HomeScreen: React.FC = React.memo(() => {
         onRequestClose={closeBusinessQuotesModal}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.upcomingEventsModalContent}>
+          <View style={[
+            styles.upcomingEventsModalContent,
+            { backgroundColor: theme.colors.background }
+          ]}>
             <LinearGradient
-              colors={['#f5f5f5', '#ffffff']}
+              colors={[theme.colors.background, theme.colors.cardBackground]}
               style={styles.upcomingEventsModalGradient}
             >
               <View style={styles.upcomingEventsModalHeader}>
                 <View style={styles.upcomingEventsModalTitleContainer}>
-                  <Text style={styles.upcomingEventsModalTitle}>Business Quotes</Text>
+                  <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>Business Quotes</Text>
                 </View>
                 <TouchableOpacity
                   style={styles.upcomingEventsCloseButton}
                   onPress={closeBusinessQuotesModal}
                 >
-                  <Text style={styles.upcomingEventsCloseButtonText}>×</Text>
+                  <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>×</Text>
                 </TouchableOpacity>
               </View>
             </LinearGradient>
-            <View style={styles.upcomingEventsModalBody}>
+            <View style={[
+              styles.upcomingEventsModalBody,
+              { backgroundColor: theme.colors.background }
+            ]}>
               <FlatList
                 key={`businessquotes-modal-${businessQuotesTemplatesRaw.length > 0 ? businessQuotesTemplatesRaw.length : businessQuotesTemplates.length}`}
                 data={businessQuotesTemplatesRaw.length > 0 ? businessQuotesTemplatesRaw : businessQuotesTemplates}
@@ -6660,18 +6759,24 @@ const HomeScreen: React.FC = React.memo(() => {
       {/* Featured Content Modal */}
       <Modal visible={isFeaturedContentModalVisible} transparent={true} animationType="slide" onRequestClose={closeFeaturedContentModal}>
         <View style={styles.modalOverlay}>
-          <View style={styles.upcomingEventsModalContent}>
-            <LinearGradient colors={['#f5f5f5', '#ffffff']} style={styles.upcomingEventsModalGradient}>
+          <View style={[
+            styles.upcomingEventsModalContent,
+            { backgroundColor: theme.colors.background }
+          ]}>
+            <LinearGradient colors={[theme.colors.background, theme.colors.cardBackground]} style={styles.upcomingEventsModalGradient}>
               <View style={styles.upcomingEventsModalHeader}>
                 <View style={styles.upcomingEventsModalTitleContainer}>
-                  <Text style={styles.upcomingEventsModalTitle}>Featured Content</Text>
+                  <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>Featured Content</Text>
                 </View>
                 <TouchableOpacity style={styles.upcomingEventsCloseButton} onPress={closeFeaturedContentModal}>
-                  <Text style={styles.upcomingEventsCloseButtonText}>×</Text>
+                  <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>×</Text>
                 </TouchableOpacity>
               </View>
             </LinearGradient>
-            <View style={styles.upcomingEventsModalBody}>
+            <View style={[
+              styles.upcomingEventsModalBody,
+              { backgroundColor: theme.colors.background }
+            ]}>
               <FlatList
                 key={`featured-content-modal-${featuredContent.length}`}
                 data={featuredContent}
@@ -7811,10 +7916,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     borderRadius: moderateScale(12),
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.12)',
-    ...responsiveShadow.small,
-    paddingVertical: moderateScale(14),
-    paddingHorizontal: moderateScale(12),
+    padding: moderateScale(12),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: moderateScale(4) },
+    shadowOpacity: 0.15,
+    shadowRadius: moderateScale(12),
+    elevation: 8,
     backgroundColor: '#ffffff',
     maxHeight: moderateScale(260),
   },
@@ -7837,8 +7944,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E0E0E0',
     borderRadius: moderateScale(12),
-    paddingHorizontal: moderateScale(12),
-    paddingVertical: moderateScale(10),
+    padding: moderateScale(10),
     marginBottom: moderateScale(8),
     backgroundColor: '#ffffff',
   },

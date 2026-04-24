@@ -8,6 +8,7 @@ import {
   Dimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { useTheme } from '../context/ThemeContext';
 
 interface CategoryAccessMessageProps {
   visible: boolean;
@@ -26,6 +27,8 @@ const CategoryAccessMessage: React.FC<CategoryAccessMessageProps> = ({
   onAddBusiness,
   onClose,
 }) => {
+  const { theme } = useTheme();
+  
   return (
     <Modal
       visible={visible}
@@ -34,29 +37,29 @@ const CategoryAccessMessage: React.FC<CategoryAccessMessageProps> = ({
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: theme.colors.cardBackground }]}>
           <View style={styles.header}>
-            <Text style={styles.title}>More Templates Available</Text>
+            <Text style={[styles.title, { color: theme.colors.text }]}>More Templates Available</Text>
             <TouchableOpacity
-              style={styles.closeButton}
+              style={[styles.closeButton, { backgroundColor: theme.colors.background }]}
               onPress={onClose}
               activeOpacity={0.85}
             >
-              <Icon name="close" size={24} color="#666666" />
+              <Icon name="close" size={24} color={theme.colors.textSecondary} />
             </TouchableOpacity>
           </View>
           
-          <Text style={styles.message}>
+          <Text style={[styles.message, { color: theme.colors.textSecondary }]}>
             To access more templates like this, add a new business profile for this category.
           </Text>
           
           <View style={styles.buttonContainer}>
             <TouchableOpacity
-              style={[styles.button, styles.primaryButton]}
+              style={[styles.button, { backgroundColor: theme.colors.primary }]}
               onPress={onAddBusiness}
               activeOpacity={0.85}
             >
-              <Text style={[styles.buttonText, styles.primaryButtonText]}>
+              <Text style={[styles.buttonText, { color: '#ffffff' }]}>
                 Add Business Profile
               </Text>
             </TouchableOpacity>

@@ -742,6 +742,8 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
           { 
             width: cardWidth,
             marginBottom: moderateScale(12),
+            backgroundColor: theme.colors.cardBackground,
+            borderColor: theme.colors.border,
           },
         ]}
         onPress={() => {
@@ -756,8 +758,14 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
           resizeMode="cover"
           mode="thumbnail"
         />
-        <View style={styles.modalPosterDateContainer}>
-          <Text style={[styles.modalPosterDateText, { color: theme.colors.text }]}>
+        <View style={[
+            styles.modalPosterDateContainer,
+            { backgroundColor: theme.colors.cardBackground }
+          ]}>
+          <Text style={[
+            styles.modalPosterDateText,
+            { color: theme.colors.textSecondary }
+          ]}>
             {formatDateShort(item.date)}
           </Text>
         </View>
@@ -944,15 +952,18 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
         statusBarTranslucent={true}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
+          <View style={[
+            styles.modalContainer,
+            { backgroundColor: theme.colors.background }
+          ]}>
             <LinearGradient
-              colors={['#f5f5f5', '#ffffff']}
+              colors={[theme.colors.background, theme.colors.cardBackground]}
               style={styles.modalGradient}
             >
               {/* Modal Header */}
               <View style={styles.modalHeader}>
                 <View style={styles.modalTitleContainer}>
-                  <Text style={styles.modalTitle}>
+                  <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
                     All Festive Alert Posters
                   </Text>
                 </View>
@@ -961,13 +972,16 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
                   onPress={() => setIsViewMoreModalVisible(false)}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.modalCloseButtonText}>✕</Text>
+                  <Text style={[styles.modalCloseButtonText, { color: theme.colors.text }]}>✕</Text>
                 </TouchableOpacity>
               </View>
             </LinearGradient>
 
             {/* Modal Content */}
-            <View style={styles.modalBody}>
+            <View style={[
+              styles.modalBody,
+              { backgroundColor: theme.colors.background }
+            ]}>
               {isLoadingAllPosters ? (
                 <View style={styles.modalLoadingContainer}>
                   <Text style={[styles.modalLoadingText, { color: theme.colors.textSecondary }]}>

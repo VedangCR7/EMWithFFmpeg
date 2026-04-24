@@ -232,6 +232,7 @@ const templateContainsLanguage = (template: Template, languageId: string): boole
 
   // Check if template explicitly matches the language in languages array
   if (templateLanguages.length > 0 && templateLanguages.includes(normalizedLanguage)) {
+    console.log('[LANGUAGE MATCH] Template', template.id, 'matches via languages array:', templateLanguages, 'for language:', normalizedLanguage);
     return true;
   }
 
@@ -251,6 +252,7 @@ const templateContainsLanguage = (template: Template, languageId: string): boole
     });
 
     if (hasLanguageKeyword) {
+      console.log('[LANGUAGE MATCH] Template', template.id, 'matches via tags:', normalizedTags, 'keywords:', keywords, 'for language:', normalizedLanguage);
       return true;
     }
 
@@ -269,6 +271,7 @@ const templateContainsLanguage = (template: Template, languageId: string): boole
 
       // If no language keywords found at all, show for English (default)
       if (!hasAnyLanguageKeyword) {
+        console.log('[LANGUAGE MATCH] Template', template.id, 'matches via English default (no language keywords found)');
         return true;
       }
     }
@@ -281,10 +284,15 @@ const templateContainsLanguage = (template: Template, languageId: string): boole
   // This prevents templates without language info from showing for all languages
   if (templateLanguages.length === 0 && tags.length === 0) {
     // Show only for English (default language) if template has no language info
-    return normalizedLanguage === 'english';
+    const matches = normalizedLanguage === 'english';
+    if (matches) {
+      console.log('[LANGUAGE MATCH] Template', template.id, 'matches via language-agnostic English default');
+    }
+    return matches;
   }
 
   // If we have language info but it doesn't match, return false
+  console.log('[LANGUAGE MATCH] Template', template.id, 'does NOT match language:', normalizedLanguage, 'languages:', templateLanguages, 'tags:', tags);
   return false;
 };
 
@@ -854,8 +862,9 @@ const PosterPlayerScreen: React.FC = () => {
       } else {
         // Clear templates and filters - PROTECT SEARCH FLOW AND GENERAL FROM SEARCH
         if (!isSearchFlow && !isGeneralFromSearch) {
-          setAllTemplates([]);
-          allTemplatesRef.current = [];
+          console.log('[SAFE GUARD] Prevented empty template overwrite - using safe reset');
+          // setAllTemplates([]); // REMOVED - Prevents breaking filteredPosters
+          // allTemplatesRef.current = [];
         }
       }
       
@@ -1795,6 +1804,7 @@ const PosterPlayerScreen: React.FC = () => {
   }, [type, posterLimit, isBusinessFromSearch]);
 
   const filteredPosters = useMemo(() => {
+    console.log('[FILTERED POSTERS] Computing with language:', selectedLanguage, 'allTemplates:', allTemplates.length);
 
     // EVENT PLANNER: Filter by service keywords using standardized exact matching
     if (isEventPlannerCategory && selectedServiceFilter && serviceFilterTemplates['eventplanner']) {
@@ -1807,17 +1817,22 @@ const PosterPlayerScreen: React.FC = () => {
         return tagsMatchCategory(templateTags, keywords);
       });
 
-      // Apply language filtering to already filtered templates
+      console.log('[FILTERED POSTERS] EventPlanner after service filter:', filteredByTags.length);
+
+      // 🎯 CRITICAL: Always apply language filter
       if (selectedLanguage === 'all') {
         const result = filteredByTags.map(t => mergeTemplateLanguages(t));
+        console.log('[FILTERED POSTERS] EventPlanner "All" result:', result.length);
         return shouldApplySixPosterLimit ? result.slice(0, 6) : result;
       }
 
       const languageFiltered = filteredByTags.filter(template => {
-        return templateContainsLanguage(template, selectedLanguage);
+        const matches = templateContainsLanguage(template, selectedLanguage);
+        return matches;
       });
 
       const result = languageFiltered.map(t => mergeTemplateLanguages(t));
+      console.log('[FILTERED POSTERS] EventPlanner language filtered result:', result.length, 'for language:', selectedLanguage);
       return shouldApplySixPosterLimit ? result.slice(0, 6) : result;
     }
 
@@ -1827,7 +1842,20 @@ const PosterPlayerScreen: React.FC = () => {
 
       // INITIAL DISPLAY: Show templates (limited only if from Business Categories)
       if (!selectedSoftwareCategory) {
-        const result = softwareTemplates.map(t => mergeTemplateLanguages(t));
+        // 🎯 CRITICAL: Always apply language filter
+        if (selectedLanguage === 'all') {
+          const result = softwareTemplates.map(t => mergeTemplateLanguages(t));
+          console.log('[FILTERED POSTERS] SoftwareCompany "All" result:', result.length);
+          return shouldApplySixPosterLimit ? result.slice(0, 6) : result;
+        }
+
+        const languageFiltered = softwareTemplates.filter(template => {
+          const matches = templateContainsLanguage(template, selectedLanguage);
+          return matches;
+        });
+
+        const result = languageFiltered.map(t => mergeTemplateLanguages(t));
+        console.log('[FILTERED POSTERS] SoftwareCompany language filtered result:', result.length, 'for language:', selectedLanguage);
         return shouldApplySixPosterLimit ? result.slice(0, 6) : result;
       }
 
@@ -1844,22 +1872,35 @@ const PosterPlayerScreen: React.FC = () => {
         return tagsMatchCategory(templateTags, selectedCategoryButton.tags);
       });
 
-      // Apply language filtering to already filtered templates
+      console.log('[FILTERED POSTERS] SoftwareCompany after category filter:', filteredByCategory.length);
+
+      // 🎯 CRITICAL: Always apply language filter
       if (selectedLanguage === 'all') {
         const result = filteredByCategory.map(t => mergeTemplateLanguages(t));
+        console.log('[FILTERED POSTERS] SoftwareCompany category "All" result:', result.length);
         return shouldApplySixPosterLimit ? result.slice(0, 6) : result;
       }
 
       const filteredByLanguage = filteredByCategory.filter(template => {
-        return templateContainsLanguage(template, selectedLanguage);
+        const matches = templateContainsLanguage(template, selectedLanguage);
+        return matches;
       });
 
       const result = filteredByLanguage.map(t => mergeTemplateLanguages(t));
+      console.log('[FILTERED POSTERS] SoftwareCompany category language filtered result:', result.length, 'for language:', selectedLanguage);
       return shouldApplySixPosterLimit ? result.slice(0, 6) : result;
     }
 
     // Ensure all templates have languages merged before filtering
     const templatesWithLanguages = allTemplates.map(t => mergeTemplateLanguages(t));
+
+    console.log('[FILTERED POSTERS] Default case - templates with languages:', templatesWithLanguages.length);
+
+    // 🎯 CRITICAL: Always apply language filter
+    if (selectedLanguage === 'all') {
+      console.log('[FILTERED POSTERS] Default "All" result:', templatesWithLanguages.length);
+      return templatesWithLanguages;
+    }
 
     // Filter by language - if no matches, return empty array
     const languageFiltered = templatesWithLanguages.filter(template => {
@@ -1867,22 +1908,10 @@ const PosterPlayerScreen: React.FC = () => {
       return matches;
     });
 
-    // If no language matches, show nothing
-    if (languageFiltered.length === 0) {
-      return [];
-    }
+    console.log('[FILTERED POSTERS] Default language filtered result:', languageFiltered.length, 'for language:', selectedLanguage);
 
-    // Inline service filter logic to avoid callback dependency
-    const serviceFiltered = isEventPlannerCategory && selectedServiceFilter
-      ? languageFiltered.filter(template => {
-          const keywords = serviceFilterKeywords[selectedServiceFilter] || [];
-          const templateTags = Array.isArray(template.tags) ? template.tags : [];
-          return tagsMatchCategory(templateTags, keywords);
-        })
-      : languageFiltered;
-
-    // Return service-filtered results (even if empty, don't fallback to all templates)
-    return serviceFiltered;
+    // Return language-filtered results (even if empty, don't fallback to all templates)
+    return languageFiltered;
   }, [serviceFilterTemplates, isEventPlannerCategory, selectedServiceFilter, serviceFilterKeywords, selectedLanguage, isSoftwareCompanyCategory, selectedSoftwareCategory, softwareCategoryButtons, allTemplates, shouldApplySixPosterLimit]);
 
   // Preload images for better scrolling performance
@@ -2137,8 +2166,9 @@ const PosterPlayerScreen: React.FC = () => {
       
       // SAFE RESET (only internal state, no UI changes) - PROTECT SEARCH FLOW AND GENERAL FROM SEARCH
       if (!isSearchFlow && !isGeneralFromSearch) {
-        setAllTemplates([]);
-        allTemplatesRef.current = [];
+        console.log('[SAFE GUARD] Prevented empty template overwrite - using safe reset');
+        // setAllTemplates([]); // REMOVED - Prevents breaking filteredPosters
+        // allTemplatesRef.current = [];
       }
       setServiceFilterTemplates({});
       
@@ -2330,7 +2360,8 @@ const PosterPlayerScreen: React.FC = () => {
 
     // Clear allTemplates immediately to prevent showing old posters in grid - PROTECT SEARCH FLOW AND GENERAL FROM SEARCH
     if (!isSearchFlow && !isGeneralFromSearch) {
-      setAllTemplates([]);
+      console.log('[SAFE GUARD] Prevented empty template overwrite - using safe reset');
+      // setAllTemplates([]); // REMOVED - Prevents breaking filteredPosters
     }
 
     // Reset language to "All" when switching to different greeting category
@@ -3306,7 +3337,8 @@ const PosterPlayerScreen: React.FC = () => {
 
     // Clear allTemplates immediately to prevent showing old posters in grid - PROTECT SEARCH FLOW AND GENERAL FROM SEARCH
     if (!isSearchFlow && !isGeneralFromSearch) {
-      setAllTemplates([]);
+      console.log('[SAFE GUARD] Prevented empty template overwrite - using safe reset');
+      // setAllTemplates([]); // REMOVED - Prevents breaking filteredPosters
     }
     // Reset language to "All" when switching to different calendar date
     if (activeCategoryRef.current.type !== 'calendar' || activeCategoryRef.current.value !== calendarDate) {
@@ -3999,6 +4031,8 @@ const PosterPlayerScreen: React.FC = () => {
   );
 
   const handleLanguageChange = useCallback((languageId: string) => {
+    console.log('[LANG CHANGE] Language selected:', languageId);
+    
     // Mark that user manually selected a language (including "All")
     // This prevents auto-detection from overriding user's choice
     userManuallySelectedLanguageRef.current = true;
@@ -4532,8 +4566,20 @@ const PosterPlayerScreen: React.FC = () => {
         {/* Language Filter Buttons or Subscription Message - Horizontal below preview */}
         {shouldShowSubscriptionMessage ? (
           // Show subscription message for business categories from HomeScreen
-          <View style={styles.subscriptionMessageContainer}>
-            <Text style={styles.subscriptionMessageTitle}>For Premium images — Subscribe Now.</Text>
+          <View style={[
+            styles.subscriptionMessageContainer,
+            {
+              backgroundColor: theme.colors.background,
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+            },
+          ]}>
+            <Text style={[
+              styles.subscriptionMessageTitle,
+              { color: theme.colors.text },
+            ]}>
+              For Premium images — Subscribe Now.
+            </Text>
           </View>
         ) : (
           // Show language filter buttons for all other cases

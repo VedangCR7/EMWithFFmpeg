@@ -2,6 +2,7 @@ import React from 'react';
 import { Modal, View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Dimensions } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
+import { useTheme } from '../context/ThemeContext';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -19,6 +20,8 @@ const PremiumTemplateModal: React.FC<PremiumTemplateModalProps> = ({
   onUpgrade,
   selectedTemplate,
 }) => {
+  const { theme } = useTheme();
+  
   return (
     <Modal
       visible={visible}
@@ -34,15 +37,21 @@ const PremiumTemplateModal: React.FC<PremiumTemplateModalProps> = ({
           bounces={false}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={[styles.upgradeModalContent, { backgroundColor: '#ffffff' }]}> 
-            <View style={styles.premiumBadge}>
-              <Icon name="star" size={isSmallScreen ? 14 : 16} color="#DAA520" />
-              <Text style={[styles.premiumBadgeText, { color: '#B8860B' }]}>PREMIUM</Text>
+          <View style={[styles.upgradeModalContent, { backgroundColor: theme.colors.cardBackground }]}> 
+            <View style={[
+              styles.premiumBadge,
+              { 
+                backgroundColor: `${theme.colors.primary}15`,
+                borderColor: `${theme.colors.primary}30`
+              }
+            ]}>
+              <Icon name="star" size={isSmallScreen ? 14 : 16} color={theme.colors.primary} />
+              <Text style={[styles.premiumBadgeText, { color: theme.colors.primary }]}>PREMIUM</Text>
             </View>
 
             <View style={styles.upgradeModalHeader}>
-              <Text style={[styles.upgradeModalTitle, { color: '#1a1a1a' }]}>Unlock Premium Template</Text>
-              <Text style={[styles.upgradeModalSubtitle, { color: '#666666' }]}>Get access to this exclusive template and all premium features</Text>
+              <Text style={[styles.upgradeModalTitle, { color: theme.colors.text }]}>Unlock Premium Template</Text>
+              <Text style={[styles.upgradeModalSubtitle, { color: theme.colors.textSecondary }]}>Get access to this exclusive template and all premium features</Text>
             </View>
 
             {selectedTemplate && (
@@ -61,29 +70,29 @@ const PremiumTemplateModal: React.FC<PremiumTemplateModalProps> = ({
 
             <View style={styles.featuresList}>
               <View style={styles.featureItem}>
-                <Icon name="check-circle" size={isSmallScreen ? 14 : 16} color="#4CAF50" />
-                <Text style={[styles.featureText, { color: '#1a1a1a' }]}>Access to all premium templates</Text>
+                <Icon name="check-circle" size={isSmallScreen ? 14 : 16} color={theme.colors.primary} />
+                <Text style={[styles.featureText, { color: theme.colors.text }]}>Access to all premium templates</Text>
               </View>
               <View style={styles.featureItem}>
-                <Icon name="check-circle" size={isSmallScreen ? 14 : 16} color="#4CAF50" />
-                <Text style={[styles.featureText, { color: '#1a1a1a' }]}>No watermarks on final designs</Text>
+                <Icon name="check-circle" size={isSmallScreen ? 14 : 16} color={theme.colors.primary} />
+                <Text style={[styles.featureText, { color: theme.colors.text }]}>No watermarks on final designs</Text>
               </View>
               <View style={styles.featureItem}>
-                <Icon name="check-circle" size={isSmallScreen ? 14 : 16} color="#4CAF50" />
-                <Text style={[styles.featureText, { color: '#1a1a1a' }]}>Priority customer support</Text>
+                <Icon name="check-circle" size={isSmallScreen ? 14 : 16} color={theme.colors.primary} />
+                <Text style={[styles.featureText, { color: theme.colors.text }]}>Priority customer support</Text>
               </View>
               <View style={styles.featureItem}>
-                <Icon name="check-circle" size={isSmallScreen ? 14 : 16} color="#4CAF50" />
-                <Text style={[styles.featureText, { color: '#1a1a1a' }]}>Advanced editing features</Text>
+                <Icon name="check-circle" size={isSmallScreen ? 14 : 16} color={theme.colors.primary} />
+                <Text style={[styles.featureText, { color: theme.colors.text }]}>Advanced editing features</Text>
               </View>
             </View>
 
             <View style={styles.upgradeModalFooter}>
               <TouchableOpacity 
-                style={[styles.cancelButton, { borderColor: '#cccccc' }]}
+                style={[styles.cancelButton, { borderColor: theme.colors.border }]}
                 onPress={onClose}
               >
-                <Text style={[styles.cancelButtonText, { color: '#666666' }]}>Maybe Later</Text>
+                <Text style={[styles.cancelButtonText, { color: theme.colors.textSecondary }]}>Maybe Later</Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.upgradeButton}
@@ -93,7 +102,7 @@ const PremiumTemplateModal: React.FC<PremiumTemplateModalProps> = ({
                 }}
               >
                 <LinearGradient
-                  colors={[ '#FF6B6B', '#FF8E53' ]}
+                  colors={[ theme.colors.primary, theme.colors.secondary ]}
                   style={styles.upgradeButtonGradient}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}

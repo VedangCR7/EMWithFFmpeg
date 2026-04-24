@@ -61,7 +61,7 @@ const RatingSection: React.FC<{ rating: number; setRating: (rating: number) => v
           <Icon
             name={star <= rating ? 'star' : 'star-border'}
             size={32}
-            color={star <= rating ? '#FFC107' : '#DDD'}
+            color={star <= rating ? theme.colors.primary : theme.colors.border}
           />
         </TouchableOpacity>
       ))}
@@ -86,8 +86,8 @@ const CategoryGrid: React.FC<{
           style={[
             styles.categoryCard,
             {
-              backgroundColor: selectedCategory === category.value ? '#E3F2FD' : theme.colors.cardBackground,
-              borderColor: selectedCategory === category.value ? '#2196F3' : 'transparent',
+              backgroundColor: selectedCategory === category.value ? `${theme.colors.primary}15` : theme.colors.cardBackground,
+              borderColor: selectedCategory === category.value ? theme.colors.primary : 'transparent',
               borderWidth: selectedCategory === category.value ? 2 : 0,
             }
           ]}
@@ -95,8 +95,11 @@ const CategoryGrid: React.FC<{
           activeOpacity={0.7}
         >
           {selectedCategory === category.value && (
-            <View style={styles.checkmarkBadge}>
-              <Icon name="check" size={16} color="#2196F3" />
+            <View style={[
+              styles.checkmarkBadge,
+              { backgroundColor: theme.colors.cardBackground }
+            ]}>
+              <Icon name="check" size={16} color={theme.colors.primary} />
             </View>
           )}
           <Text style={styles.categoryIcon}>{category.icon}</Text>
@@ -245,7 +248,7 @@ const FeedbackScreen: React.FC = () => {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: '#F8F9FB', paddingTop: insets.top }]}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background, paddingTop: insets.top }]}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -329,7 +332,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     marginBottom: 10,
-    color: '#555',
   },
   starsContainer: {
     flexDirection: 'row',
@@ -393,7 +395,6 @@ const styles = StyleSheet.create({
   feedbackInput: {
     borderWidth: 1,
     borderRadius: 12,
-    borderColor: '#DDD',
     paddingHorizontal: 16,
     paddingVertical: 16,
     fontSize: 16,
