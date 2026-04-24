@@ -2,6 +2,7 @@ import React from 'react';
 import { Modal, View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
+import { useTheme } from '../context/ThemeContext';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -23,6 +24,8 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
   message,
   onConfirm,
 }) => {
+  const { theme } = useTheme();
+  
   const handleConfirm = () => {
     if (onConfirm) {
       onConfirm();
@@ -45,29 +48,29 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
           bounces={false}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={[styles.modalContent, { backgroundColor: '#ffffff' }]}>
+          <View style={[styles.modalContent, { backgroundColor: theme.colors.cardBackground }]}>
             {/* Icon and Badge */}
             <View style={styles.iconContainer}>
               <View style={[styles.iconBadge, { 
-                backgroundColor: type === 'success' ? 'rgba(76, 175, 80, 0.1)' : 'rgba(244, 67, 54, 0.1)' 
+                backgroundColor: type === 'success' ? 'rgba(76, 175, 80, 0.1)' : '#2196F330' 
               }]}>
                 <Icon 
-                  name={type === 'success' ? 'check-circle' : 'error'} 
+                  name={type === 'success' ? 'check-circle' : 'info'} 
                   size={isSmallScreen ? 32 : 40} 
-                  color={type === 'success' ? '#4CAF50' : '#F44336'} 
+                  color={type === 'success' ? '#4CAF50' : '#2196F3'} 
                 />
               </View>
               <Text style={[styles.statusText, { 
-                color: type === 'success' ? '#4CAF50' : '#F44336' 
+                color: type === 'success' ? '#4CAF50' : '#2196F3' 
               }]}>
-                {type === 'success' ? 'SUCCESS' : 'ERROR'}
+                {type === 'success' ? 'SUCCESS' : 'Failed'}
               </Text>
             </View>
 
             {/* Content */}
             <View style={styles.contentContainer}>
-              <Text style={[styles.title, { color: '#1a1a1a' }]}>{title}</Text>
-              <Text style={[styles.message, { color: '#666666' }]}>{message}</Text>
+              <Text style={[styles.title, { color: theme.colors.text }]}>{title}</Text>
+              <Text style={[styles.message, { color: theme.colors.textSecondary }]}>{message}</Text>
             </View>
 
             {/* Action Button */}

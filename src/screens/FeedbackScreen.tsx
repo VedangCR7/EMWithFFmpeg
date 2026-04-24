@@ -61,7 +61,7 @@ const RatingSection: React.FC<{ rating: number; setRating: (rating: number) => v
           <Icon
             name={star <= rating ? 'star' : 'star-border'}
             size={32}
-            color={star <= rating ? theme.colors.primary : theme.colors.border}
+            color={star <= rating ? '#FFD700' : theme.colors.border}
           />
         </TouchableOpacity>
       ))}
