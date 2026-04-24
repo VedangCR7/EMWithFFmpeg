@@ -789,6 +789,7 @@ const PosterPlayerScreen: React.FC = () => {
   const flowSource = useMemo(() => {
     if (originScreen === "MainTabs") return "MyBusiness";
     if (templateSource === "professional") return "HomeScreen";
+    if (templateSource === "search") return "Search";
     return "Other";
   }, [originScreen, templateSource]);
 
@@ -824,14 +825,12 @@ const PosterPlayerScreen: React.FC = () => {
       validationReason: shouldShowSoftwareButtons ? 'ALLOWED' : 'BLOCKED',
       // DEBUG: Add individual flow checks
       isMyBusinessFlow: flowSource === "MyBusiness" && normalizedSubCategory === 'software company',
-      isHomeTemplateFlow: flowSource === "HomeScreen" && templateSource === "professional" && normalizedCategory === 'software company',
+      isHomeTemplateFlow: flowSource === "HomeScreen" && templateSource === 'professional' && normalizedCategory === 'software company',
       isHomeSubcategoryFlow: flowSource === "HomeScreen" && normalizedSubCategory === 'software company',
-      isHomeBusinessCategoryFlow: flowSource === "HomeScreen" && templateSource === "professional" && categoryName === 'Software Company'
+      isHomeBusinessCategoryFlow: flowSource === "HomeScreen" && templateSource === 'professional' && categoryName === 'Software Company',
+      isSearchBusinessCategoryFlow: flowSource === "Search" && templateSource === 'search' && categoryName === 'Software Company'
     });
-  }, [flowSource, isSoftwareCompanyCategory, shouldShowSoftwareButtons, normalizedCategory, normalizedSubCategory, categoryName, currentPoster?.category, initialPoster?.category, templateSource, originScreen]);
 
-  // Auto-set language to "All" when navigating from MyBusiness tab
-  useEffect(() => {
     console.log("PosterPlayer origin:", originScreen);
 
     const cameFromTab = originScreen === "MainTabs";
@@ -1590,7 +1589,13 @@ const PosterPlayerScreen: React.FC = () => {
     // CASE 4: HomeScreen Business Category Flow (FIXED)
     const isHomeBusinessCategoryFlow =
       flowSource === "HomeScreen" &&
-      templateSource === "professional" &&
+      templateSource === 'professional' &&
+      categoryName === 'Software Company';
+
+    // CASE 5: Search Business Category Flow (NEW)
+    const isSearchBusinessCategoryFlow =
+      flowSource === "Search" &&
+      templateSource === 'search' &&
       categoryName === 'Software Company';
 
     // DEBUG: Log individual flow results
@@ -1599,6 +1604,7 @@ const PosterPlayerScreen: React.FC = () => {
       isHomeTemplateFlow,
       isHomeSubcategoryFlow,
       isHomeBusinessCategoryFlow,
+      isSearchBusinessCategoryFlow,
       isSoftware
     });
 
@@ -1606,7 +1612,8 @@ const PosterPlayerScreen: React.FC = () => {
       isMyBusinessFlow ||
       isHomeTemplateFlow ||
       isHomeSubcategoryFlow ||
-      isHomeBusinessCategoryFlow
+      isHomeBusinessCategoryFlow ||
+      isSearchBusinessCategoryFlow
     );
 
     console.log('🔍 [FINAL RESULT]', { shouldShow, reason: shouldShow ? 'SHOW BUTTONS' : 'HIDE BUTTONS' });

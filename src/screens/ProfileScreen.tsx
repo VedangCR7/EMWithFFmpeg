@@ -2230,7 +2230,7 @@ const ProfileScreen: React.FC = () => {
             color: theme.colors.textSecondary,
             fontSize: getFontSize(8),
             marginTop: dynamicModerateScale(14),
-          }]}>Version 1.2</Text>
+          }]}>Version 1.1.0</Text>
         </ScrollView>
       </LinearGradient>
 
@@ -2587,20 +2587,7 @@ const ProfileScreen: React.FC = () => {
               <View style={[styles.signOutModalButtons, {
                 gap: dynamicModerateScale(8),
               }]}>
-                <TouchableOpacity 
-                  style={[styles.signOutCancelButton, { 
-                    backgroundColor: theme.colors.inputBackground,
-                    paddingVertical: dynamicModerateScale(9),
-                    borderRadius: dynamicModerateScale(10),
-                  }]}
-                  onPress={() => setShowSignOutModal(false)}
-                >
-                  <Text style={[styles.signOutCancelButtonText, { 
-                    color: theme.colors.text,
-                    fontSize: getFontSize(10),
-                  }]}>Cancel</Text>
-                </TouchableOpacity>
-                
+                                
                 <TouchableOpacity 
                   style={[styles.signOutConfirmButton, { 
                     backgroundColor: '#ff4444',
@@ -2722,25 +2709,7 @@ const ProfileScreen: React.FC = () => {
               <View style={[styles.signOutModalButtons, {
                 gap: dynamicModerateScale(12),
               }]}>
-                {!isDeletingAccount && (
-                  <TouchableOpacity 
-                    style={[styles.deleteAccountCancelButton, { 
-                      backgroundColor: '#ffffff',
-                      borderWidth: 1,
-                      borderColor: '#cccccc',
-                      paddingVertical: dynamicModerateScale(14),
-                      borderRadius: dynamicModerateScale(10),
-                    }]}
-                    onPress={() => setShowDeleteAccountModal(false)}
-                  >
-                    <Text style={[styles.deleteAccountCancelButtonText, { 
-                      color: theme.colors.text,
-                      fontSize: getFontSize(9),
-                      fontWeight: '600',
-                    }]} numberOfLines={1}>Cancel</Text>
-                  </TouchableOpacity>
-                )}
-                
+                                
                 <TouchableOpacity 
                   style={[styles.deleteAccountConfirmButton, { 
                     backgroundColor: isDeletingAccount ? '#cccccc' : '#ff4444',

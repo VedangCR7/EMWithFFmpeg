@@ -2725,8 +2725,8 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
               return;
             }
             
-            // Validate business category if business type (but skip if coming from MyBusinessPosterPlayer or IndustryCategoryScreen)
-            if (type === "business" && source !== "MyBusinessPosterPlayer" && source !== "IndustryCategoryScreen") {
+            // Validate business category if business type (but skip if coming from MyBusinessPosterPlayer, IndustryCategoryScreen, or TemplateGallery)
+            if (type === "business" && source !== "MyBusinessPosterPlayer" && source !== "IndustryCategoryScreen" && source !== "TemplateGallery") {
               console.log(":mag: [POSTER EDITOR] Validating business category", {
                 businessProfileCategory: activeBusinessProfile?.category,
                 selectedTemplate: selectedTemplate,
@@ -2736,8 +2736,13 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
               // Extract template category from selected template
               let templateCategory = null;
               try {
-                const template = JSON.parse(selectedTemplate || "{}");
-                templateCategory = template.category || template.type || null;
+                // Skip template parsing for custom uploads (TemplateGallery) where selectedTemplate is undefined
+                if (selectedTemplate && selectedTemplate !== "undefined" && source !== "TemplateGallery") {
+                  const template = JSON.parse(selectedTemplate);
+                  templateCategory = template.category || template.type || null;
+                } else {
+                  console.log(":mag: [POSTER EDITOR] Skipping template parsing for custom upload from", source);
+                }
               } catch (error) {
                 console.error("Error parsing template:", error);
               }
@@ -2755,7 +2760,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                 setShowCategoryAccessModal(true);
                 return;
               }
-            } else if (type === "business" && (source === "MyBusinessPosterPlayer" || source === "IndustryCategoryScreen")) {
+            } else if (type === "business" && (source === "MyBusinessPosterPlayer" || source === "IndustryCategoryScreen" || source === "TemplateGallery")) {
               console.log(":mag: [POSTER EDITOR] Skipping business category validation - from " + source, {
                 source: source
               });
