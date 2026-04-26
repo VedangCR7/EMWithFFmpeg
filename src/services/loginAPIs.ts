@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { resetTokenExpirationFlag } from './api';
 import authService from './auth';
 import authApi from './authApi';
@@ -281,6 +282,9 @@ class LoginAPIsService {
           await authService.saveUserToStorage(completeUserData, authTokenToSave);
           authService.setCurrentUser(completeUserData);
 
+          // Remove logout flag since user is now explicitly logged in
+          await AsyncStorage.removeItem('isLoggedOut');
+
           // Reset token expiration flag on successful login
           resetTokenExpirationFlag();
 
@@ -383,6 +387,9 @@ class LoginAPIsService {
         await authService.saveUserToStorage(user, authTokenToSave);
         authService.setCurrentUser(user);
 
+        // Remove logout flag since user is now explicitly logged in
+        await AsyncStorage.removeItem('isLoggedOut');
+
         // Reset token expiration flag on successful login
         resetTokenExpirationFlag();
 
@@ -431,6 +438,9 @@ class LoginAPIsService {
             // Update storage with complete profile data
             await authService.saveUserToStorage(completeUserData, authTokenToSave);
             authService.setCurrentUser(completeUserData);
+
+            // Ensure logout flag is removed even after profile update
+            await AsyncStorage.removeItem('isLoggedOut');
           } else {
             console.log('⚠️ Profile API returned no data, using basic user data');
           }

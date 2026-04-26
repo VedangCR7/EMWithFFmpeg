@@ -21,6 +21,7 @@ import {
   Platform,
   InteractionManager,
   Alert,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Video from 'react-native-video';
@@ -28,7 +29,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { MainStackParamList } from '../navigation/types';
 import dashboardService, { Banner, Template } from '../services/dashboard';
@@ -719,7 +720,8 @@ const RecentSearchList: React.FC<RecentSearchListProps> = React.memo(({
   onClearAll,
   theme
 }) => {
-  {__DEV__ && console.log('🔍 RecentSearchList rendered with:', { recentSearches, length: recentSearches.length })}
+  // Removed debug logging to prevent console spam
+  // Component only re-renders when props actually change
   
   if (recentSearches.length === 0) {
     return (
@@ -729,7 +731,7 @@ const RecentSearchList: React.FC<RecentSearchListProps> = React.memo(({
             Recent Searches
           </Text>
         </View>
-        <Text style={[styles.recentSearchText, { color: theme.colors.textSecondary, textAlign: 'center', paddingVertical: 16 }]}>
+        <Text style={[styles.recentSearchesText, { color: theme.colors.textSecondary, textAlign: 'center', paddingVertical: 16 }]}>
           No recent searches yet
         </Text>
       </View>
@@ -742,35 +744,53 @@ const RecentSearchList: React.FC<RecentSearchListProps> = React.memo(({
         <Text style={[styles.recentSearchesTitle, { color: theme.colors.text }]}>
           Recent Searches
         </Text>
-        <TouchableOpacity
-          onPress={onClearAll}
-          style={styles.clearAllButton}
-        >
-          <Text style={[styles.clearAllText, { color: theme.colors.primary }]}>
-            Clear All
-          </Text>
-        </TouchableOpacity>
+
       </View>
-      <View style={styles.recentSearchesList}>
-        {recentSearches.map((search, index) => (
-          <TouchableOpacity
-            key={`${search}-${index}`}
-            style={[styles.recentSearchItem, { borderBottomColor: theme.colors.border }]}
-            onPress={() => onSelectSearch(search)}
-          >
-            <Icon
-              name="history"
-              size={16}
-              color={theme.colors.textSecondary}
-              style={styles.recentSearchIcon}
-            />
-            <Text style={[styles.recentSearchText, { color: theme.colors.text }]}>
-              {search}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      <ScrollView 
+        style={{ maxHeight: moderateScale(250) }} 
+        showsVerticalScrollIndicator={false}
+        nestedScrollEnabled={true}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.recentSearchesList}>
+          {recentSearches.map((search, index) => (
+            <TouchableOpacity
+              key={`${search}-${index}`}
+              style={[styles.recentSearchItem, { borderBottomColor: theme.colors.border }]}
+              onPress={() => {
+                {__DEV__ && console.log('👆 RecentSearchItem pressed:', search)}
+                onSelectSearch(search)
+              }}
+              activeOpacity={0.7}
+            >
+              <Icon 
+                name="history" 
+                size={moderateScale(16)} 
+                color={theme.colors.textSecondary} 
+                style={styles.recentSearchIcon}
+              />
+              <Text style={[styles.recentSearchText, { color: theme.colors.text, flex: 1 }]}>
+                {search}
+              </Text>
+              <Icon 
+                name="arrow-forward" 
+                size={moderateScale(14)} 
+                color={theme.colors.textSecondary} 
+                style={styles.recentSearchArrowIcon}
+              />
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
     </View>
+  );
+}, (prevProps, nextProps) => {
+  // Custom comparison function - only re-render if props actually changed
+  return (
+    prevProps.recentSearches === nextProps.recentSearches &&
+    prevProps.onSelectSearch === nextProps.onSelectSearch &&
+    prevProps.onClearAll === nextProps.onClearAll &&
+    prevProps.theme === nextProps.theme
   );
 });
 
@@ -779,6 +799,7 @@ const HomeScreen: React.FC = React.memo(() => {
   const { isSubscriptionActive, refreshSubscription } = useSubscription();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<StackNavigationProp<MainStackParamList>>();
+  const isFocused = useIsFocused();
 
   // Get current user info
   const userProfileSectionRef = useRef<React.ElementRef<typeof TouchableOpacity>>(null);
@@ -3042,6 +3063,7 @@ const HomeScreen: React.FC = React.memo(() => {
 
   // Clean search implementation - single pipeline
   useEffect(() => {
+    {__DEV__ && console.log('🔍 Search useEffect triggered, query:', searchQuery, 'isSearching:', isSearching)}
     // Reset immediately if search is empty
     if (searchQuery.trim() === '') {
       setSearchResults([]);
@@ -3049,8 +3071,8 @@ const HomeScreen: React.FC = React.memo(() => {
       return;
     }
 
-    // Only trigger search after 3 characters
-    if (searchQuery.trim().length < 3) {
+    // Only trigger search after 3 characters unless explicitly searching (e.g. from history)
+    if (searchQuery.trim().length < 3 && !isSearching) {
       setSearchResults([]);
       setIsSearching(false);
       return;
@@ -3058,6 +3080,7 @@ const HomeScreen: React.FC = React.memo(() => {
 
     // Debounce search execution
     const timeoutId = setTimeout(async () => {
+      {__DEV__ && console.log('🔍 Executing search for:', searchQuery)}
       if (searchQuery.trim() === '') return;
 
       // Generate new request ID
@@ -3263,18 +3286,31 @@ const HomeScreen: React.FC = React.memo(() => {
     }
   }, []);
 
-  const selectRecentSearch = useCallback((search: string) => {
-    {__DEV__ && console.log('🔍 Selected recent search:', search)}
-    setSearchQuery(search);
+  // Optimized callbacks for RecentSearchList to prevent re-renders
+  const handleRecentSearchSelect = useCallback((item: string) => {
+    {__DEV__ && console.log('🔍 Recent search selected:', item)}
+    setSearchQuery(item);
     setIsSearchInputFocused(false);
-    // The search will be triggered automatically by the useEffect that watches searchQuery
+    
+    // Explicitly trigger search logic
+    if (item.trim().length > 0) {
+      setIsSearching(true);
+      // We rely on the useEffect to pick up the searchQuery change
+      // But we can also trigger any immediate actions if needed
+    }
   }, []);
 
+  const handleRecentSearchClear = useCallback(() => {
+    clearRecentSearches();
+  }, [clearRecentSearches]);
+
+  
   // Load recent searches on component mount
   useEffect(() => {
     loadRecentSearches();
   }, [loadRecentSearches]);
 
+  
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
 
@@ -3537,7 +3573,8 @@ const HomeScreen: React.FC = React.memo(() => {
   const toggleSearchBar = useCallback(() => {
     setIsSearchBarVisible(prev => {
       if (!prev) {
-        // When opening search, clear any existing search
+        // When opening search, clear any existing search and show history
+        setIsSearchInputFocused(true);
         return true;
       } else {
         // When closing search, clear search query and reset
@@ -4690,7 +4727,6 @@ const HomeScreen: React.FC = React.memo(() => {
         {item.map((category, categoryIndex) => {
           const previewTemplates = businessCategoryPreviews[category.id] || [];
           const handlePress = () => {
-            closeBusinessCategoriesModal();
             handleBusinessCategoryPress(category);
           };
           const isLastInRow = categoryIndex === item.length - 1;
@@ -4710,11 +4746,10 @@ const HomeScreen: React.FC = React.memo(() => {
         })}
       </View>
     );
-  }, [modalCardWidth, modalCardGap, modalColumns, businessCategoryPreviews, closeBusinessCategoriesModal, handleBusinessCategoryPress]);
+  }, [modalCardWidth, modalCardGap, modalColumns, businessCategoryPreviews, handleBusinessCategoryPress]);
 
   const renderVideoModalItem = useCallback(({ item, index }: { item: VideoContent; index: number }) => {
     const handlePress = () => {
-      closeVideosModal();
       const videoData: Template = {
         id: item.id,
         name: item.title,
@@ -4738,13 +4773,12 @@ const HomeScreen: React.FC = React.memo(() => {
         onPress={handlePress}
       />
     );
-  }, [modalCardWidth, modalCardGap, modalColumns, closeVideosModal, navigation, videoContent]);
+  }, [modalCardWidth, modalCardGap, modalColumns, navigation, videoContent]);
 
 
   const renderBusinessEthicsModalItem = useCallback(({ item, index }: { item: Template; index: number }) => {
     const templates = businessEthicsTemplatesRaw.length > 0 ? businessEthicsTemplatesRaw : businessEthicsTemplates;
     const handlePress = () => {
-      closeBusinessEthicsModal();
       navigation.navigate('PosterPlayer', {
         selectedPoster: item,
         relatedPosters: templates.filter(t => t.id !== item.id),
@@ -4760,12 +4794,11 @@ const HomeScreen: React.FC = React.memo(() => {
         onPress={handlePress}
       />
     );
-  }, [modalCardWidth, modalCardGap, modalColumns, businessEthicsTemplatesRaw, businessEthicsTemplates, closeBusinessEthicsModal, navigation]);
+  }, [modalCardWidth, modalCardGap, modalColumns, businessEthicsTemplatesRaw, businessEthicsTemplates, navigation]);
 
   const renderSuccessMindsetModalItem = useCallback(({ item, index }: { item: Template; index: number }) => {
     const templates = successMindsetTemplatesRaw.length > 0 ? successMindsetTemplatesRaw : successMindsetTemplates;
     const handlePress = () => {
-      closeSuccessMindsetModal();
       navigation.navigate('PosterPlayer', {
         selectedPoster: item,
         relatedPosters: templates.filter(t => t.id !== item.id),
@@ -4781,12 +4814,11 @@ const HomeScreen: React.FC = React.memo(() => {
         onPress={handlePress}
       />
     );
-  }, [modalCardWidth, modalCardGap, modalColumns, successMindsetTemplatesRaw, successMindsetTemplates, closeSuccessMindsetModal, navigation]);
+  }, [modalCardWidth, modalCardGap, modalColumns, successMindsetTemplatesRaw, successMindsetTemplates, navigation]);
 
   const renderSocialMediaGrowthModalItem = useCallback(({ item, index }: { item: Template; index: number }) => {
     const templates = socialMediaGrowthTemplatesRaw.length > 0 ? socialMediaGrowthTemplatesRaw : socialMediaGrowthTemplates;
     const handlePress = () => {
-      closeSocialMediaGrowthModal();
       navigation.navigate('PosterPlayer', {
         selectedPoster: item,
         relatedPosters: templates.filter(t => t.id !== item.id),
@@ -4802,12 +4834,11 @@ const HomeScreen: React.FC = React.memo(() => {
         onPress={handlePress}
       />
     );
-  }, [modalCardWidth, modalCardGap, modalColumns, socialMediaGrowthTemplatesRaw, socialMediaGrowthTemplates, closeSocialMediaGrowthModal, navigation]);
+  }, [modalCardWidth, modalCardGap, modalColumns, socialMediaGrowthTemplatesRaw, socialMediaGrowthTemplates, navigation]);
 
   const renderMoneyAndFinanceModalItem = useCallback(({ item, index }: { item: Template; index: number }) => {
     const templates = moneyAndFinanceTemplatesRaw.length > 0 ? moneyAndFinanceTemplatesRaw : moneyAndFinanceTemplates;
     const handlePress = () => {
-      closeMoneyAndFinanceModal();
       navigation.navigate('PosterPlayer', {
         selectedPoster: item,
         relatedPosters: templates.filter(t => t.id !== item.id),
@@ -4823,12 +4854,11 @@ const HomeScreen: React.FC = React.memo(() => {
         onPress={handlePress}
       />
     );
-  }, [modalCardWidth, modalCardGap, modalColumns, moneyAndFinanceTemplatesRaw, moneyAndFinanceTemplates, closeMoneyAndFinanceModal, navigation]);
+  }, [modalCardWidth, modalCardGap, modalColumns, moneyAndFinanceTemplatesRaw, moneyAndFinanceTemplates, navigation]);
 
   const renderBusinessLegendQuoteModalItem = useCallback(({ item, index }: { item: Template; index: number }) => {
     const templates = businessLegendQuoteTemplatesRaw.length > 0 ? businessLegendQuoteTemplatesRaw : businessLegendQuoteTemplates;
     const handlePress = () => {
-      closeBusinessLegendQuoteModal();
       navigation.navigate('PosterPlayer', {
         selectedPoster: item,
         relatedPosters: templates.filter(t => t.id !== item.id),
@@ -4844,12 +4874,11 @@ const HomeScreen: React.FC = React.memo(() => {
         onPress={handlePress}
       />
     );
-  }, [modalCardWidth, modalCardGap, modalColumns, businessLegendQuoteTemplatesRaw, businessLegendQuoteTemplates, closeBusinessLegendQuoteModal, navigation]);
+  }, [modalCardWidth, modalCardGap, modalColumns, businessLegendQuoteTemplatesRaw, businessLegendQuoteTemplates, navigation]);
 
   const renderBusinessMarketingTipsModalItem = useCallback(({ item, index }: { item: Template; index: number }) => {
     const templates = businessMarketingTipsTemplatesRaw.length > 0 ? businessMarketingTipsTemplatesRaw : businessMarketingTipsTemplates;
     const handlePress = () => {
-      closeBusinessMarketingTipsModal();
       navigation.navigate('PosterPlayer', {
         selectedPoster: item,
         relatedPosters: templates.filter(t => t.id !== item.id),
@@ -4865,12 +4894,11 @@ const HomeScreen: React.FC = React.memo(() => {
         onPress={handlePress}
       />
     );
-  }, [modalCardWidth, modalCardGap, modalColumns, businessMarketingTipsTemplatesRaw, businessMarketingTipsTemplates, closeBusinessMarketingTipsModal, navigation]);
+  }, [modalCardWidth, modalCardGap, modalColumns, businessMarketingTipsTemplatesRaw, businessMarketingTipsTemplates, navigation]);
 
   const renderBusinessQuotesModalItem = useCallback(({ item, index }: { item: Template; index: number }) => {
     const templates = businessQuotesTemplatesRaw.length > 0 ? businessQuotesTemplatesRaw : businessQuotesTemplates;
     const handlePress = () => {
-      closeBusinessQuotesModal();
       navigation.navigate('PosterPlayer', {
         selectedPoster: item,
         relatedPosters: templates.filter(t => t.id !== item.id),
@@ -4886,7 +4914,7 @@ const HomeScreen: React.FC = React.memo(() => {
         onPress={handlePress}
       />
     );
-  }, [modalCardWidth, modalCardGap, modalColumns, businessQuotesTemplatesRaw, businessQuotesTemplates, closeBusinessQuotesModal, navigation]);
+  }, [modalCardWidth, modalCardGap, modalColumns, businessQuotesTemplatesRaw, businessQuotesTemplates, navigation]);
 
 
   const renderFeaturedContentModalItem = useCallback(({ item, index }: { item: FeaturedContent; index: number }) => {
@@ -4904,7 +4932,6 @@ const HomeScreen: React.FC = React.memo(() => {
       .filter(fc => fc.id !== item.id)
       .map(convertFeaturedContentToTemplate);
     const handlePress = () => {
-      closeFeaturedContentModal();
       navigation.navigate('PosterPlayer', {
         selectedPoster: selectedTemplate,
         relatedPosters: relatedTemplates,
@@ -4920,7 +4947,7 @@ const HomeScreen: React.FC = React.memo(() => {
         onPress={handlePress}
       />
     );
-  }, [modalCardWidth, modalCardGap, modalColumns, featuredContent, closeFeaturedContentModal, navigation]);
+  }, [modalCardWidth, modalCardGap, modalColumns, featuredContent, navigation]);
 
   // Memoized getItemLayout for modal FlatLists
   const getModalItemLayout = useCallback((data: any, index: number) => {
@@ -5409,12 +5436,13 @@ const HomeScreen: React.FC = React.memo(() => {
         translucent={true}
       />
 
-      <LinearGradient
-        colors={theme.colors.gradient}
-        style={styles.gradientBackground}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
+      <TouchableWithoutFeedback onPress={() => setIsSearchInputFocused(false)}>
+        <LinearGradient
+          colors={theme.colors.gradient}
+          style={styles.gradientBackground}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerTop}>
@@ -5490,40 +5518,54 @@ const HomeScreen: React.FC = React.memo(() => {
 
         {/* Search Bar */}
         {isSearchBarVisible && (
-          <View style={styles.searchContainer}>
-            <View style={[styles.searchBar, { backgroundColor: theme.colors.cardBackground }]}>
-              <Icon name="search" size={searchIconSize} color={theme.colors.textSecondary} style={styles.searchIcon} />
-              <TextInput
-                style={[styles.searchInput, { color: theme.colors.text }]}
-                placeholder="Search"
-                placeholderTextColor={theme.colors.textSecondary}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                autoFocus={true}
-                returnKeyType="search"
-                blurOnSubmit={true}
-                onFocus={() => {
-                  {__DEV__ && console.log('🔍 Search input focused')}
-                  setIsSearchInputFocused(true);
-                }}
-                onBlur={() => {
-                  {__DEV__ && console.log('🔍 Search input blurred')}
-                  setIsSearchInputFocused(false);
-                }}
-              />
-              {searchQuery.length > 0 && (
-                <TouchableOpacity
-                  onPress={() => {
-                    setSearchQuery('');
-                    setIsSearching(false);
-                    setSearchResults([]);
+          <View style={{ position: 'relative', zIndex: 10 }}>
+            <View style={styles.searchContainer}>
+              <View style={[styles.searchBar, { backgroundColor: theme.colors.cardBackground }]}>
+                <Icon name="search" size={searchIconSize} color={theme.colors.textSecondary} style={styles.searchIcon} />
+                <TextInput
+                  style={[styles.searchInput, { color: theme.colors.text }]}
+                  placeholder="Search"
+                  placeholderTextColor={theme.colors.textSecondary}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  autoFocus={true}
+                  returnKeyType="search"
+                  blurOnSubmit={true}
+                  onFocus={() => {
+                    {__DEV__ && console.log('🔍 Search input focused')}
+                    setIsSearchInputFocused(true);
                   }}
-                  style={styles.clearIcon}
-                >
-                  <Icon name="close" size={searchIconSize} color={theme.colors.textSecondary} />
-                </TouchableOpacity>
-              )}
+                  onBlur={() => {
+                    {__DEV__ && console.log('🔍 Search input blurred')}
+                    setTimeout(() => setIsSearchInputFocused(false), 200);
+                  }}
+                />
+                {searchQuery.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      setSearchQuery('');
+                      setIsSearching(false);
+                      setSearchResults([]);
+                    }}
+                    style={styles.clearIcon}
+                  >
+                    <Icon name="close" size={searchIconSize} color={theme.colors.textSecondary} />
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
+            
+            {/* Floating Recent Searches Dropdown */}
+            {searchQuery.trim() === '' && (
+              <View style={styles.dropdown}>
+                <RecentSearchList
+                  recentSearches={recentSearches}
+                  onSelectSearch={handleRecentSearchSelect}
+                  onClearAll={handleRecentSearchClear}
+                  theme={theme}
+                />
+              </View>
+            )}
           </View>
         )}
 
@@ -5568,14 +5610,20 @@ const HomeScreen: React.FC = React.memo(() => {
                       color={selectedCategory === 'business' ? '#ffffff' : '#667eea'}
                       style={styles.categoryButtonIcon}
                     />
-                    <Animated.Text style={[
-                      styles.categoryButtonText,
-                      styles.categoryButtonTextBusiness,
-                      {
-                        color: selectedCategory === 'business' ? '#ffffff' : '#667eea',
-                        opacity: businessCategoryFadeAnim,
-                      }
-                    ]}>
+                    <Animated.Text 
+                      style={[
+                        styles.categoryButtonText,
+                        styles.categoryButtonTextBusiness,
+                        {
+                          color: selectedCategory === 'business' ? '#ffffff' : '#667eea',
+                          opacity: businessCategoryFadeAnim,
+                          flexShrink: 1,
+                          minWidth: 0,
+                        }
+                      ]}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
                       {businessCategoryButtonLabel}
                     </Animated.Text>
                   </View>
@@ -6018,7 +6066,8 @@ const HomeScreen: React.FC = React.memo(() => {
           )}
 
         </ScrollView>
-      </LinearGradient>
+        </LinearGradient>
+      </TouchableWithoutFeedback>
 
       {/* Template Preview Modal */}
       <Modal
@@ -6074,7 +6123,7 @@ const HomeScreen: React.FC = React.memo(() => {
 
       {/* Business Categories Modal */}
       <Modal
-        visible={isBusinessCategoriesModalVisible}
+        visible={isFocused && isBusinessCategoriesModalVisible}
         transparent={true}
         animationType="fade"
         onRequestClose={closeBusinessCategoriesModal}
@@ -6128,7 +6177,7 @@ const HomeScreen: React.FC = React.memo(() => {
 
       {/* General Categories Modal */}
       <Modal
-        visible={isGeneralCategoriesModalVisible}
+        visible={isFocused && isGeneralCategoriesModalVisible}
         transparent={true}
         animationType="slide"
         onRequestClose={closeGeneralCategoriesModal}
@@ -6196,7 +6245,6 @@ const HomeScreen: React.FC = React.memo(() => {
                       theme={theme}
                       categoryImage={memoizedGreetingCategoryImages[item.id] || item.imageUrl || null}
                       onPress={(category) => {
-                        closeGeneralCategoriesModal();
                         const categoryImage = memoizedGreetingCategoryImages[item.id] || item.imageUrl || null;
                         handleGreetingCategoryPress(category, categoryImage);
                       }}
@@ -6211,7 +6259,7 @@ const HomeScreen: React.FC = React.memo(() => {
 
       {/* Video Content Modal */}
       <Modal
-        visible={isVideosModalVisible}
+        visible={isFocused && isVideosModalVisible}
         transparent={true}
         animationType="slide"
         onRequestClose={closeVideosModal}
@@ -6264,7 +6312,7 @@ const HomeScreen: React.FC = React.memo(() => {
 
       {/* Customer Support Modal */}
       <Modal
-        visible={isCustomerSupportModalVisible}
+        visible={isFocused && isCustomerSupportModalVisible}
         transparent={true}
         animationType="fade"
         onRequestClose={closeCustomerSupportModal}
@@ -6383,7 +6431,7 @@ const HomeScreen: React.FC = React.memo(() => {
 
       {/* Business Ethics Modal */}
       <Modal
-        visible={isBusinessEthicsModalVisible}
+        visible={isFocused && isBusinessEthicsModalVisible}
         transparent={true}
         animationType="slide"
         onRequestClose={closeBusinessEthicsModal}
@@ -6436,7 +6484,7 @@ const HomeScreen: React.FC = React.memo(() => {
 
       {/* Success Mindset Modal */}
       <Modal
-        visible={isSuccessMindsetModalVisible}
+        visible={isFocused && isSuccessMindsetModalVisible}
         transparent={true}
         animationType="slide"
         onRequestClose={closeSuccessMindsetModal}
@@ -6489,7 +6537,7 @@ const HomeScreen: React.FC = React.memo(() => {
 
       {/* Social Media Growth Modal */}
       <Modal
-        visible={isSocialMediaGrowthModalVisible}
+        visible={isFocused && isSocialMediaGrowthModalVisible}
         transparent={true}
         animationType="slide"
         onRequestClose={closeSocialMediaGrowthModal}
@@ -6542,7 +6590,7 @@ const HomeScreen: React.FC = React.memo(() => {
 
       {/* Money and Finance Modal */}
       <Modal
-        visible={isMoneyAndFinanceModalVisible}
+        visible={isFocused && isMoneyAndFinanceModalVisible}
         transparent={true}
         animationType="slide"
         onRequestClose={closeMoneyAndFinanceModal}
@@ -6595,7 +6643,7 @@ const HomeScreen: React.FC = React.memo(() => {
 
       {/* Business Legend Quote Modal */}
       <Modal
-        visible={isBusinessLegendQuoteModalVisible}
+        visible={isFocused && isBusinessLegendQuoteModalVisible}
         transparent={true}
         animationType="slide"
         onRequestClose={closeBusinessLegendQuoteModal}
@@ -6648,7 +6696,7 @@ const HomeScreen: React.FC = React.memo(() => {
 
       {/* Business Marketing Tips Modal */}
       <Modal
-        visible={isBusinessMarketingTipsModalVisible}
+        visible={isFocused && isBusinessMarketingTipsModalVisible}
         transparent={true}
         animationType="slide"
         onRequestClose={closeBusinessMarketingTipsModal}
@@ -6701,7 +6749,7 @@ const HomeScreen: React.FC = React.memo(() => {
 
       {/* Business Quotes Modal */}
       <Modal
-        visible={isBusinessQuotesModalVisible}
+        visible={isFocused && isBusinessQuotesModalVisible}
         transparent={true}
         animationType="slide"
         onRequestClose={closeBusinessQuotesModal}
@@ -6754,7 +6802,7 @@ const HomeScreen: React.FC = React.memo(() => {
 
 
       {/* Featured Content Modal */}
-      <Modal visible={isFeaturedContentModalVisible} transparent={true} animationType="slide" onRequestClose={closeFeaturedContentModal}>
+      <Modal visible={isFocused && isFeaturedContentModalVisible} transparent={true} animationType="slide" onRequestClose={closeFeaturedContentModal}>
         <View style={styles.modalOverlay}>
           <View style={[
             styles.upcomingEventsModalContent,
@@ -6795,35 +6843,6 @@ const HomeScreen: React.FC = React.memo(() => {
         </View>
       </Modal>
 
-      {/* Recent Searches Overlay - Shown when search input is focused and empty */}
-      {isSearchBarVisible && isSearchInputFocused && searchQuery.trim() === '' && (
-        <>
-          {__DEV__ && console.log('🔍 Recent Searches Debug:', {
-            isSearchBarVisible,
-            isSearchInputFocused,
-            searchQuery: searchQuery.trim(),
-            recentSearchesLength: recentSearches.length,
-            recentSearches
-          })}
-          <TouchableOpacity 
-            style={styles.recentSearchesOverlay}
-            activeOpacity={1}
-            onPress={() => setIsSearchInputFocused(false)}
-          >
-            <TouchableOpacity
-              activeOpacity={1}
-              onPress={e => e.stopPropagation()}
-            >
-              <RecentSearchList
-                recentSearches={recentSearches}
-                onSelectSearch={selectRecentSearch}
-                onClearAll={clearRecentSearches}
-                theme={theme}
-              />
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </>
-      )}
 
     </SafeAreaView>
   );
@@ -6966,6 +6985,9 @@ const styles = StyleSheet.create({
     paddingTop: moderateScale(6),
     paddingBottom: moderateScale(6),
     marginBottom: moderateScale(4),
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
   },
   calendarSection: {
     marginHorizontal: moderateScale(8),
@@ -7100,6 +7122,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginTop: moderateScale(8),
     gap: moderateScale(8),
+    paddingHorizontal: moderateScale(10),
   },
   categoryButton: {
     flex: 1,
@@ -8124,19 +8147,24 @@ const styles = StyleSheet.create({
   },
 
   // Recent Searches Styles
-  recentSearchesOverlay: {
+  dropdown: {
     position: 'absolute',
-    top: moderateScale(100), // Position below header
+    top: '100%',   // directly below search bar
     left: 0,
     right: 0,
-    zIndex: 1000,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)', // Semi-transparent backdrop
+    marginTop: -moderateScale(10),
+    zIndex: 999,
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
+    paddingHorizontal: moderateScale(12),
   },
   recentSearchesContainer: {
-    marginHorizontal: moderateScale(16),
-    marginTop: moderateScale(8),
-    borderRadius: moderateScale(12),
+    marginTop: 0,
+    borderBottomLeftRadius: moderateScale(12),
+    borderBottomRightRadius: moderateScale(12),
     padding: moderateScale(16),
+    width: '100%',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,

@@ -5,6 +5,7 @@ import {
   StyleSheet,
   FlatList,
   SectionList,
+  ScrollView,
   TouchableOpacity,
   TextInput,
   Alert,
@@ -100,8 +101,6 @@ const RecentSearchList: React.FC<RecentSearchListProps> = React.memo(({
   onClearAll,
   theme
 }) => {
-  {__DEV__ && console.log('🔍 RecentSearchList rendered with:', { recentSearches, length: recentSearches.length })}
-  
   if (recentSearches.length === 0) {
     return (
       <View style={[styles.recentSearchesContainer, { backgroundColor: theme.colors.cardBackground }]}>
@@ -123,35 +122,51 @@ const RecentSearchList: React.FC<RecentSearchListProps> = React.memo(({
         <Text style={[styles.recentSearchesTitle, { color: theme.colors.text }]}>
           Recent Searches
         </Text>
-        <TouchableOpacity
-          onPress={onClearAll}
-          style={[styles.clearAllButton, { backgroundColor: theme.colors.background }]}
-        >
-          <Text style={[styles.clearAllText, { color: theme.colors.primary }]}>
-            Clear All
-          </Text>
-        </TouchableOpacity>
       </View>
-      <View style={styles.recentSearchesList}>
-        {recentSearches.map((search, index) => (
-          <TouchableOpacity
-            key={`${search}-${index}`}
-            style={[styles.recentSearchItem, { borderBottomColor: theme.colors.border }]}
-            onPress={() => onSelectSearch(search)}
-          >
-            <Icon
-              name="history"
-              size={16}
-              color={theme.colors.textSecondary}
-              style={styles.recentSearchIcon}
-            />
-            <Text style={[styles.recentSearchText, { color: theme.colors.text }]}>
-              {search}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      <ScrollView 
+        style={{ maxHeight: moderateScale(250) }} 
+        showsVerticalScrollIndicator={false}
+        nestedScrollEnabled={true}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.recentSearchesList}>
+          {recentSearches.map((search, index) => (
+            <TouchableOpacity
+              key={`${search}-${index}`}
+              style={[styles.recentSearchItem, { borderBottomColor: theme.colors.border }]}
+              onPress={() => {
+                {__DEV__ && console.log('👆 RecentSearchItem pressed:', search)}
+                onSelectSearch(search)
+              }}
+              activeOpacity={0.7}
+            >
+              <Icon 
+                name="history" 
+                size={moderateScale(16)} 
+                color={theme.colors.textSecondary} 
+                style={styles.recentSearchIcon}
+              />
+              <Text style={[styles.recentSearchText, { color: theme.colors.text, flex: 1 }]}>
+                {search}
+              </Text>
+              <Icon 
+                name="arrow-forward" 
+                size={moderateScale(14)} 
+                color={theme.colors.textSecondary} 
+                style={styles.recentSearchArrowIcon}
+              />
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
     </View>
+  );
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.recentSearches === nextProps.recentSearches &&
+    prevProps.onSelectSearch === nextProps.onSelectSearch &&
+    prevProps.onClearAll === nextProps.onClearAll &&
+    prevProps.theme === nextProps.theme
   );
 });
 
@@ -1374,6 +1389,7 @@ const GreetingTemplatesScreen: React.FC = () => {
     // PosterPlayerScreen will fetch templates based on greetingCategory parameter
     navigation.navigate('PosterPlayer', {
       selectedPoster: selectedPoster,
+      selectedTemplateId: selectedPoster.id,
       relatedPosters: [],
       greetingCategory: category.name,
       originScreen: 'GreetingTemplates',
@@ -1761,14 +1777,16 @@ const GreetingTemplatesScreen: React.FC = () => {
           { 
             marginHorizontal: moderateScale(8),
             marginVertical: moderateScale(3),
-              },
-            ]}
-          >
+            position: 'relative', // Ensure relative parent for absolute dropdown
+            zIndex: 10,
+                },
+              ]}
+            >
             <View
               style={[
-            styles.searchBar, 
-            { 
-              backgroundColor: theme.colors.cardBackground,
+                styles.searchBar, 
+                { 
+                  backgroundColor: theme.colors.cardBackground,
                 },
               ]}
             >
@@ -1778,18 +1796,18 @@ const GreetingTemplatesScreen: React.FC = () => {
                 color={theme.colors.textSecondary}
                 style={{ marginLeft: moderateScale(2), marginRight: moderateScale(4) }}
               />
-            <TextInput
+              <TextInput
                 style={[styles.searchInput, { color: theme.colors.text }]}
                 placeholder="Search categories..."
-              placeholderTextColor={theme.colors.textSecondary}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
+                placeholderTextColor={theme.colors.textSecondary}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
                 onFocus={() => setIsSearchInputFocused(true)}
                 onBlur={() => setIsSearchInputFocused(false)}
                 autoFocus
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery('')}>
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')}>
                   <Icon
                     name="clear"
                     size={moderateScale(14)}
@@ -1800,42 +1818,25 @@ const GreetingTemplatesScreen: React.FC = () => {
                       padding: moderateScale(2),
                     }}
                   />
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-        )}
+                </TouchableOpacity>
+              )}
+            </View>
 
-        {/* Recent Searches Overlay - Shown when search input is focused and empty */}
-        {isSearchVisible && isSearchInputFocused && searchQuery.trim() === '' && (
-          <>
-            {__DEV__ && console.log('🔍 Recent Searches Debug:', {
-              isSearchVisible,
-              isSearchInputFocused,
-              searchQuery: searchQuery.trim(),
-              recentSearchesLength: recentSearches.length,
-              recentSearches
-            })}
-            <TouchableOpacity 
-              style={styles.recentSearchesOverlay}
-              activeOpacity={1}
-              onPress={() => setIsSearchInputFocused(false)}
-            >
-              <TouchableOpacity 
-                style={[styles.recentSearchesInnerContainer, { backgroundColor: theme.colors.cardBackground }]}
-                activeOpacity={1}
-                onPress={e => e.stopPropagation()}
-              >
+            {/* Floating Recent Searches Dropdown */}
+            {searchQuery.trim() === '' && (
+              <View style={styles.dropdown}>
                 <RecentSearchList
                   recentSearches={recentSearches}
                   onSelectSearch={selectRecentSearch}
                   onClearAll={clearRecentSearches}
                   theme={theme}
                 />
-              </TouchableOpacity>
-            </TouchableOpacity>
-          </>
+              </View>
+            )}
+          </View>
         )}
+
+
 
         <SectionList
           sections={groupedCategories}
@@ -2059,38 +2060,30 @@ const styles = StyleSheet.create({
   },
   
   // Recent Searches Styles
-  recentSearchesOverlay: {
+  dropdown: {
     position: 'absolute',
-    top: moderateScale(100), // Position below header
+    top: '100%',   // directly below search bar
     left: 0,
     right: 0,
-    bottom: 0,
-    zIndex: 1000,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)', // Semi-transparent backdrop
-  },
-  recentSearchesInnerContainer: {
-    marginHorizontal: moderateScale(16),
-    marginTop: moderateScale(8),
-    borderRadius: moderateScale(12),
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: moderateScale(2),
-    },
-    shadowOpacity: 0.15,
-    shadowRadius: moderateScale(4),
-    elevation: 3,
+    marginTop: -moderateScale(10),
+    zIndex: 999,
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
+    paddingHorizontal: moderateScale(12),
   },
   recentSearchesContainer: {
-    marginHorizontal: moderateScale(16),
-    marginTop: moderateScale(8),
-    borderRadius: moderateScale(12),
+    marginTop: 0,
+    borderBottomLeftRadius: moderateScale(12),
+    borderBottomRightRadius: moderateScale(12),
+    padding: moderateScale(16),
+    width: '100%',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: moderateScale(2),
     },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.1,
     shadowRadius: moderateScale(4),
     elevation: 3,
   },
@@ -2105,9 +2098,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   clearAllButton: {
-    paddingHorizontal: moderateScale(8),
     paddingVertical: moderateScale(4),
-    borderRadius: moderateScale(8),
+    paddingHorizontal: moderateScale(8),
   },
   clearAllText: {
     fontSize: moderateScale(12),
@@ -2120,15 +2112,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: moderateScale(8),
-    paddingHorizontal: moderateScale(12),
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: moderateScale(4),
+    borderBottomWidth: 1,
   },
   recentSearchIcon: {
-    marginRight: moderateScale(8),
+    marginRight: moderateScale(12),
   },
   recentSearchText: {
-    flex: 1,
     fontSize: moderateScale(14),
+    flex: 1,
+  },
+  recentSearchArrowIcon: {
+    marginLeft: moderateScale(4),
   },
 });
 

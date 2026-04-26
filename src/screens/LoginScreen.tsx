@@ -106,6 +106,12 @@ const LoginScreen: React.FC = ({ navigation }: any) => {
   const [showPassword, setShowPassword] = useState(false);
   const inputRefs = useRef<Record<string, TextInput | null>>({});
 
+  // Memoized form validity check with email regex and password length
+  const isFormValid = useMemo(() => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email.trim()) && password.length >= 8;
+  }, [email, password]);
+
   const registerInputRef = (field: string) => (ref: TextInput | null) => {
     inputRefs.current[field] = ref;
   };
@@ -334,11 +340,11 @@ const LoginScreen: React.FC = ({ navigation }: any) => {
               <TouchableOpacity 
                 style={[
                   styles.signInButton, 
-                  { backgroundColor: theme.colors.buttonPrimary },
-                  isLoading && styles.buttonDisabled
+                  { backgroundColor: isFormValid ? theme.colors.buttonPrimary : '#A0A0A0' },
+                  (isLoading || !isFormValid) && styles.buttonDisabled
                 ]} 
                 onPress={handleSignIn}
-                disabled={isLoading}
+                disabled={isLoading || !isFormValid}
               >
                 <Text style={[styles.signInButtonText, { color: '#ffffff' }]}>
                   {isLoading ? 'SIGNING IN...' : 'SIGN IN'}

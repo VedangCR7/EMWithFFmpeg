@@ -12,7 +12,7 @@ class AuthService {
     // Note: Constructor cannot be async, so we call loadStoredUser without await
     // The initialize() method should be called by the app to ensure proper async initialization
     this.loadStoredUser();
-    
+
     // Configure Google Sign-In
     GoogleSignin.configure({
       webClientId: '1037985236626-im6lbdis9q5g1bptng6g22ods7mf4bjh.apps.googleusercontent.com', // From your google-services.json
@@ -24,25 +24,25 @@ class AuthService {
   private async loadStoredUser() {
     try {
       console.log('Loading stored user from AsyncStorage...');
-      
+
       // STEP 0: Check if user explicitly logged out - prevent auto-restore
       const isLoggedOut = await AsyncStorage.getItem('isLoggedOut');
-      
+
       if (isLoggedOut === 'true') {
         console.log('🚫 User explicitly logged out - skipping auto login');
         this.notifyAuthStateListeners(null);
         return;
       }
-      
+
       // Check for regular user only
       const storedUser = await AsyncStorage.getItem('currentUser');
       const authToken = await AsyncStorage.getItem('authToken');
-      
+
       console.log('AsyncStorage check - User:', storedUser ? 'Found' : 'Not found');
       if (__DEV__) {
         console.log('AsyncStorage check - Token:', authToken ? 'Found' : 'Not found');
       }
-      
+
       // Print the full token for debugging
       if (authToken) {
         if (__DEV__) {
@@ -50,12 +50,12 @@ class AuthService {
           console.log('TOKEN LENGTH:', authToken.length);
         }
       }
-      
+
       // STRICT VALIDATION: Only restore session if BOTH valid token AND valid user exist
       if (storedUser && authToken && authToken.length > 10) {
         try {
           const parsedUser = JSON.parse(storedUser);
-          
+
           // Additional validation: Ensure user has required fields
           if (parsedUser && parsedUser.email && parsedUser.id) {
             this.currentUser = parsedUser;
@@ -64,7 +64,7 @@ class AuthService {
             if (__DEV__) {
               console.log('Token length:', authToken.length);
             }
-            
+
             // Mark as initialized and notify auth state listeners
             this.isInitialized = true;
             this.notifyAuthStateListeners(this.currentUser);
@@ -76,30 +76,30 @@ class AuthService {
           console.log('Failed to parse stored user data - clearing and requiring login');
         }
       }
-      
+
       // If we reach here, either data is invalid or missing
       console.log('No valid stored user or token found - user needs to login');
-      
+
       // Clear any invalid data to prevent future issues
       if (storedUser || authToken) {
         console.log('Clearing invalid auth data');
         await AsyncStorage.multiRemove(['currentUser', 'authToken', 'refreshToken', 'userData']);
       }
-      
+
       // Mark as initialized and notify with null to indicate no user
       this.isInitialized = true;
       this.notifyAuthStateListeners(null);
-      
+
     } catch (error) {
       console.error('Error loading stored user:', error);
-      
+
       // Clear any potentially corrupted data
       try {
         await AsyncStorage.multiRemove(['currentUser', 'authToken', 'refreshToken', 'userData']);
       } catch (clearError) {
         console.error('Error clearing corrupted data:', clearError);
       }
-      
+
       // Mark as initialized and notify with null on error to show login screen
       this.isInitialized = true;
       this.notifyAuthStateListeners(null);
@@ -120,7 +120,7 @@ class AuthService {
         if (__DEV__) {
           console.log('✅ Auth token saved successfully');
         }
-        
+
         // Verify token was saved
         const savedToken = await AsyncStorage.getItem('authToken');
         if (__DEV__) {
@@ -138,11 +138,11 @@ class AuthService {
   async registerUser(userData: any): Promise<any> {
     try {
       console.log('Registering new user with API...');
-      
+
       // Clear all service caches before registration to ensure fresh start
       console.log('🗑️ Clearing all service caches before registration...');
       await this.clearAllCaches();
-      
+
       // Prepare registration data with all available fields
       const registerData: RegisterRequest = {
         email: userData.email,
@@ -157,9 +157,9 @@ class AuthService {
         companyLogo: userData.companyLogo,
         displayName: userData.displayName,
       };
-      
+
       const response = await authApi.register(registerData);
-      
+
       if (response.success) {
         // Save user and token, protect ALL registration fields from future contamination
         const userData = {
@@ -172,7 +172,7 @@ class AuthService {
           _originalDescription: response.data.user.description || registerData.description || '',
           _originalAlternatePhone: response.data.user.alternatePhone || registerData.alternatePhone || '',
         };
-        
+
         console.log('✅ User registration successful via API:', userData.id);
         console.log('🔒 Protected original registration values:');
         console.log('   - _originalAddress:', userData._originalAddress);
@@ -180,16 +180,16 @@ class AuthService {
         console.log('   - _originalCategory:', userData._originalCategory);
         console.log('   - _originalDescription:', userData._originalDescription);
         console.log('   - _originalAlternatePhone:', userData._originalAlternatePhone);
-        
+
         this.currentUser = userData;
         await this.saveUserToStorage(userData, response.data.token);
-        
+
         // STEP 3: Remove logout flag since user is now explicitly registered/logged in
         await AsyncStorage.removeItem('isLoggedOut');
         console.log('✅ Logout flag cleared - user explicitly registered');
-        
+
         this.notifyAuthStateListeners(this.currentUser);
-        
+
         return { success: true, user: userData };
       } else {
         throw new Error('Registration failed');
@@ -205,18 +205,18 @@ class AuthService {
   async signInWithEmail(email: string, password: string): Promise<any> {
     try {
       console.log('Email sign-in with API...');
-      
+
       // Clear all service caches before login to ensure fresh data for new user
       console.log('🗑️ Clearing all service caches before login...');
       await this.clearAllCaches();
-      
+
       const loginData: LoginRequest = {
         email,
         password,
       };
-      
+
       const response = await authApi.login(loginData);
-      
+
       if (response.success) {
         // Save user and token, ensure _original* fields are preserved if they exist
         const userData = {
@@ -229,16 +229,16 @@ class AuthService {
           _originalDescription: response.data.user._originalDescription || response.data.user.description || '',
           _originalAlternatePhone: response.data.user._originalAlternatePhone || response.data.user.alternatePhone || '',
         };
-        
+
         this.currentUser = userData;
         await this.saveUserToStorage(userData, response.data.token);
-        
+
         // STEP 3: Remove logout flag since user is now explicitly logged in
         await AsyncStorage.removeItem('isLoggedOut');
         console.log('✅ Logout flag cleared - user explicitly logged in');
-        
+
         this.notifyAuthStateListeners(this.currentUser);
-        
+
         console.log('✅ Email sign-in successful via API:', userData.id);
         console.log('🔒 Protected values preserved:', {
           _originalAddress: userData._originalAddress,
@@ -268,26 +268,26 @@ class AuthService {
   async signInWithGoogle(): Promise<any> {
     try {
       console.log('Google Sign-In started...');
-      
+
       // Clear all service caches before login to ensure fresh data for new user
       console.log('🗑️ Clearing all service caches before login...');
       await this.clearAllCaches();
-      
+
       // Check if device supports Google Play Services
       await GoogleSignin.hasPlayServices();
-      
+
       // Sign in with Google
       const userInfo = await GoogleSignin.signIn();
-      
+
       console.log('Google Sign-In user info:', userInfo);
-      
+
       const googleAuthData: GoogleAuthRequest = {
         idToken: userInfo.data?.idToken || '',
         accessToken: userInfo.data?.serverAuthCode || '',
       };
-      
+
       const response = await authApi.googleLogin(googleAuthData);
-      
+
       if (response.success) {
         // Save user and token, ensure _original* fields are preserved if they exist
         const userData = {
@@ -300,16 +300,16 @@ class AuthService {
           _originalDescription: response.data.user._originalDescription || response.data.user.description || '',
           _originalAlternatePhone: response.data.user._originalAlternatePhone || response.data.user.alternatePhone || '',
         };
-        
+
         this.currentUser = userData;
         await this.saveUserToStorage(userData, response.data.token);
-        
+
         // STEP 3: Remove logout flag since user is now explicitly logged in
         await AsyncStorage.removeItem('isLoggedOut');
         console.log('✅ Logout flag cleared - user explicitly logged in');
-        
+
         this.notifyAuthStateListeners(this.currentUser);
-        
+
         console.log('✅ Google sign-in successful via API:', userData.id);
         console.log('🔒 Protected values preserved:', {
           _originalAddress: userData._originalAddress,
@@ -330,7 +330,7 @@ class AuthService {
       }
     } catch (error: any) {
       console.error('Google Sign-In Error:', error);
-      
+
       // Handle specific Google Sign-In errors
       if (error.code === 'SIGN_IN_CANCELLED') {
         throw new Error('Sign in was cancelled by user');
@@ -354,11 +354,11 @@ class AuthService {
   async signOut(): Promise<void> {
     try {
       console.log('Signing out user...');
-      
+
       // STEP 1: Capture auth token BEFORE clearing (needed for API logout)
       const authToken = await AsyncStorage.getItem('authToken');
       const isGoogleUser = this.currentUser?.providerId === 'google';
-      
+
       // STEP 2: Ensure full Google logout to prevent auto-login
       if (isGoogleUser) {
         try {
@@ -369,10 +369,10 @@ class AuthService {
           console.error('❌ Error during Google sign out:', googleError);
         }
       }
-      
+
       // STEP 3: Clear critical local data FIRST for instant UI update
       this.currentUser = null;
-      
+
       // STEP 4: Clear ALL auth state properly
       const keysToRemove = [
         'currentUser',
@@ -396,20 +396,20 @@ class AuthService {
         'profile_cache_last_update',
         'profile_cache_user_id',
       ];
-      
+
       await AsyncStorage.multiRemove(keysToRemove);
-      
+
       // STEP 4.5: Set logout flag to prevent auto-restore on next app launch
       await AsyncStorage.setItem('isLoggedOut', 'true');
       console.log('🚫 Logout flag set - preventing auto-restore');
-      
+
       // STEP 5: Notify listeners AFTER clearing storage to prevent race conditions
       this.notifyAuthStateListeners(null);
-      
+
       // STEP 6: Background cleanup (API logout with token, cache clearing)
       // Don't await these - let them run in background
       this.performBackgroundCleanup(authToken);
-      
+
       console.log('✅ Sign out completed - user navigated to login');
     } catch (error) {
       console.error('❌ Sign out error:', error);
@@ -418,11 +418,11 @@ class AuthService {
         this.currentUser = null;
         const keysToRemove = ['currentUser', 'authToken', 'user', 'isDemoUser'];
         await AsyncStorage.multiRemove(keysToRemove);
-        
+
         // STEP 4.5: Also set logout flag in error scenario
         await AsyncStorage.setItem('isLoggedOut', 'true');
         console.log('🚫 Logout flag set even in error scenario');
-        
+
         this.notifyAuthStateListeners(null);
         console.log('✅ Local cleanup completed despite error');
       } catch (cleanupError) {
@@ -438,7 +438,7 @@ class AuthService {
     setTimeout(async () => {
       try {
         const cleanupTasks = [];
-        
+
         // API logout with the captured token
         if (authToken) {
           cleanupTasks.push(
@@ -455,13 +455,13 @@ class AuthService {
             })()
           );
         }
-        
+
         // Clear all service caches
-        cleanupTasks.push(this.clearAllCaches().catch(() => {}));
-        
+        cleanupTasks.push(this.clearAllCaches().catch(() => { }));
+
         // Execute all cleanup tasks in parallel
         await Promise.all(cleanupTasks);
-        
+
         console.log('✅ Background cleanup completed');
       } catch (error) {
         // Silent fail - user already logged out locally
@@ -527,10 +527,10 @@ class AuthService {
   async debugAsyncStorage(): Promise<void> {
     try {
       console.log('🐛 ===== AsyncStorage Debug Info =====');
-      
+
       const currentUser = await AsyncStorage.getItem('currentUser');
       const authToken = await AsyncStorage.getItem('authToken');
-      
+
       console.log('📦 currentUser in AsyncStorage:', currentUser ? 'EXISTS' : 'NOT FOUND');
       if (currentUser) {
         const parsed = JSON.parse(currentUser);
@@ -538,7 +538,7 @@ class AuthService {
         console.log('   - User Email:', parsed.email);
         console.log('   - User Name:', parsed.companyName || parsed.displayName);
       }
-      
+
       if (__DEV__) {
         console.log('🔑 authToken in AsyncStorage:', authToken ? 'EXISTS' : 'NOT FOUND');
         if (authToken) {
@@ -547,13 +547,13 @@ class AuthService {
           console.log('   - Token Preview:', authToken.substring(0, 30) + '...');
         }
       }
-      
+
       console.log('👤 currentUser in memory:', this.currentUser ? 'EXISTS' : 'NOT FOUND');
       if (this.currentUser) {
         console.log('   - User ID:', this.currentUser.id || this.currentUser.uid);
         console.log('   - User Email:', this.currentUser.email);
       }
-      
+
       console.log('🔧 Is Initialized:', this.isInitialized);
       console.log('👂 Auth State Listeners:', this.authStateListeners.length);
       console.log('🐛 ===================================');
@@ -577,13 +577,13 @@ class AuthService {
   async initialize(): Promise<void> {
     try {
       console.log('🔧 Initializing auth service...');
-      
+
       // Ensure stored user is loaded (this may be called after constructor)
       await this.loadStoredUser();
-      
+
       console.log('✅ Auth service initialized successfully');
       console.log('Current user:', this.currentUser ? `${this.currentUser.email} (${this.currentUser.id})` : 'None');
-      
+
       // DISABLED: Auto Google session restore to prevent unintended login
       // Users must explicitly click Google Sign-In to authenticate
       // This prevents automatic login after sign out
@@ -597,7 +597,7 @@ class AuthService {
   // Listen to auth state changes
   onAuthStateChanged(callback: (user: any) => void) {
     this.authStateListeners.push(callback);
-    
+
     // Immediately call the callback with current state if initialization is complete
     // This ensures listeners get the current state even if they subscribe after initialization
     if (this.isInitialized) {
@@ -611,7 +611,7 @@ class AuthService {
     } else {
       console.log('⏳ onAuthStateChanged: Listener added, waiting for initialization to complete');
     }
-    
+
     // Return unsubscribe function
     return () => {
       const index = this.authStateListeners.indexOf(callback);
@@ -645,7 +645,7 @@ class AuthService {
           // Silent fail
         }
       })(),
-      
+
       // Business category posters cache
       (async () => {
         try {
@@ -655,7 +655,7 @@ class AuthService {
           // Silent fail
         }
       })(),
-      
+
       // Home API cache
       (async () => {
         try {
@@ -665,7 +665,7 @@ class AuthService {
           // Silent fail
         }
       })(),
-      
+
       // Templates cache
       (async () => {
         try {
@@ -675,7 +675,7 @@ class AuthService {
           // Silent fail
         }
       })(),
-      
+
       // Business categories cache
       (async () => {
         try {
@@ -685,7 +685,7 @@ class AuthService {
           // Silent fail
         }
       })(),
-      
+
       // Greeting templates cache
       (async () => {
         try {
@@ -695,7 +695,7 @@ class AuthService {
           // Silent fail
         }
       })(),
-      
+
       // Profile-related AsyncStorage in batch
       (async () => {
         try {
@@ -717,7 +717,7 @@ class AuthService {
         }
       })(),
     ];
-    
+
     // Execute all in parallel
     await Promise.all(cachePromises);
   }

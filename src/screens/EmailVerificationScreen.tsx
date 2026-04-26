@@ -1,4 +1,5 @@
 import React, { useCallback } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RouteProp } from '@react-navigation/native';
 import { Alert } from 'react-native';
@@ -30,6 +31,9 @@ const EmailVerificationScreen: React.FC<Props> = ({ navigation, route }) => {
       // Save token and user data
       await authService.saveUserToStorage(response.user, response.token);
       authService.setCurrentUser(response.user);
+      
+      // Remove logout flag since user is now explicitly logged in
+      await AsyncStorage.removeItem('isLoggedOut');
       
       // Notify auth state listeners to trigger navigation
       authService.notifyAuthStateListeners(response.user);
