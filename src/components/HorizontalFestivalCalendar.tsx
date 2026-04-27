@@ -10,6 +10,7 @@ import {
   Animated,
   Easing,
   Modal,
+  SafeAreaView,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useTheme } from '../context/ThemeContext';
@@ -730,12 +731,11 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
 
   // Render poster card for modal (2 columns)
   const renderModalPosterCard = useCallback(({ item }: { item: PosterWithDate }) => {
-    const modalWidth = SCREEN_WIDTH * 0.95;
-    const maxModalWidth = 600;
-    const actualModalWidth = Math.min(modalWidth, maxModalWidth);
-    const padding = moderateScale(24); // 12 padding on each side
-    const gap = moderateScale(8); // Gap between cards
-    const cardWidth = (actualModalWidth - padding - gap) / 2;
+    // Full-screen modal width calculation
+    const horizontalPadding = moderateScale(20); // 20 padding on each side
+    const gap = moderateScale(12); // Gap between cards
+    const availableWidth = SCREEN_WIDTH - (horizontalPadding * 2);
+    const cardWidth = (availableWidth - gap) / 2;
     const highQualityThumbnail = getModalThumbnailUrl(item.thumbnail);
     
     return (
@@ -948,68 +948,71 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
       {/* View More Modal */}
       <Modal
         visible={isFocused && isViewMoreModalVisible}
-        transparent={true}
+        transparent={false}
         animationType="slide"
         onRequestClose={() => setIsViewMoreModalVisible(false)}
-        statusBarTranslucent={true}
+        statusBarTranslucent={false}
       >
-        <View style={styles.modalOverlay}>
+        <SafeAreaView style={[
+          styles.fullScreenGreetingModalContent,
+          { backgroundColor: theme.colors.background }
+        ]}>
+          <LinearGradient
+            colors={[theme.colors.background, theme.colors.cardBackground]}
+            style={styles.upcomingEventsModalGradient}
+          >
+            {/* Modal Header */}
+            <View style={styles.upcomingEventsModalHeader}>
+              <View style={styles.upcomingEventsModalTitleContainer}>
+                <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>
+                  All Festive Alert Posters
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.upcomingEventsCloseButton}
+                onPress={() => setIsViewMoreModalVisible(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>×</Text>
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
+
+          {/* Modal Content */}
           <View style={[
-            styles.modalContainer,
+            styles.upcomingEventsModalBody,
             { backgroundColor: theme.colors.background }
           ]}>
-            <LinearGradient
-              colors={[theme.colors.background, theme.colors.cardBackground]}
-              style={styles.modalGradient}
-            >
-              {/* Modal Header */}
-              <View style={styles.modalHeader}>
-                <View style={styles.modalTitleContainer}>
-                  <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
-                    All Festive Alert Posters
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.modalCloseButton}
-                  onPress={() => setIsViewMoreModalVisible(false)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.modalCloseButtonText, { color: theme.colors.text }]}>✕</Text>
-                </TouchableOpacity>
+            {isLoadingAllPosters ? (
+              <View style={styles.modalLoadingContainer}>
+                <Text style={[styles.modalLoadingText, { color: theme.colors.textSecondary }]}>
+                  Loading posters...
+                </Text>
               </View>
-            </LinearGradient>
-
-            {/* Modal Content */}
-            <View style={[
-              styles.modalBody,
-              { backgroundColor: theme.colors.background }
-            ]}>
-              {isLoadingAllPosters ? (
-                <View style={styles.modalLoadingContainer}>
-                  <Text style={[styles.modalLoadingText, { color: theme.colors.textSecondary }]}>
-                    Loading posters...
-                  </Text>
-                </View>
-              ) : allPostersWithDates.length > 0 ? (
-                <FlatList
-                  data={allPostersWithDates}
-                  renderItem={renderModalPosterCard}
-                  keyExtractor={(item) => `${item.id}-${item.dateString}`}
-                  numColumns={2}
-                  columnWrapperStyle={styles.modalRow}
-                  contentContainerStyle={styles.modalContent}
-                  showsVerticalScrollIndicator={false}
-                />
-              ) : (
-                <View style={styles.modalEmptyContainer}>
-                  <Text style={[styles.modalEmptyText, { color: theme.colors.textSecondary }]}>
-                    No posters available
-                  </Text>
-                </View>
-              )}
-            </View>
+            ) : allPostersWithDates.length > 0 ? (
+              <FlatList
+                data={allPostersWithDates}
+                renderItem={renderModalPosterCard}
+                keyExtractor={(item) => `${item.id}-${item.dateString}`}
+                numColumns={2}
+                columnWrapperStyle={styles.upcomingEventModalRow}
+                contentContainerStyle={styles.upcomingEventsModalScroll}
+                showsVerticalScrollIndicator={false}
+                removeClippedSubviews={true}
+                maxToRenderPerBatch={10}
+                windowSize={5}
+                initialNumToRender={10}
+                updateCellsBatchingPeriod={50}
+              />
+            ) : (
+              <View style={styles.modalEmptyContainer}>
+                <Text style={[styles.modalEmptyText, { color: theme.colors.textSecondary }]}>
+                  No posters available
+                </Text>
+              </View>
+            )}
           </View>
-        </View>
+        </SafeAreaView>
       </Modal>
     </View>
   );
@@ -1152,11 +1155,19 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  modalContainer: {
+  // Full-screen modal style for greeting View More modals
+  fullScreenGreetingModalContent: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#ffffff', // This will be overridden by theme in the component
+    // No borderRadius, margins, or shadows for full-screen experience
+  },
+  upcomingEventsModalContent: {
     width: SCREEN_WIDTH >= 768 ? SCREEN_WIDTH * 0.90 : SCREEN_WIDTH * 0.96,
     maxWidth: SCREEN_WIDTH >= 768 ? 900 : SCREEN_WIDTH * 0.96,
     height: SCREEN_HEIGHT * 0.85,
@@ -1173,58 +1184,58 @@ const styles = StyleSheet.create({
     shadowRadius: moderateScale(12),
     elevation: 10,
   },
-  modalGradient: {
+  upcomingEventsModalGradient: {
     paddingTop: moderateScale(8),
     paddingBottom: moderateScale(4),
   },
-  modalHeader: {
+  upcomingEventsModalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: moderateScale(12),
+    alignItems: 'center', // Changed from flex-start to center
+    paddingHorizontal: moderateScale(16), // Increased from 12
+    paddingVertical: moderateScale(4), // Added vertical padding
   },
-  modalTitleContainer: {
+  upcomingEventsModalTitleContainer: {
     flex: 1,
-    marginRight: moderateScale(6),
+    marginRight: moderateScale(8), // Increased from 6
   },
-  modalTitle: {
-    fontSize: SCREEN_WIDTH >= 768 ? moderateScale(15) : moderateScale(13),
+  upcomingEventsModalTitle: {
+    fontSize: SCREEN_WIDTH >= 768 ? moderateScale(18) : moderateScale(16), // Increased from 15/13
     fontWeight: 'bold',
-    color: '#333333',
-    marginBottom: 0,
+    color: '#333333', // This will be overridden by theme in the component
+    marginBottom: 0, // No margin needed without subtitle
     textShadowColor: 'rgba(255,255,255,0.5)',
     textShadowOffset: { width: 0, height: 0.5 },
     textShadowRadius: 2,
   },
-  modalCloseButton: {
-    width: SCREEN_WIDTH >= 768 ? moderateScale(28) : moderateScale(26),
-    height: SCREEN_WIDTH >= 768 ? moderateScale(28) : moderateScale(26),
-    borderRadius: SCREEN_WIDTH >= 768 ? moderateScale(14) : moderateScale(13),
+  upcomingEventsCloseButton: {
+    width: SCREEN_WIDTH >= 768 ? moderateScale(34) : moderateScale(32), // Increased from 28/26
+    height: SCREEN_WIDTH >= 768 ? moderateScale(34) : moderateScale(32), // Increased from 28/26
+    borderRadius: SCREEN_WIDTH >= 768 ? moderateScale(17) : moderateScale(16), // Increased from 14/13
     backgroundColor: 'rgba(0,0,0,0.08)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 0.3,
     borderColor: 'rgba(0,0,0,0.1)',
   },
-  modalCloseButtonText: {
-    fontSize: SCREEN_WIDTH >= 768 ? moderateScale(15) : moderateScale(14),
+  upcomingEventsCloseButtonText: {
+    fontSize: SCREEN_WIDTH >= 768 ? moderateScale(18) : moderateScale(16), // Increased from 15/14
     color: '#333333',
     fontWeight: 'bold',
   },
-  modalBody: {
+  upcomingEventsModalBody: {
     flex: 1,
     backgroundColor: '#f8f9fa',
   },
-  modalContent: {
-    paddingHorizontal: 0,
-    paddingTop: moderateScale(12),
-    paddingBottom: moderateScale(12),
+  upcomingEventsModalScroll: {
+    paddingHorizontal: moderateScale(20),
+    paddingTop: moderateScale(16),
+    paddingBottom: moderateScale(20),
   },
-  modalRow: {
-    justifyContent: 'flex-start',
-    marginBottom: moderateScale(6),
-    paddingLeft: moderateScale(8),
-    paddingRight: moderateScale(8),
+  upcomingEventModalRow: {
+    justifyContent: 'space-between',
+    marginBottom: moderateScale(16),
+    // No horizontal padding here since it's handled by the parent container
   },
   modalPosterCard: {
     backgroundColor: '#ffffff',

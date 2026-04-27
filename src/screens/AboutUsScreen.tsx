@@ -702,7 +702,7 @@ const AboutUsScreen: React.FC = () => {
           <Text style={[dynamicStyles.versionText, {
             marginBottom: dynamicModerateScale(6),
           }]}>
-            Version 1.0.0 • Founded 2024
+            Version 1.1.0 • Founded 2025
           </Text>
           
           {/* Privacy Policy Link */}

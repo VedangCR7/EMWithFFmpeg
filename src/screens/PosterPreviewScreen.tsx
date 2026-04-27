@@ -757,7 +757,7 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
       minHeight: dynamicModerateScale(28),
     },
     editButtonText: {
-      color: '#ffffff',
+      color: theme?.colors?.text || '#ffffff',
       fontSize: dynamicModerateScale(8.5),
       fontWeight: '600' as const,
     },

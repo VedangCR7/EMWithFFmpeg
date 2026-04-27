@@ -1078,7 +1078,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: screenHeight * 0.06,
+    paddingTop: screenHeight * 0.03,
     paddingHorizontal: screenWidth * 0.05,
     paddingBottom: screenHeight * 0.02,
   },

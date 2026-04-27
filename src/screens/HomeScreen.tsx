@@ -1799,6 +1799,15 @@ const HomeScreen: React.FC = React.memo(() => {
           };
 
           // Update state directly to prevent sections from disappearing
+          if (__DEV__) console.log('🎨 Greeting Sections: Loading from cache -', {
+            businessEthics: greetingUpdates.businessEthics.display.length,
+            successMindset: greetingUpdates.successMindset.display.length,
+            socialMediaGrowth: greetingUpdates.socialMediaGrowth.display.length,
+            moneyAndFinance: greetingUpdates.moneyAndFinance.display.length,
+            businessLegendQuote: greetingUpdates.businessLegendQuote.display.length,
+            businessMarketingTips: greetingUpdates.businessMarketingTips.display.length,
+            businessQuotes: greetingUpdates.businessQuotes.display.length
+          });
           setBusinessEthicsTemplates(greetingUpdates.businessEthics.display);
           setBusinessEthicsTemplatesRaw(greetingUpdates.businessEthics.raw);
           setSuccessMindsetTemplates(greetingUpdates.successMindset.display);
@@ -2142,6 +2151,15 @@ const HomeScreen: React.FC = React.memo(() => {
 
             // Update state immediately (without startTransition) to ensure sections appear right away
             // This prevents the issue where sections don't show until app refresh
+            if (__DEV__) console.log('🎨 Greeting Sections: Loading from API -', {
+              businessEthics: greetingUpdates.businessEthics.display.length,
+              successMindset: greetingUpdates.successMindset.display.length,
+              socialMediaGrowth: greetingUpdates.socialMediaGrowth.display.length,
+              moneyAndFinance: greetingUpdates.moneyAndFinance.display.length,
+              businessLegendQuote: greetingUpdates.businessLegendQuote.display.length,
+              businessMarketingTips: greetingUpdates.businessMarketingTips.display.length,
+              businessQuotes: greetingUpdates.businessQuotes.display.length
+            });
             setBusinessEthicsTemplates(greetingUpdates.businessEthics.display);
             setBusinessEthicsTemplatesRaw(greetingUpdates.businessEthics.raw);
             setSuccessMindsetTemplates(greetingUpdates.successMindset.display);
@@ -2341,7 +2359,7 @@ const HomeScreen: React.FC = React.memo(() => {
       return;
     }
 
-    console.log(`BUSINESS CATEGORIES: Starting preview fetch for ${categories.length} categories`);
+    if (__DEV__) console.log(`📦 Business Categories: Loading previews for ${categories.length} categories`);
 
     // Process in batches for faster initial display
     const processBatch = async (batch: BusinessCategory[]) => {
@@ -2350,33 +2368,29 @@ const HomeScreen: React.FC = React.memo(() => {
         const imageEntries = await Promise.allSettled(
           batch.map(async (category: BusinessCategory) => {
             try {
-              console.log(`BUSINESS CATEGORIES: Fetching preview for ${category.name} (ID: ${category.id})`);
+              if (__DEV__) console.log(`📦 Loading: ${category.name}`);
               const response = await businessCategoryPostersApi.getPostersByCategory(category.name, 200); // Request all posters to show complete collection
               const posters = response.data?.posters || [];
 
-              console.log(`BUSINESS CATEGORIES: Got ${posters.length} posters for ${category.name}`);
 
               const templates = posters
                 .map((poster: any) => convertBusinessPosterToTemplate(poster, category.name))
                 .filter((template: Template) => !!template.thumbnail)
                 .slice(0, 6); // Show 6 images for business categories
 
-              console.log(`BUSINESS CATEGORIES: ${templates.length} valid templates for ${category.name}`);
 
               if (templates.length > 0) {
                 // Prefetch first thumbnail immediately for instant display
                 const firstThumbnail = templates[0]?.thumbnail;
                 if (firstThumbnail) {
-                  console.log(`BUSINESS CATEGORIES: Prefetching thumbnail for ${category.name}:`, firstThumbnail);
                   Image.prefetch(firstThumbnail).catch(() => { });
                 }
 
                 return { categoryId: category.id, templates, success: true };
               } else {
-                console.warn(`BUSINESS CATEGORIES: No valid templates found for ${category.name}`);
               }
             } catch (error) {
-              console.error(`BUSINESS CATEGORIES: Failed to fetch preview for category ${category.name}:`, error);
+              if (__DEV__) console.warn(`⚠️ Failed: ${category.name}`);
             }
             return { categoryId: category.id, templates: undefined, success: false };
           })
@@ -2386,9 +2400,7 @@ const HomeScreen: React.FC = React.memo(() => {
         imageEntries.forEach((result: PromiseSettledResult<{ categoryId: string; templates?: Template[]; success: boolean }>) => {
           if (result.status === 'fulfilled' && result.value.success && result.value.templates) {
             nextPreviews[result.value.categoryId] = result.value.templates;
-            console.log(`BUSINESS CATEGORIES: Successfully cached ${result.value.templates.length} templates for category ${result.value.categoryId}`);
           } else if (result.status === 'rejected') {
-            console.error(`BUSINESS CATEGORIES: Promise rejected for category:`, result.reason);
           }
         });
 
@@ -2396,7 +2408,7 @@ const HomeScreen: React.FC = React.memo(() => {
         if (Object.keys(nextPreviews).length > 0) {
           React.startTransition(() => {
             setBusinessCategoryPreviews(prev => ({ ...prev, ...nextPreviews }));
-            console.log(`BUSINESS CATEGORIES: Updated preview cache with ${Object.keys(nextPreviews).length} categories`);
+            if (__DEV__) console.log(`📦 Business Categories: Cached ${Object.keys(nextPreviews).length} previews`);
           });
         }
       } catch (error) {
@@ -3263,6 +3275,73 @@ const HomeScreen: React.FC = React.memo(() => {
 
     return () => clearTimeout(timeoutId);
   }, [searchQuery, businessCategories, filteredGreetingCategoriesList, filterCategories, businessEthicsTemplates, successMindsetTemplates, socialMediaGrowthTemplates, businessLegendQuoteTemplates, businessMarketingTipsTemplates, moneyAndFinanceTemplates, businessQuotesTemplates]);
+
+  // 🎨 DEBUG: Track greeting sections state and rendering conditions
+  useEffect(() => {
+    if (__DEV__) {
+      const greetingState = {
+        isSearching,
+        searchQuery: searchQuery.trim(),
+        businessEthics: businessEthicsTemplates.length,
+        successMindset: successMindsetTemplates.length,
+        socialMediaGrowth: socialMediaGrowthTemplates.length,
+        moneyAndFinance: moneyAndFinanceTemplates.length,
+        businessLegendQuote: businessLegendQuoteTemplates.length,
+        businessMarketingTips: businessMarketingTipsTemplates.length,
+        businessQuotes: businessQuotesTemplates.length,
+        businessCategoriesLoading,
+        businessCategories: businessCategories.length
+      };
+
+      // Check rendering conditions for each section
+      const renderConditions = {
+        businessEthics: !isSearching && searchQuery.trim() === '' && businessEthicsTemplates.length > 0,
+        successMindset: !isSearching && searchQuery.trim() === '' && successMindsetTemplates.length > 0,
+        socialMediaGrowth: !isSearching && searchQuery.trim() === '' && socialMediaGrowthTemplates.length > 0,
+        moneyAndFinance: !isSearching && searchQuery.trim() === '' && moneyAndFinanceTemplates.length > 0,
+        businessLegendQuote: !isSearching && searchQuery.trim() === '' && businessLegendQuoteTemplates.length > 0,
+        businessMarketingTips: !isSearching && searchQuery.trim() === '' && businessMarketingTipsTemplates.length > 0,
+        businessQuotes: !isSearching && searchQuery.trim() === '' && businessQuotesTemplates.length > 0
+      };
+
+      const visibleSections = Object.entries(renderConditions).filter(([_, visible]) => visible).map(([name]) => name);
+      const invisibleSections = Object.entries(renderConditions).filter(([_, visible]) => !visible).map(([name]) => name);
+
+      console.log('🎨 Greeting Sections State Check:', {
+        ...greetingState,
+        visibleSections: visibleSections.length,
+        invisibleSections: invisibleSections.length,
+        sectionList: visibleSections
+      });
+
+      // Alert if sections disappear (only if they had data before)
+      const sectionsWithData = ['businessEthics', 'successMindset', 'socialMediaGrowth', 'moneyAndFinance', 'businessLegendQuote', 'businessMarketingTips', 'businessQuotes'];
+      const problemSections = invisibleSections.filter(section => {
+        // Check if this section typically should have data (based on common patterns)
+        const commonDataSections = ['businessEthics', 'successMindset', 'socialMediaGrowth', 'businessLegendQuote', 'businessMarketingTips'];
+        return commonDataSections.includes(section);
+      });
+      
+      if (problemSections.length > 0 && greetingState.businessCategoriesLoading === false) {
+        console.warn('⚠️ Greeting sections with expected data missing:', problemSections);
+        console.warn('⚠️ State details:', greetingState);
+      } else if (invisibleSections.length > 0) {
+        if (__DEV__) console.log('ℹ️ Greeting sections with no data (expected):', invisibleSections);
+      }
+    }
+  }, [
+    isSearching, 
+    searchQuery, 
+    businessEthicsTemplates.length, 
+    successMindsetTemplates.length, 
+    socialMediaGrowthTemplates.length,
+    moneyAndFinanceTemplates.length,
+    businessLegendQuoteTemplates.length,
+    businessMarketingTipsTemplates.length,
+    businessQuotesTemplates.length,
+    businessCategoriesLoading,
+    businessCategories.length
+  ]);
 
   // Business Category Modal Search Logic
   useEffect(() => {
@@ -6414,7 +6493,7 @@ const HomeScreen: React.FC = React.memo(() => {
 
 
           {/* Business Ethics Section - Hidden when searching */}
-          {!isSearching && searchQuery.trim() === '' && (businessEthicsTemplates.length > 0 || greetingSectionsLoadedRef.current) && businessEthicsTemplates.length > 0 && (
+          {!isSearching && searchQuery.trim() === '' && businessEthicsTemplates.length > 0 && (
             <View style={styles.templatesSection}>
               <View style={styles.sectionHeader}>
                 <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
@@ -6444,7 +6523,7 @@ const HomeScreen: React.FC = React.memo(() => {
           )}
 
           {/* Success Mindset Section - Hidden when searching */}
-          {!isSearching && searchQuery.trim() === '' && (successMindsetTemplates.length > 0 || greetingSectionsLoadedRef.current) && successMindsetTemplates.length > 0 && (
+          {!isSearching && searchQuery.trim() === '' && successMindsetTemplates.length > 0 && (
             <View style={styles.templatesSection}>
               <View style={styles.sectionHeader}>
                 <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
@@ -6474,7 +6553,7 @@ const HomeScreen: React.FC = React.memo(() => {
           )}
 
           {/* Social Media Growth Section - Hidden when searching */}
-          {!isSearching && searchQuery.trim() === '' && (socialMediaGrowthTemplates.length > 0 || greetingSectionsLoadedRef.current) && socialMediaGrowthTemplates.length > 0 && (
+          {!isSearching && searchQuery.trim() === '' && socialMediaGrowthTemplates.length > 0 && (
             <View style={styles.templatesSection}>
               <View style={styles.sectionHeader}>
                 <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
@@ -6504,7 +6583,7 @@ const HomeScreen: React.FC = React.memo(() => {
           )}
 
           {/* Money and Finance Section - Hidden when searching */}
-          {!isSearching && searchQuery.trim() === '' && (moneyAndFinanceTemplates.length > 0 || greetingSectionsLoadedRef.current) && moneyAndFinanceTemplates.length > 0 && (
+          {!isSearching && searchQuery.trim() === '' && moneyAndFinanceTemplates.length > 0 && (
             <View style={styles.templatesSection}>
               <View style={styles.sectionHeader}>
                 <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
@@ -6534,7 +6613,7 @@ const HomeScreen: React.FC = React.memo(() => {
           )}
 
           {/* Business Legend Quote Section - Hidden when searching */}
-          {!isSearching && searchQuery.trim() === '' && (businessLegendQuoteTemplates.length > 0 || greetingSectionsLoadedRef.current) && businessLegendQuoteTemplates.length > 0 && (
+          {!isSearching && searchQuery.trim() === '' && businessLegendQuoteTemplates.length > 0 && (
             <View style={styles.templatesSection}>
               <View style={styles.sectionHeader}>
                 <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
@@ -6564,7 +6643,7 @@ const HomeScreen: React.FC = React.memo(() => {
           )}
 
           {/* Business Marketing Tips Section - Hidden when searching */}
-          {!isSearching && searchQuery.trim() === '' && (businessMarketingTipsTemplates.length > 0 || greetingSectionsLoadedRef.current) && businessMarketingTipsTemplates.length > 0 && (
+          {!isSearching && searchQuery.trim() === '' && businessMarketingTipsTemplates.length > 0 && (
             <View style={styles.templatesSection}>
               <View style={styles.sectionHeader}>
                 <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
@@ -6594,7 +6673,7 @@ const HomeScreen: React.FC = React.memo(() => {
           )}
 
           {/* Business Quotes Section - Hidden when searching */}
-          {!isSearching && searchQuery.trim() === '' && (businessQuotesTemplates.length > 0 || greetingSectionsLoadedRef.current) && businessQuotesTemplates.length > 0 && (
+          {!isSearching && searchQuery.trim() === '' && businessQuotesTemplates.length > 0 && (
             <View style={styles.templatesSection}>
               <View style={styles.sectionHeader}>
                 <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
