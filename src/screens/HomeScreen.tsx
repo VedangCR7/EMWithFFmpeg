@@ -437,9 +437,10 @@ interface GreetingCategoryCardProps {
   theme: any;
   categoryImage: string | null;
   onPress: (item: { id: string; name: string; icon: string; color?: string }, categoryImage: string | null) => void;
+  getThumbnailUrl: (url: string) => string;
 }
 
-const GreetingCategoryCard: React.FC<GreetingCategoryCardProps> = React.memo(({ item, cardWidth, theme, categoryImage, onPress }) => {
+const GreetingCategoryCard: React.FC<GreetingCategoryCardProps> = React.memo(({ item, cardWidth, theme, categoryImage, onPress, getThumbnailUrl }) => {
   const handlePress = useCallback(() => {
     onPress(item, categoryImage);
   }, [item, categoryImage, onPress]);
@@ -1468,6 +1469,18 @@ const HomeScreen: React.FC = React.memo(() => {
   const [isBusinessQuotesModalVisible, setIsBusinessQuotesModalVisible] = useState(false);
   const [isFeaturedContentModalVisible, setIsFeaturedContentModalVisible] = useState(false);
   const [isGeneralCategoriesModalVisible, setIsGeneralCategoriesModalVisible] = useState(false);
+  // General Category Modal Data states
+  const [modalGeneralCategories, setModalGeneralCategories] = useState<Array<{ id: string; name: string; icon: string; color?: string; imageUrl?: string; parentCategoryName?: string }>>([]);
+  const [isModalCategoriesLoading, setIsModalCategoriesLoading] = useState(false);
+  const [modalCategoriesError, setModalCategoriesError] = useState<string | null>(null);
+  // General Category Modal Search states
+  const [generalModalSearchQuery, setGeneralModalSearchQuery] = useState('');
+  const [isGeneralModalSearching, setIsGeneralModalSearching] = useState(false);
+  const [generalModalSearchResults, setGeneralModalSearchResults] = useState<any[]>([]);
+  const [generalModalRecentSearches, setGeneralModalRecentSearches] = useState<string[]>([]);
+  const [isGeneralModalSearchInputFocused, setIsGeneralModalSearchInputFocused] = useState(false);
+  const [isGeneralModalSearchBarVisible, setIsGeneralModalSearchBarVisible] = useState(false);
+  const [isGeneralCategoriesModalClosing, setIsGeneralCategoriesModalClosing] = useState(false);
 
   // Business Category Modal Search states
   const [businessModalSearchQuery, setBusinessModalSearchQuery] = useState('');
@@ -3300,6 +3313,95 @@ const HomeScreen: React.FC = React.memo(() => {
     return () => clearTimeout(timeoutId);
   }, [businessModalSearchQuery, businessCategories]);
 
+  // General Category Modal Search Logic
+  useEffect(() => {
+    // Reset immediately if search is empty
+    if (generalModalSearchQuery.trim() === '') {
+      setGeneralModalSearchResults([]);
+      setIsGeneralModalSearching(false);
+      return;
+    }
+
+    // Only trigger search after 3 characters
+    if (generalModalSearchQuery.trim().length < 3) {
+      setGeneralModalSearchResults([]);
+      setIsGeneralModalSearching(false);
+      return;
+    }
+
+    // Debounce search execution
+    const timeoutId = setTimeout(() => {
+      if (generalModalSearchQuery.trim() === '') return;
+
+      setIsGeneralModalSearching(true);
+      
+      try {
+        // Filter general categories that match the search query (using modal data)
+        const query = generalModalSearchQuery.toLowerCase().trim();
+        const filteredCategories = modalGeneralCategories.filter(category =>
+          category?.name?.toLowerCase().startsWith(query)
+        );
+
+        setGeneralModalSearchResults(filteredCategories);
+        
+        // Save recent search when results are successfully fetched
+        if (filteredCategories.length > 0) {
+          saveGeneralModalRecentSearch(generalModalSearchQuery);
+        }
+
+      } catch (error) {
+        console.warn('General modal search error:', error);
+        setGeneralModalSearchResults([]);
+      } finally {
+        setIsGeneralModalSearching(false);
+      }
+
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [generalModalSearchQuery, modalGeneralCategories]);
+
+  // Group general modal search results for sectioned display (matching main grouping logic)
+  const groupedGeneralModalSearchResults = useMemo(() => {
+    if (generalModalSearchResults.length === 0) return [];
+
+    const groups: Record<string, any[]> = {};
+    
+    generalModalSearchResults.forEach(category => {
+      // Use 'General' for categories without parentCategoryName (null, undefined, or empty string)
+      const parentName = (category.parentCategoryName && category.parentCategoryName.trim()) || 'General';
+      if (!groups[parentName]) {
+        groups[parentName] = [];
+      }
+      groups[parentName].push(category);
+    });
+    
+    // Convert to SectionList format with rows for proper grid layout
+    const sections = Object.keys(groups)
+      .sort((a, b) => {
+        // Sort: "General" first, then alphabetically
+        if (a === 'General') return -1;
+        if (b === 'General') return 1;
+        return a.localeCompare(b);
+      })
+      .map(parentName => {
+        const categories = groups[parentName];
+        // Group categories into rows based on generalCategoryModalColumns
+        const rows: any[][] = [];
+        for (let i = 0; i < categories.length; i += generalCategoryModalColumns) {
+          const row = categories.slice(i, i + generalCategoryModalColumns);
+          rows.push(row);
+        }
+        return {
+          title: parentName,
+          data: rows, // Each row is an array of categories
+        };
+      })
+      .filter(section => section.data.length > 0); // Filter out empty sections
+    
+    return sections;
+  }, [generalModalSearchResults, generalCategoryModalColumns]);
+
   // Group business modal search results by parentCategoryName for sectioned display
   const groupedBusinessModalSearchResults = useMemo(() => {
     if (businessModalSearchResults.length === 0) return [];
@@ -3448,11 +3550,58 @@ const HomeScreen: React.FC = React.memo(() => {
     }
   }, []);
 
+  // General Category Modal Recent searches AsyncStorage functions
+  const loadGeneralModalRecentSearches = useCallback(async () => {
+    try {
+      const stored = await AsyncStorage.getItem('GENERAL_MODAL_RECENT_SEARCHES');
+      if (stored) {
+        const searches = JSON.parse(stored);
+        const validSearches = Array.isArray(searches) ? searches : [];
+        setGeneralModalRecentSearches(validSearches);
+      } else {
+        setGeneralModalRecentSearches([]);
+      }
+    } catch (error) {
+      console.warn('Failed to load general modal recent searches:', error);
+      setGeneralModalRecentSearches([]);
+    }
+  }, []);
+
+  const saveGeneralModalRecentSearch = useCallback(async (query: string) => {
+    if (!query || query.trim().length < 3) return;
+    
+    const trimmedQuery = query.trim();
+    
+    try {
+      setGeneralModalRecentSearches(prev => {
+        const filtered = prev.filter(search => search !== trimmedQuery);
+        const updated = [trimmedQuery, ...filtered].slice(0, 5);
+        
+        AsyncStorage.setItem('GENERAL_MODAL_RECENT_SEARCHES', JSON.stringify(updated))
+          .catch(error => console.warn('Failed to save general modal recent searches:', error));
+        
+        return updated;
+      });
+    } catch (error) {
+      console.warn('Failed to save general modal recent search:', error);
+    }
+  }, []);
+
+  const clearGeneralModalRecentSearches = useCallback(async () => {
+    try {
+      await AsyncStorage.removeItem('GENERAL_MODAL_RECENT_SEARCHES');
+      setGeneralModalRecentSearches([]);
+    } catch (error) {
+      console.warn('Failed to clear general modal recent searches:', error);
+    }
+  }, []);
+
   // Load recent searches on component mount
   useEffect(() => {
     loadRecentSearches();
     loadBusinessModalRecentSearches();
-  }, [loadRecentSearches, loadBusinessModalRecentSearches]);
+    loadGeneralModalRecentSearches();
+  }, [loadRecentSearches, loadBusinessModalRecentSearches, loadGeneralModalRecentSearches]);
 
   
   const onRefresh = useCallback(async () => {
@@ -3858,12 +4007,64 @@ const HomeScreen: React.FC = React.memo(() => {
     handleViewAllBusinessCategories();
   }, [handleViewAllBusinessCategories]);
 
+  // Fetch all general categories for modal (independent from HomeScreen state)
+  const fetchAllGeneralCategoriesForModal = useCallback(async () => {
+    setIsModalCategoriesLoading(true);
+    setModalCategoriesError(null);
+    
+    try {
+      const categories = await greetingTemplatesService.getCategories();
+      if (categories && categories.length > 0) {
+        const mappedCategories = categories.map(category => ({
+          id: category.id,
+          name: category.name,
+          icon: category.icon,
+          color: (category as any).color,
+          imageUrl: (category as any).imageUrl || (category as any).image || (category as any).thumbnail || '',
+          parentCategoryName: (category as any).parentCategoryName
+        }));
+        setModalGeneralCategories(mappedCategories);
+      } else {
+        setModalCategoriesError('No categories found');
+      }
+    } catch (error) {
+      console.error('Error fetching general categories for modal:', error);
+      setModalCategoriesError('Failed to load categories. Please try again.');
+    } finally {
+      setIsModalCategoriesLoading(false);
+    }
+  }, []);
+
   const handleViewAllGeneralCategories = useCallback(() => {
-    navigation.navigate('GreetingTemplates');
-  }, [navigation]);
+    // Reset search state when opening modal
+    setGeneralModalSearchQuery('');
+    setIsGeneralModalSearching(false);
+    setGeneralModalSearchResults([]);
+    setIsGeneralModalSearchInputFocused(false);
+    setIsGeneralModalSearchBarVisible(false);
+    setIsGeneralCategoriesModalVisible(true);
+    // Fetch all categories for modal (lazy loading)
+    fetchAllGeneralCategoriesForModal();
+  }, [fetchAllGeneralCategoriesForModal]);
 
   const closeGeneralCategoriesModal = useCallback(() => {
+    // Hide content immediately for instant feedback
+    setIsGeneralCategoriesModalClosing(true);
+    // Hide modal immediately - no delay
     setIsGeneralCategoriesModalVisible(false);
+    // Reset search state when closing modal
+    setGeneralModalSearchQuery('');
+    setIsGeneralModalSearching(false);
+    setGeneralModalSearchResults([]);
+    setIsGeneralModalSearchInputFocused(false);
+    setIsGeneralModalSearchBarVisible(false);
+    // Reset modal data states
+    setModalGeneralCategories([]);
+    setModalCategoriesError(null);
+    // Reset closing state after animation would complete
+    requestAnimationFrame(() => {
+      setIsGeneralCategoriesModalClosing(false);
+    });
   }, []);
 
   // Memoized render functions to prevent unnecessary re-renders
@@ -4671,9 +4872,55 @@ const HomeScreen: React.FC = React.memo(() => {
     return sections;
   }, [businessCategories, modalColumns]);
 
-  // Get icon for section type (parentCategoryName) - Business category specific icons
+  // Group general categories for sectioned display (matching GreetingTemplatesScreen structure)
+  const groupedGeneralCategories = useMemo(() => {
+    if (modalGeneralCategories.length === 0) {
+      return [];
+    }
+    
+    const groups: Record<string, any[]> = {};
+    
+    modalGeneralCategories.forEach(category => {
+      // Use 'General' for categories without parentCategoryName (null, undefined, or empty string)
+      const parentName = (category.parentCategoryName && category.parentCategoryName.trim()) || 'General';
+      if (!groups[parentName]) {
+        groups[parentName] = [];
+      }
+      groups[parentName].push(category);
+    });
+    
+    // Convert to SectionList format with rows for proper grid layout
+    const sections = Object.keys(groups)
+      .sort((a, b) => {
+        // Sort: "General" first, then alphabetically
+        if (a === 'General') return -1;
+        if (b === 'General') return 1;
+        return a.localeCompare(b);
+      })
+      .map(parentName => {
+        const categories = groups[parentName];
+        // Group categories into rows based on generalCategoryModalColumns
+        const rows: any[][] = [];
+        for (let i = 0; i < categories.length; i += generalCategoryModalColumns) {
+          const row = categories.slice(i, i + generalCategoryModalColumns);
+          rows.push(row);
+        }
+        return {
+          title: parentName,
+          data: rows, // Each row is an array of categories
+        };
+      })
+      .filter(section => section.data.length > 0); // Filter out empty sections
+    
+    return sections;
+  }, [modalGeneralCategories, generalCategoryModalColumns]);
+
+  // Get icon for section type (parentCategoryName) - Works for both Business and General categories
   const getSectionIcon = useCallback((title: string) => {
     const titleLower = title.toLowerCase();
+
+    // General category icon (matching GreetingTemplatesScreen)
+    if (title.includes('General') || titleLower.includes('general')) return 'category';
 
     // Business category specific icons
     if (titleLower.includes('restaurant') || titleLower.includes('food') || titleLower.includes('dining')) return 'restaurant';
@@ -4690,15 +4937,12 @@ const HomeScreen: React.FC = React.memo(() => {
     if (titleLower.includes('retail') || titleLower.includes('shop') || titleLower.includes('store')) return 'store';
     if (titleLower.includes('medical') || titleLower.includes('hospital') || titleLower.includes('clinic')) return 'local-hospital';
     if (titleLower.includes('legal') || titleLower.includes('law') || titleLower.includes('attorney')) return 'gavel';
-    if (titleLower.includes('construction') || titleLower.includes('building') || titleLower.includes('contractor')) return 'construction';
-    if (titleLower.includes('agriculture') || titleLower.includes('farming') || titleLower.includes('farm')) return 'agriculture';
-    if (titleLower.includes('entertainment') || titleLower.includes('media') || titleLower.includes('music')) return 'movie';
-    if (titleLower.includes('sports') || titleLower.includes('gym') || titleLower.includes('athletic')) return 'sports';
-    if (titleLower.includes('pharmacy') || titleLower.includes('drug') || titleLower.includes('medicine')) return 'local-pharmacy';
-    if (titleLower.includes('pet') || titleLower.includes('animal') || titleLower.includes('veterinary')) return 'pets';
+    if (titleLower.includes('professional') || titleLower.includes('services') || titleLower.includes('consulting')) return 'business-center';
+    if (titleLower.includes('entertainment') || titleLower.includes('media') || titleLower.includes('arts')) return 'movie';
+    if (titleLower.includes('sports') || titleLower.includes('fitness') || titleLower.includes('gym')) return 'sports-basketball';
 
-    // Default business icons
-    return 'business-center';
+    // Default icon for other categories
+    return 'collections';
   }, []);
 
   // Render section header for grouped business categories
@@ -4767,6 +5011,143 @@ const HomeScreen: React.FC = React.memo(() => {
       </View>
     );
   }, [theme, isDarkMode, isTabletDevice, responsiveFontSize, getSectionIcon]);
+
+  // Render section header for grouped general categories
+  const renderGeneralCategorySectionHeader = useCallback((info: { section: { title: string; data: any[][] } }) => {
+    const iconName = 'category'; // General icon for all categories
+
+    return (
+      <View
+        style={[
+          styles.businessCategorySectionHeaderContainer,
+          {
+            paddingHorizontal: moderateScale(isTabletDevice ? 16 : 12),
+            paddingTop: moderateScale(isTabletDevice ? 16 : 12),
+            paddingBottom: moderateScale(isTabletDevice ? 12 : 8),
+            marginBottom: moderateScale(isTabletDevice ? 12 : 8),
+          }
+        ]}
+      >
+        <View style={styles.businessCategorySectionHeaderWrapper}>
+          <LinearGradient
+            colors={isDarkMode
+              ? [theme.colors.primary + '30', theme.colors.secondary + '20', 'transparent']
+              : [theme.colors.primary + '18', theme.colors.secondary + '10', 'transparent']
+            }
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.businessCategorySectionHeaderGradient}
+          >
+            <View style={styles.businessCategorySectionHeaderContent}>
+              <LinearGradient
+                colors={[theme.colors.primary, theme.colors.secondary]}
+                style={styles.businessCategorySectionIconContainer}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <Icon
+                  name={iconName}
+                  size={moderateScale(isTabletDevice ? 22 : 20)}
+                  color="#ffffff"
+                />
+              </LinearGradient>
+              <View style={styles.businessCategorySectionTitleContainer}>
+                <Text style={[
+                  styles.businessCategorySectionHeaderText,
+                  {
+                    color: theme.colors.text,
+                    fontSize: responsiveFontSize.lg,
+                    fontWeight: '700',
+                    marginLeft: moderateScale(10),
+                  }
+                ]}>
+                  {info.section.title}
+                </Text>
+                <View style={[
+                  styles.businessCategorySectionUnderline,
+                  {
+                    backgroundColor: theme.colors.primary,
+                    marginLeft: moderateScale(10),
+                    marginTop: moderateScale(2),
+                  }
+                ]} />
+              </View>
+            </View>
+          </LinearGradient>
+        </View>
+      </View>
+    );
+  }, [theme, isDarkMode, isTabletDevice, responsiveFontSize]);
+
+  const renderGeneralCategoryModalItem = useCallback(({ item, index, section }: { item: any[]; index: number; section: { title: string; data: any[][] } }) => {
+    // item is now a row (array of categories)
+    // Each row should only contain up to generalCategoryModalColumns items
+    return (
+      <View style={[styles.upcomingEventModalRow, {
+        flexDirection: 'row',
+        flexWrap: 'nowrap',
+        width: '100%',
+      }]}>
+        {item.map((category, categoryIndex) => {
+          const categoryImage = memoizedGreetingCategoryImages[category.id] || category.imageUrl || null;
+          const handlePress = () => {
+            handleGreetingCategoryPress(category, categoryImage);
+          };
+          const isLastInRow = categoryIndex === item.length - 1;
+          return (
+            <View
+              key={category.id}
+              style={[
+                styles.generalCategoryModalCardWrapper,
+                {
+                  width: generalCategoryModalCardWidth,
+                  marginRight: isLastInRow ? 0 : moderateScale(generalCategoryModalGap),
+                },
+              ]}
+            >
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={[
+                  styles.upcomingEventModalCard,
+                  { width: generalCategoryModalCardWidth, backgroundColor: theme.colors.cardBackground }
+                ]}
+                onPress={handlePress}
+              >
+                <View style={styles.upcomingEventModalImageContainer}>
+                  {categoryImage ? (
+                    <OptimizedImage
+                      uri={getThumbnailUrl(categoryImage)}
+                      style={styles.upcomingEventModalImage}
+                      resizeMode="cover"
+                      mode="thumbnail"
+                      cacheKey={`greeting_category_${category.id}`}
+                    />
+                  ) : (
+                    <View style={[styles.upcomingEventModalImage, { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.05)' }]}>
+                      <ActivityIndicator size="small" color={theme.colors.primary} />
+                    </View>
+                  )}
+                  <LinearGradient
+                    colors={['transparent', 'rgba(0,0,0,0.85)']}
+                    style={styles.upcomingEventModalOverlay}
+                  />
+                  <View style={styles.businessCategoryModalNameContainer}>
+                    <Text
+                      style={styles.businessCategoryModalName}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      {category.name}
+                    </Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            </View>
+          );
+        })}
+      </View>
+    );
+  }, [generalCategoryModalCardWidth, generalCategoryModalGap, generalCategoryModalColumns, memoizedGreetingCategoryImages, handleGreetingCategoryPress, theme, getThumbnailUrl]);
 
   // Memoized renderItem functions for modal FlatLists
   const handleBusinessCategoryPress = useCallback(async (category: BusinessCategory) => {
@@ -5430,9 +5811,10 @@ const HomeScreen: React.FC = React.memo(() => {
         theme={theme}
         categoryImage={categoryImage}
         onPress={(category) => handleGreetingCategoryPress(category, categoryImage)}
+        getThumbnailUrl={getThumbnailUrl}
       />
     );
-  }, [cardWidth, theme, memoizedGreetingCategoryImages, handleGreetingCategoryPress]);
+  }, [cardWidth, theme, memoizedGreetingCategoryImages, handleGreetingCategoryPress, getThumbnailUrl]);
 
   // Memoized category button labels - computed only when dependencies change
   const businessCategoryButtonLabel = useMemo(() => {
@@ -6468,72 +6850,184 @@ const HomeScreen: React.FC = React.memo(() => {
       >
         <SafeAreaView style={[
           styles.fullScreenGreetingModalContent,
-          { backgroundColor: theme.colors.background }
+          { backgroundColor: theme.colors.surface }
         ]}>
           <LinearGradient
-            colors={[theme.colors.background, theme.colors.cardBackground]}
+            colors={theme.colors.gradient}
             style={styles.upcomingEventsModalGradient}
           >
             <View style={styles.upcomingEventsModalHeader}>
               <View style={styles.upcomingEventsModalTitleContainer}>
                 <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>General Categories</Text>
               </View>
-              <TouchableOpacity
-                style={styles.upcomingEventsCloseButton}
-                onPress={closeGeneralCategoriesModal}
-              >
-                <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>×</Text>
-              </TouchableOpacity>
+              <View style={styles.upcomingEventsModalHeaderButtons}>
+                <TouchableOpacity
+                  style={[styles.upcomingEventsHeaderActionButton, { backgroundColor: theme.colors.cardBackground }]}
+                  onPress={() => setIsGeneralModalSearchBarVisible(true)}
+                  activeOpacity={0.7}
+                >
+                  <Icon
+                    name="search"
+                    size={moderateScale(20)} // Increased from 18
+                    color={theme.colors.text}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.upcomingEventsCloseButton}
+                  onPress={closeGeneralCategoriesModal}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>×</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </LinearGradient>
-          <View style={[
-            styles.upcomingEventsModalBody,
-            { backgroundColor: theme.colors.background }
-          ]}>
-            <FlatList
-              key={`general-categories-modal-${generalCategoryModalColumns}-${filteredGreetingCategoriesList.length}`}
-              data={filteredGreetingCategoriesList}
-              keyExtractor={keyExtractorIdString}
-              numColumns={generalCategoryModalColumns}
-              columnWrapperStyle={styles.generalCategoryModalRow}
-              style={{ width: '100%' }}
-              contentContainerStyle={[
-                styles.generalCategoryModalList,
-                {
-                  width: generalCategoryModalContentWidth,
-                },
-              ]}
-              showsVerticalScrollIndicator={false}
-              initialNumToRender={generalCategoryModalInitialRenderCount}
-              maxToRenderPerBatch={generalCategoryModalColumns * 2}
-              windowSize={5}
-              updateCellsBatchingPeriod={80}
-              removeClippedSubviews={true}
-              getItemLayout={getGeneralCategoryModalItemLayout}
-              maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-              renderItem={({ item, index }) => (
-                <View
-                  style={[
-                    styles.generalCategoryModalCardWrapper,
-                    {
-                      width: generalCategoryModalCardWidth,
-                    },
-                  ]}
-                >
-                  <GreetingCategoryCard
-                    item={item}
-                    cardWidth={generalCategoryModalCardWidth}
-                    theme={theme}
-                    categoryImage={memoizedGreetingCategoryImages[item.id] || item.imageUrl || null}
-                    onPress={(category) => {
-                      const categoryImage = memoizedGreetingCategoryImages[item.id] || item.imageUrl || null;
-                      handleGreetingCategoryPress(category, categoryImage);
+          
+          {/* General Category Modal Search Bar */}
+          {isGeneralModalSearchBarVisible && (
+            <View style={{ position: 'relative', zIndex: 10, backgroundColor: theme.colors.background }}>
+              <View style={styles.searchContainer}>
+                <View style={[styles.searchBar, { backgroundColor: theme.colors.cardBackground }]}>
+                  <Icon name="search" size={searchIconSize} color={theme.colors.textSecondary} style={styles.searchIcon} />
+                  <TextInput
+                    style={[styles.searchInput, { color: theme.colors.text }]}
+                    placeholder="Search general categories..."
+                    placeholderTextColor={theme.colors.textSecondary}
+                    value={generalModalSearchQuery}
+                    onChangeText={setGeneralModalSearchQuery}
+                    returnKeyType="search"
+                    blurOnSubmit={true}
+                    autoFocus={true}
+                    onFocus={() => {
+                      setIsGeneralModalSearchInputFocused(true);
                     }}
+                    onBlur={() => {
+                      setTimeout(() => setIsGeneralModalSearchInputFocused(false), 200);
+                    }}
+                  />
+                  <TouchableOpacity
+                    onPress={() => {
+                      setIsGeneralModalSearchBarVisible(false);
+                      setGeneralModalSearchQuery('');
+                      setIsGeneralModalSearching(false);
+                      setGeneralModalSearchResults([]);
+                      setIsGeneralModalSearchInputFocused(false);
+                    }}
+                    style={styles.clearIcon}
+                  >
+                    <Icon name="close" size={searchIconSize} color={theme.colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+              
+              {/* Floating Recent Searches Dropdown */}
+              {generalModalSearchQuery.trim() === '' && isGeneralModalSearchInputFocused && (
+                <View style={styles.dropdown}>
+                  <RecentSearchList
+                    recentSearches={generalModalRecentSearches}
+                    onSelectSearch={(search) => {
+                      setGeneralModalSearchQuery(search);
+                      setIsGeneralModalSearchInputFocused(false);
+                    }}
+                    onClearAll={() => {
+                      setGeneralModalRecentSearches([]);
+                      AsyncStorage.removeItem('GENERAL_MODAL_RECENT_SEARCHES')
+                        .catch(error => console.warn('Failed to clear general modal recent searches:', error));
+                    }}
+                    theme={theme}
                   />
                 </View>
               )}
-            />
-          </View>
+            </View>
+          )}
+          
+          {!isGeneralCategoriesModalClosing && (
+            <View style={[styles.upcomingEventsModalBody, { backgroundColor: theme.colors.background }]}>
+              {isModalCategoriesLoading ? (
+                // Show loading state while fetching categories
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+                  <ActivityIndicator size="large" color={theme.colors.primary} />
+                  <Text style={{ color: theme.colors.textSecondary, fontSize: 16, marginTop: 16 }}>
+                    Loading categories...
+                  </Text>
+                </View>
+              ) : modalCategoriesError ? (
+                // Show error state with retry option
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+                  <Text style={{ color: theme.colors.text, fontSize: 16, textAlign: 'center', marginBottom: 16 }}>
+                    {modalCategoriesError}
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.upcomingEventsHeaderActionButton, { 
+                      backgroundColor: theme.colors.primary, 
+                      paddingHorizontal: 20, 
+                      paddingVertical: 10, 
+                      borderRadius: 8 
+                    }]}
+                    onPress={fetchAllGeneralCategoriesForModal}
+                  >
+                    <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '600' }}>
+                      Retry
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <>
+                  {!isGeneralModalSearchBarVisible || generalModalSearchQuery.trim() === '' ? (
+                    // Show full general categories when not searching
+                    <SectionList
+                      key={`general-categories-modal-${modalGeneralCategories.length}`}
+                      sections={groupedGeneralCategories}
+                      keyExtractor={(item, index) => `row-${index}-${item.map(c => c.id).join('-')}`}
+                      renderItem={renderGeneralCategoryModalItem}
+                      renderSectionHeader={renderGeneralCategorySectionHeader}
+                      contentContainerStyle={styles.upcomingEventsModalScroll}
+                      showsVerticalScrollIndicator={false}
+                      removeClippedSubviews={true}
+                      maxToRenderPerBatch={10}
+                      windowSize={5}
+                      initialNumToRender={10}
+                      updateCellsBatchingPeriod={50}
+                      stickySectionHeadersEnabled={false}
+                    />
+                  ) : (
+                    // Show search results when searching
+                    <View style={styles.upcomingEventsModalScroll}>
+                      {isGeneralModalSearching ? (
+                        <View style={{ padding: 20, alignItems: 'center' }}>
+                          <Text style={{ color: theme.colors.textSecondary, fontSize: 14 }}>
+                            Searching...
+                          </Text>
+                        </View>
+                      ) : generalModalSearchResults.length === 0 ? (
+                        <View style={{ padding: 20, alignItems: 'center' }}>
+                          <Text style={{ color: theme.colors.textSecondary, fontSize: 14 }}>
+                            No results found for "{generalModalSearchQuery}"
+                          </Text>
+                        </View>
+                      ) : (
+                        <SectionList
+                          key={`general-modal-search-${generalModalSearchResults.length}`}
+                          sections={groupedGeneralModalSearchResults}
+                          keyExtractor={(item, index) => `search-row-${index}-${item.map(c => c.id).join('-')}`}
+                          renderItem={renderGeneralCategoryModalItem}
+                          renderSectionHeader={renderGeneralCategorySectionHeader}
+                          contentContainerStyle={styles.upcomingEventsModalScroll}
+                          showsVerticalScrollIndicator={false}
+                          removeClippedSubviews={true}
+                          maxToRenderPerBatch={10}
+                          windowSize={5}
+                          initialNumToRender={10}
+                          updateCellsBatchingPeriod={50}
+                          stickySectionHeadersEnabled={false}
+                        />
+                      )}
+                    </View>
+                  )}
+                </>
+              )}
+            </View>
+          )}
         </SafeAreaView>
       </Modal>
 
