@@ -132,6 +132,12 @@ const LoginScreen: React.FC = ({ navigation }: any) => {
     if (nextField) {
       focusField(nextField);
     } else if (action) {
+      // Validate before calling action (e.g., handleSignIn)
+      if (action === handleSignIn && !isFormValid) {
+        // Don't proceed with login if form is invalid
+        Keyboard.dismiss();
+        return;
+      }
       action();
     } else {
       Keyboard.dismiss();

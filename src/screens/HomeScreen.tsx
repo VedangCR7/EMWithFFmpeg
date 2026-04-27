@@ -1073,6 +1073,12 @@ const HomeScreen: React.FC = React.memo(() => {
     setIsBusinessCategoriesModalClosing(true);
     // Hide modal immediately - no delay
     setIsBusinessCategoriesModalVisible(false);
+    // Reset search state when closing modal
+    setBusinessModalSearchQuery('');
+    setIsBusinessModalSearching(false);
+    setBusinessModalSearchResults([]);
+    setIsBusinessModalSearchInputFocused(false);
+    setIsBusinessModalSearchBarVisible(false);
     // Reset closing state after animation would complete
     requestAnimationFrame(() => {
       setIsBusinessCategoriesModalClosing(false);
@@ -1158,14 +1164,14 @@ const HomeScreen: React.FC = React.memo(() => {
 
   // Responsive modal card width calculation
   const modalCardWidth = useMemo(() => {
-    const containerWidth = isTabletDevice ? screenWidth * 0.90 : screenWidth * 0.96;
+    const containerWidth = screenWidth; // Use full screen width for full-screen modals
     const rowPadding = getModerateScale(8) * 2; // Equal padding on both sides of row
     const gap = getModerateScale(3);
     const gapsCount = modalColumns - 1; // Number of gaps between columns
     const totalSpacing = rowPadding + gap * gapsCount;
     const cardWidth = (containerWidth - totalSpacing) / modalColumns;
     return cardWidth;
-  }, [isTabletDevice, screenWidth, modalColumns, getModerateScale]);
+  }, [screenWidth, modalColumns, getModerateScale]);
 
   // Gap between cards (for spacing)
   const modalCardGap = useMemo(() => getModerateScale(3), [getModerateScale]);
@@ -1372,10 +1378,11 @@ const HomeScreen: React.FC = React.memo(() => {
     generalCategoryModalHorizontalPadding,
     generalCategoryModalRowHeight,
   } = useMemo(() => {
-    const containerWidth = isTabletDevice ? screenWidth * 0.9 : screenWidth * 0.96;
+    const containerWidth = screenWidth; // Use full screen width for full-screen modal
     const horizontalPadding = getModerateScale(16);
     const gap = getModerateScale(3);
-    const totalSpacing = horizontalPadding * 2 + gap * (generalCategoryModalColumns - 1);
+    // With space-between, gaps are distributed automatically, so we only need container padding
+    const totalSpacing = horizontalPadding * 2;
     const cardWidth = (containerWidth - totalSpacing) / generalCategoryModalColumns;
     const rowHeight = cardWidth + getModerateScale(12); // card height + spacing
 
@@ -1461,6 +1468,14 @@ const HomeScreen: React.FC = React.memo(() => {
   const [isBusinessQuotesModalVisible, setIsBusinessQuotesModalVisible] = useState(false);
   const [isFeaturedContentModalVisible, setIsFeaturedContentModalVisible] = useState(false);
   const [isGeneralCategoriesModalVisible, setIsGeneralCategoriesModalVisible] = useState(false);
+
+  // Business Category Modal Search states
+  const [businessModalSearchQuery, setBusinessModalSearchQuery] = useState('');
+  const [isBusinessModalSearching, setIsBusinessModalSearching] = useState(false);
+  const [businessModalSearchResults, setBusinessModalSearchResults] = useState<BusinessCategory[]>([]);
+  const [businessModalRecentSearches, setBusinessModalRecentSearches] = useState<string[]>([]);
+  const [isBusinessModalSearchInputFocused, setIsBusinessModalSearchInputFocused] = useState(false);
+  const [isBusinessModalSearchBarVisible, setIsBusinessModalSearchBarVisible] = useState(false);
 
   // New API data states
   const [featuredContent, setFeaturedContent] = useState<FeaturedContent[]>([]);
@@ -3236,6 +3251,89 @@ const HomeScreen: React.FC = React.memo(() => {
     return () => clearTimeout(timeoutId);
   }, [searchQuery, businessCategories, filteredGreetingCategoriesList, filterCategories, businessEthicsTemplates, successMindsetTemplates, socialMediaGrowthTemplates, businessLegendQuoteTemplates, businessMarketingTipsTemplates, moneyAndFinanceTemplates, businessQuotesTemplates]);
 
+  // Business Category Modal Search Logic
+  useEffect(() => {
+    // Reset immediately if search is empty
+    if (businessModalSearchQuery.trim() === '') {
+      setBusinessModalSearchResults([]);
+      setIsBusinessModalSearching(false);
+      return;
+    }
+
+    // Only trigger search after 3 characters
+    if (businessModalSearchQuery.trim().length < 3) {
+      setBusinessModalSearchResults([]);
+      setIsBusinessModalSearching(false);
+      return;
+    }
+
+    // Debounce search execution
+    const timeoutId = setTimeout(() => {
+      if (businessModalSearchQuery.trim() === '') return;
+
+      setIsBusinessModalSearching(true);
+      
+      try {
+        // Filter business categories that match the search query
+        const query = businessModalSearchQuery.toLowerCase().trim();
+        const filteredCategories = businessCategories.filter(category =>
+          category?.name?.toLowerCase().startsWith(query) ||
+          category?.parentCategoryName?.toLowerCase().startsWith(query)
+        );
+
+        setBusinessModalSearchResults(filteredCategories);
+        
+        // Save recent search when results are successfully fetched
+        if (filteredCategories.length > 0) {
+          saveBusinessModalRecentSearch(businessModalSearchQuery);
+        }
+
+      } catch (error) {
+        console.warn('Business modal search error:', error);
+        setBusinessModalSearchResults([]);
+      } finally {
+        setIsBusinessModalSearching(false);
+      }
+
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [businessModalSearchQuery, businessCategories]);
+
+  // Group business modal search results by parentCategoryName for sectioned display
+  const groupedBusinessModalSearchResults = useMemo(() => {
+    if (businessModalSearchResults.length === 0) return [];
+
+    const groups: Record<string, BusinessCategory[]> = {};
+
+    businessModalSearchResults.forEach(category => {
+      const parentName = category.parentCategoryName || 'General';
+      if (!groups[parentName]) {
+        groups[parentName] = [];
+      }
+      groups[parentName].push(category);
+    });
+
+    // Convert to SectionList format with rows for proper grid layout
+    const sections = Object.keys(groups)
+      .sort() // Sort section names alphabetically
+      .map(parentName => {
+        const categories = groups[parentName];
+        // Group categories into rows based on modalColumns
+        const rows: BusinessCategory[][] = [];
+        for (let i = 0; i < categories.length; i += modalColumns) {
+          const row = categories.slice(i, i + modalColumns);
+          rows.push(row);
+        }
+        return {
+          title: parentName,
+          data: rows, // Each row is an array of categories
+        };
+      });
+
+    return sections;
+  }, [businessModalSearchResults, modalColumns]);
+
   // Recent searches AsyncStorage functions
   const loadRecentSearches = useCallback(async () => {
     try {
@@ -3304,11 +3402,57 @@ const HomeScreen: React.FC = React.memo(() => {
     clearRecentSearches();
   }, [clearRecentSearches]);
 
-  
+  // Business Category Modal Recent searches AsyncStorage functions
+  const loadBusinessModalRecentSearches = useCallback(async () => {
+    try {
+      const stored = await AsyncStorage.getItem('BUSINESS_MODAL_RECENT_SEARCHES');
+      if (stored) {
+        const searches = JSON.parse(stored);
+        const validSearches = Array.isArray(searches) ? searches : [];
+        setBusinessModalRecentSearches(validSearches);
+      } else {
+        setBusinessModalRecentSearches([]);
+      }
+    } catch (error) {
+      console.warn('Failed to load business modal recent searches:', error);
+      setBusinessModalRecentSearches([]);
+    }
+  }, []);
+
+  const saveBusinessModalRecentSearch = useCallback(async (query: string) => {
+    if (!query || query.trim().length < 3) return;
+    
+    const trimmedQuery = query.trim();
+    
+    try {
+      setBusinessModalRecentSearches(prev => {
+        const filtered = prev.filter(search => search !== trimmedQuery);
+        const updated = [trimmedQuery, ...filtered].slice(0, 5);
+        
+        AsyncStorage.setItem('BUSINESS_MODAL_RECENT_SEARCHES', JSON.stringify(updated))
+          .catch(error => console.warn('Failed to save business modal recent searches:', error));
+        
+        return updated;
+      });
+    } catch (error) {
+      console.warn('Failed to save business modal recent search:', error);
+    }
+  }, []);
+
+  const clearBusinessModalRecentSearches = useCallback(async () => {
+    try {
+      await AsyncStorage.removeItem('BUSINESS_MODAL_RECENT_SEARCHES');
+      setBusinessModalRecentSearches([]);
+    } catch (error) {
+      console.warn('Failed to clear business modal recent searches:', error);
+    }
+  }, []);
+
   // Load recent searches on component mount
   useEffect(() => {
     loadRecentSearches();
-  }, [loadRecentSearches]);
+    loadBusinessModalRecentSearches();
+  }, [loadRecentSearches, loadBusinessModalRecentSearches]);
 
   
   const onRefresh = useCallback(async () => {
@@ -3662,6 +3806,12 @@ const HomeScreen: React.FC = React.memo(() => {
   }, []);
 
   const handleViewAllBusinessCategories = useCallback(() => {
+    // Reset search state when opening modal
+    setBusinessModalSearchQuery('');
+    setIsBusinessModalSearching(false);
+    setBusinessModalSearchResults([]);
+    setIsBusinessModalSearchInputFocused(false);
+    setIsBusinessModalSearchBarVisible(false);
     setIsBusinessCategoriesModalVisible(true);
   }, []);
 
@@ -4277,8 +4427,7 @@ const HomeScreen: React.FC = React.memo(() => {
         activeOpacity={0.8}
         style={[
           styles.upcomingEventModalCard,
-          { width: modalCardWidth },
-          !isLastInRow && { marginRight: modalCardGap }
+          { width: modalCardWidth }
         ]}
         onPress={onPress}
       >
@@ -4330,8 +4479,7 @@ const HomeScreen: React.FC = React.memo(() => {
         activeOpacity={0.8}
         style={[
           styles.upcomingEventModalCard,
-          { width: modalCardWidth },
-          !isLastInRow && { marginRight: modalCardGap }
+          { width: modalCardWidth }
         ]}
         onPress={onPress}
       >
@@ -4383,8 +4531,7 @@ const HomeScreen: React.FC = React.memo(() => {
         activeOpacity={0.8}
         style={[
           styles.upcomingEventModalCard,
-          { width: modalCardWidth },
-          !isLastInRow && { marginRight: modalCardGap }
+          { width: modalCardWidth }
         ]}
         onPress={onPress}
       >
@@ -4448,8 +4595,7 @@ const HomeScreen: React.FC = React.memo(() => {
         activeOpacity={0.8}
         style={[
           styles.upcomingEventModalCard,
-          { width: modalCardWidth, backgroundColor: theme.colors.cardBackground },
-          !isLastInRow && { marginRight: modalCardGap }
+          { width: modalCardWidth, backgroundColor: theme.colors.cardBackground }
         ]}
         onPress={onPress}
       >
@@ -4779,9 +4925,15 @@ const HomeScreen: React.FC = React.memo(() => {
   const renderBusinessEthicsModalItem = useCallback(({ item, index }: { item: Template; index: number }) => {
     const templates = businessEthicsTemplatesRaw.length > 0 ? businessEthicsTemplatesRaw : businessEthicsTemplates;
     const handlePress = () => {
+      console.log('BUSINESS ETHICS MODAL: Clicked Item:', item);
       navigation.navigate('PosterPlayer', {
         selectedPoster: item,
         relatedPosters: templates.filter(t => t.id !== item.id),
+        searchQuery: '',
+        templateSource: 'greeting',
+        posterLimit: 200,
+        type: 'greeting',
+        categoryName: 'Business Ethics'
       });
     };
     return (
@@ -4799,9 +4951,15 @@ const HomeScreen: React.FC = React.memo(() => {
   const renderSuccessMindsetModalItem = useCallback(({ item, index }: { item: Template; index: number }) => {
     const templates = successMindsetTemplatesRaw.length > 0 ? successMindsetTemplatesRaw : successMindsetTemplates;
     const handlePress = () => {
+      console.log('SUCCESS MINDSET MODAL: Clicked Item:', item);
       navigation.navigate('PosterPlayer', {
         selectedPoster: item,
         relatedPosters: templates.filter(t => t.id !== item.id),
+        searchQuery: '',
+        templateSource: 'greeting',
+        posterLimit: 200,
+        type: 'greeting',
+        categoryName: 'Success Mindset'
       });
     };
     return (
@@ -4819,9 +4977,15 @@ const HomeScreen: React.FC = React.memo(() => {
   const renderSocialMediaGrowthModalItem = useCallback(({ item, index }: { item: Template; index: number }) => {
     const templates = socialMediaGrowthTemplatesRaw.length > 0 ? socialMediaGrowthTemplatesRaw : socialMediaGrowthTemplates;
     const handlePress = () => {
+      console.log('SOCIAL MEDIA GROWTH MODAL: Clicked Item:', item);
       navigation.navigate('PosterPlayer', {
         selectedPoster: item,
         relatedPosters: templates.filter(t => t.id !== item.id),
+        searchQuery: '',
+        templateSource: 'greeting',
+        posterLimit: 200,
+        type: 'greeting',
+        categoryName: 'Social Media Growth'
       });
     };
     return (
@@ -4859,9 +5023,15 @@ const HomeScreen: React.FC = React.memo(() => {
   const renderBusinessLegendQuoteModalItem = useCallback(({ item, index }: { item: Template; index: number }) => {
     const templates = businessLegendQuoteTemplatesRaw.length > 0 ? businessLegendQuoteTemplatesRaw : businessLegendQuoteTemplates;
     const handlePress = () => {
+      console.log('BUSINESS LEGEND QUOTE MODAL: Clicked Item:', item);
       navigation.navigate('PosterPlayer', {
         selectedPoster: item,
         relatedPosters: templates.filter(t => t.id !== item.id),
+        searchQuery: '',
+        templateSource: 'greeting',
+        posterLimit: 200,
+        type: 'greeting',
+        categoryName: 'Business Legend Quote'
       });
     };
     return (
@@ -4879,9 +5049,15 @@ const HomeScreen: React.FC = React.memo(() => {
   const renderBusinessMarketingTipsModalItem = useCallback(({ item, index }: { item: Template; index: number }) => {
     const templates = businessMarketingTipsTemplatesRaw.length > 0 ? businessMarketingTipsTemplatesRaw : businessMarketingTipsTemplates;
     const handlePress = () => {
+      console.log('BUSINESS MARKETING TIPS MODAL: Clicked Item:', item);
       navigation.navigate('PosterPlayer', {
         selectedPoster: item,
         relatedPosters: templates.filter(t => t.id !== item.id),
+        searchQuery: '',
+        templateSource: 'greeting',
+        posterLimit: 200,
+        type: 'greeting',
+        categoryName: 'Business Marketing Tips'
       });
     };
     return (
@@ -5715,7 +5891,7 @@ const HomeScreen: React.FC = React.memo(() => {
 
           {/* Festivals Calendar Section */}
           {!isSearching && searchQuery.trim() === '' && (
-            <HorizontalFestivalCalendar key={calendarRefreshKey} />
+            <HorizontalFestivalCalendar key={calendarRefreshKey} isFocused={isFocused} />
           )}
 
           {/* Business Categories Section */}
@@ -6124,25 +6300,36 @@ const HomeScreen: React.FC = React.memo(() => {
       {/* Business Categories Modal */}
       <Modal
         visible={isFocused && isBusinessCategoriesModalVisible}
-        transparent={true}
-        animationType="fade"
+        transparent={false}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        statusBarTranslucent={true}
         onRequestClose={closeBusinessCategoriesModal}
       >
-        <View style={styles.modalOverlay} pointerEvents="box-none">
-          <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            activeOpacity={1}
-            onPress={closeBusinessCategoriesModal}
-          />
-          <View style={[styles.upcomingEventsModalContent, { backgroundColor: theme.colors.surface }]}>
-            <LinearGradient
-              colors={theme.colors.gradient}
-              style={styles.upcomingEventsModalGradient}
-            >
-              <View style={styles.upcomingEventsModalHeader}>
-                <View style={styles.upcomingEventsModalTitleContainer}>
-                  <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>Business Categories</Text>
-                </View>
+        <SafeAreaView style={[
+          styles.fullScreenGreetingModalContent,
+          { backgroundColor: theme.colors.surface }
+        ]}>
+          <LinearGradient
+            colors={theme.colors.gradient}
+            style={styles.upcomingEventsModalGradient}
+          >
+            <View style={styles.upcomingEventsModalHeader}>
+              <View style={styles.upcomingEventsModalTitleContainer}>
+                <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>Business Categories</Text>
+              </View>
+              <View style={styles.upcomingEventsModalHeaderButtons}>
+                <TouchableOpacity
+                  style={[styles.upcomingEventsHeaderActionButton, { backgroundColor: theme.colors.cardBackground }]}
+                  onPress={() => setIsBusinessModalSearchBarVisible(true)}
+                  activeOpacity={0.7}
+                >
+                  <Icon
+                    name="search"
+                    size={moderateScale(20)} // Increased from 18
+                    color={theme.colors.text}
+                  />
+                </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.upcomingEventsCloseButton}
                   onPress={closeBusinessCategoriesModal}
@@ -6151,9 +6338,71 @@ const HomeScreen: React.FC = React.memo(() => {
                   <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>×</Text>
                 </TouchableOpacity>
               </View>
-            </LinearGradient>
-            {!isBusinessCategoriesModalClosing && (
-              <View style={[styles.upcomingEventsModalBody, { backgroundColor: theme.colors.background }]}>
+            </View>
+          </LinearGradient>
+          
+          {/* Business Category Modal Search Bar */}
+          {isBusinessModalSearchBarVisible && (
+            <View style={{ position: 'relative', zIndex: 10, backgroundColor: theme.colors.background }}>
+              <View style={styles.searchContainer}>
+                <View style={[styles.searchBar, { backgroundColor: theme.colors.cardBackground }]}>
+                  <Icon name="search" size={searchIconSize} color={theme.colors.textSecondary} style={styles.searchIcon} />
+                  <TextInput
+                    style={[styles.searchInput, { color: theme.colors.text }]}
+                    placeholder="Search business categories..."
+                    placeholderTextColor={theme.colors.textSecondary}
+                    value={businessModalSearchQuery}
+                    onChangeText={setBusinessModalSearchQuery}
+                    returnKeyType="search"
+                    blurOnSubmit={true}
+                    autoFocus={true}
+                    onFocus={() => {
+                      setIsBusinessModalSearchInputFocused(true);
+                    }}
+                    onBlur={() => {
+                      setTimeout(() => setIsBusinessModalSearchInputFocused(false), 200);
+                    }}
+                  />
+                  <TouchableOpacity
+                    onPress={() => {
+                      setIsBusinessModalSearchBarVisible(false);
+                      setBusinessModalSearchQuery('');
+                      setIsBusinessModalSearching(false);
+                      setBusinessModalSearchResults([]);
+                      setIsBusinessModalSearchInputFocused(false);
+                    }}
+                    style={styles.clearIcon}
+                  >
+                    <Icon name="close" size={searchIconSize} color={theme.colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+              
+              {/* Floating Recent Searches Dropdown */}
+              {businessModalSearchQuery.trim() === '' && isBusinessModalSearchInputFocused && (
+                <View style={styles.dropdown}>
+                  <RecentSearchList
+                    recentSearches={businessModalRecentSearches}
+                    onSelectSearch={(search) => {
+                      setBusinessModalSearchQuery(search);
+                      setIsBusinessModalSearchInputFocused(false);
+                    }}
+                    onClearAll={() => {
+                      setBusinessModalRecentSearches([]);
+                      AsyncStorage.removeItem('BUSINESS_MODAL_RECENT_SEARCHES')
+                        .catch(error => console.warn('Failed to clear business modal recent searches:', error));
+                    }}
+                    theme={theme}
+                  />
+                </View>
+              )}
+            </View>
+          )}
+          
+          {!isBusinessCategoriesModalClosing && (
+            <View style={[styles.upcomingEventsModalBody, { backgroundColor: theme.colors.background }]}>
+              {!isBusinessModalSearchBarVisible || businessModalSearchQuery.trim() === '' ? (
+                // Show full business categories when not searching
                 <SectionList
                   key={`business-categories-modal-${businessCategories.length}`}
                   sections={groupedBusinessCategories}
@@ -6169,92 +6418,123 @@ const HomeScreen: React.FC = React.memo(() => {
                   updateCellsBatchingPeriod={50}
                   stickySectionHeadersEnabled={false}
                 />
-              </View>
-            )}
-          </View>
-        </View>
+              ) : (
+                // Show search results when searching
+                <View style={styles.upcomingEventsModalScroll}>
+                  {isBusinessModalSearching ? (
+                    <View style={{ padding: 20, alignItems: 'center' }}>
+                      <Text style={{ color: theme.colors.textSecondary, fontSize: 14 }}>
+                        Searching...
+                      </Text>
+                    </View>
+                  ) : businessModalSearchResults.length === 0 ? (
+                    <View style={{ padding: 20, alignItems: 'center' }}>
+                      <Text style={{ color: theme.colors.textSecondary, fontSize: 14 }}>
+                        No results found for "{businessModalSearchQuery}"
+                      </Text>
+                    </View>
+                  ) : (
+                    <SectionList
+                      key={`business-modal-search-${businessModalSearchResults.length}`}
+                      sections={groupedBusinessModalSearchResults}
+                      keyExtractor={(item, index) => `search-row-${index}-${item.map(c => c.id).join('-')}`}
+                      renderItem={renderBusinessCategoryModalItem}
+                      renderSectionHeader={renderBusinessCategorySectionHeader}
+                      contentContainerStyle={styles.upcomingEventsModalScroll}
+                      showsVerticalScrollIndicator={false}
+                      removeClippedSubviews={true}
+                      maxToRenderPerBatch={10}
+                      windowSize={5}
+                      initialNumToRender={10}
+                      updateCellsBatchingPeriod={50}
+                      stickySectionHeadersEnabled={false}
+                    />
+                  )}
+                </View>
+              )}
+            </View>
+          )}
+        </SafeAreaView>
       </Modal>
 
       {/* General Categories Modal */}
       <Modal
         visible={isFocused && isGeneralCategoriesModalVisible}
-        transparent={true}
+        transparent={false}
         animationType="slide"
+        presentationStyle="fullScreen"
+        statusBarTranslucent={true}
         onRequestClose={closeGeneralCategoriesModal}
       >
-        <View style={styles.modalOverlay}>
+        <SafeAreaView style={[
+          styles.fullScreenGreetingModalContent,
+          { backgroundColor: theme.colors.background }
+        ]}>
+          <LinearGradient
+            colors={[theme.colors.background, theme.colors.cardBackground]}
+            style={styles.upcomingEventsModalGradient}
+          >
+            <View style={styles.upcomingEventsModalHeader}>
+              <View style={styles.upcomingEventsModalTitleContainer}>
+                <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>General Categories</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.upcomingEventsCloseButton}
+                onPress={closeGeneralCategoriesModal}
+              >
+                <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>×</Text>
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
           <View style={[
-            styles.upcomingEventsModalContent,
+            styles.upcomingEventsModalBody,
             { backgroundColor: theme.colors.background }
           ]}>
-            <LinearGradient
-              colors={[theme.colors.background, theme.colors.cardBackground]}
-              style={styles.upcomingEventsModalGradient}
-            >
-              <View style={styles.upcomingEventsModalHeader}>
-                <View style={styles.upcomingEventsModalTitleContainer}>
-                  <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>General Categories</Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.upcomingEventsCloseButton}
-                  onPress={closeGeneralCategoriesModal}
+            <FlatList
+              key={`general-categories-modal-${generalCategoryModalColumns}-${filteredGreetingCategoriesList.length}`}
+              data={filteredGreetingCategoriesList}
+              keyExtractor={keyExtractorIdString}
+              numColumns={generalCategoryModalColumns}
+              columnWrapperStyle={styles.generalCategoryModalRow}
+              style={{ width: '100%' }}
+              contentContainerStyle={[
+                styles.generalCategoryModalList,
+                {
+                  width: generalCategoryModalContentWidth,
+                },
+              ]}
+              showsVerticalScrollIndicator={false}
+              initialNumToRender={generalCategoryModalInitialRenderCount}
+              maxToRenderPerBatch={generalCategoryModalColumns * 2}
+              windowSize={5}
+              updateCellsBatchingPeriod={80}
+              removeClippedSubviews={true}
+              getItemLayout={getGeneralCategoryModalItemLayout}
+              maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+              renderItem={({ item, index }) => (
+                <View
+                  style={[
+                    styles.generalCategoryModalCardWrapper,
+                    {
+                      width: generalCategoryModalCardWidth,
+                    },
+                  ]}
                 >
-                  <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>×</Text>
-                </TouchableOpacity>
-              </View>
-            </LinearGradient>
-            <View style={[
-              styles.upcomingEventsModalBody,
-              { backgroundColor: theme.colors.background }
-            ]}>
-              <FlatList
-                key={`general-categories-modal-${generalCategoryModalColumns}-${filteredGreetingCategoriesList.length}`}
-                data={filteredGreetingCategoriesList}
-                keyExtractor={keyExtractorIdString}
-                numColumns={generalCategoryModalColumns}
-                columnWrapperStyle={styles.generalCategoryModalRow}
-                contentContainerStyle={[
-                  styles.generalCategoryModalList,
-                  {
-                    width: generalCategoryModalContentWidth,
-                    paddingHorizontal: generalCategoryModalHorizontalPadding,
-                    alignSelf: 'center',
-                  },
-                ]}
-                showsVerticalScrollIndicator={false}
-                initialNumToRender={generalCategoryModalInitialRenderCount}
-                maxToRenderPerBatch={generalCategoryModalColumns * 2}
-                windowSize={5}
-                updateCellsBatchingPeriod={80}
-                removeClippedSubviews={true}
-                getItemLayout={getGeneralCategoryModalItemLayout}
-                maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-                renderItem={({ item, index }) => (
-                  <View
-                    style={[
-                      styles.generalCategoryModalCardWrapper,
-                      {
-                        width: generalCategoryModalCardWidth,
-                        marginRight: (index + 1) % generalCategoryModalColumns === 0 ? 0 : generalCategoryModalGap,
-                      },
-                    ]}
-                  >
-                    <GreetingCategoryCard
-                      item={item}
-                      cardWidth={generalCategoryModalCardWidth}
-                      theme={theme}
-                      categoryImage={memoizedGreetingCategoryImages[item.id] || item.imageUrl || null}
-                      onPress={(category) => {
-                        const categoryImage = memoizedGreetingCategoryImages[item.id] || item.imageUrl || null;
-                        handleGreetingCategoryPress(category, categoryImage);
-                      }}
-                    />
-                  </View>
-                )}
-              />
-            </View>
+                  <GreetingCategoryCard
+                    item={item}
+                    cardWidth={generalCategoryModalCardWidth}
+                    theme={theme}
+                    categoryImage={memoizedGreetingCategoryImages[item.id] || item.imageUrl || null}
+                    onPress={(category) => {
+                      const categoryImage = memoizedGreetingCategoryImages[item.id] || item.imageUrl || null;
+                      handleGreetingCategoryPress(category, categoryImage);
+                    }}
+                  />
+                </View>
+              )}
+            />
           </View>
-        </View>
+        </SafeAreaView>
       </Modal>
 
       {/* Video Content Modal */}
@@ -6432,372 +6712,372 @@ const HomeScreen: React.FC = React.memo(() => {
       {/* Business Ethics Modal */}
       <Modal
         visible={isFocused && isBusinessEthicsModalVisible}
-        transparent={true}
+        transparent={false}
         animationType="slide"
+        presentationStyle="fullScreen"
+        statusBarTranslucent={true}
         onRequestClose={closeBusinessEthicsModal}
       >
-        <View style={styles.modalOverlay}>
+        <SafeAreaView style={[
+          styles.fullScreenGreetingModalContent,
+          { backgroundColor: theme.colors.background }
+        ]}>
+          <LinearGradient
+            colors={[theme.colors.background, theme.colors.cardBackground]}
+            style={styles.upcomingEventsModalGradient}
+          >
+            <View style={styles.upcomingEventsModalHeader}>
+              <View style={styles.upcomingEventsModalTitleContainer}>
+                <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>Business Ethics</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.upcomingEventsCloseButton}
+                onPress={closeBusinessEthicsModal}
+              >
+                <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>×</Text>
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
           <View style={[
-            styles.upcomingEventsModalContent,
+            styles.upcomingEventsModalBody,
             { backgroundColor: theme.colors.background }
           ]}>
-            <LinearGradient
-              colors={[theme.colors.background, theme.colors.cardBackground]}
-              style={styles.upcomingEventsModalGradient}
-            >
-              <View style={styles.upcomingEventsModalHeader}>
-                <View style={styles.upcomingEventsModalTitleContainer}>
-                  <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>Business Ethics</Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.upcomingEventsCloseButton}
-                  onPress={closeBusinessEthicsModal}
-                >
-                  <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>×</Text>
-                </TouchableOpacity>
-              </View>
-            </LinearGradient>
-            <View style={[
-              styles.upcomingEventsModalBody,
-              { backgroundColor: theme.colors.background }
-            ]}>
-              <FlatList
-                key={`businessethics-modal-${businessEthicsTemplatesRaw.length > 0 ? businessEthicsTemplatesRaw.length : businessEthicsTemplates.length}`}
-                data={businessEthicsTemplatesRaw.length > 0 ? businessEthicsTemplatesRaw : businessEthicsTemplates}
-                keyExtractor={keyExtractorId}
-                numColumns={modalColumns}
-                columnWrapperStyle={styles.upcomingEventModalRow}
-                contentContainerStyle={styles.upcomingEventsModalScroll}
-                showsVerticalScrollIndicator={false}
-                removeClippedSubviews={true}
-                maxToRenderPerBatch={10}
-                windowSize={5}
-                initialNumToRender={10}
-                updateCellsBatchingPeriod={50}
-                getItemLayout={getModalItemLayout}
-                renderItem={renderBusinessEthicsModalItem}
-              />
-            </View>
+            <FlatList
+              key={`businessethics-modal-${businessEthicsTemplatesRaw.length > 0 ? businessEthicsTemplatesRaw.length : businessEthicsTemplates.length}`}
+              data={businessEthicsTemplatesRaw.length > 0 ? businessEthicsTemplatesRaw : businessEthicsTemplates}
+              keyExtractor={keyExtractorId}
+              numColumns={modalColumns}
+              columnWrapperStyle={styles.upcomingEventModalRow}
+              contentContainerStyle={styles.upcomingEventsModalScroll}
+              showsVerticalScrollIndicator={false}
+              removeClippedSubviews={true}
+              maxToRenderPerBatch={10}
+              windowSize={5}
+              initialNumToRender={10}
+              updateCellsBatchingPeriod={50}
+              getItemLayout={getModalItemLayout}
+              renderItem={renderBusinessEthicsModalItem}
+            />
           </View>
-        </View>
+        </SafeAreaView>
       </Modal>
 
       {/* Success Mindset Modal */}
       <Modal
         visible={isFocused && isSuccessMindsetModalVisible}
-        transparent={true}
+        transparent={false}
         animationType="slide"
+        presentationStyle="fullScreen"
+        statusBarTranslucent={true}
         onRequestClose={closeSuccessMindsetModal}
       >
-        <View style={styles.modalOverlay}>
+        <SafeAreaView style={[
+          styles.fullScreenGreetingModalContent,
+          { backgroundColor: theme.colors.background }
+        ]}>
+          <LinearGradient
+            colors={[theme.colors.background, theme.colors.cardBackground]}
+            style={styles.upcomingEventsModalGradient}
+          >
+            <View style={styles.upcomingEventsModalHeader}>
+              <View style={styles.upcomingEventsModalTitleContainer}>
+                <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>Success Mindset</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.upcomingEventsCloseButton}
+                onPress={closeSuccessMindsetModal}
+              >
+                <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>×</Text>
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
           <View style={[
-            styles.upcomingEventsModalContent,
+            styles.upcomingEventsModalBody,
             { backgroundColor: theme.colors.background }
           ]}>
-            <LinearGradient
-              colors={[theme.colors.background, theme.colors.cardBackground]}
-              style={styles.upcomingEventsModalGradient}
-            >
-              <View style={styles.upcomingEventsModalHeader}>
-                <View style={styles.upcomingEventsModalTitleContainer}>
-                  <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>Success Mindset</Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.upcomingEventsCloseButton}
-                  onPress={closeSuccessMindsetModal}
-                >
-                  <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>×</Text>
-                </TouchableOpacity>
-              </View>
-            </LinearGradient>
-            <View style={[
-              styles.upcomingEventsModalBody,
-              { backgroundColor: theme.colors.background }
-            ]}>
-              <FlatList
-                key={`successmindset-modal-${successMindsetTemplatesRaw.length > 0 ? successMindsetTemplatesRaw.length : successMindsetTemplates.length}`}
-                data={successMindsetTemplatesRaw.length > 0 ? successMindsetTemplatesRaw : successMindsetTemplates}
-                keyExtractor={keyExtractorId}
-                numColumns={modalColumns}
-                columnWrapperStyle={styles.upcomingEventModalRow}
-                contentContainerStyle={styles.upcomingEventsModalScroll}
-                showsVerticalScrollIndicator={false}
-                removeClippedSubviews={true}
-                maxToRenderPerBatch={10}
-                windowSize={5}
-                initialNumToRender={10}
-                updateCellsBatchingPeriod={50}
-                getItemLayout={getModalItemLayout}
-                renderItem={renderSuccessMindsetModalItem}
-              />
-            </View>
+            <FlatList
+              key={`successmindset-modal-${successMindsetTemplatesRaw.length > 0 ? successMindsetTemplatesRaw.length : successMindsetTemplates.length}`}
+              data={successMindsetTemplatesRaw.length > 0 ? successMindsetTemplatesRaw : successMindsetTemplates}
+              keyExtractor={keyExtractorId}
+              numColumns={modalColumns}
+              columnWrapperStyle={styles.upcomingEventModalRow}
+              contentContainerStyle={styles.upcomingEventsModalScroll}
+              showsVerticalScrollIndicator={false}
+              removeClippedSubviews={true}
+              maxToRenderPerBatch={10}
+              windowSize={5}
+              initialNumToRender={10}
+              updateCellsBatchingPeriod={50}
+              getItemLayout={getModalItemLayout}
+              renderItem={renderSuccessMindsetModalItem}
+            />
           </View>
-        </View>
+        </SafeAreaView>
       </Modal>
 
       {/* Social Media Growth Modal */}
       <Modal
         visible={isFocused && isSocialMediaGrowthModalVisible}
-        transparent={true}
+        transparent={false}
         animationType="slide"
+        presentationStyle="fullScreen"
+        statusBarTranslucent={true}
         onRequestClose={closeSocialMediaGrowthModal}
       >
-        <View style={styles.modalOverlay}>
+        <SafeAreaView style={[
+          styles.fullScreenGreetingModalContent,
+          { backgroundColor: theme.colors.background }
+        ]}>
+          <LinearGradient
+            colors={[theme.colors.background, theme.colors.cardBackground]}
+            style={styles.upcomingEventsModalGradient}
+          >
+            <View style={styles.upcomingEventsModalHeader}>
+              <View style={styles.upcomingEventsModalTitleContainer}>
+                <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>Social Media Growth</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.upcomingEventsCloseButton}
+                onPress={closeSocialMediaGrowthModal}
+              >
+                <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>×</Text>
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
           <View style={[
-            styles.upcomingEventsModalContent,
+            styles.upcomingEventsModalBody,
             { backgroundColor: theme.colors.background }
           ]}>
-            <LinearGradient
-              colors={[theme.colors.background, theme.colors.cardBackground]}
-              style={styles.upcomingEventsModalGradient}
-            >
-              <View style={styles.upcomingEventsModalHeader}>
-                <View style={styles.upcomingEventsModalTitleContainer}>
-                  <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>Social Media Growth</Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.upcomingEventsCloseButton}
-                  onPress={closeSocialMediaGrowthModal}
-                >
-                  <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>×</Text>
-                </TouchableOpacity>
-              </View>
-            </LinearGradient>
-            <View style={[
-              styles.upcomingEventsModalBody,
-              { backgroundColor: theme.colors.background }
-            ]}>
-              <FlatList
-                key={`socialmediagrowth-modal-${socialMediaGrowthTemplatesRaw.length > 0 ? socialMediaGrowthTemplatesRaw.length : socialMediaGrowthTemplates.length}`}
-                data={socialMediaGrowthTemplatesRaw.length > 0 ? socialMediaGrowthTemplatesRaw : socialMediaGrowthTemplates}
-                keyExtractor={keyExtractorId}
-                numColumns={modalColumns}
-                columnWrapperStyle={styles.upcomingEventModalRow}
-                contentContainerStyle={styles.upcomingEventsModalScroll}
-                showsVerticalScrollIndicator={false}
-                removeClippedSubviews={true}
-                maxToRenderPerBatch={10}
-                windowSize={5}
-                initialNumToRender={10}
-                updateCellsBatchingPeriod={50}
-                getItemLayout={getModalItemLayout}
-                renderItem={renderSocialMediaGrowthModalItem}
-              />
-            </View>
+            <FlatList
+              key={`socialmediagrowth-modal-${socialMediaGrowthTemplatesRaw.length > 0 ? socialMediaGrowthTemplatesRaw.length : socialMediaGrowthTemplates.length}`}
+              data={socialMediaGrowthTemplatesRaw.length > 0 ? socialMediaGrowthTemplatesRaw : socialMediaGrowthTemplates}
+              keyExtractor={keyExtractorId}
+              numColumns={modalColumns}
+              columnWrapperStyle={styles.upcomingEventModalRow}
+              contentContainerStyle={styles.upcomingEventsModalScroll}
+              showsVerticalScrollIndicator={false}
+              removeClippedSubviews={true}
+              maxToRenderPerBatch={10}
+              windowSize={5}
+              initialNumToRender={10}
+              updateCellsBatchingPeriod={50}
+              getItemLayout={getModalItemLayout}
+              renderItem={renderSocialMediaGrowthModalItem}
+            />
           </View>
-        </View>
+        </SafeAreaView>
       </Modal>
 
       {/* Money and Finance Modal */}
       <Modal
         visible={isFocused && isMoneyAndFinanceModalVisible}
-        transparent={true}
+        transparent={false}
         animationType="slide"
+        presentationStyle="fullScreen"
+        statusBarTranslucent={true}
         onRequestClose={closeMoneyAndFinanceModal}
       >
-        <View style={styles.modalOverlay}>
+        <SafeAreaView style={[
+          styles.fullScreenGreetingModalContent,
+          { backgroundColor: theme.colors.background }
+        ]}>
+          <LinearGradient
+            colors={[theme.colors.background, theme.colors.cardBackground]}
+            style={styles.upcomingEventsModalGradient}
+          >
+            <View style={styles.upcomingEventsModalHeader}>
+              <View style={styles.upcomingEventsModalTitleContainer}>
+                <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>Money and Finance</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.upcomingEventsCloseButton}
+                onPress={closeMoneyAndFinanceModal}
+              >
+                <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>×</Text>
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
           <View style={[
-            styles.upcomingEventsModalContent,
+            styles.upcomingEventsModalBody,
             { backgroundColor: theme.colors.background }
           ]}>
-            <LinearGradient
-              colors={[theme.colors.background, theme.colors.cardBackground]}
-              style={styles.upcomingEventsModalGradient}
-            >
-              <View style={styles.upcomingEventsModalHeader}>
-                <View style={styles.upcomingEventsModalTitleContainer}>
-                  <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>Money and Finance</Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.upcomingEventsCloseButton}
-                  onPress={closeMoneyAndFinanceModal}
-                >
-                  <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>×</Text>
-                </TouchableOpacity>
-              </View>
-            </LinearGradient>
-            <View style={[
-              styles.upcomingEventsModalBody,
-              { backgroundColor: theme.colors.background }
-            ]}>
-              <FlatList
-                key={`moneyandfinance-modal-${moneyAndFinanceTemplatesRaw.length > 0 ? moneyAndFinanceTemplatesRaw.length : moneyAndFinanceTemplates.length}`}
-                data={moneyAndFinanceTemplatesRaw.length > 0 ? moneyAndFinanceTemplatesRaw : moneyAndFinanceTemplates}
-                keyExtractor={keyExtractorId}
-                numColumns={modalColumns}
-                columnWrapperStyle={styles.upcomingEventModalRow}
-                contentContainerStyle={styles.upcomingEventsModalScroll}
-                showsVerticalScrollIndicator={false}
-                removeClippedSubviews={true}
-                maxToRenderPerBatch={10}
-                windowSize={5}
-                initialNumToRender={10}
-                updateCellsBatchingPeriod={50}
-                getItemLayout={getModalItemLayout}
-                renderItem={renderMoneyAndFinanceModalItem}
-              />
-            </View>
+            <FlatList
+              key={`moneyandfinance-modal-${moneyAndFinanceTemplatesRaw.length > 0 ? moneyAndFinanceTemplatesRaw.length : moneyAndFinanceTemplates.length}`}
+              data={moneyAndFinanceTemplatesRaw.length > 0 ? moneyAndFinanceTemplatesRaw : moneyAndFinanceTemplates}
+              keyExtractor={keyExtractorId}
+              numColumns={modalColumns}
+              columnWrapperStyle={styles.upcomingEventModalRow}
+              contentContainerStyle={styles.upcomingEventsModalScroll}
+              showsVerticalScrollIndicator={false}
+              removeClippedSubviews={true}
+              maxToRenderPerBatch={10}
+              windowSize={5}
+              initialNumToRender={10}
+              updateCellsBatchingPeriod={50}
+              getItemLayout={getModalItemLayout}
+              renderItem={renderMoneyAndFinanceModalItem}
+            />
           </View>
-        </View>
+        </SafeAreaView>
       </Modal>
 
       {/* Business Legend Quote Modal */}
       <Modal
         visible={isFocused && isBusinessLegendQuoteModalVisible}
-        transparent={true}
+        transparent={false}
         animationType="slide"
+        presentationStyle="fullScreen"
+        statusBarTranslucent={true}
         onRequestClose={closeBusinessLegendQuoteModal}
       >
-        <View style={styles.modalOverlay}>
+        <SafeAreaView style={[
+          styles.fullScreenGreetingModalContent,
+          { backgroundColor: theme.colors.background }
+        ]}>
+          <LinearGradient
+            colors={[theme.colors.background, theme.colors.cardBackground]}
+            style={styles.upcomingEventsModalGradient}
+          >
+            <View style={styles.upcomingEventsModalHeader}>
+              <View style={styles.upcomingEventsModalTitleContainer}>
+                <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>Business Legend Quote</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.upcomingEventsCloseButton}
+                onPress={closeBusinessLegendQuoteModal}
+              >
+                <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>×</Text>
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
           <View style={[
-            styles.upcomingEventsModalContent,
+            styles.upcomingEventsModalBody,
             { backgroundColor: theme.colors.background }
           ]}>
-            <LinearGradient
-              colors={[theme.colors.background, theme.colors.cardBackground]}
-              style={styles.upcomingEventsModalGradient}
-            >
-              <View style={styles.upcomingEventsModalHeader}>
-                <View style={styles.upcomingEventsModalTitleContainer}>
-                  <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>Business Legend Quote</Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.upcomingEventsCloseButton}
-                  onPress={closeBusinessLegendQuoteModal}
-                >
-                  <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>×</Text>
-                </TouchableOpacity>
-              </View>
-            </LinearGradient>
-            <View style={[
-              styles.upcomingEventsModalBody,
-              { backgroundColor: theme.colors.background }
-            ]}>
-              <FlatList
-                key={`businesslegendquote-modal-${businessLegendQuoteTemplatesRaw.length > 0 ? businessLegendQuoteTemplatesRaw.length : businessLegendQuoteTemplates.length}`}
-                data={businessLegendQuoteTemplatesRaw.length > 0 ? businessLegendQuoteTemplatesRaw : businessLegendQuoteTemplates}
-                keyExtractor={keyExtractorId}
-                numColumns={modalColumns}
-                columnWrapperStyle={styles.upcomingEventModalRow}
-                contentContainerStyle={styles.upcomingEventsModalScroll}
-                showsVerticalScrollIndicator={false}
-                removeClippedSubviews={true}
-                maxToRenderPerBatch={10}
-                windowSize={5}
-                initialNumToRender={10}
-                updateCellsBatchingPeriod={50}
-                getItemLayout={getModalItemLayout}
-                renderItem={renderBusinessLegendQuoteModalItem}
-              />
-            </View>
+            <FlatList
+              key={`businesslegendquote-modal-${businessLegendQuoteTemplatesRaw.length > 0 ? businessLegendQuoteTemplatesRaw.length : businessLegendQuoteTemplates.length}`}
+              data={businessLegendQuoteTemplatesRaw.length > 0 ? businessLegendQuoteTemplatesRaw : businessLegendQuoteTemplates}
+              keyExtractor={keyExtractorId}
+              numColumns={modalColumns}
+              columnWrapperStyle={styles.upcomingEventModalRow}
+              contentContainerStyle={styles.upcomingEventsModalScroll}
+              showsVerticalScrollIndicator={false}
+              removeClippedSubviews={true}
+              maxToRenderPerBatch={10}
+              windowSize={5}
+              initialNumToRender={10}
+              updateCellsBatchingPeriod={50}
+              getItemLayout={getModalItemLayout}
+              renderItem={renderBusinessLegendQuoteModalItem}
+            />
           </View>
-        </View>
+        </SafeAreaView>
       </Modal>
 
       {/* Business Marketing Tips Modal */}
       <Modal
         visible={isFocused && isBusinessMarketingTipsModalVisible}
-        transparent={true}
+        transparent={false}
         animationType="slide"
+        presentationStyle="fullScreen"
+        statusBarTranslucent={true}
         onRequestClose={closeBusinessMarketingTipsModal}
       >
-        <View style={styles.modalOverlay}>
+        <SafeAreaView style={[
+          styles.fullScreenGreetingModalContent,
+          { backgroundColor: theme.colors.background }
+        ]}>
+          <LinearGradient
+            colors={[theme.colors.background, theme.colors.cardBackground]}
+            style={styles.upcomingEventsModalGradient}
+          >
+            <View style={styles.upcomingEventsModalHeader}>
+              <View style={styles.upcomingEventsModalTitleContainer}>
+                <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>Business Marketing Tips</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.upcomingEventsCloseButton}
+                onPress={closeBusinessMarketingTipsModal}
+              >
+                <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>×</Text>
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
           <View style={[
-            styles.upcomingEventsModalContent,
+            styles.upcomingEventsModalBody,
             { backgroundColor: theme.colors.background }
           ]}>
-            <LinearGradient
-              colors={[theme.colors.background, theme.colors.cardBackground]}
-              style={styles.upcomingEventsModalGradient}
-            >
-              <View style={styles.upcomingEventsModalHeader}>
-                <View style={styles.upcomingEventsModalTitleContainer}>
-                  <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>Business Marketing Tips</Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.upcomingEventsCloseButton}
-                  onPress={closeBusinessMarketingTipsModal}
-                >
-                  <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>×</Text>
-                </TouchableOpacity>
-              </View>
-            </LinearGradient>
-            <View style={[
-              styles.upcomingEventsModalBody,
-              { backgroundColor: theme.colors.background }
-            ]}>
-              <FlatList
-                key={`businessmarketingtips-modal-${businessMarketingTipsTemplatesRaw.length > 0 ? businessMarketingTipsTemplatesRaw.length : businessMarketingTipsTemplates.length}`}
-                data={businessMarketingTipsTemplatesRaw.length > 0 ? businessMarketingTipsTemplatesRaw : businessMarketingTipsTemplates}
-                keyExtractor={keyExtractorId}
-                numColumns={modalColumns}
-                columnWrapperStyle={styles.upcomingEventModalRow}
-                contentContainerStyle={styles.upcomingEventsModalScroll}
-                showsVerticalScrollIndicator={false}
-                removeClippedSubviews={true}
-                maxToRenderPerBatch={10}
-                windowSize={5}
-                initialNumToRender={10}
-                updateCellsBatchingPeriod={50}
-                getItemLayout={getModalItemLayout}
-                renderItem={renderBusinessMarketingTipsModalItem}
-              />
-            </View>
+            <FlatList
+              key={`businessmarketingtips-modal-${businessMarketingTipsTemplatesRaw.length > 0 ? businessMarketingTipsTemplatesRaw.length : businessMarketingTipsTemplates.length}`}
+              data={businessMarketingTipsTemplatesRaw.length > 0 ? businessMarketingTipsTemplatesRaw : businessMarketingTipsTemplates}
+              keyExtractor={keyExtractorId}
+              numColumns={modalColumns}
+              columnWrapperStyle={styles.upcomingEventModalRow}
+              contentContainerStyle={styles.upcomingEventsModalScroll}
+              showsVerticalScrollIndicator={false}
+              removeClippedSubviews={true}
+              maxToRenderPerBatch={10}
+              windowSize={5}
+              initialNumToRender={10}
+              updateCellsBatchingPeriod={50}
+              getItemLayout={getModalItemLayout}
+              renderItem={renderBusinessMarketingTipsModalItem}
+            />
           </View>
-        </View>
+        </SafeAreaView>
       </Modal>
 
       {/* Business Quotes Modal */}
       <Modal
         visible={isFocused && isBusinessQuotesModalVisible}
-        transparent={true}
+        transparent={false}
         animationType="slide"
+        presentationStyle="fullScreen"
+        statusBarTranslucent={true}
         onRequestClose={closeBusinessQuotesModal}
       >
-        <View style={styles.modalOverlay}>
+        <SafeAreaView style={[
+          styles.fullScreenGreetingModalContent,
+          { backgroundColor: theme.colors.background }
+        ]}>
+          <LinearGradient
+            colors={[theme.colors.background, theme.colors.cardBackground]}
+            style={styles.upcomingEventsModalGradient}
+          >
+            <View style={styles.upcomingEventsModalHeader}>
+              <View style={styles.upcomingEventsModalTitleContainer}>
+                <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>Business Quotes</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.upcomingEventsCloseButton}
+                onPress={closeBusinessQuotesModal}
+              >
+                <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>×</Text>
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
           <View style={[
-            styles.upcomingEventsModalContent,
+            styles.upcomingEventsModalBody,
             { backgroundColor: theme.colors.background }
           ]}>
-            <LinearGradient
-              colors={[theme.colors.background, theme.colors.cardBackground]}
-              style={styles.upcomingEventsModalGradient}
-            >
-              <View style={styles.upcomingEventsModalHeader}>
-                <View style={styles.upcomingEventsModalTitleContainer}>
-                  <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>Business Quotes</Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.upcomingEventsCloseButton}
-                  onPress={closeBusinessQuotesModal}
-                >
-                  <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>×</Text>
-                </TouchableOpacity>
-              </View>
-            </LinearGradient>
-            <View style={[
-              styles.upcomingEventsModalBody,
-              { backgroundColor: theme.colors.background }
-            ]}>
-              <FlatList
-                key={`businessquotes-modal-${businessQuotesTemplatesRaw.length > 0 ? businessQuotesTemplatesRaw.length : businessQuotesTemplates.length}`}
-                data={businessQuotesTemplatesRaw.length > 0 ? businessQuotesTemplatesRaw : businessQuotesTemplates}
-                keyExtractor={keyExtractorId}
-                numColumns={modalColumns}
-                columnWrapperStyle={styles.upcomingEventModalRow}
-                contentContainerStyle={styles.upcomingEventsModalScroll}
-                showsVerticalScrollIndicator={false}
-                removeClippedSubviews={true}
-                maxToRenderPerBatch={10}
-                windowSize={5}
-                initialNumToRender={10}
-                updateCellsBatchingPeriod={50}
-                getItemLayout={getModalItemLayout}
-                renderItem={renderBusinessQuotesModalItem}
-              />
-            </View>
+            <FlatList
+              key={`businessquotes-modal-${businessQuotesTemplatesRaw.length > 0 ? businessQuotesTemplatesRaw.length : businessQuotesTemplates.length}`}
+              data={businessQuotesTemplatesRaw.length > 0 ? businessQuotesTemplatesRaw : businessQuotesTemplates}
+              keyExtractor={keyExtractorId}
+              numColumns={modalColumns}
+              columnWrapperStyle={styles.upcomingEventModalRow}
+              contentContainerStyle={styles.upcomingEventsModalScroll}
+              showsVerticalScrollIndicator={false}
+              removeClippedSubviews={true}
+              maxToRenderPerBatch={10}
+              windowSize={5}
+              initialNumToRender={10}
+              updateCellsBatchingPeriod={50}
+              getItemLayout={getModalItemLayout}
+              renderItem={renderBusinessQuotesModalItem}
+            />
           </View>
-        </View>
+        </SafeAreaView>
       </Modal>
 
 
@@ -7673,22 +7953,31 @@ const styles = StyleSheet.create({
     shadowRadius: moderateScale(12), // Reduced from 25
     elevation: 10, // Reduced from 15
   },
+  // Full-screen modal style for greeting View More modals
+  fullScreenGreetingModalContent: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#ffffff', // This will be overridden by theme in the component
+    // No borderRadius, margins, or shadows for full-screen experience
+  },
   upcomingEventsModalGradient: {
-    paddingTop: verticalScale(8), // Further reduced from 15
-    paddingBottom: verticalScale(4), // Further reduced from 6
+    paddingTop: verticalScale(16), // Increased from 8
+    paddingBottom: verticalScale(8), // Increased from 4
   },
   upcomingEventsModalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center', // Changed from flex-start to center
-    paddingHorizontal: moderateScale(12),
+    paddingHorizontal: moderateScale(16), // Increased from 12
+    paddingVertical: moderateScale(4), // Added vertical padding
   },
   upcomingEventsModalTitleContainer: {
     flex: 1,
-    marginRight: moderateScale(6), // Reduced from 8
+    marginRight: moderateScale(8), // Increased from 6
   },
   upcomingEventsModalTitle: {
-    fontSize: SCREEN_WIDTH >= 768 ? moderateScale(15) : moderateScale(13), // Further reduced from 18/16
+    fontSize: SCREEN_WIDTH >= 768 ? moderateScale(18) : moderateScale(16), // Increased from 15/13
     fontWeight: 'bold',
     color: '#333333', // This will be overridden by theme in the component
     marginBottom: 0, // No margin needed without subtitle
@@ -7702,10 +7991,22 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     display: 'none',
   },
+  upcomingEventsModalHeaderButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(8),
+  },
+  upcomingEventsHeaderActionButton: {
+    width: SCREEN_WIDTH >= 768 ? moderateScale(34) : moderateScale(32), // Increased from 28/26
+    height: SCREEN_WIDTH >= 768 ? moderateScale(34) : moderateScale(32), // Increased from 28/26
+    borderRadius: SCREEN_WIDTH >= 768 ? moderateScale(17) : moderateScale(16), // Increased from 14/13
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   upcomingEventsCloseButton: {
-    width: SCREEN_WIDTH >= 768 ? moderateScale(28) : moderateScale(26), // Further reduced from 36/32
-    height: SCREEN_WIDTH >= 768 ? moderateScale(28) : moderateScale(26),
-    borderRadius: SCREEN_WIDTH >= 768 ? moderateScale(14) : moderateScale(13),
+    width: SCREEN_WIDTH >= 768 ? moderateScale(34) : moderateScale(32), // Increased from 28/26
+    height: SCREEN_WIDTH >= 768 ? moderateScale(34) : moderateScale(32), // Increased from 28/26
+    borderRadius: SCREEN_WIDTH >= 768 ? moderateScale(17) : moderateScale(16), // Increased from 14/13
     backgroundColor: 'rgba(0,0,0,0.08)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -7713,7 +8014,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0,0,0,0.1)',
   },
   upcomingEventsCloseButtonText: {
-    fontSize: SCREEN_WIDTH >= 768 ? moderateScale(15) : moderateScale(14), // Further reduced from 18/16
+    fontSize: SCREEN_WIDTH >= 768 ? moderateScale(18) : moderateScale(16), // Increased from 15/14
     color: '#333333',
     fontWeight: 'bold',
   },
@@ -7728,7 +8029,7 @@ const styles = StyleSheet.create({
   },
   upcomingEventModalRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-start', // Changed from space-between to align items from left
+    justifyContent: 'space-between', // Use space-between for equal distribution
     marginBottom: moderateScale(6),
     paddingLeft: moderateScale(8), // Left padding
     paddingRight: moderateScale(8), // Right padding - equal to left
@@ -8048,17 +8349,15 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   generalCategoryModalRow: {
-    justifyContent: 'flex-start',
+    justifyContent: 'space-between',
     marginBottom: moderateScale(6),
     paddingHorizontal: 0,
   },
   generalCategoryModalList: {
-    paddingHorizontal: moderateScale(8),
     paddingTop: moderateScale(8),
     paddingBottom: moderateScale(12),
   },
   generalCategoryModalCardWrapper: {
-    marginRight: 0,
     marginBottom: moderateScale(6),
   },
   businessCategorySectionHeaderContainer: {

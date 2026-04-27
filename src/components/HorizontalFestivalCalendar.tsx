@@ -347,9 +347,10 @@ const getOptimizedCloudinaryUrl = (url: string, width: number = 200): string => 
 
 interface HorizontalFestivalCalendarProps {
   refreshKey?: number;
+  isFocused?: boolean;
 }
 
-const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({ refreshKey = 0 }) => {
+const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({ refreshKey = 0, isFocused = true }) => {
   const { theme } = useTheme();
   const { selectedBusinessProfile } = useBusinessProfile();
   const navigation = useNavigation<StackNavigationProp<MainStackParamList>>();
@@ -645,9 +646,11 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
     // Use global business profile for consistent branding
     navigation.navigate('PosterPlayer', {
       selectedPoster: poster,
+      selectedTemplateId: poster.id,
       relatedPosters: selectedDatePosters.filter(p => p.id !== poster.id),
       calendarDate: dateString,
       originScreen: 'Calendar',
+      type: 'calendar',
     });
   }, [navigation, selectedDatePosters]);
 
@@ -747,7 +750,6 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
           },
         ]}
         onPress={() => {
-          setIsViewMoreModalVisible(false);
           handlePosterPress(item, item.dateString);
         }}
         activeOpacity={0.8}
@@ -945,7 +947,7 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
 
       {/* View More Modal */}
       <Modal
-        visible={isViewMoreModalVisible}
+        visible={isFocused && isViewMoreModalVisible}
         transparent={true}
         animationType="slide"
         onRequestClose={() => setIsViewMoreModalVisible(false)}

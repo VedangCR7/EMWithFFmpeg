@@ -595,6 +595,9 @@ const PosterPlayerScreen: React.FC = () => {
     isHomeScreenSoftwareFlow: type === 'business' && categoryName === 'Software Company' && templateSource === 'professional'
   });
 
+  // DEBUG: Log all route params for modal debugging
+  console.log('PosterPlayerScreen FULL Route Params:', JSON.stringify(route.params, null, 2));
+
   // PROTECTION: Detect if valid templates are received via navigation params
   const hasNavigationTemplates = useMemo(() => {
     return !!(initialPoster && initialRelatedPosters && initialRelatedPosters.length > 0);
@@ -1336,17 +1339,26 @@ const PosterPlayerScreen: React.FC = () => {
     if (globalBusinessProfile?.id !== prevProfileRef.current?.id) {
       console.log('🔄 [POSTER PLAYER] Profile changed, forcing template refresh...');
       
-      // Reset template state to trigger re-fetch - PROTECT SEARCH FLOW AND GENERAL FROM SEARCH
-      if (!isSearchFlow && !isGeneralFromSearch) {
+      // Reset template state to trigger re-fetch - PROTECT SEARCH FLOW, GENERAL FROM SEARCH, AND GREETING MODALS
+      const isGreetingModalFlow = templateSource === 'greeting' && type === 'greeting' && !isSearchFlow && !isGeneralFromSearch;
+      if (!isSearchFlow && !isGeneralFromSearch && !isGreetingModalFlow) {
         setAllTemplatesState([]);
         allTemplatesRef.current = [];
+      } else {
+        console.log('🔄 [POSTER PLAYER] SKIPPING template reset - protected flow detected:', { 
+          isSearchFlow, 
+          isGeneralFromSearch, 
+          isGreetingModalFlow,
+          templateSource,
+          type 
+        });
       }
       
       // Update previous profile reference
       prevProfileRef.current = globalBusinessProfile;
       
-      // Re-trigger template loading based on current category
-      if (activeCategoryRef.current?.type === 'business' && activeCategoryRef.current?.value) {
+      // Re-trigger template loading based on current category - ONLY FOR NON-PROTECTED FLOWS
+      if (activeCategoryRef.current?.type === 'business' && activeCategoryRef.current?.value && !isGreetingModalFlow) {
         console.log('🔄 [POSTER PLAYER] Re-loading business templates for new profile');
         // The existing category loading logic will pick up the new profile
       }
@@ -2151,6 +2163,13 @@ const PosterPlayerScreen: React.FC = () => {
       return;
     }
 
+    // ✅ BLOCK BUSINESS FETCH FOR GREETING MODAL FLOWS (Success Mindset, Social Media Growth, etc.)
+    const isGreetingModalFlow = templateSource === 'greeting' && type === 'greeting' && !isSearchFlow && !isGeneralFromSearch;
+    if (isGreetingModalFlow) {
+      console.log('🚫 [BUSINESS FETCH] Skipped — greeting modal flow is active (Success Mindset, Social Media Growth, etc.)');
+      return;
+    }
+
     if (!globalBusinessCategory) {
       return;
     }
@@ -2368,6 +2387,13 @@ const PosterPlayerScreen: React.FC = () => {
   // Fetch greeting category templates when greetingCategory is provided
   useEffect(() => {
     if (!greetingCategory) {
+      return;
+    }
+
+    // ✅ BLOCK GREETING CATEGORY FETCH FOR GREETING MODAL FLOWS (Success Mindset, Social Media Growth, etc.)
+    const isGreetingModalFlow = templateSource === 'greeting' && type === 'greeting' && !isSearchFlow && !isGeneralFromSearch;
+    if (isGreetingModalFlow) {
+      console.log('🚫 [GREETING CATEGORY FETCH] Skipped — greeting modal flow is active (Success Mindset, Social Media Growth, etc.)');
       return;
     }
 

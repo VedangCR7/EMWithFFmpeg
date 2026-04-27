@@ -490,7 +490,7 @@ const HelpSupportScreen: React.FC = () => {
               color: 'rgba(102, 102, 102, 0.8)',
               fontSize: isTabletDevice ? getFontSize(7.5) : getFontSize(7),
             }]}>
-              Version 1.0.0
+              Version 1.1.0
             </Text>
           </View>
         </ScrollView>
