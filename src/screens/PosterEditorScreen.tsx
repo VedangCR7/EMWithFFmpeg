@@ -52,6 +52,12 @@ import { useBusinessProfile } from '../context/BusinessProfileContext';
 import { useTheme } from '../context/ThemeContext';
 import PremiumTemplateModal from '../components/PremiumTemplateModal';
 
+// Frame assets imports
+import frame1 from '../assets/frames/f1.png';
+import frame2 from '../assets/frames/f2.png';
+import frame3 from '../assets/frames/f3.png';
+import frame4 from '../assets/frames/f4.png';
+
 
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -159,6 +165,14 @@ const TEMPLATE_OPTIONS = [
   { id: 'ombre-autumn', label: 'Ombre Autumn' },
   { id: 'ombre-rose', label: 'Ombre Rose' },
   { id: 'ombre-galaxy', label: 'Ombre Galaxy' },
+];
+
+// Frame options for overlay frames
+const FRAME_OPTIONS = [
+  { id: 'frame1', source: frame1 },
+  { id: 'frame2', source: frame2 },
+  { id: 'frame3', source: frame3 },
+  { id: 'frame4', source: frame4 },
 ];
 
 // Responsive scaling functions for static styles
@@ -480,6 +494,9 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
   const [selectedTemplate, setSelectedTemplate] = useState<string>(initialTemplate || 'business');
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
   const [initialTemplateApplied, setInitialTemplateApplied] = useState(false);
+  
+  // State for overlay frames (independent of templates)
+  const [selectedFrame, setSelectedFrame] = useState<string | null>(null);
   
   // State for business profiles
   const [businessProfiles, setBusinessProfiles] = useState<BusinessProfile[]>([]);
@@ -1406,6 +1423,14 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     }
   }, [activeBusinessProfile, applyProfileSafely]);
 
+  // Handle frame state: hide footer background when frame is applied
+  useEffect(() => {
+    if (selectedFrame) {
+      setVisibleFields(prev => ({ ...prev, footerBackground: false }));
+      console.log('🖼️ [FRAME STATE] Footer background hidden due to selected frame:', selectedFrame);
+    }
+  }, [selectedFrame]);
+
   // Apply business profile data to poster
   const applyBusinessProfileToPoster = (profile: BusinessProfile) => {
     setShowProfileSelectionModal(false);
@@ -1663,6 +1688,12 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
         },
       };
       newLayers.push(servicesLayer);
+    }
+
+    // Check if frame is already selected and hide footer background accordingly
+    if (selectedFrame) {
+      setVisibleFields(prev => ({ ...prev, footerBackground: false }));
+      console.log('🖼️ [FRAME DETECTED] Footer background hidden due to applied frame');
     }
 
     setLayers(newLayers);
@@ -2979,10 +3010,18 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                   style={styles.backgroundImage}
                   resizeMode="contain"
                 />
+                {/* ✅ FRAME integrated into background layer - won't interfere with text */}
+                {selectedFrame && (
+                  <Image
+                    source={FRAME_OPTIONS.find(f => f.id === selectedFrame)?.source}
+                    style={styles.frameIntegrated}
+                    resizeMode="stretch"
+                    pointerEvents="none"
+                  />
+                )}
               </View>
 
-
-              {/* Layers - rendered AFTER frame so they appear on top */}
+              {/* ✅ TEXT LAYERS - now always on top since frame is in background */}
               {layers.map((layer) => {
                 if (layer.fieldType === 'footerBackground') {
                   return (
@@ -3039,6 +3078,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                 />
               ))}
 
+              
             </View>
           </TouchableWithoutFeedback>
         </ViewShot>
@@ -3152,12 +3192,31 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
             contentContainerStyle={styles.fieldToggleScrollContent}
           >
             <TouchableOpacity
-              style={[styles.fieldToggleButton, visibleFields.footerBackground && styles.fieldToggleButtonActive]}
-              onPress={() => toggleFieldVisibility('footerBackground')}
+              style={[
+                styles.fieldToggleButton, 
+                visibleFields.footerBackground && styles.fieldToggleButtonActive,
+                selectedFrame && styles.fieldToggleButtonDisabled
+              ]}
+              onPress={() => !selectedFrame && toggleFieldVisibility('footerBackground')}
+              disabled={!!selectedFrame}
             >
-              <Icon name="format-color-fill" size={getResponsiveIconSize()} color={visibleFields.footerBackground ? "#ffffff" : "#667eea"} />
-              <Text style={[styles.fieldToggleButtonText, visibleFields.footerBackground && styles.fieldToggleButtonTextActive]}>
-                Footer BG
+              <Icon 
+                name="format-color-fill" 
+                size={getResponsiveIconSize()} 
+                color={
+                  selectedFrame 
+                    ? "#999999" 
+                    : visibleFields.footerBackground 
+                      ? "#ffffff" 
+                      : "#667eea"
+                } 
+              />
+              <Text style={[
+                styles.fieldToggleButtonText, 
+                visibleFields.footerBackground && styles.fieldToggleButtonTextActive,
+                selectedFrame && styles.fieldToggleButtonTextDisabled
+              ]}>
+                Footer BG {selectedFrame && '(Frame)'}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -3275,6 +3334,54 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                 </TouchableOpacity>
               );
             })}
+          </ScrollView>
+        </View>
+
+        {/* Frames Section */}
+        <View style={styles.framesSection}>
+          <View style={styles.framesHeader}>
+            <Text style={styles.framesTitle}>Frames</Text>
+          </View>
+          <ScrollView
+            style={styles.framesContent}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.framesScrollContent}
+          >
+            {FRAME_OPTIONS.map(frame => (
+              <TouchableOpacity
+                key={frame.id}
+                style={[
+                  styles.frameButton,
+                  selectedFrame === frame.id && styles.frameButtonActive
+                ]}
+                onPress={() => {
+                  setSelectedFrame(frame.id);
+                  // Hide footer background when frame is applied
+                  setVisibleFields(prev => ({ ...prev, footerBackground: false }));
+                }}
+              >
+                <Image
+                  source={frame.source}
+                  style={styles.framePreview}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+            ))}
+            
+            {/* Remove Frame Option */}
+            <TouchableOpacity
+              style={styles.removeFrameButton}
+              onPress={() => {
+                  setSelectedFrame(null);
+                  // Restore footer background when frame is removed
+                  setVisibleFields(prev => ({ ...prev, footerBackground: true }));
+                }}
+            >
+              <Icon name="close" size={20} color="#667eea" />
+              <Text style={styles.removeFrameText}>Remove</Text>
+            </TouchableOpacity>
           </ScrollView>
         </View>
 
@@ -4595,6 +4702,13 @@ const styles = StyleSheet.create({
   fieldToggleButtonTextActive: {
     color: '#ffffff',
   },
+  fieldToggleButtonDisabled: {
+    backgroundColor: '#e0e0e0',
+    opacity: 0.6,
+  },
+  fieldToggleButtonTextDisabled: {
+    color: '#999999',
+  },
   closeButton: {
     backgroundColor: '#f8f9fa',
     borderWidth: 2,
@@ -5290,6 +5404,28 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
     borderStyle: 'solid',
   },
+  // Frame Overlay Style (legacy - not used anymore)
+  frameOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    zIndex: 999, // must be above all layers
+  },
+  // ✅ Frame Integrated Style - positioned within background container
+  frameIntegrated: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    zIndex: 2, // within background container, above image but below text layers
+  },
   // Frames Section Styles
   framesSection: {
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
@@ -5383,6 +5519,24 @@ const styles = StyleSheet.create({
   frameTextActive: {
     color: '#667eea',
     fontWeight: '700',
+  },
+  removeFrameButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: isSmallScreen ? 4 : 8,
+    padding: isSmallScreen ? 8 : 12,
+    borderRadius: isSmallScreen ? 6 : 8,
+    borderWidth: 2,
+    borderColor: '#e9ecef',
+    backgroundColor: '#f8f9fa',
+    minWidth: isSmallScreen ? 55 : 70,
+  },
+  removeFrameText: {
+    fontSize: isSmallScreen ? 8 : 9,
+    color: '#667eea',
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 2,
   },
   // Frame Preview Styles
   classicFramePreview: {
