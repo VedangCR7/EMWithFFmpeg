@@ -1427,138 +1427,53 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
 
   // Handle frame state: hide footer background when frame is applied, restore original positions when removed
   useEffect(() => {
-    console.log('🔍 [FRAME USEEFFECT DEBUG] Frame state changed:', {
-      selectedFrame,
-      layersCount: layers.length,
-      isAutoLayoutApplied: Object.keys(isAutoLayoutApplied),
-      originalLayersCount: originalLayers.length
-    });
-    
     if (selectedFrame) {
       setVisibleFields(prev => ({ ...prev, footerBackground: false }));
-      console.log('🖼️ [FRAME STATE] Footer background hidden due to selected frame:', selectedFrame);
       
       // Apply frame layout ONLY if layers are available AND layout hasn't been applied for this frame yet
       if (layers.length > 0 && !isAutoLayoutApplied[selectedFrame]) {
-        console.log('🎯 [FRAME USEEFFECT DEBUG] Applying frame layout - conditions met:', {
-          selectedFrame,
-          layersCount: layers.length,
-          layoutAlreadyApplied: isAutoLayoutApplied[selectedFrame],
-          currentLayers: layers.map(l => ({
-            id: l.id,
-            fieldType: l.fieldType,
-            position: l.position,
-            content: l.content?.substring(0, 15) + '...'
-          }))
-        });
         applyFrameLayout(selectedFrame);
-      } else if (layers.length > 0 && isAutoLayoutApplied[selectedFrame]) {
-        console.log('⚠️ [FRAME USEEFFECT DEBUG] Frame layout already applied, skipping:', {
-          selectedFrame,
-          layoutAlreadyApplied: isAutoLayoutApplied[selectedFrame]
-        });
-      } else {
-        console.log('⚠️ [FRAME USEEFFECT DEBUG] No layers available to apply frame layout');
       }
     } else {
-      console.log('ℹ️ [FRAME USEEFFECT DEBUG] No frame selected - checking if original layers need restoration');
-      
       // ✅ RESTORE ORIGINAL LAYERS WHEN FRAME IS REMOVED
       if (originalLayers.length > 0) {
-        console.log('🔄 [FRAME RESTORE] Restoring original layers due to frame removal:', {
-          layersToRestore: originalLayers.length,
-          fromPositions: layers.map(l => ({
-            id: l.id,
-            fieldType: l.fieldType,
-            position: l.position
-          })),
-          toPositions: originalLayers.map(l => ({
-            id: l.id,
-            fieldType: l.fieldType,
-            position: l.position
-          }))
+        // Force immediate state update with original layers
+        const restoredLayers = [...originalLayers];
+        setLayers(restoredLayers);
+        
+        // ✅ RESTORE ANIMATED VALUES TO MATCH ORIGINAL POSITIONS
+        restoredLayers.forEach(layer => {
+          if (layerAnimations[layer.id]) {
+            layerAnimations[layer.id].x.setValue(layer.position.x);
+            layerAnimations[layer.id].y.setValue(layer.position.y);
+          }
         });
-        setLayers([...originalLayers]);
         
         // Restore footer background visibility when frame is removed
         setVisibleFields(prev => ({ ...prev, footerBackground: true }));
-        console.log('🖼️ [FRAME RESTORE] Original layers and footer background restored');
       } else {
-        console.log('ℹ️ [FRAME RESTORE] No original layers to restore (first time or already cleared)');
-        
         // Still restore footer background even if no original layers
         setVisibleFields(prev => ({ ...prev, footerBackground: true }));
       }
     }
   }, [selectedFrame, layers.length, isAutoLayoutApplied, applyFrameLayout, originalLayers]);
 
+  
   // Apply frame-specific layout to elements
   const applyFrameLayout = useCallback((frameId: string) => {
-    console.log('🚀 [FRAME LAYOUT DEBUG] Starting frame layout application:', {
-      frameId,
-      currentLayersCount: layers.length,
-      originalLayersCount: originalLayers.length,
-      canvasSize: { width: canvasWidth, height: canvasHeight },
-      isAutoLayoutApplied: Object.keys(isAutoLayoutApplied)
-    });
-
-    // Log current layers before any changes
-    console.log('📋 [FRAME LAYOUT DEBUG] Current layers before application:', {
-      layers: layers.map(l => ({
-        id: l.id,
-        fieldType: l.fieldType,
-        position: l.position,
-        content: l.content?.substring(0, 20) + '...'
-      }))
-    });
-
-    // Store original layers before applying first frame layout
-    if (originalLayers.length === 0 && layers.length > 0) {
+    // Store original layers before applying frame layout (always store current positions)
+    if (layers.length > 0) {
       const layersToStore = [...layers];
       setOriginalLayers(layersToStore);
-      console.log('💾 [FRAME LAYOUT DEBUG] Stored original layers for frame removal:', {
-        layersStored: layersToStore.length,
-        frameId,
-        storedLayers: layersToStore.map(l => ({
-          id: l.id,
-          fieldType: l.fieldType,
-          position: l.position
-        }))
-      });
-    } else if (originalLayers.length > 0) {
-      console.log('ℹ️ [FRAME LAYOUT DEBUG] Original layers already stored, skipping storage:', {
-        originalLayersCount: originalLayers.length
-      });
     }
     
     // Apply frame layout (always apply to ensure proper positioning)
-    console.log('🔄 [FRAME LAYOUT DEBUG] Calling applyFrameLayoutToLayers with:', {
-      layersCount: layers.length,
-      frameId,
-      canvasWidth,
-      canvasHeight
-    });
-    
     const updatedLayers = applyFrameLayoutToLayers(
       layers,
       frameId,
       canvasWidth,
       canvasHeight
     );
-    
-    console.log('📝 [FRAME LAYOUT DEBUG] Got updated layers from applyFrameLayoutToLayers:', {
-      updatedLayersCount: updatedLayers.length,
-      layersChanged: updatedLayers.some((layer, index) => 
-        layers[index].position.x !== layer.position.x || layers[index].position.y !== layer.position.y
-      ),
-      updatedLayers: updatedLayers.map(l => ({
-        id: l.id,
-        fieldType: l.fieldType,
-        position: l.position,
-        positionChanged: layers.find(orig => orig.id === l.id)?.position.x !== l.position.x || 
-                     layers.find(orig => orig.id === l.id)?.position.y !== l.position.y
-      }))
-    });
 
     // ✅ UPDATE ANIMATED VALUES FOR FRAME LAYOUT
     updatedLayers.forEach(layer => {
@@ -1567,7 +1482,6 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
         const positionChanged = oldPosition && (oldPosition.x !== layer.position.x || oldPosition.y !== layer.position.y);
         
         if (positionChanged) {
-          console.log(`🔄 [FRAME ANIMATION UPDATE] Updating animated values for layer ${layer.id} (${layer.fieldType}) to position: x: ${layer.position.x}, y: ${layer.position.y}`);
           layerAnimations[layer.id].x.setValue(layer.position.x);
           layerAnimations[layer.id].y.setValue(layer.position.y);
         }
@@ -1575,29 +1489,10 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     });
 
     // Update state
-    console.log('⚡ [FRAME LAYOUT DEBUG] Updating layers state...');
     setLayers(updatedLayers);
     
-    console.log('🏷️ [FRAME LAYOUT DEBUG] Updating auto-layout applied state...');
-    setIsAutoLayoutApplied(prev => {
-      const newState = { ...prev, [frameId]: true };
-      console.log('📊 [FRAME LAYOUT DEBUG] Auto-layout state updated:', {
-        previousState: prev,
-        newState,
-        frameId
-      });
-      return newState;
-    });
-    
-    console.log('✅ [FRAME LAYOUT DEBUG] Frame layout application complete:', {
-      frameId,
-      layersUpdated: updatedLayers.length,
-      canvasSize: { width: canvasWidth, height: canvasHeight },
-      originalLayersStored: originalLayers.length,
-      layersActuallyChanged: updatedLayers.filter((layer, index) => 
-        layers[index].position.x !== layer.position.x || layers[index].position.y !== layer.position.y
-      ).length
-    });
+    // Update auto-layout applied state
+    setIsAutoLayoutApplied(prev => ({ ...prev, [frameId]: true }));
   }, [layers, canvasWidth, canvasHeight, originalLayers.length]);
 
   // Apply business profile data to poster
@@ -3362,6 +3257,25 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                 </LinearGradient>
               </TouchableOpacity>
             )}
+
+            {selectedFrame && (
+              <TouchableOpacity
+                style={styles.toolbarButton}
+                onPress={() => {
+                  setSelectedFrame(null);
+                  // Reset auto-layout state when frame is removed
+                  setIsAutoLayoutApplied({});
+                }}
+              >
+                <LinearGradient
+                  colors={['#ff6b6b', '#ff5252']}
+                  style={styles.toolbarButtonGradient}
+                >
+                  <Icon name="close" size={getResponsiveIconSize()} color="#ffffff" />
+                  <Text style={styles.toolbarButtonText}>Remove Frame</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
           </ScrollView>
         </View>
 
@@ -3544,40 +3458,17 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                   selectedFrame === frame.id && styles.frameButtonActive
                 ]}
                 onPress={() => {
-                  console.log('🎯 [FRAME BUTTON DEBUG] Frame button pressed:', {
-                    selectedFrameId: frame.id,
-                    previousFrame: selectedFrame,
-                    isSwitching: selectedFrame && selectedFrame !== frame.id,
-                    originalLayersCount: originalLayers.length,
-                    currentLayersCount: layers.length
-                  });
-                  
-                  // If switching frames, restore original positions first
-                  if (selectedFrame && selectedFrame !== frame.id && originalLayers.length > 0) {
-                    console.log('🔄 [FRAME BUTTON DEBUG] Switching frames - restoring original positions:', {
-                      fromFrame: selectedFrame,
-                      toFrame: frame.id,
-                      originalLayersCount: originalLayers.length,
-                      restoringToPositions: originalLayers.map(l => ({
-                        id: l.id,
-                        fieldType: l.fieldType,
-                        position: l.position
-                      }))
-                    });
-                    setLayers([...originalLayers]);
-                    console.log('🖼️ [FRAME SWITCH] Restored original positions before applying new frame');
+                  if (selectedFrame === frame.id) {
+                    // If same frame is selected, remove it
+                    setSelectedFrame(null);
+                    // Reset auto-layout state when frame is removed
+                    setIsAutoLayoutApplied({});
+                  } else {
+                    // If different frame or no frame selected, apply new frame
+                    setSelectedFrame(frame.id);
+                    setVisibleFields(prev => ({ ...prev, footerBackground: false }));
+                    applyFrameLayout(frame.id);
                   }
-                  
-                  console.log('🏷️ [FRAME BUTTON DEBUG] Setting selected frame to:', frame.id);
-                  setSelectedFrame(frame.id);
-                  
-                  // Hide footer background when frame is applied
-                  console.log('🎨 [FRAME BUTTON DEBUG] Hiding footer background');
-                  setVisibleFields(prev => ({ ...prev, footerBackground: false }));
-                  
-                  // Apply frame-specific layout
-                  console.log('⚡ [FRAME BUTTON DEBUG] Calling applyFrameLayout for frame:', frame.id);
-                  applyFrameLayout(frame.id);
                 }}
               >
                 <Image
@@ -3587,30 +3478,6 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                 />
               </TouchableOpacity>
             ))}
-            
-            {/* Remove Frame Option */}
-            <TouchableOpacity
-              style={styles.removeFrameButton}
-              onPress={() => {
-                  console.log('🗑️ [FRAME REMOVE DEBUG] Remove frame button pressed:', {
-                    currentFrame: selectedFrame,
-                    originalLayersCount: originalLayers.length,
-                    currentLayersCount: layers.length,
-                    isAutoLayoutApplied: Object.keys(isAutoLayoutApplied)
-                  });
-                  
-                  console.log('🏷️ [FRAME REMOVE DEBUG] Clearing selected frame - useEffect will handle restoration');
-                  setSelectedFrame(null);
-                  
-                  // Reset auto-layout state when frame is removed
-                  console.log('🏷️ [FRAME REMOVE DEBUG] Resetting auto-layout applied state');
-                  setIsAutoLayoutApplied({});
-                  console.log('🖼️ [FRAME REMOVED] Frame cleared - useEffect will restore original positions');
-                }}
-            >
-              <Icon name="close" size={20} color="#667eea" />
-              <Text style={styles.removeFrameText}>Remove</Text>
-            </TouchableOpacity>
           </ScrollView>
         </View>
 

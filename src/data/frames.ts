@@ -76,45 +76,19 @@ export const applyFrameLayoutToLayers = (
   canvasWidth: number,
   canvasHeight: number
 ) => {
-  console.log('🔍 [FRAME LAYOUT DEBUG] Starting frame layout application:', {
-    frameId,
-    totalLayers: layers.length,
-    canvasSize: { width: canvasWidth, height: canvasHeight }
-  });
-
   const layout = FRAME_LAYOUTS[frameId];
   if (!layout) {
-    console.log('❌ [FRAME LAYOUT DEBUG] No layout found for frame:', frameId);
     return layers;
   }
 
-  console.log('✅ [FRAME LAYOUT DEBUG] Found layout for frame:', {
-    frameId,
-    layoutElements: layout.length,
-    layoutConfig: layout
-  });
-
   const updatedLayers = layers.map(layer => {
-    console.log('🔍 [FRAME LAYOUT DEBUG] Processing layer:', {
-      layerId: layer.id,
-      fieldType: layer.fieldType,
-      currentPosition: layer.position,
-      content: layer.content?.substring(0, 20) + '...'
-    });
-
     // Find the layout configuration for this layer type
     const layoutConfig = layout.find((l: FrameLayoutElement) => l.key === layer.fieldType);
     
     // If no layout config for this layer type, return unchanged
     if (!layoutConfig) {
-      console.log('⚠️ [FRAME LAYOUT DEBUG] No layout config for layer type:', layer.fieldType);
       return layer;
     }
-
-    console.log('✅ [FRAME LAYOUT DEBUG] Found layout config for layer:', {
-      fieldType: layer.fieldType,
-      referencePosition: { x: layoutConfig.x, y: layoutConfig.y }
-    });
 
     // Convert reference coordinates to canvas coordinates
     const canvasPosition = convertReferenceToCanvas(
@@ -123,30 +97,6 @@ export const applyFrameLayoutToLayers = (
       canvasWidth,
       canvasHeight
     );
-
-    console.log('📍 [FRAME LAYOUT DEBUG] Converted to canvas coordinates:', {
-      fieldType: layer.fieldType,
-      from: { x: layoutConfig.x, y: layoutConfig.y },
-      to: { x: canvasPosition.x, y: canvasPosition.y },
-      canvasSize: { width: canvasWidth, height: canvasHeight },
-      calculation: {
-        scaleX: canvasWidth / 720,
-        scaleY: canvasHeight / 487.2,
-        calcX: `${layoutConfig.x} × (${canvasWidth} / 720) = ${canvasPosition.x}`,
-        calcY: `${layoutConfig.y} × (${canvasHeight} / 487.2) = ${canvasPosition.y}`
-      }
-    });
-
-    // ✅ SPECIAL DEBUGGING FOR EMAIL ELEMENT
-    if (layer.fieldType === 'email' && frameId === 'frame1') {
-      console.log('🎯🎯🎯 [EMAIL FRAME1 DEBUG] Email positioning details:');
-      console.log(`📐 [EMAIL] Reference coordinates: x: ${layoutConfig.x}, y: ${layoutConfig.y}`);
-      console.log(`📏 [EMAIL] Canvas size: ${canvasWidth} x ${canvasHeight}`);
-      console.log(`🔄 [EMAIL] Scale factors: X=${(canvasWidth / 720).toFixed(4)}, Y=${(canvasHeight / 487.2).toFixed(4)}`);
-      console.log(`📍 [EMAIL] Final canvas position: x: ${canvasPosition.x.toFixed(2)}, y: ${canvasPosition.y.toFixed(2)}`);
-      console.log(`🎯 [EMAIL] Rounded position: x: ${Math.round(canvasPosition.x)}, y: ${Math.round(canvasPosition.y)}`);
-      console.log('🎯🎯🎯 [EMAIL FRAME1 DEBUG] End of email positioning details');
-    }
 
     // Return updated layer with new position
     const updatedLayer = {
@@ -158,52 +108,8 @@ export const applyFrameLayoutToLayers = (
       },
     };
 
-    console.log('🔄 [FRAME LAYOUT DEBUG] Updated layer position:', {
-      layerId: layer.id,
-      fieldType: layer.fieldType,
-      oldPosition: layer.position,
-      newPosition: updatedLayer.position,
-      positionChanged: layer.position.x !== canvasPosition.x || layer.position.y !== canvasPosition.y,
-      finalPosition: {
-        x: updatedLayer.position.x,
-        y: updatedLayer.position.y,
-        roundedX: Math.round(updatedLayer.position.x),
-        roundedY: Math.round(updatedLayer.position.y)
-      }
-    });
-
-    // ✅ SPECIAL LOG FOR EMAIL ELEMENT UPDATE
-    if (layer.fieldType === 'email' && frameId === 'frame1') {
-      console.log('🎯🎯🎯 [EMAIL UPDATE] Email layer position set in state:');
-      console.log(`📍 [EMAIL SET] Position being stored: x: ${updatedLayer.position.x.toFixed(2)}, y: ${updatedLayer.position.y.toFixed(2)}`);
-      console.log(`🎯 [EMAIL SET] Rounded stored position: x: ${Math.round(updatedLayer.position.x)}, y: ${Math.round(updatedLayer.position.y)}`);
-      console.log('🎯🎯🎯 [EMAIL UPDATE] End of email layer position update');
-    }
-
     return updatedLayer;
   });
-
-  console.log('🎯 [FRAME LAYOUT DEBUG] Frame layout application complete:', {
-    frameId,
-    totalLayersProcessed: layers.length,
-    layersUpdated: updatedLayers.filter((layer, index) => 
-      layers[index].position.x !== layer.position.x || layers[index].position.y !== layer.position.y
-    ).length,
-    finalLayers: updatedLayers.map(l => ({
-      id: l.id,
-      fieldType: l.fieldType,
-      position: l.position
-    }))
-  });
-
-  // ✅ SPECIAL LOG FOR FRAME1 - SHOW ELEMENT POSITIONS
-  if (frameId === 'frame1') {
-    console.log('🎯🎯🎯 [FRAME1 APPLIED] Frame1 layout applied! Element positions:');
-    updatedLayers.forEach(layer => {
-      console.log(`📍 [FRAME1] ${layer.fieldType}: x: ${Math.round(layer.position.x)}, y: ${Math.round(layer.position.y)} | Content: ${layer.content?.substring(0, 20)}...`);
-    });
-    console.log('🎯🎯🎯 [FRAME1 APPLIED] End of Frame1 element positions');
-  }
 
   return updatedLayers;
 };

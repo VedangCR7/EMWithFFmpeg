@@ -708,11 +708,13 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
     },
     previewContainer: {
       flex: 1,
-      padding: dynamicModerateScale(4),
+      paddingTop: dynamicModerateScale(8),
+      paddingBottom: dynamicModerateScale(8),
+      paddingHorizontal: dynamicModerateScale(4),
       backgroundColor: theme?.colors?.background || '#f8f9fa',
     },
     previewTitle: {
-      fontSize: dynamicModerateScale(11),
+      fontSize: dynamicModerateScale(16),
       fontWeight: 700 as const,
       color: theme?.colors?.text || '#333333',
       marginBottom: dynamicModerateScale(1.5),

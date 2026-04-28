@@ -233,7 +233,7 @@ const GreetingTemplatesScreen: React.FC = () => {
   const loadRecentSearches = useCallback(async () => {
     try {
       {__DEV__ && console.log('🔍 Loading recent searches from AsyncStorage...')}
-      const stored = await AsyncStorage.getItem('RECENT_SEARCHES');
+      const stored = await AsyncStorage.getItem('GREETING_TEMPLATES_RECENT_SEARCHES');
       {__DEV__ && console.log('🔍 AsyncStorage result:', stored)}
       if (stored) {
         const searches = JSON.parse(stored);
@@ -260,7 +260,7 @@ const GreetingTemplatesScreen: React.FC = () => {
         const filtered = prev.filter(search => search !== trimmedQuery);
         const updated = [trimmedQuery, ...filtered].slice(0, 5);
         
-        AsyncStorage.setItem('RECENT_SEARCHES', JSON.stringify(updated))
+        AsyncStorage.setItem('GREETING_TEMPLATES_RECENT_SEARCHES', JSON.stringify(updated))
           .catch(error => console.warn('Failed to save recent searches:', error));
         
         return updated;
@@ -1308,7 +1308,7 @@ const GreetingTemplatesScreen: React.FC = () => {
 
   const clearRecentSearches = useCallback(async () => {
     try {
-      await AsyncStorage.removeItem('RECENT_SEARCHES');
+      await AsyncStorage.removeItem('GREETING_TEMPLATES_RECENT_SEARCHES');
       setRecentSearches([]);
     } catch (error) {
       console.warn('Failed to clear recent searches:', error);
