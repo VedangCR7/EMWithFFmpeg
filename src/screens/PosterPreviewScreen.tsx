@@ -792,21 +792,41 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
         translucent={true}
       />
       
-             {/* Professional Header */}
+      {/* Modern Premium Header */}
       <View
         style={[styles.header, { 
-          paddingTop: insets.top + responsiveSpacing.xs,
+          paddingTop: insets.top + responsiveSpacing.sm,
           backgroundColor: theme?.colors?.surface || '#ffffff'
         }]}
       >
-        <View style={styles.headerContent} />
+        <View style={styles.headerContent}>
+          <View style={styles.premiumTitleContainer}>
+            <Text style={[styles.posterText, { color: theme?.colors?.text || '#1a1a1a' }]}>
+              Poster
+            </Text>
+            <LinearGradient
+              colors={['#667eea', '#764ba2']}
+              style={styles.studioGradientContainer}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              <Text style={styles.studioPlusText}>
+                Studio
+              </Text>
+            </LinearGradient>
+          </View>
+          <Text style={[styles.headerSubtitle, { color: theme?.colors?.textSecondary || '#666666' }]}>
+            Design. Share. Inspire.
+          </Text>
+        </View>
+        
         <View style={styles.headerSpacer} />
       </View>
 
       {/* Poster Preview */}
       <View style={themeStyles.previewContainer}>
         <View style={styles.previewHeader}>
-          <Text style={themeStyles.previewTitle}>Your Poster</Text>
+          {/* <Text style={themeStyles.previewTitle}>Your Poster</Text> */}
         </View>
         
         {/* Direct Image Display without Container */}
@@ -880,33 +900,37 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
         )}
       </View>
 
-             {/* Action Buttons */}
+             {/* Modern Action Buttons */}
        <View style={[
-         styles.actionContainer, 
+         styles.modernActionContainer, 
          themeStyles.actionContainer,
          { 
-           paddingBottom: Math.max(insets.bottom + responsiveSpacing.xs, responsiveSpacing.md)
+           paddingBottom: Math.max(insets.bottom + responsiveSpacing.lg, responsiveSpacing.xl)
          }
        ]}>
-        <View style={styles.actionButtons}>
+        {/* Premium Share and Download Buttons */}
+        <View style={styles.premiumActionButtons}>
           <TouchableOpacity
-            style={styles.actionButton}
+            style={styles.premiumActionButton}
             onPress={sharePoster}
             disabled={isProcessing}
+            activeOpacity={0.8}
           >
             <LinearGradient
               colors={isProcessing ? ['#cccccc', '#999999'] : ['#667eea', '#764ba2']}
-              style={styles.shareButtonGradient}
+              style={styles.premiumButtonGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
             >
-              <Icon name="share" size={getIconSize(28)} color="#ffffff" />
-              <Text style={styles.shareButtonText}>
-                {isProcessing ? 'Sharing...' : 'Share'}
+              <Icon name="share" size={getIconSize(24)} color="#ffffff" />
+              <Text style={styles.premiumButtonText}>
+                {isProcessing ? 'Sharing...' : 'Share Poster'}
               </Text>
             </LinearGradient>
           </TouchableOpacity>
           
           <TouchableOpacity
-            style={styles.actionButton}
+            style={styles.premiumActionButton}
             onPress={isCategoryTemplate ? () => {
               Alert.alert(
                 'Download Not Available',
@@ -915,24 +939,36 @@ const PosterPreviewScreen: React.FC<PosterPreviewScreenProps> = ({ route }) => {
               );
             } : downloadPoster}
             disabled={isProcessing || isDownloadProcessing || isLimitReached}
+            activeOpacity={0.8}
           >
             <LinearGradient
               colors={isCategoryTemplate ? ['#6c757d', '#5a6268'] : isLimitReached ? ['#dc3545', '#c82333'] : isProcessing ? ['#cccccc', '#999999'] : ['#28a745', '#20c997']}
-              style={styles.saveButtonGradient}
+              style={styles.premiumButtonGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
             >
-              <Icon name="download" size={getIconSize(28)} color="#ffffff" />
-              <Text style={styles.saveButtonText}>
-                {isCategoryTemplate ? 'Select a Poster' : isLimitReached ? 'Limit Reached' : isProcessing ? 'Saving...' : 'Download'}
+              <Icon name="download" size={getIconSize(24)} color="#ffffff" />
+              <Text style={styles.premiumButtonText}>
+                {isCategoryTemplate ? 'Select a Poster' : isLimitReached ? 'Limit Reached' : isProcessing ? 'Saving...' : 'Download Poster'}
               </Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
         
+        {/* Elegant Back to Editor Button */}
         <TouchableOpacity
-          style={[styles.editButton, themeStyles.editButton, { marginBottom: moderateScale(3) }]}
+          style={[styles.elegantBackButton, { 
+            borderColor: theme?.colors?.border || '#e9ecef',
+            backgroundColor: theme?.colors?.surface || '#ffffff'
+          }]}
           onPress={() => navigation.goBack()}
+          activeOpacity={0.7}
         >
-          <Text style={themeStyles.editButtonText}>Back to Editor</Text>
+          <Text style={[styles.elegantBackButtonText, { 
+            color: theme?.colors?.text || '#333333' 
+          }]}>
+            Back to Editor
+          </Text>
         </TouchableOpacity>
       </View>
       
@@ -970,14 +1006,60 @@ const styles = StyleSheet.create({
     paddingHorizontal: moderateScale(4),
   },
   headerTitle: {
-    fontSize: moderateScale(12),
-    fontWeight: 700,
+    fontSize: moderateScale(14),
+    fontWeight: '700',
     color: '#333333',
+    letterSpacing: 0.5,
   },
   headerSubtitle: {
-    fontSize: moderateScale(8.5),
+    fontSize: moderateScale(9),
     color: 'rgba(102, 102, 102, 0.8)',
-    marginTop: moderateScale(0.5),
+    marginTop: moderateScale(1),
+    letterSpacing: 0.3,
+  },
+  // Premium Title Styles
+  premiumTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  posterText: {
+    fontSize: moderateScale(16),
+    fontWeight: '800',
+    color: '#1a1a1a',
+    letterSpacing: 0.8,
+    textShadowColor: 'rgba(0, 0, 0, 0.1)',
+    textShadowOffset: {
+      width: 0,
+      height: moderateScale(1),
+    },
+    textShadowRadius: moderateScale(2),
+  },
+  studioGradientContainer: {
+    paddingHorizontal: moderateScale(6),
+    paddingVertical: moderateScale(2),
+    borderRadius: moderateScale(8),
+    marginLeft: moderateScale(2),
+    shadowColor: '#667eea',
+    shadowOffset: {
+      width: 0,
+      height: moderateScale(2),
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: moderateScale(4),
+    elevation: moderateScale(3),
+  },
+  studioPlusText: {
+    fontSize: moderateScale(16),
+    fontWeight: '700',
+    color: '#ffffff',
+    letterSpacing: 0.6,
+    textShadowColor: 'rgba(255, 255, 255, 0.3)',
+    textShadowOffset: {
+      width: 0,
+      height: moderateScale(1),
+    },
+    textShadowRadius: moderateScale(2),
   },
   headerSpacer: {
     width: moderateScale(26),
@@ -1276,6 +1358,69 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: moderateScale(4),
+  },
+  // Premium Action Button Styles
+  modernActionContainer: {
+    paddingHorizontal: moderateScale(6),
+    paddingTop: moderateScale(6),
+    backgroundColor: '#ffffff',
+    borderTopWidth: 0.5,
+    borderTopColor: '#e9ecef',
+  },
+  premiumActionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: moderateScale(5),
+  },
+  premiumActionButton: {
+    flex: 1,
+    marginHorizontal: moderateScale(2),
+    borderRadius: moderateScale(12),
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: moderateScale(3),
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: moderateScale(8),
+    elevation: moderateScale(6),
+  },
+  premiumButtonGradient: {
+    paddingVertical: moderateScale(10),
+    paddingHorizontal: moderateScale(6),
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: moderateScale(48),
+  },
+  premiumButtonText: {
+    color: '#ffffff',
+    fontSize: moderateScale(10.5),
+    fontWeight: '600',
+    marginLeft: moderateScale(3),
+    letterSpacing: 0.3,
+  },
+  elegantBackButton: {
+    paddingVertical: moderateScale(10),
+    paddingHorizontal: moderateScale(8),
+    borderRadius: moderateScale(10),
+    borderWidth: 1.5,
+    alignItems: 'center',
+    minHeight: moderateScale(44),
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: moderateScale(1),
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: moderateScale(3),
+    elevation: moderateScale(2),
+  },
+  elegantBackButtonText: {
+    fontSize: moderateScale(11),
+    fontWeight: '600',
+    letterSpacing: 0.2,
   },
   actionButton: {
     flex: 1,
