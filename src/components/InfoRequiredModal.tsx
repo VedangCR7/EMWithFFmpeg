@@ -1,6 +1,7 @@
 import React from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
+import { useNavigation } from '@react-navigation/native';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -8,10 +9,12 @@ interface InfoRequiredModalProps {
   visible: boolean;
   onClose: () => void;
   fieldName: string;
+  onUpdate?: () => void; // Optional custom update handler
 }
 
-const InfoRequiredModal: React.FC<InfoRequiredModalProps> = ({ visible, onClose, fieldName }) => {
+const InfoRequiredModal: React.FC<InfoRequiredModalProps> = ({ visible, onClose, fieldName, onUpdate }) => {
   const { theme, isDarkMode } = useTheme();
+  const navigation = useNavigation<any>();
 
   const getResponsiveStyles = () => {
     const isSmallScreen = screenWidth < 375;
@@ -40,7 +43,7 @@ const InfoRequiredModal: React.FC<InfoRequiredModalProps> = ({ visible, onClose,
   const styles = StyleSheet.create({
     overlay: {
       flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.5)',
+      backgroundColor: isDarkMode ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.5)',
       justifyContent: 'center',
       alignItems: 'center',
     },
@@ -52,38 +55,66 @@ const InfoRequiredModal: React.FC<InfoRequiredModalProps> = ({ visible, onClose,
       backgroundColor: theme?.colors?.surface || '#ffffff',
       borderRadius: 12,
       padding: responsive.padding,
-      shadowColor: '#000',
+      shadowColor: isDarkMode ? 'rgba(0,0,0,0.8)' : '#000',
       shadowOffset: {
         width: 0,
         height: 4,
       },
-      shadowOpacity: isDarkMode ? 0.3 : 0.2,
+      shadowOpacity: isDarkMode ? 0.4 : 0.2,
       shadowRadius: 8,
-      elevation: 8,
+      elevation: isDarkMode ? 12 : 8,
+      borderWidth: isDarkMode ? 1 : 0,
+      borderColor: theme?.colors?.border || 'rgba(255,255,255,0.1)',
     },
     title: {
       fontSize: responsive.titleSize,
       fontWeight: '600',
-      color: theme?.colors?.text || '#333333',
+      color: theme?.colors?.text || (isDarkMode ? '#ffffff' : '#333333'),
       marginBottom: 10,
       textAlign: 'center',
     },
     message: {
       fontSize: responsive.messageSize,
-      color: theme?.colors?.textSecondary || '#555555',
+      color: theme?.colors?.textSecondary || (isDarkMode ? '#cccccc' : '#555555'),
       marginBottom: 20,
       lineHeight: responsive.messageSize * 1.4,
       textAlign: 'center',
     },
     buttonContainer: {
-      alignItems: 'center',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    buttonWrapper: {
+      flex: 1,
     },
     button: {
-      backgroundColor: theme?.colors?.primary || '#667eea',
+      backgroundColor: theme?.colors?.primary || (isDarkMode ? '#7c3aed' : '#667eea'),
       paddingVertical: responsive.buttonPadding,
       paddingHorizontal: responsive.buttonHorizontalPadding,
       borderRadius: 8,
-      minWidth: 80,
+      shadowColor: isDarkMode ? 'rgba(124,58,237,0.3)' : 'rgba(102,126,234,0.3)',
+      shadowOffset: {
+        width: 0,
+        height: 2,
+      },
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    updateButton: {
+      backgroundColor: isDarkMode ? '#10b981' : '#059669',
+      paddingVertical: responsive.buttonPadding,
+      paddingHorizontal: responsive.buttonHorizontalPadding,
+      borderRadius: 8,
+      shadowColor: isDarkMode ? 'rgba(16,185,129,0.3)' : 'rgba(5,150,105,0.3)',
+      shadowOffset: {
+        width: 0,
+        height: 2,
+      },
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+      elevation: 3,
     },
     buttonText: {
       color: '#ffffff',
@@ -109,9 +140,28 @@ const InfoRequiredModal: React.FC<InfoRequiredModalProps> = ({ visible, onClose,
           </Text>
           
           <View style={styles.buttonContainer}>
-            <TouchableOpacity style={styles.button} onPress={onClose}>
-              <Text style={styles.buttonText}>Got it</Text>
-            </TouchableOpacity>
+            <View style={styles.buttonWrapper}>
+              <TouchableOpacity style={styles.button} onPress={onClose}>
+                <Text style={styles.buttonText}>Got it</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.buttonWrapper}>
+              <TouchableOpacity 
+                style={styles.updateButton} 
+                onPress={() => {
+                  // Close modal first
+                  onClose();
+                  // Navigate to BusinessProfilesScreen
+                  if (onUpdate) {
+                    onUpdate();
+                  } else {
+                    navigation.navigate('BusinessProfiles' as any);
+                  }
+                }}
+              >
+                <Text style={styles.buttonText}>Update</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </View>

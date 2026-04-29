@@ -1872,6 +1872,39 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     }
   };
 
+  // Get the effective toggle value (state + data availability)
+  const getEffectiveToggleValue = (fieldType: string): boolean => {
+    const isBusinessField = ['logo', 'companyName', 'phone', 'email', 'website', 'category', 'address', 'tagline', 'established', 'description', 'services', 'hours', 'social', 'custom1', 'custom2', 'custom3'].includes(fieldType);
+    
+    // For business fields, ensure data is available
+    if (isBusinessField) {
+      return visibleFields[fieldType] && isFieldDataAvailable(fieldType);
+    }
+    
+    // For non-business fields, use state directly
+    return visibleFields[fieldType];
+  };
+
+  // Sync state with data availability (safety layer)
+  useEffect(() => {
+    if (activeBusinessProfile) {
+      setVisibleFields(prev => {
+        const updated = { ...prev };
+        
+        // Reset any business fields that are ON but have no data
+        const businessFields = ['logo', 'companyName', 'phone', 'email', 'website', 'category', 'address', 'tagline', 'established', 'description', 'services', 'hours', 'social', 'custom1', 'custom2', 'custom3'];
+        
+        businessFields.forEach((fieldType) => {
+          if (prev[fieldType] && !isFieldDataAvailable(fieldType)) {
+            updated[fieldType] = false;
+          }
+        });
+        
+        return updated;
+      });
+    }
+  }, [activeBusinessProfile]);
+
   // Toggle field visibility with validation
   const toggleFieldVisibility = (fieldType: string) => {
     // Check if trying to enable (toggle ON) a business field
@@ -2167,12 +2200,18 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
   // Add text layer
   const addTextLayer = useCallback(() => {
     if (newText.trim()) {
+      // Ensure text is truncated to 100 characters (safety measure)
+      const truncatedText = newText.slice(0, 100);
+      
+      // Calculate dynamic width based on text content (approximate)
+      const estimatedWidth = Math.max(truncatedText.length * 10, 50); // Minimum 50px width
+      
       const newLayer: Layer = {
         id: generateId(),
         type: 'text',
-        content: newText,
-        position: { x: canvasWidth / 2 - 50, y: canvasHeight / 2 - 20 },
-        size: { width: 100, height: 40 },
+        content: truncatedText,
+        position: { x: canvasWidth / 2 - estimatedWidth / 2, y: canvasHeight / 2 - 20 },
+        size: { width: estimatedWidth, height: 40 },
         rotation: 0,
         zIndex: layers.length,
         style: {
@@ -2609,7 +2648,9 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
       transform: baseTransforms,
       width: layer.size?.width ?? 'auto',
       minWidth: 10,
-      maxWidth: layer.size?.width ?? '100%',
+      maxWidth: layer.size?.width ?? 'auto',
+      alignSelf: 'flex-start',
+      flexWrap: 'nowrap',
     };
 
     const handleLayerPress = () => {
@@ -2735,9 +2776,12 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                 fontWeight: layer.style?.fontWeight as any,
                 padding: 0,
                 margin: 0,
-                flexWrap: 'wrap',
-                width: '100%',
-              }}>
+                flexWrap: 'nowrap',
+                width: 'auto',
+                alignSelf: 'flex-start',
+              }}
+              numberOfLines={1}
+              ellipsizeMode="clip">
                 {layer.content}
               </Text>
             </TouchableOpacity>
@@ -3407,71 +3451,71 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.fieldToggleButton, visibleFields.logo && styles.fieldToggleButtonActive]}
+              style={[styles.fieldToggleButton, getEffectiveToggleValue('logo') && styles.fieldToggleButtonActive]}
               onPress={() => toggleFieldVisibility('logo')}
             >
-              <Icon name="account-balance" size={getResponsiveIconSize()} color={visibleFields.logo ? "#ffffff" : "#667eea"} />
-              <Text style={[styles.fieldToggleButtonText, visibleFields.logo && styles.fieldToggleButtonTextActive]}>
+              <Icon name="account-balance" size={getResponsiveIconSize()} color={getEffectiveToggleValue('logo') ? "#ffffff" : "#667eea"} />
+              <Text style={[styles.fieldToggleButtonText, getEffectiveToggleValue('logo') && styles.fieldToggleButtonTextActive]}>
                 Logo
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.fieldToggleButton, visibleFields.companyName && styles.fieldToggleButtonActive]}
+              style={[styles.fieldToggleButton, getEffectiveToggleValue('companyName') && styles.fieldToggleButtonActive]}
               onPress={() => toggleFieldVisibility('companyName')}
             >
-              <Icon name="title" size={getResponsiveIconSize()} color={visibleFields.companyName ? "#ffffff" : "#667eea"} />
-              <Text style={[styles.fieldToggleButtonText, visibleFields.companyName && styles.fieldToggleButtonTextActive]}>
+              <Icon name="title" size={getResponsiveIconSize()} color={getEffectiveToggleValue('companyName') ? "#ffffff" : "#667eea"} />
+              <Text style={[styles.fieldToggleButtonText, getEffectiveToggleValue('companyName') && styles.fieldToggleButtonTextActive]}>
                 Company Name
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.fieldToggleButton, visibleFields.phone && styles.fieldToggleButtonActive]}
+              style={[styles.fieldToggleButton, getEffectiveToggleValue('phone') && styles.fieldToggleButtonActive]}
               onPress={() => toggleFieldVisibility('phone')}
             >
-              <Icon name="call" size={getResponsiveIconSize()} color={visibleFields.phone ? "#ffffff" : "#667eea"} />
-              <Text style={[styles.fieldToggleButtonText, visibleFields.phone && styles.fieldToggleButtonTextActive]}>
+              <Icon name="call" size={getResponsiveIconSize()} color={getEffectiveToggleValue('phone') ? "#ffffff" : "#667eea"} />
+              <Text style={[styles.fieldToggleButtonText, getEffectiveToggleValue('phone') && styles.fieldToggleButtonTextActive]}>
                 Phone
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.fieldToggleButton, visibleFields.email && styles.fieldToggleButtonActive]}
+              style={[styles.fieldToggleButton, getEffectiveToggleValue('email') && styles.fieldToggleButtonActive]}
               onPress={() => toggleFieldVisibility('email')}
             >
-              <Icon name="mail" size={getResponsiveIconSize()} color={visibleFields.email ? "#ffffff" : "#667eea"} />
-              <Text style={[styles.fieldToggleButtonText, visibleFields.email && styles.fieldToggleButtonTextActive]}>
+              <Icon name="mail" size={getResponsiveIconSize()} color={getEffectiveToggleValue('email') ? "#ffffff" : "#667eea"} />
+              <Text style={[styles.fieldToggleButtonText, getEffectiveToggleValue('email') && styles.fieldToggleButtonTextActive]}>
                 Email
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.fieldToggleButton, visibleFields.website && styles.fieldToggleButtonActive]}
+              style={[styles.fieldToggleButton, getEffectiveToggleValue('website') && styles.fieldToggleButtonActive]}
               onPress={() => toggleFieldVisibility('website')}
             >
-              <Icon name="public" size={getResponsiveIconSize()} color={visibleFields.website ? "#ffffff" : "#667eea"} />
-              <Text style={[styles.fieldToggleButtonText, visibleFields.website && styles.fieldToggleButtonTextActive]}>
+              <Icon name="public" size={getResponsiveIconSize()} color={getEffectiveToggleValue('website') ? "#ffffff" : "#667eea"} />
+              <Text style={[styles.fieldToggleButtonText, getEffectiveToggleValue('website') && styles.fieldToggleButtonTextActive]}>
                 Website
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.fieldToggleButton, visibleFields.category && styles.fieldToggleButtonActive]}
+              style={[styles.fieldToggleButton, getEffectiveToggleValue('category') && styles.fieldToggleButtonActive]}
               onPress={() => toggleFieldVisibility('category')}
             >
-              <Icon name="business-center" size={getResponsiveIconSize()} color={visibleFields.category ? "#ffffff" : "#667eea"} />
-              <Text style={[styles.fieldToggleButtonText, visibleFields.category && styles.fieldToggleButtonTextActive]}>
+              <Icon name="business-center" size={getResponsiveIconSize()} color={getEffectiveToggleValue('category') ? "#ffffff" : "#667eea"} />
+              <Text style={[styles.fieldToggleButtonText, getEffectiveToggleValue('category') && styles.fieldToggleButtonTextActive]}>
                 Category
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.fieldToggleButton, visibleFields.address && styles.fieldToggleButtonActive]}
+              style={[styles.fieldToggleButton, getEffectiveToggleValue('address') && styles.fieldToggleButtonActive]}
               onPress={() => toggleFieldVisibility('address')}
             >
-              <Icon name="place" size={getResponsiveIconSize()} color={visibleFields.address ? "#ffffff" : "#667eea"} />
-              <Text style={[styles.fieldToggleButtonText, visibleFields.address && styles.fieldToggleButtonTextActive]}>
+              <Icon name="place" size={getResponsiveIconSize()} color={getEffectiveToggleValue('address') ? "#ffffff" : "#667eea"} />
+              <Text style={[styles.fieldToggleButtonText, getEffectiveToggleValue('address') && styles.fieldToggleButtonTextActive]}>
                 Address
               </Text>
             </TouchableOpacity>
@@ -3623,9 +3667,15 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
               placeholder="Enter text..."
               placeholderTextColor="#999999"
               value={newText}
-              onChangeText={setNewText}
+              onChangeText={(text) => setNewText(text.slice(0, 100))}
               multiline
+              maxLength={100}
             />
+            <View style={styles.characterCountContainer}>
+              <Text style={styles.characterCountText}>
+                {newText.length}/100
+              </Text>
+            </View>
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
@@ -4763,6 +4813,15 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: moderateScale(13),
     fontWeight: '600',
+  },
+  characterCountContainer: {
+    alignSelf: 'flex-end',
+    marginBottom: moderateScale(8),
+  },
+  characterCountText: {
+    fontSize: moderateScale(11),
+    color: '#666666',
+    fontWeight: '500',
   },
   styleOptions: {
     flexDirection: 'row',
