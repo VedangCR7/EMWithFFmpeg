@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import authService from '../services/auth';
 import { useSubscription } from '../contexts/SubscriptionContext';
@@ -15,6 +15,7 @@ import VerifyResetCodeScreen from '../screens/VerifyResetCodeScreen';
 import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 import EmailVerificationScreen from '../screens/EmailVerificationScreen';
 import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
+import { useTheme } from '../context/ThemeContext';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -22,6 +23,7 @@ const AppNavigator = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const { refreshSubscription, refreshTransactions } = useSubscription();
+  const { theme, isDarkMode } = useTheme();
 
   useEffect(() => {
     logger.log('🚀 AppNavigator: Starting initialization');
@@ -78,10 +80,28 @@ const AppNavigator = () => {
     };
   }, []);
 
+  // Create navigation theme based on app theme
+  const navigationTheme = React.useMemo(() => ({
+    ...DefaultTheme,
+    colors: {
+      ...DefaultTheme.colors,
+      background: theme.colors.gradient[0] || theme.colors.background,
+      card: theme.colors.cardBackground,
+      text: theme.colors.text,
+      border: theme.colors.border,
+      notification: theme.colors.primary,
+      primary: theme.colors.primary,
+    },
+  }), [theme]);
+
   if (isLoading) {
     return (
-      <NavigationContainer ref={navigationRef}>
-        <Stack.Navigator>
+      <NavigationContainer ref={navigationRef} theme={navigationTheme}>
+        <Stack.Navigator
+          screenOptions={{
+            cardStyle: { backgroundColor: theme.colors.gradient[0] || theme.colors.background },
+          }}
+        >
           <Stack.Screen name="Splash" component={SplashScreen} options={{ headerShown: false }} />
         </Stack.Navigator>
       </NavigationContainer>
@@ -89,8 +109,12 @@ const AppNavigator = () => {
   }
 
   return (
-    <NavigationContainer ref={navigationRef}>
-      <Stack.Navigator>
+    <NavigationContainer ref={navigationRef} theme={navigationTheme}>
+      <Stack.Navigator
+        screenOptions={{
+          cardStyle: { backgroundColor: theme.colors.gradient[0] || theme.colors.background },
+        }}
+      >
         {isAuthenticated ? (
           <Stack.Screen name="MainApp" component={TabNavigator} options={{ headerShown: false }} />
         ) : (

@@ -363,9 +363,6 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
   const [isLoadingAllPosters, setIsLoadingAllPosters] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const borderAnimation = useRef(new Animated.Value(0)).current;
-  const festiveAlertScale = useRef(new Animated.Value(1)).current;
-  const festiveAlertOpacity = useRef(new Animated.Value(1)).current;
-  const festiveAlertTranslateY = useRef(new Animated.Value(0)).current;
 
   const gradientColors = [theme.colors.secondary, theme.colors.primary];
   const borderThickness = 2.5;
@@ -390,70 +387,7 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
     return () => loop.stop();
   }, [borderAnimation]);
 
-  // Enhanced attractive animation for "Festive alerts" text
-  // Combines scale bounce, opacity pulse, and vertical bounce (all use native driver for performance)
-  useEffect(() => {
-    // Create a combined parallel animation for smoother effect
-    const combinedAnimation = Animated.loop(
-      Animated.parallel([
-        // Scale bounce animation
-        Animated.sequence([
-          Animated.spring(festiveAlertScale, {
-            toValue: 1.2,
-            tension: 40,
-            friction: 3,
-            useNativeDriver: true,
-          }),
-          Animated.spring(festiveAlertScale, {
-            toValue: 1,
-            tension: 40,
-            friction: 3,
-            useNativeDriver: true,
-          }),
-          Animated.delay(400),
-        ]),
-        // Opacity pulse animation
-        Animated.sequence([
-          Animated.timing(festiveAlertOpacity, {
-            toValue: 0.6,
-            duration: 600,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.timing(festiveAlertOpacity, {
-            toValue: 1,
-            duration: 600,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.delay(300),
-        ]),
-        // Vertical bounce animation
-        Animated.sequence([
-          Animated.spring(festiveAlertTranslateY, {
-            toValue: -4,
-            tension: 120,
-            friction: 3,
-            useNativeDriver: true,
-          }),
-          Animated.spring(festiveAlertTranslateY, {
-            toValue: 0,
-            tension: 120,
-            friction: 3,
-            useNativeDriver: true,
-          }),
-          Animated.delay(200),
-        ]),
-      ])
-    );
-
-    combinedAnimation.start();
-
-    return () => {
-      combinedAnimation.stop();
-    };
-  }, [festiveAlertScale, festiveAlertOpacity, festiveAlertTranslateY]);
-
+  
   // Use state for current date so it updates automatically
   const [currentDateState, setCurrentDateState] = useState(() => new Date());
   const autoSelectRef = useRef<string | null>(null);
@@ -787,48 +721,22 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
     <View style={styles.container}>
       {/* Section Header */}
       <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, { paddingHorizontal: 0, color: theme.colors.text, fontWeight: 'bold' }]}>
+          Festival Calendar {new Date().getFullYear()}
+        </Text>
         <TouchableOpacity
+          style={styles.viewAllButton}
           onPress={handleViewMore}
-          activeOpacity={0.7}
+          activeOpacity={0.85}
         >
-          <Animated.View
-            style={{
-              transform: [
-                { scale: festiveAlertScale },
-                { translateY: festiveAlertTranslateY }
-              ],
-              opacity: festiveAlertOpacity,
-            }}
+          <LinearGradient
+            colors={[theme.colors.secondary, theme.colors.primary]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.viewAllButtonGradient}
           >
-            <LinearGradient
-              colors={[theme.colors.primary, theme.colors.secondary]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={{
-                paddingHorizontal: moderateScale(12),
-                paddingVertical: moderateScale(6),
-                borderRadius: moderateScale(20),
-                shadowColor: theme.colors.primary,
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.3,
-                shadowRadius: 4,
-                elevation: 4,
-              }}
-            >
-              <Text 
-                style={[
-                  styles.sectionTitle, 
-                  { 
-                    fontWeight: 'bold',
-                    color: '#FFFFFF',
-                    textAlign: 'center',
-                  }
-                ]}
-              >
-                Festive alerts
-              </Text>
-            </LinearGradient>
-          </Animated.View>
+            <Text style={styles.viewAllButtonText}>View More</Text>
+          </LinearGradient>
         </TouchableOpacity>
       </View>
 
@@ -971,7 +879,7 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
             <View style={styles.upcomingEventsModalHeader}>
               <View style={styles.upcomingEventsModalTitleContainer}>
                 <Text style={[styles.upcomingEventsModalTitle, { color: theme.colors.text }]}>
-                  All Festive Alert Posters
+                  All Festive Calendar Posters
                 </Text>
               </View>
               <TouchableOpacity
@@ -1289,6 +1197,26 @@ const styles = StyleSheet.create({
   },
   modalEmptyText: {
     fontSize: moderateScale(14),
+  },
+  viewAllButton: {
+    paddingHorizontal: moderateScale(2),
+    paddingVertical: moderateScale(2),
+    borderRadius: moderateScale(8),
+    overflow: 'hidden',
+  },
+  viewAllButtonGradient: {
+    paddingHorizontal: moderateScale(6),
+    paddingVertical: moderateScale(3),
+    borderRadius: moderateScale(6),
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: moderateScale(2),
+  },
+  viewAllButtonText: {
+    fontSize: SCREEN_WIDTH < 360 ? moderateScale(10) : moderateScale(9),
+    fontWeight: '600',
+    color: '#ffffff',
   },
 });
 

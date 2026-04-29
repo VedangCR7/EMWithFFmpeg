@@ -1,5 +1,6 @@
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
+import { DefaultTheme } from '@react-navigation/native';
 import { MainStackParamList } from './types';
 import MainTabNavigator from './MainTabNavigator';
 import PosterEditorScreen from '../screens/PosterEditorScreen';
@@ -21,12 +22,19 @@ import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 import HelpSupportScreen from '../screens/HelpSupportScreen';
 import FeedbackScreen from '../screens/FeedbackScreen';
 import TodaysPickScreen from '../screens/TodaysPickScreen';
+import { useTheme } from '../context/ThemeContext';
 
 const MainStack = createStackNavigator<MainStackParamList>();
 
 const TabNavigator = () => {
+  const { theme } = useTheme();
+  
   return (
-    <MainStack.Navigator>
+    <MainStack.Navigator
+      screenOptions={{
+        cardStyle: { backgroundColor: theme.colors.gradient[0] || theme.colors.background },
+      }}
+    >
       <MainStack.Screen
         name="MainTabs"
         component={MainTabNavigator}
