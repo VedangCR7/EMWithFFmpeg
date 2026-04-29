@@ -51,6 +51,7 @@ import { useSubscription } from '../contexts/SubscriptionContext';
 import { useBusinessProfile } from '../context/BusinessProfileContext';
 import { useTheme } from '../context/ThemeContext';
 import PremiumTemplateModal from '../components/PremiumTemplateModal';
+import InfoRequiredModal from '../components/InfoRequiredModal';
 import { applyFrameLayoutToLayers } from '../data/frames';
 
 // Frame assets imports
@@ -513,6 +514,8 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
   const [showPremiumAlertModal, setShowPremiumAlertModal] = useState(false);
   const [showConnectionErrorModal, setShowConnectionErrorModal] = useState(false);
   const [showCategoryAccessModal, setShowCategoryAccessModal] = useState(false);
+  const [showInfoRequiredModal, setShowInfoRequiredModal] = useState(false);
+  const [selectedFieldName, setSelectedFieldName] = useState('');
   const [categoryData, setCategoryData] = useState({
     templateCategory: "",
     businessCategory: ""
@@ -1799,8 +1802,91 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     applyProfileSafely(profile);
   };
 
-  // Toggle field visibility
+  // Field display names for validation messages
+  const fieldDisplayNames: { [key: string]: string } = {
+    logo: "Logo",
+    companyName: "Company Name",
+    phone: "Phone Number",
+    email: "Email",
+    website: "Website",
+    category: "Category",
+    address: "Address",
+    tagline: "Tagline",
+    established: "Established",
+    description: "Description",
+    services: "Services",
+    hours: "Business Hours",
+    social: "Social Media",
+    custom1: "Custom Field 1",
+    custom2: "Custom Field 2",
+    custom3: "Custom Field 3"
+  };
+
+  // Check if field data is available in business profile
+  const isFieldDataAvailable = (fieldKey: string): boolean => {
+    if (!activeBusinessProfile) return false;
+    
+    const profile = activeBusinessProfile;
+    const trimmedValue = (value: any) => {
+      if (typeof value === 'string') {
+        return value.trim();
+      }
+      return value;
+    };
+
+    switch (fieldKey) {
+      case 'logo':
+        return !!(trimmedValue(profile.companyLogo) || trimmedValue(profile.logo));
+      case 'companyName':
+        return !!trimmedValue(profile.name);
+      case 'phone':
+        return !!trimmedValue(profile.phone);
+      case 'email':
+        return !!trimmedValue(profile.email);
+      case 'website':
+        return !!trimmedValue(profile.website);
+      case 'category':
+        return !!trimmedValue(profile.category);
+      case 'address':
+        return !!trimmedValue(profile.address);
+      case 'tagline':
+        return !!trimmedValue(profile.tagline);
+      case 'established':
+        return !!trimmedValue(profile.established);
+      case 'description':
+        return !!trimmedValue(profile.description);
+      case 'services':
+        return !!trimmedValue(profile.services);
+      case 'hours':
+        return !!trimmedValue(profile.hours);
+      case 'social':
+        return !!trimmedValue(profile.social);
+      case 'custom1':
+        return !!trimmedValue(profile.custom1);
+      case 'custom2':
+        return !!trimmedValue(profile.custom2);
+      case 'custom3':
+        return !!trimmedValue(profile.custom3);
+      default:
+        return false;
+    }
+  };
+
+  // Toggle field visibility with validation
   const toggleFieldVisibility = (fieldType: string) => {
+    // Check if trying to enable (toggle ON) a business field
+    const isCurrentlyVisible = visibleFields[fieldType];
+    const isBusinessField = ['logo', 'companyName', 'phone', 'email', 'website', 'category', 'address', 'tagline', 'established', 'description', 'services', 'hours', 'social', 'custom1', 'custom2', 'custom3'].includes(fieldType);
+    
+    // If trying to enable a business field and data is missing, show modal and prevent toggle
+    if (!isCurrentlyVisible && isBusinessField && !isFieldDataAvailable(fieldType)) {
+      const displayName = fieldDisplayNames[fieldType] || fieldType;
+      setSelectedFieldName(displayName);
+      setShowInfoRequiredModal(true);
+      return; // Prevent toggle
+    }
+
+    // Allow normal toggle for all other cases
     setVisibleFields(prev => ({
       ...prev,
       [fieldType]: !prev[fieldType]
@@ -3439,7 +3525,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
         </View>
 
         {/* Frames Section */}
-        <View style={styles.framesSection}>
+        {/* <View style={styles.framesSection}>
           <View style={styles.framesHeader}>
             <Text style={styles.framesTitle}>Frames</Text>
           </View>
@@ -3479,7 +3565,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
               </TouchableOpacity>
             ))}
           </ScrollView>
-        </View>
+        </View> */}
 
       </View>
 
@@ -4089,6 +4175,13 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
           navigation.navigate('BusinessProfiles' as any);
         }}
         selectedTemplate={null}
+      />
+
+      {/* Info Required Modal */}
+      <InfoRequiredModal
+        visible={showInfoRequiredModal}
+        fieldName={selectedFieldName}
+        onClose={() => setShowInfoRequiredModal(false)}
       />
 
       {/* Connection Error Modal */}
