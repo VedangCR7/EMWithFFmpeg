@@ -7,6 +7,7 @@ import {
   SectionList,
   ScrollView,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   TextInput,
   Alert,
   StatusBar,
@@ -17,6 +18,7 @@ import {
   Easing,
   InteractionManager,
   Image,
+  BackHandler,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets, Edge } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -1078,6 +1080,22 @@ const GreetingTemplatesScreen: React.FC = () => {
     }, [])
   );
 
+  // Close searchbar when screen loses focus (user navigates away)
+  useFocusEffect(
+    useCallback(() => {
+      // This runs when screen comes into focus - no action needed
+      
+      return () => {
+        // This runs when screen loses focus - close searchbar
+        if (isSearchVisible) {
+          setIsSearchVisible(false);
+          setSearchQuery('');
+          setIsSearchInputFocused(false);
+        }
+      };
+    }, [isSearchVisible])
+  );
+
   // Initial cleanup and cache management
   // Use a ref to track previous category IDs to avoid unnecessary cleanup
   const previousCategoryIdsRef = useRef<Set<string>>(new Set());
@@ -1305,6 +1323,24 @@ const GreetingTemplatesScreen: React.FC = () => {
       setSearchQuery('');
     }
   }, [isSearchVisible, searchQuery]);
+
+  // Back button handler to close searchbar when it's open
+  useEffect(() => {
+    const backAction = () => {
+      if (isSearchVisible) {
+        // Close searchbar and reset search state
+        setIsSearchVisible(false);
+        setSearchQuery('');
+        setIsSearchInputFocused(false);
+        return true; // Prevent default back action
+      }
+      return false; // Allow default back action
+    };
+
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+
+    return () => backHandler.remove();
+  }, [isSearchVisible]);
 
   const clearRecentSearches = useCallback(async () => {
     try {
@@ -1728,12 +1764,20 @@ const GreetingTemplatesScreen: React.FC = () => {
         translucent={true}
       />
       
-      <LinearGradient
-        colors={theme.colors.gradient}
-        style={styles.gradientBackground}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
+      <TouchableWithoutFeedback onPress={() => {
+        setIsSearchInputFocused(false);
+        // Close searchbar if it's visible and user taps anywhere on screen
+        if (isSearchVisible) {
+          setIsSearchVisible(false);
+          setSearchQuery('');
+        }
+      }}>
+        <LinearGradient
+          colors={theme.colors.gradient}
+          style={styles.gradientBackground}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
         <View
           style={[
           styles.header, 
@@ -1881,7 +1925,8 @@ const GreetingTemplatesScreen: React.FC = () => {
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
         />
-      </LinearGradient>
+        </LinearGradient>
+      </TouchableWithoutFeedback>
     </SafeAreaView>
   );
 };

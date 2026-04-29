@@ -349,9 +349,10 @@ const getOptimizedCloudinaryUrl = (url: string, width: number = 200): string => 
 interface HorizontalFestivalCalendarProps {
   refreshKey?: number;
   isFocused?: boolean;
+  onDateSelect?: (date: Date) => void;
 }
 
-const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({ refreshKey = 0, isFocused = true }) => {
+const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({ refreshKey = 0, isFocused = true, onDateSelect }) => {
   const { theme } = useTheme();
   const { selectedBusinessProfile } = useBusinessProfile();
   const navigation = useNavigation<StackNavigationProp<MainStackParamList>>();
@@ -545,7 +546,12 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
     
     setSelectedDate(dateString);
     setSelectedDatePosters(resolvedPosters);
-  }, [formatDateKey, refreshKey]);
+    
+    // Call parent callback if provided
+    if (onDateSelect) {
+      onDateSelect(date);
+    }
+  }, [formatDateKey, refreshKey, onDateSelect]);
 
   // Check if date is today
   const isToday = useCallback((date: Date) => {

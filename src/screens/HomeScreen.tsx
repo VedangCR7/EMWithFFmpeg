@@ -22,6 +22,7 @@ import {
   InteractionManager,
   Alert,
   TouchableWithoutFeedback,
+  BackHandler,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Video from 'react-native-video';
@@ -802,8 +803,11 @@ const HomeScreen: React.FC = React.memo(() => {
   const navigation = useNavigation<StackNavigationProp<MainStackParamList>>();
   const isFocused = useIsFocused();
 
+  
   // Get current user info
   const userProfileSectionRef = useRef<React.ElementRef<typeof TouchableOpacity>>(null);
+  const generalModalSearchInputRef = useRef<React.ElementRef<typeof TextInput>>(null);
+  const businessModalSearchInputRef = useRef<React.ElementRef<typeof TextInput>>(null);
   const [userProfile, setUserProfile] = useState(() => authService.getCurrentUser());
   const [userBusinessProfiles, setUserBusinessProfiles] = useState<BusinessProfile[]>([]);
   const [businessProfilesLoadingState, setBusinessProfilesLoadingState] = useState(false);
@@ -988,6 +992,24 @@ const HomeScreen: React.FC = React.memo(() => {
     }, [userProfile?.id, initializeSelectedProfile])
   );
 
+  // Close searchbar when screen loses focus (user navigates away)
+  useFocusEffect(
+    useCallback(() => {
+      // This runs when screen comes into focus - no action needed
+      
+      return () => {
+        // This runs when screen loses focus - close searchbar
+        if (isSearchBarVisible) {
+          setIsSearchBarVisible(false);
+          setSearchQuery('');
+          setIsSearching(false);
+          setSearchResults([]);
+          setIsSearchInputFocused(false);
+        }
+      };
+    }, [isSearchBarVisible])
+  );
+
   const refreshBusinessProfiles = useCallback(async () => {
     const currentUserId = userProfile?.id || authService.getCurrentUser()?.id;
     if (!currentUserId) return;
@@ -1070,6 +1092,7 @@ const HomeScreen: React.FC = React.memo(() => {
   const [isBusinessCategoriesModalClosing, setIsBusinessCategoriesModalClosing] = useState(false);
 
   const closeBusinessCategoriesModal = useCallback(() => {
+    console.log('[DEBUG] closeBusinessCategoriesModal was called!');
     // Hide content immediately for instant feedback
     setIsBusinessCategoriesModalClosing(true);
     // Hide modal immediately - no delay
@@ -1085,6 +1108,35 @@ const HomeScreen: React.FC = React.memo(() => {
       setIsBusinessCategoriesModalClosing(false);
     });
   }, []);
+
+  // DEBUG EFFECT
+  useEffect(() => {
+    console.log('[DEBUG STATE]', { isFocused, isBusinessCategoriesModalVisible, isBusinessModalSearchBarVisible });
+  }, [isFocused, isBusinessCategoriesModalVisible, isBusinessModalSearchBarVisible]);
+
+  // Handle modal close with search state priority
+  const handleBusinessCategoriesModalClose = useCallback(() => {
+    setIsBusinessModalSearchBarVisible(prevVisible => {
+      console.log('[DEBUG] handleBusinessCategoriesModalClose called', { prevVisible });
+      if (prevVisible) {
+        console.log('[DEBUG] Search bar is visible, closing search bar ONLY');
+        // Blur the input field first
+        businessModalSearchInputRef.current?.blur();
+        
+        // If search bar is active, close search first (don't close modal)
+        setBusinessModalSearchQuery('');
+        setIsBusinessModalSearching(false);
+        setBusinessModalSearchResults([]);
+        setIsBusinessModalSearchInputFocused(false);
+        return false; // Set isBusinessModalSearchBarVisible to false
+      } else {
+        console.log('[DEBUG] Search bar is NOT visible, closing entire modal');
+        // If search is not active, close modal normally
+        closeBusinessCategoriesModal();
+        return prevVisible; // Leave it as false
+      }
+    });
+  }, [closeBusinessCategoriesModal]);
 
   const screenWidth = dimensions.width;
   const screenHeight = dimensions.height;
@@ -1469,7 +1521,8 @@ const HomeScreen: React.FC = React.memo(() => {
   const [isBusinessQuotesModalVisible, setIsBusinessQuotesModalVisible] = useState(false);
   const [isFeaturedContentModalVisible, setIsFeaturedContentModalVisible] = useState(false);
   const [isGeneralCategoriesModalVisible, setIsGeneralCategoriesModalVisible] = useState(false);
-  // General Category Modal Data states
+
+    // General Category Modal Data states
   const [modalGeneralCategories, setModalGeneralCategories] = useState<Array<{ id: string; name: string; icon: string; color?: string; imageUrl?: string; parentCategoryName?: string }>>([]);
   const [isModalCategoriesLoading, setIsModalCategoriesLoading] = useState(false);
   const [modalCategoriesError, setModalCategoriesError] = useState<string | null>(null);
@@ -1482,6 +1535,7 @@ const HomeScreen: React.FC = React.memo(() => {
   const [isGeneralModalSearchBarVisible, setIsGeneralModalSearchBarVisible] = useState(false);
   const [isGeneralCategoriesModalClosing, setIsGeneralCategoriesModalClosing] = useState(false);
 
+  
   // Business Category Modal Search states
   const [businessModalSearchQuery, setBusinessModalSearchQuery] = useState('');
   const [isBusinessModalSearching, setIsBusinessModalSearching] = useState(false);
@@ -3682,6 +3736,88 @@ const HomeScreen: React.FC = React.memo(() => {
     loadGeneralModalRecentSearches();
   }, [loadRecentSearches, loadBusinessModalRecentSearches, loadGeneralModalRecentSearches]);
 
+  // Back button handler to close searchbar when it's open
+  useEffect(() => {
+    const backAction = () => {
+      if (isSearchBarVisible) {
+        // Close searchbar and reset search state
+        setIsSearchBarVisible(false);
+        setSearchQuery('');
+        setIsSearching(false);
+        setSearchResults([]);
+        setIsSearchInputFocused(false);
+        return true; // Prevent default back action
+      }
+      return false; // Allow default back action
+    };
+
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+
+    return () => backHandler.remove();
+  }, [isSearchBarVisible]);
+
+  // Back button handler for General Category modal search bar
+  useEffect(() => {
+    const backAction = () => {
+      if (isGeneralCategoriesModalVisible && isGeneralModalSearchBarVisible) {
+        // Blur the input field first
+        generalModalSearchInputRef.current?.blur();
+        
+        // Close modal search bar and reset search state
+        setIsGeneralModalSearchBarVisible(false);
+        setGeneralModalSearchQuery('');
+        setIsGeneralModalSearching(false);
+        setGeneralModalSearchResults([]);
+        setIsGeneralModalSearchInputFocused(false);
+        return true; // Prevent default back action (don't close modal)
+      }
+      
+      return false; // Allow default back action (close modal)
+    };
+
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+
+    return () => backHandler.remove();
+  }, [isGeneralCategoriesModalVisible, isGeneralModalSearchBarVisible]);
+
+  // Back button handler for Business Category modal search bar
+  useEffect(() => {
+    const backAction = () => {
+      console.log('[DEBUG] BusinessCategories BackHandler invoked', { isBusinessCategoriesModalVisible, isBusinessModalSearchBarVisible });
+      if (isBusinessCategoriesModalVisible && isBusinessModalSearchBarVisible) {
+        console.log('[DEBUG] BackHandler intercepting to close search bar');
+        // Blur the input field first
+        businessModalSearchInputRef.current?.blur();
+        
+        // Close modal search bar and reset search state
+        setIsBusinessModalSearchBarVisible(false);
+        setBusinessModalSearchQuery('');
+        setIsBusinessModalSearching(false);
+        setBusinessModalSearchResults([]);
+        setIsBusinessModalSearchInputFocused(false);
+        return true; // Prevent default back action (don't close modal)
+      }
+      
+      console.log('[DEBUG] BackHandler allowing default behavior');
+      return false; // Allow default back action (close modal)
+    };
+
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+
+    return () => backHandler.remove();
+  }, [isBusinessCategoriesModalVisible, isBusinessModalSearchBarVisible]);
+
+  // Handle calendar date selection - close searchbar if open
+  const handleCalendarDateSelect = useCallback(() => {
+    if (isSearchBarVisible) {
+      setIsSearchBarVisible(false);
+      setSearchQuery('');
+      setIsSearching(false);
+      setSearchResults([]);
+      setIsSearchInputFocused(false);
+    }
+  }, [isSearchBarVisible]);
+
   
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -4125,6 +4261,27 @@ const HomeScreen: React.FC = React.memo(() => {
     // Fetch all categories for modal (lazy loading)
     fetchAllGeneralCategoriesForModal();
   }, [fetchAllGeneralCategoriesForModal]);
+
+  // Handle modal close with search state priority
+  const handleGeneralCategoriesModalClose = useCallback(() => {
+    setIsGeneralModalSearchBarVisible(prevVisible => {
+      if (prevVisible) {
+        // Blur the input field first
+        generalModalSearchInputRef.current?.blur();
+        
+        // If search bar is active, close search first (don't close modal)
+        setGeneralModalSearchQuery('');
+        setIsGeneralModalSearching(false);
+        setGeneralModalSearchResults([]);
+        setIsGeneralModalSearchInputFocused(false);
+        return false; // Set isGeneralModalSearchBarVisible to false
+      } else {
+        // If search is not active, close modal normally
+        closeGeneralCategoriesModal();
+        return prevVisible; // Leave it as false
+      }
+    });
+  }, [closeGeneralCategoriesModal]);
 
   const closeGeneralCategoriesModal = useCallback(() => {
     // Hide content immediately for instant feedback
@@ -6073,7 +6230,16 @@ const HomeScreen: React.FC = React.memo(() => {
         translucent={true}
       />
 
-      <TouchableWithoutFeedback onPress={() => setIsSearchInputFocused(false)}>
+      <TouchableWithoutFeedback onPress={() => {
+        setIsSearchInputFocused(false);
+        // Close searchbar if it's visible and user taps anywhere on screen
+        if (isSearchBarVisible) {
+          setIsSearchBarVisible(false);
+          setSearchQuery('');
+          setIsSearching(false);
+          setSearchResults([]);
+        }
+      }}>
         <LinearGradient
           colors={theme.colors.gradient}
           style={styles.gradientBackground}
@@ -6352,7 +6518,11 @@ const HomeScreen: React.FC = React.memo(() => {
 
           {/* Festivals Calendar Section */}
           {!isSearching && searchQuery.trim() === '' && (
-            <HorizontalFestivalCalendar key={calendarRefreshKey} isFocused={isFocused} />
+            <HorizontalFestivalCalendar 
+              key={calendarRefreshKey} 
+              isFocused={isFocused} 
+              onDateSelect={handleCalendarDateSelect}
+            />
           )}
 
           {/* Business Categories Section */}
@@ -6765,12 +6935,25 @@ const HomeScreen: React.FC = React.memo(() => {
         animationType="slide"
         presentationStyle="fullScreen"
         statusBarTranslucent={true}
-        onRequestClose={closeBusinessCategoriesModal}
+        onRequestClose={handleBusinessCategoriesModalClose}
       >
-        <SafeAreaView style={[
-          styles.fullScreenGreetingModalContent,
-          { backgroundColor: theme.colors.surface }
-        ]}>
+        <TouchableWithoutFeedback onPress={() => {
+          // Blur input first
+          businessModalSearchInputRef.current?.blur();
+          setIsBusinessModalSearchInputFocused(false);
+          // Close searchbar if it's visible and user taps anywhere on screen
+          if (isBusinessModalSearchBarVisible) {
+            setIsBusinessModalSearchBarVisible(false);
+            setBusinessModalSearchQuery('');
+            setIsBusinessModalSearching(false);
+            setBusinessModalSearchResults([]);
+            setIsBusinessModalSearchInputFocused(false);
+          }
+        }}>
+          <SafeAreaView style={[
+            styles.fullScreenGreetingModalContent,
+            { backgroundColor: theme.colors.surface }
+          ]}>
           <LinearGradient
             colors={theme.colors.gradient}
             style={styles.upcomingEventsModalGradient}
@@ -6793,7 +6976,7 @@ const HomeScreen: React.FC = React.memo(() => {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.upcomingEventsCloseButton}
-                  onPress={closeBusinessCategoriesModal}
+                  onPress={handleBusinessCategoriesModalClose}
                   activeOpacity={0.7}
                 >
                   <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>×</Text>
@@ -6809,6 +6992,7 @@ const HomeScreen: React.FC = React.memo(() => {
                 <View style={[styles.searchBar, { backgroundColor: theme.colors.cardBackground }]}>
                   <Icon name="search" size={searchIconSize} color={theme.colors.textSecondary} style={styles.searchIcon} />
                   <TextInput
+                    ref={businessModalSearchInputRef}
                     style={[styles.searchInput, { color: theme.colors.text }]}
                     placeholder="Search business categories..."
                     placeholderTextColor={theme.colors.textSecondary}
@@ -6826,6 +7010,7 @@ const HomeScreen: React.FC = React.memo(() => {
                   />
                   <TouchableOpacity
                     onPress={() => {
+                      businessModalSearchInputRef.current?.blur();
                       setIsBusinessModalSearchBarVisible(false);
                       setBusinessModalSearchQuery('');
                       setIsBusinessModalSearching(false);
@@ -6915,7 +7100,8 @@ const HomeScreen: React.FC = React.memo(() => {
               )}
             </View>
           )}
-        </SafeAreaView>
+          </SafeAreaView>
+        </TouchableWithoutFeedback>
       </Modal>
 
       {/* General Categories Modal */}
@@ -6925,12 +7111,25 @@ const HomeScreen: React.FC = React.memo(() => {
         animationType="slide"
         presentationStyle="fullScreen"
         statusBarTranslucent={true}
-        onRequestClose={closeGeneralCategoriesModal}
+        onRequestClose={handleGeneralCategoriesModalClose}
       >
-        <SafeAreaView style={[
-          styles.fullScreenGreetingModalContent,
-          { backgroundColor: theme.colors.surface }
-        ]}>
+        <TouchableWithoutFeedback onPress={() => {
+          // Blur input first
+          generalModalSearchInputRef.current?.blur();
+          setIsGeneralModalSearchInputFocused(false);
+          // Close searchbar if it's visible and user taps anywhere on screen
+          if (isGeneralModalSearchBarVisible) {
+            setIsGeneralModalSearchBarVisible(false);
+            setGeneralModalSearchQuery('');
+            setIsGeneralModalSearching(false);
+            setGeneralModalSearchResults([]);
+            setIsGeneralModalSearchInputFocused(false);
+          }
+        }}>
+          <SafeAreaView style={[
+            styles.fullScreenGreetingModalContent,
+            { backgroundColor: theme.colors.surface }
+          ]}>
           <LinearGradient
             colors={theme.colors.gradient}
             style={styles.upcomingEventsModalGradient}
@@ -6953,7 +7152,7 @@ const HomeScreen: React.FC = React.memo(() => {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.upcomingEventsCloseButton}
-                  onPress={closeGeneralCategoriesModal}
+                  onPress={handleGeneralCategoriesModalClose}
                   activeOpacity={0.7}
                 >
                   <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>×</Text>
@@ -6969,6 +7168,7 @@ const HomeScreen: React.FC = React.memo(() => {
                 <View style={[styles.searchBar, { backgroundColor: theme.colors.cardBackground }]}>
                   <Icon name="search" size={searchIconSize} color={theme.colors.textSecondary} style={styles.searchIcon} />
                   <TextInput
+                    ref={generalModalSearchInputRef}
                     style={[styles.searchInput, { color: theme.colors.text }]}
                     placeholder="Search general categories..."
                     placeholderTextColor={theme.colors.textSecondary}
@@ -6986,6 +7186,7 @@ const HomeScreen: React.FC = React.memo(() => {
                   />
                   <TouchableOpacity
                     onPress={() => {
+                      generalModalSearchInputRef.current?.blur();
                       setIsGeneralModalSearchBarVisible(false);
                       setGeneralModalSearchQuery('');
                       setIsGeneralModalSearching(false);
@@ -7108,6 +7309,7 @@ const HomeScreen: React.FC = React.memo(() => {
             </View>
           )}
         </SafeAreaView>
+        </TouchableWithoutFeedback>
       </Modal>
 
       {/* Video Content Modal */}
