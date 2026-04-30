@@ -580,6 +580,9 @@ const PosterPlayerScreen: React.FC = () => {
   
   // ✅ GENERAL FROM SEARCH DETECTION: Detect general category from search flow
   const isGeneralFromSearch = route.params?.isGeneralCategoryFromSearch === true;
+  
+  // ✅ GREETING CATEGORY FROM SEARCH DETECTION: Detect greeting category from view more modal
+  const isGreetingCategoryFromSearch = route.params?.templateSource === 'greeting-category';
 
   // Add debug log for received parameters
   console.log('PosterPlayerScreen received params:', {
@@ -983,6 +986,9 @@ const PosterPlayerScreen: React.FC = () => {
   // ✅ GENERAL FROM SEARCH: Prevent multiple fetches
   const hasFetchedGeneralRef = useRef(false);
 
+  // ✅ GREETING CATEGORY FROM SEARCH: Prevent multiple fetches
+  const hasFetchedGreetingCategoryRef = useRef(false);
+
   // ✅ GENERAL FROM SEARCH: Use existing working greeting category fetch
   useEffect(() => {
     // Only handle general category from search
@@ -1134,6 +1140,126 @@ const PosterPlayerScreen: React.FC = () => {
       fetchFullCategoryData();
     }
   }, [isGeneralFromSearch, route.params?.categoryName, convertedInitialPoster]);
+
+  // ✅ GREETING CATEGORY FROM SEARCH: Fetch full category data when coming from greeting view more modal
+  useEffect(() => {
+    // Only handle greeting category from search
+    if (isGreetingCategoryFromSearch && route.params?.categoryName && !hasFetchedGreetingCategoryRef.current) {
+      console.log('GREETING CATEGORY FROM SEARCH: Fetching full category data for:', route.params.categoryName);
+      
+      // Prevent multiple fetches
+      hasFetchedGreetingCategoryRef.current = true;
+      
+      // Set active category to prevent other useEffects from interfering
+      activeCategoryRef.current = { type: 'greeting', value: route.params.categoryName };
+      
+      const fetchFullGreetingCategoryData = async () => {
+        try {
+          setIsPosterLoading(true);
+          setIsGreetingCategoryLoading(true);
+          
+          // Use the same comprehensive API approach as the working greeting category fetch
+          const category = route.params.categoryName;
+          const posterToMatch = convertedInitialPoster;
+          
+          if (!posterToMatch) {
+            console.warn('⚠️ [GREETING CATEGORY FROM SEARCH] No poster to match, using category only');
+            // Continue with category-only fetch
+          }
+
+          // Normalize category name for search (like working function does)
+          const normalizedGreetingCategory = category.toLowerCase()
+            .replace(/[&]/g, 'and')
+            .replace(/[^a-z0-9\s]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+          // Generate search variations for better matching
+          const categoryWords = normalizedGreetingCategory.split(/\s+/).filter(word => word.length > 0);
+          const searchVariations = [
+            category.toLowerCase(),
+            normalizedGreetingCategory,
+            ...categoryWords,
+            categoryWords.join(' '),
+          ].filter((v, i, arr) => arr.indexOf(v) === i);
+
+          // Use comprehensive API approach with high limits
+          const initialLimit = 200;
+          const searchPromises = [
+            greetingTemplatesService.getTemplates({ category: category, limit: initialLimit }),
+            greetingTemplatesService.searchTemplates(category, undefined, initialLimit),
+            greetingTemplatesService.searchTemplates(normalizedGreetingCategory, undefined, initialLimit),
+            ...searchVariations.slice(0, 3).map(variation =>
+              greetingTemplatesService.searchTemplates(variation, undefined, initialLimit)
+            ),
+          ];
+
+          const results = await Promise.all(searchPromises);
+          const [categoryTemplates, searchTemplatesOriginal, searchTemplatesNormalized, ...variationResults] = results;
+
+          // Combine all search results and remove duplicates
+          const allSearchResults = [
+            ...searchTemplatesOriginal,
+            ...searchTemplatesNormalized,
+            ...variationResults.flat()
+          ];
+          const combinedTemplates = [...categoryTemplates, ...allSearchResults];
+
+          // Use Set for faster duplicate removal
+          const uniqueTemplatesMap = new Map<string, any>();
+          combinedTemplates.forEach(template => {
+            if (template?.id && !uniqueTemplatesMap.has(template.id)) {
+              uniqueTemplatesMap.set(template.id, template);
+            }
+          });
+          const allTemplates = Array.from(uniqueTemplatesMap.values());
+
+          // Filter templates to match current category
+          const filteredTemplates = allTemplates.filter(template => {
+            const templateCategory = template.category || '';
+            const templateCategoryLower = templateCategory.toLowerCase();
+            const categoryLower = category.toLowerCase();
+            const normalizedCategoryLower = normalizedGreetingCategory.toLowerCase();
+
+            // Strict matching for current category
+            if (templateCategoryLower === categoryLower ||
+                templateCategoryLower === normalizedCategoryLower ||
+                templateCategoryLower.startsWith(categoryLower + ' ') ||
+                templateCategoryLower.startsWith(normalizedCategoryLower + ' ')) {
+              return true;
+            }
+
+            // Check tags for category match
+            if (template.tags && Array.isArray(template.tags)) {
+              const templateTags = template.tags.map((tag: any) => String(tag).toLowerCase());
+              if (templateTags.some(tag => tag === categoryLower || tag === normalizedCategoryLower ||
+                  tag.startsWith(categoryLower + ' ') || tag.startsWith(normalizedCategoryLower + ' '))) {
+                return true;
+              }
+            }
+
+            return false;
+          });
+
+          // Set templates if we have valid data
+          if (filteredTemplates.length > 0) {
+            setAllTemplates(filteredTemplates);
+            allTemplatesRef.current = filteredTemplates;
+            console.log('GREETING CATEGORY FROM SEARCH: Successfully loaded', filteredTemplates.length, 'templates for category:', category);
+          } else {
+            console.warn('GREETING CATEGORY FROM SEARCH: No templates found for category:', category);
+          }
+        } catch (error) {
+          console.error('GREETING CATEGORY FROM SEARCH: Error fetching templates:', error);
+        } finally {
+          setIsPosterLoading(false);
+          setIsGreetingCategoryLoading(false);
+        }
+      };
+
+      fetchFullGreetingCategoryData();
+    }
+  }, [isGreetingCategoryFromSearch, route.params?.categoryName, convertedInitialPoster]);
 
   // Helper to detect placeholder posters
   const isPlaceholderPoster = useCallback((poster: any): boolean => {
@@ -2392,8 +2518,10 @@ const PosterPlayerScreen: React.FC = () => {
 
     // ✅ BLOCK GREETING CATEGORY FETCH FOR GREETING MODAL FLOWS (Success Mindset, Social Media Growth, etc.)
     const isGreetingModalFlow = templateSource === 'greeting' && type === 'greeting' && !isSearchFlow && !isGeneralFromSearch;
-    if (isGreetingModalFlow) {
-      console.log('🚫 [GREETING CATEGORY FETCH] Skipped — greeting modal flow is active (Success Mindset, Social Media Growth, etc.)');
+    const isGreetingCategoryFlow = greetingCategory && !isSearchFlow && !isGeneralFromSearch && !isGreetingCategoryFromSearch;
+    
+    if (isGreetingModalFlow || isGreetingCategoryFromSearch) {
+      console.log('🚫 [GREETING CATEGORY FETCH] Skipped — greeting modal flow or greeting category from search is active');
       return;
     }
 
@@ -3366,7 +3494,7 @@ const PosterPlayerScreen: React.FC = () => {
     };
 
     fetchGreetingCategoryTemplates();
-  }, [greetingCategory, convertedInitialPoster.id, selectedLanguage, setAllTemplates]);
+  }, [greetingCategory, convertedInitialPoster.id, selectedLanguage, setAllTemplates, isGreetingCategoryFromSearch]);
 
   // Fetch calendar posters when calendarDate is provided
   useEffect(() => {

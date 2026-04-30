@@ -1092,7 +1092,6 @@ const HomeScreen: React.FC = React.memo(() => {
   const [isBusinessCategoriesModalClosing, setIsBusinessCategoriesModalClosing] = useState(false);
 
   const closeBusinessCategoriesModal = useCallback(() => {
-    console.log('[DEBUG] closeBusinessCategoriesModal was called!');
     // Hide content immediately for instant feedback
     setIsBusinessCategoriesModalClosing(true);
     // Hide modal immediately - no delay
@@ -1109,28 +1108,227 @@ const HomeScreen: React.FC = React.memo(() => {
     });
   }, []);
 
-  // DEBUG EFFECT
+  // Track modal state changes to detect re-animation triggers
+  const previousModalVisibleRef = useRef(isBusinessCategoriesModalVisible);
+  const [disableModalAnimation, setDisableModalAnimation] = useState(false);
+  
   useEffect(() => {
-    console.log('[DEBUG STATE]', { isFocused, isBusinessCategoriesModalVisible, isBusinessModalSearchBarVisible });
-  }, [isFocused, isBusinessCategoriesModalVisible, isBusinessModalSearchBarVisible]);
+    const previousVisible = previousModalVisibleRef.current;
+    const currentVisible = isBusinessCategoriesModalVisible;
+    
+    if (previousVisible === false && currentVisible === true) {
+      setDisableModalAnimation(false); // Enable animation for new open
+    } else if (previousVisible === true && currentVisible === false) {
+      setDisableModalAnimation(false); // Reset for next open
+    }
+    
+    previousModalVisibleRef.current = currentVisible;
+  }, [isBusinessCategoriesModalVisible, isFocused]);
+
+  // Detect when screen regains focus while modal is already open (re-animation scenario)
+  useEffect(() => {
+    if (isBusinessCategoriesModalVisible && isFocused) {
+      setDisableModalAnimation(true);
+    }
+  }, [isFocused, isBusinessCategoriesModalVisible]);
+
+  // Track General Categories modal state changes to detect re-animation triggers
+  const previousGeneralModalVisibleRef = useRef(isGeneralCategoriesModalVisible);
+  const [disableGeneralCategoriesModalAnimation, setDisableGeneralCategoriesModalAnimation] = useState(false);
+  
+  useEffect(() => {
+    const previousVisible = previousGeneralModalVisibleRef.current;
+    const currentVisible = isGeneralCategoriesModalVisible;
+    
+    if (previousVisible === false && currentVisible === true) {
+      setDisableGeneralCategoriesModalAnimation(false); // Enable animation for new open
+    } else if (previousVisible === true && currentVisible === false) {
+      setDisableGeneralCategoriesModalAnimation(false); // Reset for next open
+    }
+    
+    previousGeneralModalVisibleRef.current = currentVisible;
+  }, [isGeneralCategoriesModalVisible, isFocused]);
+
+  // Detect when screen regains focus while General Categories modal is already open (re-animation scenario)
+  useEffect(() => {
+    if (isGeneralCategoriesModalVisible && isFocused) {
+      setDisableGeneralCategoriesModalAnimation(true);
+    }
+  }, [isFocused, isGeneralCategoriesModalVisible]);
+
+  // Greeting section modal animation control states
+  const [disableBusinessEthicsModalAnimation, setDisableBusinessEthicsModalAnimation] = useState(false);
+  const [disableSuccessMindsetModalAnimation, setDisableSuccessMindsetModalAnimation] = useState(false);
+  const [disableSocialMediaGrowthModalAnimation, setDisableSocialMediaGrowthModalAnimation] = useState(false);
+  const [disableMoneyAndFinanceModalAnimation, setDisableMoneyAndFinanceModalAnimation] = useState(false);
+  const [disableBusinessLegendQuoteModalAnimation, setDisableBusinessLegendQuoteModalAnimation] = useState(false);
+  const [disableBusinessMarketingTipsModalAnimation, setDisableBusinessMarketingTipsModalAnimation] = useState(false);
+  const [disableBusinessQuotesModalAnimation, setDisableBusinessQuotesModalAnimation] = useState(false);
+
+  // Greeting section modal state tracking
+  const previousBusinessEthicsModalVisibleRef = useRef(isBusinessEthicsModalVisible);
+  const previousSuccessMindsetModalVisibleRef = useRef(isSuccessMindsetModalVisible);
+  const previousSocialMediaGrowthModalVisibleRef = useRef(isSocialMediaGrowthModalVisible);
+  const previousMoneyAndFinanceModalVisibleRef = useRef(isMoneyAndFinanceModalVisible);
+  const previousBusinessLegendQuoteModalVisibleRef = useRef(isBusinessLegendQuoteModalVisible);
+  const previousBusinessMarketingTipsModalVisibleRef = useRef(isBusinessMarketingTipsModalVisible);
+  const previousBusinessQuotesModalVisibleRef = useRef(isBusinessQuotesModalVisible);
+
+  // Business Ethics modal animation control
+  useEffect(() => {
+    const previousVisible = previousBusinessEthicsModalVisibleRef.current;
+    const currentVisible = isBusinessEthicsModalVisible;
+    
+    if (previousVisible === false && currentVisible === true) {
+      setDisableBusinessEthicsModalAnimation(false);
+    } else if (previousVisible === true && currentVisible === false) {
+      setDisableBusinessEthicsModalAnimation(false);
+    }
+    
+    previousBusinessEthicsModalVisibleRef.current = currentVisible;
+  }, [isBusinessEthicsModalVisible, isFocused]);
+
+  useEffect(() => {
+    if (isBusinessEthicsModalVisible && isFocused) {
+      setDisableBusinessEthicsModalAnimation(true);
+    }
+  }, [isFocused, isBusinessEthicsModalVisible]);
+
+  // Success Mindset modal animation control
+  useEffect(() => {
+    const previousVisible = previousSuccessMindsetModalVisibleRef.current;
+    const currentVisible = isSuccessMindsetModalVisible;
+    
+    if (previousVisible === false && currentVisible === true) {
+      setDisableSuccessMindsetModalAnimation(false);
+    } else if (previousVisible === true && currentVisible === false) {
+      setDisableSuccessMindsetModalAnimation(false);
+    }
+    
+    previousSuccessMindsetModalVisibleRef.current = currentVisible;
+  }, [isSuccessMindsetModalVisible, isFocused]);
+
+  useEffect(() => {
+    if (isSuccessMindsetModalVisible && isFocused) {
+      setDisableSuccessMindsetModalAnimation(true);
+    }
+  }, [isFocused, isSuccessMindsetModalVisible]);
+
+  // Social Media Growth modal animation control
+  useEffect(() => {
+    const previousVisible = previousSocialMediaGrowthModalVisibleRef.current;
+    const currentVisible = isSocialMediaGrowthModalVisible;
+    
+    if (previousVisible === false && currentVisible === true) {
+      setDisableSocialMediaGrowthModalAnimation(false);
+    } else if (previousVisible === true && currentVisible === false) {
+      setDisableSocialMediaGrowthModalAnimation(false);
+    }
+    
+    previousSocialMediaGrowthModalVisibleRef.current = currentVisible;
+  }, [isSocialMediaGrowthModalVisible, isFocused]);
+
+  useEffect(() => {
+    if (isSocialMediaGrowthModalVisible && isFocused) {
+      setDisableSocialMediaGrowthModalAnimation(true);
+    }
+  }, [isFocused, isSocialMediaGrowthModalVisible]);
+
+  // Money and Finance modal animation control
+  useEffect(() => {
+    const previousVisible = previousMoneyAndFinanceModalVisibleRef.current;
+    const currentVisible = isMoneyAndFinanceModalVisible;
+    
+    if (previousVisible === false && currentVisible === true) {
+      setDisableMoneyAndFinanceModalAnimation(false);
+    } else if (previousVisible === true && currentVisible === false) {
+      setDisableMoneyAndFinanceModalAnimation(false);
+    }
+    
+    previousMoneyAndFinanceModalVisibleRef.current = currentVisible;
+  }, [isMoneyAndFinanceModalVisible, isFocused]);
+
+  useEffect(() => {
+    if (isMoneyAndFinanceModalVisible && isFocused) {
+      setDisableMoneyAndFinanceModalAnimation(true);
+    }
+  }, [isFocused, isMoneyAndFinanceModalVisible]);
+
+  // Business Legend Quote modal animation control
+  useEffect(() => {
+    const previousVisible = previousBusinessLegendQuoteModalVisibleRef.current;
+    const currentVisible = isBusinessLegendQuoteModalVisible;
+    
+    if (previousVisible === false && currentVisible === true) {
+      setDisableBusinessLegendQuoteModalAnimation(false);
+    } else if (previousVisible === true && currentVisible === false) {
+      setDisableBusinessLegendQuoteModalAnimation(false);
+    }
+    
+    previousBusinessLegendQuoteModalVisibleRef.current = currentVisible;
+  }, [isBusinessLegendQuoteModalVisible, isFocused]);
+
+  useEffect(() => {
+    if (isBusinessLegendQuoteModalVisible && isFocused) {
+      setDisableBusinessLegendQuoteModalAnimation(true);
+    }
+  }, [isFocused, isBusinessLegendQuoteModalVisible]);
+
+  // Business Marketing Tips modal animation control
+  useEffect(() => {
+    const previousVisible = previousBusinessMarketingTipsModalVisibleRef.current;
+    const currentVisible = isBusinessMarketingTipsModalVisible;
+    
+    if (previousVisible === false && currentVisible === true) {
+      setDisableBusinessMarketingTipsModalAnimation(false);
+    } else if (previousVisible === true && currentVisible === false) {
+      setDisableBusinessMarketingTipsModalAnimation(false);
+    }
+    
+    previousBusinessMarketingTipsModalVisibleRef.current = currentVisible;
+  }, [isBusinessMarketingTipsModalVisible, isFocused]);
+
+  useEffect(() => {
+    if (isBusinessMarketingTipsModalVisible && isFocused) {
+      setDisableBusinessMarketingTipsModalAnimation(true);
+    }
+  }, [isFocused, isBusinessMarketingTipsModalVisible]);
+
+  // Business Quotes modal animation control
+  useEffect(() => {
+    const previousVisible = previousBusinessQuotesModalVisibleRef.current;
+    const currentVisible = isBusinessQuotesModalVisible;
+    
+    if (previousVisible === false && currentVisible === true) {
+      setDisableBusinessQuotesModalAnimation(false);
+    } else if (previousVisible === true && currentVisible === false) {
+      setDisableBusinessQuotesModalAnimation(false);
+    }
+    
+    previousBusinessQuotesModalVisibleRef.current = currentVisible;
+  }, [isBusinessQuotesModalVisible, isFocused]);
+
+  useEffect(() => {
+    if (isBusinessQuotesModalVisible && isFocused) {
+      setDisableBusinessQuotesModalAnimation(true);
+    }
+  }, [isFocused, isBusinessQuotesModalVisible]);
 
   // Handle modal close with search state priority
   const handleBusinessCategoriesModalClose = useCallback(() => {
     setIsBusinessModalSearchBarVisible(prevVisible => {
-      console.log('[DEBUG] handleBusinessCategoriesModalClose called', { prevVisible });
       if (prevVisible) {
-        console.log('[DEBUG] Search bar is visible, closing search bar ONLY');
         // Blur the input field first
         businessModalSearchInputRef.current?.blur();
         
         // If search bar is active, close search first (don't close modal)
+        setIsBusinessModalSearchBarVisible(false);
         setBusinessModalSearchQuery('');
         setIsBusinessModalSearching(false);
         setBusinessModalSearchResults([]);
         setIsBusinessModalSearchInputFocused(false);
-        return false; // Set isBusinessModalSearchBarVisible to false
+        return prevVisible; // Keep it as false
       } else {
-        console.log('[DEBUG] Search bar is NOT visible, closing entire modal');
         // If search is not active, close modal normally
         closeBusinessCategoriesModal();
         return prevVisible; // Leave it as false
@@ -4106,58 +4304,72 @@ const HomeScreen: React.FC = React.memo(() => {
 
   // Greeting section modal handlers
   const handleViewAllBusinessEthics = useCallback(() => {
+    setDisableBusinessEthicsModalAnimation(false);
     setIsBusinessEthicsModalVisible(true);
   }, []);
 
   const closeBusinessEthicsModal = useCallback(() => {
+    setDisableBusinessEthicsModalAnimation(false);
     setIsBusinessEthicsModalVisible(false);
   }, []);
 
   const handleViewAllSuccessMindset = useCallback(() => {
+    setDisableSuccessMindsetModalAnimation(false);
     setIsSuccessMindsetModalVisible(true);
   }, []);
 
   const closeSuccessMindsetModal = useCallback(() => {
+    setDisableSuccessMindsetModalAnimation(false);
     setIsSuccessMindsetModalVisible(false);
   }, []);
 
   const handleViewAllSocialMediaGrowth = useCallback(() => {
+    setDisableSocialMediaGrowthModalAnimation(false);
     setIsSocialMediaGrowthModalVisible(true);
   }, []);
 
   const closeSocialMediaGrowthModal = useCallback(() => {
+    setDisableSocialMediaGrowthModalAnimation(false);
     setIsSocialMediaGrowthModalVisible(false);
   }, []);
 
   const handleViewAllMoneyAndFinance = useCallback(() => {
+    setDisableMoneyAndFinanceModalAnimation(false);
     setIsMoneyAndFinanceModalVisible(true);
   }, []);
 
   const closeMoneyAndFinanceModal = useCallback(() => {
+    setDisableMoneyAndFinanceModalAnimation(false);
     setIsMoneyAndFinanceModalVisible(false);
   }, []);
 
   const handleViewAllBusinessLegendQuote = useCallback(() => {
+    setDisableBusinessLegendQuoteModalAnimation(false);
     setIsBusinessLegendQuoteModalVisible(true);
   }, []);
 
   const closeBusinessLegendQuoteModal = useCallback(() => {
+    setDisableBusinessLegendQuoteModalAnimation(false);
     setIsBusinessLegendQuoteModalVisible(false);
   }, []);
 
   const handleViewAllBusinessMarketingTips = useCallback(() => {
+    setDisableBusinessMarketingTipsModalAnimation(false);
     setIsBusinessMarketingTipsModalVisible(true);
   }, []);
 
   const closeBusinessMarketingTipsModal = useCallback(() => {
+    setDisableBusinessMarketingTipsModalAnimation(false);
     setIsBusinessMarketingTipsModalVisible(false);
   }, []);
 
   const handleViewAllBusinessQuotes = useCallback(() => {
+    setDisableBusinessQuotesModalAnimation(false);
     setIsBusinessQuotesModalVisible(true);
   }, []);
 
   const closeBusinessQuotesModal = useCallback(() => {
+    setDisableBusinessQuotesModalAnimation(false);
     setIsBusinessQuotesModalVisible(false);
   }, []);
 
@@ -4176,6 +4388,7 @@ const HomeScreen: React.FC = React.memo(() => {
     setBusinessModalSearchResults([]);
     setIsBusinessModalSearchInputFocused(false);
     setIsBusinessModalSearchBarVisible(false);
+    
     setIsBusinessCategoriesModalVisible(true);
   }, []);
 
@@ -4251,6 +4464,8 @@ const HomeScreen: React.FC = React.memo(() => {
   }, []);
 
   const handleViewAllGeneralCategories = useCallback(() => {
+    // Reset animation state for fresh open
+    setDisableGeneralCategoriesModalAnimation(false);
     // Reset search state when opening modal
     setGeneralModalSearchQuery('');
     setIsGeneralModalSearching(false);
@@ -4288,6 +4503,8 @@ const HomeScreen: React.FC = React.memo(() => {
     setIsGeneralCategoriesModalClosing(true);
     // Hide modal immediately - no delay
     setIsGeneralCategoriesModalVisible(false);
+    // Reset animation state for next open
+    setDisableGeneralCategoriesModalAnimation(false);
     // Reset search state when closing modal
     setGeneralModalSearchQuery('');
     setIsGeneralModalSearching(false);
@@ -5547,10 +5764,8 @@ const HomeScreen: React.FC = React.memo(() => {
         selectedPoster: item,
         relatedPosters: templates.filter(t => t.id !== item.id),
         searchQuery: '',
-        templateSource: 'greeting',
-        posterLimit: 200,
-        type: 'greeting',
-        categoryName: 'Business Ethics'
+        categoryName: 'Business Ethics',
+        templateSource: 'greeting-category',
       });
     };
     return (
@@ -5573,10 +5788,8 @@ const HomeScreen: React.FC = React.memo(() => {
         selectedPoster: item,
         relatedPosters: templates.filter(t => t.id !== item.id),
         searchQuery: '',
-        templateSource: 'greeting',
-        posterLimit: 200,
-        type: 'greeting',
-        categoryName: 'Success Mindset'
+        categoryName: 'Success Mindset',
+        templateSource: 'greeting-category',
       });
     };
     return (
@@ -5589,7 +5802,7 @@ const HomeScreen: React.FC = React.memo(() => {
         onPress={handlePress}
       />
     );
-  }, [modalCardWidth, modalCardGap, modalColumns, successMindsetTemplatesRaw, successMindsetTemplates, navigation]);
+  }, [modalCardWidth, modalCardGap, modalColumns, socialMediaGrowthTemplatesRaw, socialMediaGrowthTemplates, navigation]);
 
   const renderSocialMediaGrowthModalItem = useCallback(({ item, index }: { item: Template; index: number }) => {
     const templates = socialMediaGrowthTemplatesRaw.length > 0 ? socialMediaGrowthTemplatesRaw : socialMediaGrowthTemplates;
@@ -5599,10 +5812,8 @@ const HomeScreen: React.FC = React.memo(() => {
         selectedPoster: item,
         relatedPosters: templates.filter(t => t.id !== item.id),
         searchQuery: '',
-        templateSource: 'greeting',
-        posterLimit: 200,
-        type: 'greeting',
-        categoryName: 'Social Media Growth'
+        categoryName: 'Social Media Growth',
+        templateSource: 'greeting-category',
       });
     };
     return (
@@ -5623,6 +5834,8 @@ const HomeScreen: React.FC = React.memo(() => {
       navigation.navigate('PosterPlayer', {
         selectedPoster: item,
         relatedPosters: templates.filter(t => t.id !== item.id),
+        categoryName: 'Money and Finance',
+        templateSource: 'greeting-category',
       });
     };
     return (
@@ -5645,10 +5858,8 @@ const HomeScreen: React.FC = React.memo(() => {
         selectedPoster: item,
         relatedPosters: templates.filter(t => t.id !== item.id),
         searchQuery: '',
-        templateSource: 'greeting',
-        posterLimit: 200,
-        type: 'greeting',
-        categoryName: 'Business Legend Quote'
+        categoryName: 'Business Legend Quote',
+        templateSource: 'greeting-category',
       });
     };
     return (
@@ -5671,10 +5882,8 @@ const HomeScreen: React.FC = React.memo(() => {
         selectedPoster: item,
         relatedPosters: templates.filter(t => t.id !== item.id),
         searchQuery: '',
-        templateSource: 'greeting',
-        posterLimit: 200,
-        type: 'greeting',
-        categoryName: 'Business Marketing Tips'
+        categoryName: 'Business Marketing Tips',
+        templateSource: 'greeting-category',
       });
     };
     return (
@@ -5695,6 +5904,8 @@ const HomeScreen: React.FC = React.memo(() => {
       navigation.navigate('PosterPlayer', {
         selectedPoster: item,
         relatedPosters: templates.filter(t => t.id !== item.id),
+        categoryName: 'Business Quotes',
+        templateSource: 'greeting-category',
       });
     };
     return (
@@ -6930,9 +7141,9 @@ const HomeScreen: React.FC = React.memo(() => {
 
       {/* Business Categories Modal */}
       <Modal
-        visible={isFocused && isBusinessCategoriesModalVisible}
+        visible={isBusinessCategoriesModalVisible}
         transparent={false}
-        animationType="slide"
+        animationType={disableModalAnimation ? "none" : "slide"}
         presentationStyle="fullScreen"
         statusBarTranslucent={true}
         onRequestClose={handleBusinessCategoriesModalClose}
@@ -7106,9 +7317,9 @@ const HomeScreen: React.FC = React.memo(() => {
 
       {/* General Categories Modal */}
       <Modal
-        visible={isFocused && isGeneralCategoriesModalVisible}
+        visible={isGeneralCategoriesModalVisible}
         transparent={false}
-        animationType="slide"
+        animationType={disableGeneralCategoriesModalAnimation ? "none" : "slide"}
         presentationStyle="fullScreen"
         statusBarTranslucent={true}
         onRequestClose={handleGeneralCategoriesModalClose}
@@ -7486,9 +7697,9 @@ const HomeScreen: React.FC = React.memo(() => {
 
       {/* Business Ethics Modal */}
       <Modal
-        visible={isFocused && isBusinessEthicsModalVisible}
+        visible={isBusinessEthicsModalVisible}
         transparent={false}
-        animationType="slide"
+        animationType={disableBusinessEthicsModalAnimation ? "none" : "slide"}
         presentationStyle="fullScreen"
         statusBarTranslucent={true}
         onRequestClose={closeBusinessEthicsModal}
@@ -7539,9 +7750,9 @@ const HomeScreen: React.FC = React.memo(() => {
 
       {/* Success Mindset Modal */}
       <Modal
-        visible={isFocused && isSuccessMindsetModalVisible}
+        visible={isSuccessMindsetModalVisible}
         transparent={false}
-        animationType="slide"
+        animationType={disableSuccessMindsetModalAnimation ? "none" : "slide"}
         presentationStyle="fullScreen"
         statusBarTranslucent={true}
         onRequestClose={closeSuccessMindsetModal}
@@ -7592,9 +7803,9 @@ const HomeScreen: React.FC = React.memo(() => {
 
       {/* Social Media Growth Modal */}
       <Modal
-        visible={isFocused && isSocialMediaGrowthModalVisible}
+        visible={isSocialMediaGrowthModalVisible}
         transparent={false}
-        animationType="slide"
+        animationType={disableSocialMediaGrowthModalAnimation ? "none" : "slide"}
         presentationStyle="fullScreen"
         statusBarTranslucent={true}
         onRequestClose={closeSocialMediaGrowthModal}
@@ -7645,9 +7856,9 @@ const HomeScreen: React.FC = React.memo(() => {
 
       {/* Money and Finance Modal */}
       <Modal
-        visible={isFocused && isMoneyAndFinanceModalVisible}
+        visible={isMoneyAndFinanceModalVisible}
         transparent={false}
-        animationType="slide"
+        animationType={disableMoneyAndFinanceModalAnimation ? "none" : "slide"}
         presentationStyle="fullScreen"
         statusBarTranslucent={true}
         onRequestClose={closeMoneyAndFinanceModal}
@@ -7698,9 +7909,9 @@ const HomeScreen: React.FC = React.memo(() => {
 
       {/* Business Legend Quote Modal */}
       <Modal
-        visible={isFocused && isBusinessLegendQuoteModalVisible}
+        visible={isBusinessLegendQuoteModalVisible}
         transparent={false}
-        animationType="slide"
+        animationType={disableBusinessLegendQuoteModalAnimation ? "none" : "slide"}
         presentationStyle="fullScreen"
         statusBarTranslucent={true}
         onRequestClose={closeBusinessLegendQuoteModal}
@@ -7751,9 +7962,9 @@ const HomeScreen: React.FC = React.memo(() => {
 
       {/* Business Marketing Tips Modal */}
       <Modal
-        visible={isFocused && isBusinessMarketingTipsModalVisible}
+        visible={isBusinessMarketingTipsModalVisible}
         transparent={false}
-        animationType="slide"
+        animationType={disableBusinessMarketingTipsModalAnimation ? "none" : "slide"}
         presentationStyle="fullScreen"
         statusBarTranslucent={true}
         onRequestClose={closeBusinessMarketingTipsModal}
@@ -7804,9 +8015,9 @@ const HomeScreen: React.FC = React.memo(() => {
 
       {/* Business Quotes Modal */}
       <Modal
-        visible={isFocused && isBusinessQuotesModalVisible}
+        visible={isBusinessQuotesModalVisible}
         transparent={false}
-        animationType="slide"
+        animationType={disableBusinessQuotesModalAnimation ? "none" : "slide"}
         presentationStyle="fullScreen"
         statusBarTranslucent={true}
         onRequestClose={closeBusinessQuotesModal}

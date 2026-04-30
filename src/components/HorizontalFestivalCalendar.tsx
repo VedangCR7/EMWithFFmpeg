@@ -364,6 +364,31 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
   const scrollViewRef = useRef<ScrollView>(null);
   const borderAnimation = useRef(new Animated.Value(0)).current;
 
+  // Animation control for View More modal
+  const [disableViewMoreModalAnimation, setDisableViewMoreModalAnimation] = useState(false);
+  const previousViewMoreModalVisibleRef = useRef(isViewMoreModalVisible);
+
+  // Track modal state changes to detect re-animation triggers
+  useEffect(() => {
+    const previousVisible = previousViewMoreModalVisibleRef.current;
+    const currentVisible = isViewMoreModalVisible;
+    
+    if (previousVisible === false && currentVisible === true) {
+      setDisableViewMoreModalAnimation(false); // Enable animation for fresh open
+    } else if (previousVisible === true && currentVisible === false) {
+      setDisableViewMoreModalAnimation(false); // Reset for next open
+    }
+    
+    previousViewMoreModalVisibleRef.current = currentVisible;
+  }, [isViewMoreModalVisible, isFocused]);
+
+  // Detect when screen regains focus while modal is already open (re-animation scenario)
+  useEffect(() => {
+    if (isViewMoreModalVisible && isFocused) {
+      setDisableViewMoreModalAnimation(true);
+    }
+  }, [isFocused, isViewMoreModalVisible]);
+
   const gradientColors = [theme.colors.secondary, theme.colors.primary];
   const borderThickness = 2.5;
   const borderInset = borderThickness + 1.2;
@@ -665,6 +690,7 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
 
   // Handle view more button press
   const handleViewMore = useCallback(() => {
+    setDisableViewMoreModalAnimation(false); // Reset animation state for fresh open
     fetchAllPosters();
     setIsViewMoreModalVisible(true);
   }, [fetchAllPosters]);
@@ -861,10 +887,13 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
 
       {/* View More Modal */}
       <Modal
-        visible={isFocused && isViewMoreModalVisible}
+        visible={isViewMoreModalVisible}
         transparent={false}
-        animationType="slide"
-        onRequestClose={() => setIsViewMoreModalVisible(false)}
+        animationType={disableViewMoreModalAnimation ? "none" : "slide"}
+        onRequestClose={() => {
+    setDisableViewMoreModalAnimation(false); // Reset animation state for next open
+    setIsViewMoreModalVisible(false);
+  }}
         statusBarTranslucent={false}
       >
         <SafeAreaView style={[
@@ -884,7 +913,10 @@ const HorizontalFestivalCalendar: React.FC<HorizontalFestivalCalendarProps> = ({
               </View>
               <TouchableOpacity
                 style={styles.upcomingEventsCloseButton}
-                onPress={() => setIsViewMoreModalVisible(false)}
+                onPress={() => {
+                  setDisableViewMoreModalAnimation(false); // Reset animation state for next open
+                  setIsViewMoreModalVisible(false);
+                }}
                 activeOpacity={0.7}
               >
                 <Text style={[styles.upcomingEventsCloseButtonText, { color: theme.colors.text }]}>×</Text>
