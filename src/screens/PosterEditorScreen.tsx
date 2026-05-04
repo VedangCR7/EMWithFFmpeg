@@ -515,6 +515,8 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
   const [showConnectionErrorModal, setShowConnectionErrorModal] = useState(false);
   const [showCategoryAccessModal, setShowCategoryAccessModal] = useState(false);
   const [showInfoRequiredModal, setShowInfoRequiredModal] = useState(false);
+  const [showFrameRemovalModal, setShowFrameRemovalModal] = useState(false);
+  const [pendingTemplate, setPendingTemplate] = useState<string | null>(null);
   const [selectedFieldName, setSelectedFieldName] = useState('');
   const [categoryData, setCategoryData] = useState({
     templateCategory: "",
@@ -525,6 +527,35 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
   const handleUpgrade = () => {
     setShowPremiumAlertModal(false);
     navigation.navigate('BusinessProfilesScreen' as any);
+  };
+
+  // Handle frame removal modal actions
+  const handleRemoveFrameOnly = () => {
+    setShowFrameRemovalModal(false);
+    
+    // Restore original layers before removing frame
+    if (originalLayers.length > 0) {
+      const restoredLayers = [...originalLayers];
+      setLayers(restoredLayers);
+      
+      // Restore footer background visibility
+      setVisibleFields(prev => ({ ...prev, footerBackground: true }));
+      
+      console.log('🖼️ [FRAME REMOVED] Original layers restored:', restoredLayers.length);
+    }
+    
+    setSelectedFrame(null);
+    // Reset auto-layout state when frame is removed
+    setIsAutoLayoutApplied({});
+    
+    // Clear pending template - only remove frame, don't apply template
+    setPendingTemplate(null);
+    console.log('🖼️ [FRAME REMOVED] Frame removed without applying template');
+  };
+
+  const handleCancelFrameRemoval = () => {
+    setShowFrameRemovalModal(false);
+    setPendingTemplate(null);
   };
   
   // Prevent rendering if context is still loading
@@ -1464,10 +1495,11 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
   
   // Apply frame-specific layout to elements
   const applyFrameLayout = useCallback((frameId: string) => {
-    // Store original layers before applying frame layout (always store current positions)
-    if (layers.length > 0) {
+    // Store original layers ONLY if no frame is currently applied (preserve true original positions)
+    if (layers.length > 0 && !selectedFrame) {
       const layersToStore = [...layers];
       setOriginalLayers(layersToStore);
+      console.log('🖼️ [FRAME LAYOUT] Stored original layers before first frame application:', layersToStore.length);
     }
     
     // Apply frame layout (always apply to ensure proper positioning)
@@ -1496,7 +1528,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     
     // Update auto-layout applied state
     setIsAutoLayoutApplied(prev => ({ ...prev, [frameId]: true }));
-  }, [layers, canvasWidth, canvasHeight, originalLayers.length]);
+  }, [layers, canvasWidth, canvasHeight, originalLayers.length, selectedFrame]);
 
   // Apply business profile data to poster
   const applyBusinessProfileToPoster = (profile: BusinessProfile) => {
@@ -2478,6 +2510,12 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
 
   // Apply template to poster
   const applyTemplate = useCallback((templateType: string) => {
+    // Check if a frame is applied and show warning modal
+    if (selectedFrame) {
+      setPendingTemplate(templateType);
+      setShowFrameRemovalModal(true);
+      return;
+    }
 
     setSelectedTemplate(templateType);
     setShowTemplatesModal(false);
@@ -2488,7 +2526,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
 
     // Apply different poster layouts and styles based on template
     setLayers(prev => applyTemplateStylesToLayers(templateType, prev));
-  }, [applyTemplateStylesToLayers]);
+  }, [applyTemplateStylesToLayers, selectedFrame]);
 
   useEffect(() => {
     if (!initialTemplateApplied && layers.length > 0 && !activeBusinessProfile) {
@@ -3569,7 +3607,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
         </View>
 
         {/* Frames Section */}
-        {/* <View style={styles.framesSection}>
+         <View style={styles.framesSection}>
           <View style={styles.framesHeader}>
             <Text style={styles.framesTitle}>Frames</Text>
           </View>
@@ -3609,7 +3647,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
               </TouchableOpacity>
             ))}
           </ScrollView>
-        </View> */}
+        </View> 
 
       </View>
 
@@ -4234,6 +4272,80 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
         onClose={() => setShowInfoRequiredModal(false)}
       />
 
+      {/* Frame Removal Warning Modal */}
+      <Modal
+        visible={showFrameRemovalModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleCancelFrameRemoval}
+      >
+        <View style={getThemeStyles().modalOverlay}>
+          <View style={[
+            styles.frameRemovalModalContent,
+            { backgroundColor: getThemeStyles().modalContent.backgroundColor }
+          ]}>
+            {/* Icon Container */}
+            <View style={styles.frameRemovalIconContainer}>
+              <View style={styles.frameRemovalIconBackground}>
+                <Icon 
+                  name="image-not-supported" 
+                  size={dynamicModerateScale(32)} 
+                  color="#ff6b6b" 
+                />
+              </View>
+            </View>
+
+            {/* Text Content */}
+            <View style={styles.frameRemovalTextContainer}>
+              <Text style={[
+                styles.frameRemovalTitle,
+                { color: getThemeStyles().modalTitle.color }
+              ]}>
+                Remove the frame
+              </Text>
+              <Text style={[
+                styles.frameRemovalSubtitle,
+                { color: getThemeStyles().modalSubtitle.color }
+              ]}>
+                Remove the frame to apply a new template
+              </Text>
+            </View>
+
+            {/* Action Buttons */}
+            <View style={styles.frameRemovalButtonContainer}>
+              <TouchableOpacity
+                style={[styles.frameRemovalButton, styles.frameRemovalCancelButton]}
+                onPress={handleCancelFrameRemoval}
+              >
+                <Icon 
+                  name="close" 
+                  size={dynamicModerateScale(18)} 
+                  color="#666666" 
+                  style={styles.frameRemovalButtonIcon}
+                />
+                <Text style={styles.frameRemovalCancelButtonText}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.frameRemovalButton, styles.frameRemovalConfirmButton]}
+                onPress={handleRemoveFrameOnly}
+              >
+                <Icon 
+                  name="delete-outline" 
+                  size={dynamicModerateScale(18)} 
+                  color="#ffffff" 
+                  style={styles.frameRemovalButtonIcon}
+                />
+                <Text style={styles.frameRemovalConfirmButtonText}>
+                  Remove Frame
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Connection Error Modal */}
       <Modal
         visible={showConnectionErrorModal}
@@ -4813,6 +4925,112 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: moderateScale(13),
     fontWeight: '600',
+  },
+  modalButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: moderateScale(8),
+    marginTop: moderateScale(16),
+  },
+  modalButtonPrimary: {
+    backgroundColor: '#667eea',
+  },
+  modalButtonPrimaryText: {
+    color: '#ffffff',
+    fontSize: moderateScale(13),
+    fontWeight: '600',
+  },
+  // Enhanced Frame Removal Modal Styles
+  frameRemovalModalContent: {
+    backgroundColor: '#ffffff',
+    borderRadius: moderateScale(20),
+    padding: moderateScale(24),
+    width: screenWidth * 0.9,
+    maxWidth: moderateScale(400),
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: moderateScale(8),
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: moderateScale(16),
+    elevation: moderateScale(12),
+  },
+  frameRemovalIconContainer: {
+    alignItems: 'center',
+    marginBottom: moderateScale(20),
+  },
+  frameRemovalIconBackground: {
+    width: moderateScale(80),
+    height: moderateScale(80),
+    borderRadius: moderateScale(40),
+    backgroundColor: 'rgba(255, 107, 107, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 107, 107, 0.2)',
+  },
+  frameRemovalTextContainer: {
+    alignItems: 'center',
+    marginBottom: moderateScale(24),
+  },
+  frameRemovalTitle: {
+    fontSize: moderateScale(20),
+    fontWeight: '700',
+    color: '#2d3748',
+    textAlign: 'center',
+    marginBottom: moderateScale(8),
+  },
+  frameRemovalSubtitle: {
+    fontSize: moderateScale(14),
+    color: '#718096',
+    textAlign: 'center',
+    lineHeight: moderateScale(20),
+    paddingHorizontal: moderateScale(8),
+  },
+  frameRemovalButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: moderateScale(12),
+  },
+  frameRemovalButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: moderateScale(14),
+    paddingHorizontal: moderateScale(16),
+    borderRadius: moderateScale(12),
+    minHeight: moderateScale(48),
+  },
+  frameRemovalCancelButton: {
+    backgroundColor: '#f7fafc',
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+  },
+  frameRemovalConfirmButton: {
+    backgroundColor: '#ff6b6b',
+    shadowColor: '#ff6b6b',
+    shadowOffset: {
+      width: 0,
+      height: moderateScale(4),
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: moderateScale(8),
+    elevation: moderateScale(6),
+  },
+  frameRemovalButtonIcon: {
+    marginRight: moderateScale(8),
+  },
+  frameRemovalCancelButtonText: {
+    fontSize: moderateScale(14),
+    fontWeight: '600',
+    color: '#666666',
+  },
+  frameRemovalConfirmButtonText: {
+    fontSize: moderateScale(14),
+    fontWeight: '600',
+    color: '#ffffff',
   },
   characterCountContainer: {
     alignSelf: 'flex-end',
