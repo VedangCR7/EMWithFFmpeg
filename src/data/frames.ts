@@ -65,13 +65,13 @@ export const FRAME_LAYOUTS: FrameLayouts = {
     { key: 'logo', x: 15, y: 391, circular: true, size: { width: 60, height: 61 } }, // Updated to position logo at (x: 15.3, y: 279.0) on canvas - CIRCULAR - LARGER SIZE
   ],
   frame6: [
-    { key: 'companyName', x: 50, y: 30 },
-    { key: 'phone', x: 50, y: 440 }, // Will be positioned based on current canvas position
-    { key: 'email', x: 50, y: 409 }, // Updated to position email at (x: 23.8, y: 288.3) on canvas
-    { key: 'website', x: 441, y: 409 }, // Updated to position website at (x: 210.3, y: 288.0) on canvas
-    { key: 'address', x: 441, y: 440 }, // Updated to position address at (x: 210.3, y: 309.9) on canvas
-    { key: 'category', x: 237, y: 440 }, // Updated to position category at (x: 112.9, y: 309.9) on canvas
-    { key: 'logo', x: 580, y: 20 },
+    { key: 'companyName', x: 50, y: 30 }, // Default position - no manual position provided
+    { key: 'phone', x: 50, y: 440 }, // Default position - no manual position provided
+    { key: 'email', x: 50, y: 409 }, // Default position - no manual position provided
+    { key: 'website', x: 441, y: 409 }, // Default position - no manual position provided
+    { key: 'address', x: 441, y: 440 }, // Default position - no manual position provided
+    { key: 'category', x: 69, y: 364, color:'black' }, // Updated to position category at (x: 33.1, y: 256.2) on canvas
+    { key: 'logo', x: 580, y: 20 }, // Default position - no manual position provided
   ],
   frame7: [
     { key: 'companyName', x: 60, y: 25 },
