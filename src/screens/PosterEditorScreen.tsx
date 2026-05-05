@@ -64,6 +64,10 @@ import frame6 from '../assets/frames/f6.png';
 import frame7 from '../assets/frames/f7.png';
 import frame8 from '../assets/frames/f8.png';
 import frame9 from '../assets/frames/f9.png';
+import frame10 from '../assets/frames/f10.png';
+import frame11 from '../assets/frames/f11.png';
+import frame12 from '../assets/frames/f12.png';
+import frame13 from '../assets/frames/f13.png';
 
 
 
@@ -185,6 +189,10 @@ const FRAME_OPTIONS = [
   { id: 'frame7', source: frame7 },
   { id: 'frame8', source: frame8 },
   { id: 'frame9', source: frame9 },
+  { id: 'frame10', source: frame10 },
+  { id: 'frame11', source: frame11 },
+  { id: 'frame12', source: frame12 },
+  { id: 'frame13', source: frame13 },
 ];
 
 // Responsive scaling functions for static styles
@@ -423,24 +431,24 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     route.params?.businessCategory ?? selectedBusinessCategory ?? null;
   
   // Add verification log for received parameters
-  console.log("🎨 PosterEditorScreen received params:", {
-    type,
-    categoryName,
-    posterCategory,
-    receivedBusinessProfile: !!businessProfile,
-    receivedBusinessCategory: !!businessCategory,
-    contextBusinessProfile: !!selectedBusinessProfile,
-    contextBusinessCategory: !!selectedBusinessCategory,
-    finalBusinessProfile: !!activeBusinessProfile,
-    finalBusinessCategory: !!activeBusinessCategory,
-    // 🔍 [BUSINESS PROFILE] Detailed profile info
-    businessProfileName: businessProfile?.name,
-    businessProfileId: businessProfile?.id,
-    contextProfileName: selectedBusinessProfile?.name,
-    contextProfileId: selectedBusinessProfile?.id,
-    finalProfileName: activeBusinessProfile?.name,
-    finalProfileId: activeBusinessProfile?.id
-  });
+  // console.log("🎨 PosterEditorScreen received params:", {
+  //   type,
+  //   categoryName,
+  //   posterCategory,
+  //   receivedBusinessProfile: !!businessProfile,
+  //   receivedBusinessCategory: !!businessCategory,
+  //   contextBusinessProfile: !!selectedBusinessProfile,
+  //   contextBusinessCategory: !!selectedBusinessCategory,
+  //   finalBusinessProfile: !!activeBusinessProfile,
+  //   finalBusinessCategory: !!activeBusinessCategory,
+  //   // 🔍 [BUSINESS PROFILE] Detailed profile info
+  //   businessProfileName: businessProfile?.name,
+  //   businessProfileId: businessProfile?.id,
+  //   contextProfileName: selectedBusinessProfile?.name,
+  //   contextProfileId: selectedBusinessProfile?.id,
+  //   finalProfileName: activeBusinessProfile?.name,
+  //   finalProfileId: activeBusinessProfile?.id
+  // });
   const { isSubscribed, checkPremiumAccess, refreshSubscription, isSubscriptionActive } = useSubscription();
   const { isDarkMode, theme } = useTheme();
   const { selectedBusinessProfile, selectedBusinessCategory, selectedBusinessId, isLoading: isContextLoading } = useBusinessProfile();
@@ -546,17 +554,37 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     // Restore original layers before removing frame
     if (originalLayers.length > 0) {
       const restoredLayers = [...originalLayers];
-      console.log('🖼️ [FRAME REMOVED] Restoring original layers:', {
+      
+      // Reset logo circular state for all logo layers
+      const resetLayers = restoredLayers.map(layer => {
+        if (layer.type === 'logo' && layer.fieldType === 'logo') {
+          console.log(`🔄 [FRAME REMOVAL] Resetting logo circular state for layer ${layer.id}`);
+          
+          // Reset border radius animated values to 0 (square)
+          if (borderRadiusValues[layer.id]) {
+            borderRadiusValues[layer.id].setValue(0);
+          }
+          if (selectionBorderRadiusValues[layer.id]) {
+            selectionBorderRadiusValues[layer.id].setValue(3); // 0 + 3 for selection
+          }
+          
+          // Reset isCircular property to false
+          return { ...layer, isCircular: false };
+        }
+        return layer;
+      });
+      
+      console.log('🖼️ [FRAME REMOVED] Restoring original layers with logo reset:', {
         originalLayersCount: originalLayers.length,
         removedFrame: selectedFrame,
-        layers: restoredLayers.map(l => ({ id: l.id, fieldType: l.fieldType, position: l.position }))
+        layers: resetLayers.map(l => ({ id: l.id, fieldType: l.fieldType, position: l.position, isCircular: l.isCircular }))
       });
-      setLayers(restoredLayers);
+      setLayers(resetLayers);
       
       // Restore footer background visibility
       setVisibleFields(prev => ({ ...prev, footerBackground: true }));
       
-      console.log('🖼️ [FRAME REMOVED] Original layers restored:', restoredLayers.length);
+      console.log('🖼️ [FRAME REMOVED] Original layers restored with logo circular reset:', resetLayers.length);
     } else {
       console.log('🖼️ [FRAME REMOVED] No original layers to restore for frame:', selectedFrame);
     }
@@ -567,7 +595,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     
     // Clear pending template - only remove frame, don't apply template
     setPendingTemplate(null);
-    console.log('🖼️ [FRAME REMOVED] Frame removed without applying template');
+    console.log('🖼️ [FRAME REMOVED] Frame removed with logo circular state reset');
   };
 
   const handleCancelFrameRemoval = () => {
@@ -1488,8 +1516,25 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     } else {
       // ✅ RESTORE ORIGINAL LAYERS WHEN FRAME IS REMOVED
       if (originalLayers.length > 0) {
-        // Force immediate state update with original layers
-        const restoredLayers = [...originalLayers];
+        // Force immediate state update with original layers and reset logo circular state
+        const restoredLayers = originalLayers.map(layer => {
+          if (layer.type === 'logo' && layer.fieldType === 'logo') {
+            console.log(`🔄 [FRAME REMOVAL useEffect] Resetting logo circular state for layer ${layer.id}`);
+            
+            // Reset border radius animated values to 0 (square)
+            if (borderRadiusValues[layer.id]) {
+              borderRadiusValues[layer.id].setValue(0);
+            }
+            if (selectionBorderRadiusValues[layer.id]) {
+              selectionBorderRadiusValues[layer.id].setValue(3); // 0 + 3 for selection
+            }
+            
+            // Reset isCircular property to false
+            return { ...layer, isCircular: false };
+          }
+          return layer;
+        });
+        
         setLayers(restoredLayers);
         
         // ✅ RESTORE ANIMATED VALUES TO MATCH ORIGINAL POSITIONS
@@ -1502,6 +1547,8 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
         
         // Restore footer background visibility when frame is removed
         setVisibleFields(prev => ({ ...prev, footerBackground: true }));
+        
+        console.log('🖼️ [FRAME REMOVAL useEffect] Original layers restored with logo circular reset:', restoredLayers.length);
       } else {
         // Still restore footer background even if no original layers
         setVisibleFields(prev => ({ ...prev, footerBackground: true }));
@@ -1535,7 +1582,8 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
       layers,
       frameId,
       canvasWidth,
-      canvasHeight
+      canvasHeight,
+      originalLayers // Pass original layers to restore colors when switching frames
     );
 
     // ✅ UPDATE ANIMATED VALUES FOR FRAME LAYOUT
