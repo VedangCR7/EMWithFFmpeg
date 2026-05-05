@@ -59,6 +59,11 @@ import frame1 from '../assets/frames/f1.png';
 import frame2 from '../assets/frames/f2.png';
 import frame3 from '../assets/frames/f3.png';
 import frame4 from '../assets/frames/f4.png';
+import frame5 from '../assets/frames/f5.png';
+import frame6 from '../assets/frames/f6.png';
+import frame7 from '../assets/frames/f7.png';
+import frame8 from '../assets/frames/f8.png';
+import frame9 from '../assets/frames/f9.png';
 
 
 
@@ -175,6 +180,11 @@ const FRAME_OPTIONS = [
   { id: 'frame2', source: frame2 },
   { id: 'frame3', source: frame3 },
   { id: 'frame4', source: frame4 },
+  { id: 'frame5', source: frame5 },
+  { id: 'frame6', source: frame6 },
+  { id: 'frame7', source: frame7 },
+  { id: 'frame8', source: frame8 },
+  { id: 'frame9', source: frame9 },
 ];
 
 // Responsive scaling functions for static styles
@@ -536,12 +546,19 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     // Restore original layers before removing frame
     if (originalLayers.length > 0) {
       const restoredLayers = [...originalLayers];
+      console.log('🖼️ [FRAME REMOVED] Restoring original layers:', {
+        originalLayersCount: originalLayers.length,
+        removedFrame: selectedFrame,
+        layers: restoredLayers.map(l => ({ id: l.id, fieldType: l.fieldType, position: l.position }))
+      });
       setLayers(restoredLayers);
       
       // Restore footer background visibility
       setVisibleFields(prev => ({ ...prev, footerBackground: true }));
       
       console.log('🖼️ [FRAME REMOVED] Original layers restored:', restoredLayers.length);
+    } else {
+      console.log('🖼️ [FRAME REMOVED] No original layers to restore for frame:', selectedFrame);
     }
     
     setSelectedFrame(null);
@@ -1499,7 +1516,18 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     if (layers.length > 0 && !selectedFrame) {
       const layersToStore = [...layers];
       setOriginalLayers(layersToStore);
-      console.log('🖼️ [FRAME LAYOUT] Stored original layers before first frame application:', layersToStore.length);
+      console.log('🖼️ [FRAME LAYOUT] Stored original layers before first frame application:', {
+        frameId,
+        layersCount: layersToStore.length,
+        layers: layersToStore.map(l => ({ id: l.id, fieldType: l.fieldType, position: l.position }))
+      });
+    } else {
+      console.log('🖼️ [FRAME LAYOUT] Skipping original layer storage:', {
+        frameId,
+        hasFrame: !!selectedFrame,
+        layersCount: layers.length,
+        currentFrame: selectedFrame
+      });
     }
     
     // Apply frame layout (always apply to ensure proper positioning)
@@ -1517,8 +1545,53 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
         const positionChanged = oldPosition && (oldPosition.x !== layer.position.x || oldPosition.y !== layer.position.y);
         
         if (positionChanged) {
+          console.log(`🔄 [FRAME ANIMATION UPDATE] Updating animated values for layer ${layer.id} (${layer.fieldType}) to position: x: ${layer.position.x}, y: ${layer.position.y}`);
           layerAnimations[layer.id].x.setValue(layer.position.x);
           layerAnimations[layer.id].y.setValue(layer.position.y);
+        }
+        
+        // ✅ UPDATE SIZE FOR LAYER WITH SIZE PROPERTY
+        const oldSize = layers.find(l => l.id === layer.id)?.size;
+        const sizeChanged = oldSize && (oldSize.width !== layer.size.width || oldSize.height !== layer.size.height);
+        
+        if (sizeChanged) {
+          console.log(`🔄 [FRAME SIZE UPDATE] Updating size for layer ${layer.id} (${layer.fieldType}): ${oldSize?.width}x${oldSize?.height} → ${layer.size.width}x${layer.size.height}`);
+          
+          // Update scale values if they exist
+          if (scaleValues[layer.id]) {
+            const scaleX = layer.size.width / oldSize.width;
+            const scaleY = layer.size.height / oldSize.height;
+            console.log(`🔄 [FRAME SIZE UPDATE] Scale factors: X=${scaleX.toFixed(2)}, Y=${scaleY.toFixed(2)}`);
+          }
+        }
+        
+        // ✅ UPDATE BORDER RADIUS FOR LOGO CIRCULAR PROPERTY
+        if (layer.type === 'logo' && layer.fieldType === 'logo') {
+          const oldCircularState = layers.find(l => l.id === layer.id)?.isCircular;
+          const circularStateChanged = oldCircularState !== layer.isCircular;
+          
+          if (circularStateChanged) {
+            console.log(`🔄 [LOGO CIRCULAR UPDATE] Updating circular state for layer ${layer.id} (${layer.fieldType}): ${oldCircularState} → ${layer.isCircular}`);
+            
+            // Initialize borderRadius values if they don't exist
+            if (!borderRadiusValues[layer.id]) {
+              borderRadiusValues[layer.id] = new Animated.Value(0);
+              selectionBorderRadiusValues[layer.id] = new Animated.Value(3);
+            }
+            
+            // Calculate target radius based on NEW size
+            const targetRadius = layer.isCircular
+              ? Math.min(layer.size.width, layer.size.height) / 2
+              : 0;
+            
+            const targetSelectionRadius = targetRadius + 3;
+            
+            console.log(`🔄 [LOGO CIRCULAR UPDATE] Setting border radius to: ${targetRadius} (selection: ${targetSelectionRadius}) based on size: ${layer.size.width}x${layer.size.height}`);
+            
+            // Update border radius values
+            borderRadiusValues[layer.id].setValue(targetRadius);
+            selectionBorderRadiusValues[layer.id].setValue(targetSelectionRadius);
+          }
         }
       }
     });
