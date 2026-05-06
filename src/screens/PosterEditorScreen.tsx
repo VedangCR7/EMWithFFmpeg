@@ -55,19 +55,26 @@ import InfoRequiredModal from '../components/InfoRequiredModal';
 import { applyFrameLayoutToLayers } from '../data/frames';
 
 // Frame assets imports
-import frame1 from '../assets/frames/f1.png';
-import frame2 from '../assets/frames/f2.png';
 import frame3 from '../assets/frames/f3.png';
 import frame4 from '../assets/frames/f4.png';
 import frame5 from '../assets/frames/f5.png';
 import frame6 from '../assets/frames/f6.png';
-import frame7 from '../assets/frames/f7.png';
 import frame8 from '../assets/frames/f8.png';
-import frame9 from '../assets/frames/f9.png';
-import frame10 from '../assets/frames/f10.png';
 import frame11 from '../assets/frames/f11.png';
 import frame12 from '../assets/frames/f12.png';
 import frame13 from '../assets/frames/f13.png';
+import frame15 from '../assets/frames/f15.png';
+import frame16 from '../assets/frames/f16.png';
+import frame17 from '../assets/frames/f17.png';
+import frame18 from '../assets/frames/f18.png';
+import frame19 from '../assets/frames/f19.png';
+import frame20 from '../assets/frames/f20.png';
+import frame21 from '../assets/frames/f21.png';
+import frame22 from '../assets/frames/f22.png';
+import frame23 from '../assets/frames/f23.png';
+import frame24 from '../assets/frames/f24.png';
+import frame25 from '../assets/frames/f25.png';
+import frame26 from '../assets/frames/f26.png';
 
 
 
@@ -180,19 +187,26 @@ const TEMPLATE_OPTIONS = [
 
 // Frame options for overlay frames
 const FRAME_OPTIONS = [
-  { id: 'frame1', source: frame1 },
-  { id: 'frame2', source: frame2 },
   { id: 'frame3', source: frame3 },
   { id: 'frame4', source: frame4 },
   { id: 'frame5', source: frame5 },
   { id: 'frame6', source: frame6 },
-  { id: 'frame7', source: frame7 },
   { id: 'frame8', source: frame8 },
-  { id: 'frame9', source: frame9 },
-  { id: 'frame10', source: frame10 },
   { id: 'frame11', source: frame11 },
   { id: 'frame12', source: frame12 },
   { id: 'frame13', source: frame13 },
+  { id: 'frame15', source: frame15 },
+  { id: 'frame16', source: frame16 },
+  { id: 'frame17', source: frame17 },
+  { id: 'frame18', source: frame18 },
+  { id: 'frame19', source: frame19 },
+  { id: 'frame20', source: frame20 },
+  { id: 'frame21', source: frame21 },
+  { id: 'frame22', source: frame22 },
+  { id: 'frame23', source: frame23 },
+  { id: 'frame24', source: frame24 },
+  { id: 'frame25', source: frame25 },
+  { id: 'frame26', source: frame26 },
 ];
 
 // Responsive scaling functions for static styles
@@ -1712,7 +1726,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
         id: generateId(),
         type: 'logo',
         content: profile.companyLogo || profile.logo || 'https://via.placeholder.com/80x80/667eea/ffffff?text=LOGO',
-        position: { x: canvasWidth - 100, y: 20 }, // Keep same position
+        position: { x: 285.6769230769231, y: 5.638499431602881 }, // Updated position
         size: { width: logoSize, height: logoSize }, // Responsive size
         rotation: 0,
         zIndex: 10,
@@ -1728,14 +1742,14 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
         id: generateId(),
         type: 'text',
         content: profile.name,
-        position: { x: 20, y: 30 }, // Keep same position
+        position: { x: 9.538461538461538, y: 5.638499431602881 }, // Updated position
         size: { width: canvasWidth - 140, height: 60 }, // Keep same size
         rotation: 0,
         zIndex: 10,
         fieldType: 'companyName',
         style: {
           fontSize: companyNameSize, // Responsive font size
-          color: '#ffffff',
+          color: '#808080',
           fontFamily: 'System',
           fontWeight: '600',
         },
@@ -2517,7 +2531,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
         id: layerId,
         type: 'logo',
         content: imageUri,
-        position: { x: 20, y: 20 },
+        position: { x: 285.6769230769231, y: 5.638499431602881 },
         size: { width: 80, height: 80 },
         rotation: 0,
         zIndex: layers.length,
@@ -2527,8 +2541,8 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
       // Initialize animated values for the new layer
       if (!layerAnimations[layerId]) {
         layerAnimations[layerId] = {
-          x: new Animated.Value(20),
-          y: new Animated.Value(20)
+          x: new Animated.Value(285.6769230769231),
+          y: new Animated.Value(5.638499431602881)
         };
       }
 
