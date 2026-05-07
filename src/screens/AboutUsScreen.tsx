@@ -387,27 +387,7 @@ const AboutUsScreen: React.FC = () => {
         end={{ x: 1, y: 1 }}
       />
       
-      {/* Header */}
-      <View style={[dynamicStyles.header, {
-        paddingHorizontal: isTabletDevice ? dynamicModerateScale(12) : dynamicModerateScale(8),
-        paddingTop: insets.top + dynamicModerateScale(4),
-        paddingBottom: dynamicModerateScale(6),
-      }]}>
-        <TouchableOpacity
-          style={[dynamicStyles.backButton, {
-            width: isTabletDevice ? dynamicModerateScale(32) : dynamicModerateScale(28),
-            height: isTabletDevice ? dynamicModerateScale(32) : dynamicModerateScale(28),
-            borderRadius: isTabletDevice ? dynamicModerateScale(16) : dynamicModerateScale(14),
-            marginRight: dynamicModerateScale(8),
-          }]}
-          onPress={handleGoBack}
-          activeOpacity={0.7}
-        >
-          <Icon name="arrow-back" size={isTabletDevice ? getIconSize(20) : getIconSize(18)} color={theme.colors.text} />
-        </TouchableOpacity>
-        <Text style={dynamicStyles.headerTitle}>About Us</Text>
-      </View>
-
+      
       {/* Scrollable Content */}
       <ScrollView
         style={dynamicStyles.scrollContainer}
@@ -419,6 +399,47 @@ const AboutUsScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
         bounces={true}
       >
+        {/* Simple Header with Back Button */}
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: 'transparent',
+          borderBottomWidth: 0,
+          paddingTop: insets.top + dynamicModerateScale(4),
+          paddingBottom: dynamicModerateScale(6),
+          marginBottom: dynamicModerateScale(8),
+        }}>
+          <TouchableOpacity
+            onPress={handleGoBack}
+            style={{
+              marginRight: dynamicModerateScale(8),
+              borderRadius: dynamicModerateScale(8),
+              backgroundColor: 'rgba(0, 0, 0, 0.05)',
+              width: isTabletDevice ? dynamicModerateScale(32) : (currentScreenWidth < 375 ? dynamicModerateScale(32) : dynamicModerateScale(28)),
+              height: isTabletDevice ? dynamicModerateScale(32) : (currentScreenWidth < 375 ? dynamicModerateScale(32) : dynamicModerateScale(28)),
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <Icon 
+              name="arrow-back" 
+              size={isTabletDevice ? getIconSize(20) : (currentScreenWidth < 375 ? getIconSize(22) : getIconSize(18))} 
+              color={theme.colors.text} 
+            />
+          </TouchableOpacity>
+          <Text style={{
+            fontWeight: '600',
+            flex: 1,
+            textShadowColor: 'rgba(255, 255, 255, 0.5)',
+            textShadowOffset: { width: 0, height: 1 },
+            textShadowRadius: 2,
+            lineHeight: moderateScale(isTabletDevice ? 18 : 17),
+            includeFontPadding: false,
+            paddingBottom: moderateScale(3),
+            fontSize: isTabletDevice ? getFontSize(12) : getFontSize(11),
+            color: theme.colors.text,
+          }}>About Us</Text>
+        </View>
         {/* Hero Section */}
         <View style={[dynamicStyles.heroSection, {
           marginBottom: dynamicModerateScale(12),

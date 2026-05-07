@@ -713,6 +713,7 @@ interface RecentSearchListProps {
   recentSearches: string[];
   onSelectSearch: (search: string) => void;
   onClearAll: () => void;
+  onRemoveItem?: (search: string) => void;
   theme: any;
 }
 
@@ -720,6 +721,7 @@ const RecentSearchList: React.FC<RecentSearchListProps> = React.memo(({
   recentSearches,
   onSelectSearch,
   onClearAll,
+  onRemoveItem,
   theme
 }) => {
   // Removed debug logging to prevent console spam
@@ -756,31 +758,42 @@ const RecentSearchList: React.FC<RecentSearchListProps> = React.memo(({
       >
         <View style={styles.recentSearchesList}>
           {recentSearches.map((search, index) => (
-            <TouchableOpacity
-              key={`${search}-${index}`}
-              style={[styles.recentSearchItem, { borderBottomColor: theme.colors.border }]}
-              onPress={() => {
-                {__DEV__ && console.log('👆 RecentSearchItem pressed:', search)}
-                onSelectSearch(search)
-              }}
-              activeOpacity={0.7}
-            >
-              <Icon 
-                name="history" 
-                size={moderateScale(16)} 
-                color={theme.colors.textSecondary} 
-                style={styles.recentSearchIcon}
-              />
-              <Text style={[styles.recentSearchText, { color: theme.colors.text, flex: 1 }]}>
-                {search}
-              </Text>
-              <Icon 
-                name="arrow-forward" 
-                size={moderateScale(14)} 
-                color={theme.colors.textSecondary} 
-                style={styles.recentSearchArrowIcon}
-              />
-            </TouchableOpacity>
+            <View key={`${search}-${index}`} style={[styles.recentSearchItem, { borderBottomColor: theme.colors.border }]}>
+              <TouchableOpacity
+                style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}
+                onPress={() => {
+                  {__DEV__ && console.log('👆 RecentSearchItem pressed:', search)}
+                  onSelectSearch(search)
+                }}
+                activeOpacity={0.7}
+              >
+                <Icon 
+                  name="history" 
+                  size={moderateScale(16)} 
+                  color={theme.colors.textSecondary} 
+                  style={styles.recentSearchIcon}
+                />
+                <Text style={[styles.recentSearchText, { color: theme.colors.text, flex: 1 }]}>
+                  {search}
+                </Text>
+              </TouchableOpacity>
+              {onRemoveItem && (
+                <TouchableOpacity
+                  onPress={() => {
+                    {__DEV__ && console.log('🗑️ Remove recent search:', search)}
+                    onRemoveItem(search)
+                  }}
+                  activeOpacity={0.7}
+                  style={styles.recentSearchRemoveButton}
+                >
+                  <MaterialCommunityIcons 
+                    name="close" 
+                    size={moderateScale(16)} 
+                    color={theme.colors.textSecondary} 
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
           ))}
         </View>
       </ScrollView>
@@ -792,6 +805,7 @@ const RecentSearchList: React.FC<RecentSearchListProps> = React.memo(({
     prevProps.recentSearches === nextProps.recentSearches &&
     prevProps.onSelectSearch === nextProps.onSelectSearch &&
     prevProps.onClearAll === nextProps.onClearAll &&
+    prevProps.onRemoveItem === nextProps.onRemoveItem &&
     prevProps.theme === nextProps.theme
   );
 });
@@ -3817,6 +3831,23 @@ const HomeScreen: React.FC = React.memo(() => {
     }
   }, []);
 
+  const removeRecentSearch = useCallback(async (searchToRemove: string) => {
+    if (!searchToRemove) return;
+    
+    try {
+      setRecentSearches(prev => {
+        const updated = prev.filter(search => search !== searchToRemove);
+        
+        AsyncStorage.setItem('HOMESCREEN_RECENT_SEARCHES', JSON.stringify(updated))
+          .catch(error => console.warn('Failed to save recent searches after removal:', error));
+        
+        return updated;
+      });
+    } catch (error) {
+      console.warn('Failed to remove recent search:', error);
+    }
+  }, []);
+
   // Optimized callbacks for RecentSearchList to prevent re-renders
   const handleRecentSearchSelect = useCallback((item: string) => {
     {__DEV__ && console.log('🔍 Recent search selected:', item)}
@@ -3834,6 +3865,10 @@ const HomeScreen: React.FC = React.memo(() => {
   const handleRecentSearchClear = useCallback(() => {
     clearRecentSearches();
   }, [clearRecentSearches]);
+
+  const handleRecentSearchRemove = useCallback((search: string) => {
+    removeRecentSearch(search);
+  }, [removeRecentSearch]);
 
   // Business Category Modal Recent searches AsyncStorage functions
   const loadBusinessModalRecentSearches = useCallback(async () => {
@@ -3869,6 +3904,23 @@ const HomeScreen: React.FC = React.memo(() => {
       });
     } catch (error) {
       console.warn('Failed to save business modal recent search:', error);
+    }
+  }, []);
+
+  const removeBusinessModalRecentSearch = useCallback(async (searchToRemove: string) => {
+    if (!searchToRemove) return;
+    
+    try {
+      setBusinessModalRecentSearches(prev => {
+        const updated = prev.filter(search => search !== searchToRemove);
+        
+        AsyncStorage.setItem('BUSINESS_MODAL_RECENT_SEARCHES', JSON.stringify(updated))
+          .catch(error => console.warn('Failed to save business modal recent searches after removal:', error));
+        
+        return updated;
+      });
+    } catch (error) {
+      console.warn('Failed to remove business modal recent search:', error);
     }
   }, []);
 
@@ -3915,6 +3967,23 @@ const HomeScreen: React.FC = React.memo(() => {
       });
     } catch (error) {
       console.warn('Failed to save general modal recent search:', error);
+    }
+  }, []);
+
+  const removeGeneralModalRecentSearch = useCallback(async (searchToRemove: string) => {
+    if (!searchToRemove) return;
+    
+    try {
+      setGeneralModalRecentSearches(prev => {
+        const updated = prev.filter(search => search !== searchToRemove);
+        
+        AsyncStorage.setItem('GENERAL_MODAL_RECENT_SEARCHES', JSON.stringify(updated))
+          .catch(error => console.warn('Failed to save general modal recent searches after removal:', error));
+        
+        return updated;
+      });
+    } catch (error) {
+      console.warn('Failed to remove general modal recent search:', error);
     }
   }, []);
 
@@ -6576,6 +6645,7 @@ const HomeScreen: React.FC = React.memo(() => {
                   recentSearches={recentSearches}
                   onSelectSearch={handleRecentSearchSelect}
                   onClearAll={handleRecentSearchClear}
+                  onRemoveItem={handleRecentSearchRemove}
                   theme={theme}
                 />
               </View>
@@ -7249,6 +7319,9 @@ const HomeScreen: React.FC = React.memo(() => {
                       AsyncStorage.removeItem('BUSINESS_MODAL_RECENT_SEARCHES')
                         .catch(error => console.warn('Failed to clear business modal recent searches:', error));
                     }}
+                    onRemoveItem={(search) => {
+                      removeBusinessModalRecentSearch(search);
+                    }}
                     theme={theme}
                   />
                 </View>
@@ -7424,6 +7497,9 @@ const HomeScreen: React.FC = React.memo(() => {
                       setGeneralModalRecentSearches([]);
                       AsyncStorage.removeItem('GENERAL_MODAL_RECENT_SEARCHES')
                         .catch(error => console.warn('Failed to clear general modal recent searches:', error));
+                    }}
+                    onRemoveItem={(search) => {
+                      removeGeneralModalRecentSearch(search);
                     }}
                     theme={theme}
                   />
@@ -9493,6 +9569,10 @@ const styles = StyleSheet.create({
   recentSearchText: {
     fontSize: moderateScale(14),
     flex: 1,
+  },
+  recentSearchRemoveButton: {
+    padding: moderateScale(4),
+    marginLeft: moderateScale(8),
   },
 
 });
