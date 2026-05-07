@@ -52,29 +52,7 @@ import { useBusinessProfile } from '../context/BusinessProfileContext';
 import { useTheme } from '../context/ThemeContext';
 import PremiumTemplateModal from '../components/PremiumTemplateModal';
 import InfoRequiredModal from '../components/InfoRequiredModal';
-import { applyFrameLayoutToLayers } from '../data/frames';
-
-// Frame assets imports
-import frame3 from '../assets/frames/f3.png';
-import frame4 from '../assets/frames/f4.png';
-import frame5 from '../assets/frames/f5.png';
-import frame6 from '../assets/frames/f6.png';
-import frame8 from '../assets/frames/f8.png';
-import frame11 from '../assets/frames/f11.png';
-import frame12 from '../assets/frames/f12.png';
-import frame13 from '../assets/frames/f13.png';
-import frame15 from '../assets/frames/f15.png';
-import frame16 from '../assets/frames/f16.png';
-import frame17 from '../assets/frames/f17.png';
-import frame18 from '../assets/frames/f18.png';
-import frame19 from '../assets/frames/f19.png';
-import frame20 from '../assets/frames/f20.png';
-import frame21 from '../assets/frames/f21.png';
-import frame22 from '../assets/frames/f22.png';
-import frame23 from '../assets/frames/f23.png';
-import frame24 from '../assets/frames/f24.png';
-import frame25 from '../assets/frames/f25.png';
-import frame26 from '../assets/frames/f26.png';
+import { applyFrameLayoutToLayers, FRAME_ASSETS } from '../data/frames';
 
 
 
@@ -185,29 +163,16 @@ const TEMPLATE_OPTIONS = [
   { id: 'ombre-galaxy', label: 'Ombre Galaxy' },
 ];
 
-// Frame options for overlay frames
-const FRAME_OPTIONS = [
-  { id: 'frame3', source: frame3 },
-  { id: 'frame4', source: frame4 },
-  { id: 'frame5', source: frame5 },
-  { id: 'frame6', source: frame6 },
-  { id: 'frame8', source: frame8 },
-  { id: 'frame11', source: frame11 },
-  { id: 'frame12', source: frame12 },
-  { id: 'frame13', source: frame13 },
-  { id: 'frame15', source: frame15 },
-  { id: 'frame16', source: frame16 },
-  { id: 'frame17', source: frame17 },
-  { id: 'frame18', source: frame18 },
-  { id: 'frame19', source: frame19 },
-  { id: 'frame20', source: frame20 },
-  { id: 'frame21', source: frame21 },
-  { id: 'frame22', source: frame22 },
-  { id: 'frame23', source: frame23 },
-  { id: 'frame24', source: frame24 },
-  { id: 'frame25', source: frame25 },
-  { id: 'frame26', source: frame26 },
-];
+// Frame options for overlay frames - dynamically generated from FRAME_ASSETS
+const FRAME_OPTIONS = Object.keys(FRAME_ASSETS).map(id => ({
+  id,
+  source: FRAME_ASSETS[id as keyof typeof FRAME_ASSETS]
+}));
+
+console.log('🖼️ [FRAME_OPTIONS] Dynamic Initialization:', {
+  count: FRAME_OPTIONS.length,
+  ids: FRAME_OPTIONS.map(f => f.id)
+});
 
 // Responsive scaling functions for static styles
 const scale = (size: number) => (screenWidth / 375) * size;
@@ -409,6 +374,68 @@ interface Layer {
   };
 }
 
+// Memoized Template Item Component for optimization
+const TemplateItem = React.memo(({ option, isSelected, onPress, styles, templateStyle }: { 
+  option: any, 
+  isSelected: boolean, 
+  onPress: () => void,
+  styles: any,
+  templateStyle: any
+}) => (
+  <TouchableOpacity
+    style={[styles.templateButton, isSelected && styles.templateButtonActive]}
+    onPress={onPress}
+  >
+    <View style={styles.templatePreview}>
+      <View style={styles.templatePreviewContent}>
+        {templateStyle?.gradient ? (
+          <LinearGradient
+            colors={templateStyle.gradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={[styles.templatePreviewFooter, { backgroundColor: 'transparent' }]}
+          />
+        ) : (
+          <View
+            style={[
+              styles.templatePreviewFooter,
+              { backgroundColor: templateStyle?.backgroundColor || 'rgba(102, 126, 234, 0.9)' }
+            ]}
+          />
+        )}
+      </View>
+    </View>
+    <Text style={[styles.templateText, isSelected && styles.templateTextActive]}>
+      {option.label}
+    </Text>
+  </TouchableOpacity>
+));
+
+// Memoized Frame Item Component for optimization
+const FrameItem = React.memo(({ frame, isSelected, onPress, styles }: { 
+  frame: any, 
+  isSelected: boolean, 
+  onPress: () => void,
+  styles: any 
+}) => (
+  <TouchableOpacity
+    style={[
+      styles.frameButton,
+      isSelected && styles.frameButtonActive
+    ]}
+    onPress={onPress}
+  >
+    <Image
+      source={frame.source}
+      style={styles.framePreview}
+      resizeMode="contain"
+      resizeMethod="resize" // Android optimization: reduces memory footprint by scaling image down during decode
+      onLoad={() => console.log(`✅ [PREVIEW FRAME] Loaded: ${frame.id}`)}
+      onError={(e) => console.error(`❌ [PREVIEW FRAME] Failed: ${frame.id}`, e.nativeEvent)}
+    />
+  </TouchableOpacity>
+));
+
 interface PosterEditorScreenProps {
   route: {
     params: {
@@ -436,14 +463,14 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
   const navigation = useNavigation<NavigationProp<MainStackParamList>>();
   const insets = useSafeAreaInsets();
   const { selectedImage, selectedLanguage, selectedTemplateId, selectedTemplate: initialTemplate, posterCategory, type, categoryName, businessProfile, businessCategory, source } = route.params;
-  
+
   // ✅ ADD SAFE FALLBACK
   const activeBusinessProfile =
     route.params?.businessProfile ?? selectedBusinessProfile ?? null;
 
   const activeBusinessCategory =
     route.params?.businessCategory ?? selectedBusinessCategory ?? null;
-  
+
   // Add verification log for received parameters
   // console.log("🎨 PosterEditorScreen received params:", {
   //   type,
@@ -466,16 +493,16 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
   const { isSubscribed, checkPremiumAccess, refreshSubscription, isSubscriptionActive } = useSubscription();
   const { isDarkMode, theme } = useTheme();
   const { selectedBusinessProfile, selectedBusinessCategory, selectedBusinessId, isLoading: isContextLoading } = useBusinessProfile();
-  
+
   // Get business subscription status for modal display
   const businessStatus = activeBusinessProfile?.businessSubscriptionStatus;
-  
+
   // State for dynamic dimensions to handle orientation changes
   const [dimensions, setDimensions] = useState(() => {
     const { width, height } = Dimensions.get('window');
     return { width, height };
   });
-  
+
   // State for layers
   const [layers, setLayers] = useState<Layer[]>([]);
   const [selectedLayer, setSelectedLayer] = useState<string | null>(null);
@@ -490,10 +517,10 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
   const [showLogoModal, setShowLogoModal] = useState(false);
   const [showLogoUrlInput, setShowLogoUrlInput] = useState(false);
   const [selectedFontSize, setSelectedFontSize] = useState<number>(16);
-  
+
   // State for dragging
   const [draggedLayer, setDraggedLayer] = useState<string | null>(null);
-  
+
   // State for field visibility
   const [visibleFields, setVisibleFields] = useState<{ [key: string]: boolean }>({
     logo: true,
@@ -514,30 +541,40 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     custom2: false,
     custom3: false,
   });
-  
+
   // Store original layers for frame removal
   const [originalLayers, setOriginalLayers] = useState<Layer[]>([]);
   const [originalTemplate, setOriginalTemplate] = useState<string>('business');
-  
+
   const [alignmentGuides, setAlignmentGuides] = useState<{ vertical: number[]; horizontal: number[] }>({
     vertical: [],
     horizontal: []
   });
-  
+
   // State for templates
   const [selectedTemplate, setSelectedTemplate] = useState<string>(initialTemplate || 'business');
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
   const [initialTemplateApplied, setInitialTemplateApplied] = useState(false);
-  
+
   // State for overlay frames (independent of templates)
   const [selectedFrame, setSelectedFrame] = useState<string | null>(null);
+  const renderCount = useRef(0);
+  renderCount.current++;
+
+  useEffect(() => {
+    console.log(`🔄 [POSTER_EDITOR_SCREEN] Render cycle: ${renderCount.current}`, {
+      selectedFrame,
+      layersCount: layers.length,
+      visibleFields: Object.keys(visibleFields).filter(k => visibleFields[k])
+    });
+  });
   const [isAutoLayoutApplied, setIsAutoLayoutApplied] = useState<{ [key: string]: boolean }>({});
-  
+
   // State for business profiles
   const [businessProfiles, setBusinessProfiles] = useState<BusinessProfile[]>([]);
   const [showProfileSelectionModal, setShowProfileSelectionModal] = useState(false);
   const [loadingProfiles, setLoadingProfiles] = useState(true);
-  
+
   const [isCapturing, setIsCapturing] = useState(false);
   const [currentPositions, setCurrentPositions] = useState<{ [key: string]: { x: number; y: number } }>({});
   const [showDeleteElementModal, setShowDeleteElementModal] = useState(false);
@@ -554,7 +591,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     templateCategory: "",
     businessCategory: ""
   });
-  
+
   // Handle upgrade navigation
   const handleUpgrade = () => {
     setShowPremiumAlertModal(false);
@@ -564,16 +601,16 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
   // Handle frame removal modal actions
   const handleRemoveFrameOnly = () => {
     setShowFrameRemovalModal(false);
-    
+
     // Restore original layers before removing frame
     if (originalLayers.length > 0) {
       const restoredLayers = [...originalLayers];
-      
+
       // Reset logo circular state for all logo layers
       const resetLayers = restoredLayers.map(layer => {
         if (layer.type === 'logo' && layer.fieldType === 'logo') {
           console.log(`🔄 [FRAME REMOVAL] Resetting logo circular state for layer ${layer.id}`);
-          
+
           // Reset border radius animated values to 0 (square)
           if (borderRadiusValues[layer.id]) {
             borderRadiusValues[layer.id].setValue(0);
@@ -581,32 +618,32 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
           if (selectionBorderRadiusValues[layer.id]) {
             selectionBorderRadiusValues[layer.id].setValue(3); // 0 + 3 for selection
           }
-          
+
           // Reset isCircular property to false
           return { ...layer, isCircular: false };
         }
         return layer;
       });
-      
+
       console.log('🖼️ [FRAME REMOVED] Restoring original layers with logo reset:', {
         originalLayersCount: originalLayers.length,
         removedFrame: selectedFrame,
         layers: resetLayers.map(l => ({ id: l.id, fieldType: l.fieldType, position: l.position, isCircular: l.isCircular }))
       });
       setLayers(resetLayers);
-      
+
       // Restore footer background visibility
       setVisibleFields(prev => ({ ...prev, footerBackground: true }));
-      
+
       console.log('🖼️ [FRAME REMOVED] Original layers restored with logo circular reset:', resetLayers.length);
     } else {
       console.log('🖼️ [FRAME REMOVED] No original layers to restore for frame:', selectedFrame);
     }
-    
+
     setSelectedFrame(null);
     // Reset auto-layout state when frame is removed
     setIsAutoLayoutApplied({});
-    
+
     // Clear pending template - only remove frame, don't apply template
     setPendingTemplate(null);
     console.log('🖼️ [FRAME REMOVED] Frame removed with logo circular state reset');
@@ -616,12 +653,12 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     setShowFrameRemovalModal(false);
     setPendingTemplate(null);
   };
-  
+
   // Prevent rendering if context is still loading
   if (isContextLoading) {
     return null;
   }
-  
+
   // Check if the selected business profile has an active subscription
   // CRITICAL FIX: Remove mixed subscription logic - use ONLY business profile subscription status
   const isActive = activeBusinessProfile?.subscriptionStatus?.toUpperCase() === "ACTIVE";
@@ -1261,22 +1298,22 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
   // Ref for capturing the poster as image
   const posterRef = useRef<ViewShot>(null);
   const visibleCanvasRef = useRef<ViewShot>(null);
-  
+
   // Animated values for each layer's position (not just translation)
   const layerAnimations = useRef<{ [key: string]: { x: Animated.Value; y: Animated.Value } }>({}).current;
-  
+
   // Translation values for dragging
   const translationValues = useRef<{ [key: string]: { x: Animated.Value; y: Animated.Value } }>({}).current;
-  
+
   // Scale values for zooming
   const scaleValues = useRef<{ [key: string]: Animated.Value }>({}).current;
-  
+
   // BorderRadius values for logo shape animation
   const borderRadiusValues = useRef<{ [key: string]: Animated.Value }>({}).current;
-  
+
   // Selection border radius values (borderRadius + 3)
   const selectionBorderRadiusValues = useRef<{ [key: string]: Animated.Value }>({}).current;
-  
+
   const snapOffsets = useRef<{ [key: string]: { x: Animated.Value; y: Animated.Value } }>({}).current;
   const snapOffsetsLatest = useRef<{ [key: string]: { x: number; y: number } }>({});
   const alignmentFrameRef = useRef<number | null>(null);
@@ -1522,7 +1559,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
   useEffect(() => {
     if (selectedFrame) {
       setVisibleFields(prev => ({ ...prev, footerBackground: false }));
-      
+
       // Apply frame layout ONLY if layers are available AND layout hasn't been applied for this frame yet
       if (layers.length > 0 && !isAutoLayoutApplied[selectedFrame]) {
         applyFrameLayout(selectedFrame);
@@ -1534,7 +1571,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
         const restoredLayers = originalLayers.map(layer => {
           if (layer.type === 'logo' && layer.fieldType === 'logo') {
             console.log(`🔄 [FRAME REMOVAL useEffect] Resetting logo circular state for layer ${layer.id}`);
-            
+
             // Reset border radius animated values to 0 (square)
             if (borderRadiusValues[layer.id]) {
               borderRadiusValues[layer.id].setValue(0);
@@ -1542,15 +1579,15 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
             if (selectionBorderRadiusValues[layer.id]) {
               selectionBorderRadiusValues[layer.id].setValue(3); // 0 + 3 for selection
             }
-            
+
             // Reset isCircular property to false
             return { ...layer, isCircular: false };
           }
           return layer;
         });
-        
+
         setLayers(restoredLayers);
-        
+
         // ✅ RESTORE ANIMATED VALUES TO MATCH ORIGINAL POSITIONS
         restoredLayers.forEach(layer => {
           if (layerAnimations[layer.id]) {
@@ -1558,10 +1595,10 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
             layerAnimations[layer.id].y.setValue(layer.position.y);
           }
         });
-        
+
         // Restore footer background visibility when frame is removed
         setVisibleFields(prev => ({ ...prev, footerBackground: true }));
-        
+
         console.log('🖼️ [FRAME REMOVAL useEffect] Original layers restored with logo circular reset:', restoredLayers.length);
       } else {
         // Still restore footer background even if no original layers
@@ -1570,9 +1607,16 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     }
   }, [selectedFrame, layers.length, isAutoLayoutApplied, applyFrameLayout, originalLayers]);
 
-  
+
   // Apply frame-specific layout to elements
   const applyFrameLayout = useCallback((frameId: string) => {
+    const frameObj = FRAME_OPTIONS.find(f => f.id === frameId);
+    console.log('🖼️ [FRAME LAYOUT] applyFrameLayout triggered:', {
+      frameId,
+      foundInOptions: !!frameObj,
+      sourceValid: !!frameObj?.source
+    });
+
     // Store original layers ONLY if no frame is currently applied (preserve true original positions)
     if (layers.length > 0 && !selectedFrame) {
       const layersToStore = [...layers];
@@ -1590,7 +1634,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
         currentFrame: selectedFrame
       });
     }
-    
+
     // Apply frame layout (always apply to ensure proper positioning)
     const updatedLayers = applyFrameLayoutToLayers(
       layers,
@@ -1605,20 +1649,20 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
       if (layerAnimations[layer.id]) {
         const oldPosition = layers.find(l => l.id === layer.id)?.position;
         const positionChanged = oldPosition && (oldPosition.x !== layer.position.x || oldPosition.y !== layer.position.y);
-        
+
         if (positionChanged) {
           console.log(`🔄 [FRAME ANIMATION UPDATE] Updating animated values for layer ${layer.id} (${layer.fieldType}) to position: x: ${layer.position.x}, y: ${layer.position.y}`);
           layerAnimations[layer.id].x.setValue(layer.position.x);
           layerAnimations[layer.id].y.setValue(layer.position.y);
         }
-        
+
         // ✅ UPDATE SIZE FOR LAYER WITH SIZE PROPERTY
         const oldSize = layers.find(l => l.id === layer.id)?.size;
         const sizeChanged = oldSize && (oldSize.width !== layer.size.width || oldSize.height !== layer.size.height);
-        
+
         if (sizeChanged) {
           console.log(`🔄 [FRAME SIZE UPDATE] Updating size for layer ${layer.id} (${layer.fieldType}): ${oldSize?.width}x${oldSize?.height} → ${layer.size.width}x${layer.size.height}`);
-          
+
           // Update scale values if they exist
           if (scaleValues[layer.id]) {
             const scaleX = layer.size.width / oldSize.width;
@@ -1626,30 +1670,30 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
             console.log(`🔄 [FRAME SIZE UPDATE] Scale factors: X=${scaleX.toFixed(2)}, Y=${scaleY.toFixed(2)}`);
           }
         }
-        
+
         // ✅ UPDATE BORDER RADIUS FOR LOGO CIRCULAR PROPERTY
         if (layer.type === 'logo' && layer.fieldType === 'logo') {
           const oldCircularState = layers.find(l => l.id === layer.id)?.isCircular;
           const circularStateChanged = oldCircularState !== layer.isCircular;
-          
+
           if (circularStateChanged) {
             console.log(`🔄 [LOGO CIRCULAR UPDATE] Updating circular state for layer ${layer.id} (${layer.fieldType}): ${oldCircularState} → ${layer.isCircular}`);
-            
+
             // Initialize borderRadius values if they don't exist
             if (!borderRadiusValues[layer.id]) {
               borderRadiusValues[layer.id] = new Animated.Value(0);
               selectionBorderRadiusValues[layer.id] = new Animated.Value(3);
             }
-            
+
             // Calculate target radius based on NEW size
             const targetRadius = layer.isCircular
               ? Math.min(layer.size.width, layer.size.height) / 2
               : 0;
-            
+
             const targetSelectionRadius = targetRadius + 3;
-            
+
             console.log(`🔄 [LOGO CIRCULAR UPDATE] Setting border radius to: ${targetRadius} (selection: ${targetSelectionRadius}) based on size: ${layer.size.width}x${layer.size.height}`);
-            
+
             // Update border radius values
             borderRadiusValues[layer.id].setValue(targetRadius);
             selectionBorderRadiusValues[layer.id].setValue(targetSelectionRadius);
@@ -1660,7 +1704,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
 
     // Update state
     setLayers(updatedLayers);
-    
+
     // Update auto-layout applied state
     setIsAutoLayoutApplied(prev => ({ ...prev, [frameId]: true }));
   }, [layers, canvasWidth, canvasHeight, originalLayers.length, selectedFrame]);
@@ -1992,7 +2036,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
   // Check if field data is available in business profile
   const isFieldDataAvailable = (fieldKey: string): boolean => {
     if (!activeBusinessProfile) return false;
-    
+
     const profile = activeBusinessProfile;
     const trimmedValue = (value: any) => {
       if (typeof value === 'string') {
@@ -2042,12 +2086,12 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
   // Get the effective toggle value (state + data availability)
   const getEffectiveToggleValue = (fieldType: string): boolean => {
     const isBusinessField = ['logo', 'companyName', 'phone', 'email', 'website', 'category', 'address', 'tagline', 'established', 'description', 'services', 'hours', 'social', 'custom1', 'custom2', 'custom3'].includes(fieldType);
-    
+
     // For business fields, ensure data is available
     if (isBusinessField) {
       return visibleFields[fieldType] && isFieldDataAvailable(fieldType);
     }
-    
+
     // For non-business fields, use state directly
     return visibleFields[fieldType];
   };
@@ -2057,16 +2101,16 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     if (activeBusinessProfile) {
       setVisibleFields(prev => {
         const updated = { ...prev };
-        
+
         // Reset any business fields that are ON but have no data
         const businessFields = ['logo', 'companyName', 'phone', 'email', 'website', 'category', 'address', 'tagline', 'established', 'description', 'services', 'hours', 'social', 'custom1', 'custom2', 'custom3'];
-        
+
         businessFields.forEach((fieldType) => {
           if (prev[fieldType] && !isFieldDataAvailable(fieldType)) {
             updated[fieldType] = false;
           }
         });
-        
+
         return updated;
       });
     }
@@ -2077,7 +2121,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     // Check if trying to enable (toggle ON) a business field
     const isCurrentlyVisible = visibleFields[fieldType];
     const isBusinessField = ['logo', 'companyName', 'phone', 'email', 'website', 'category', 'address', 'tagline', 'established', 'description', 'services', 'hours', 'social', 'custom1', 'custom2', 'custom3'].includes(fieldType);
-    
+
     // If trying to enable a business field and data is missing, show modal and prevent toggle
     if (!isCurrentlyVisible && isBusinessField && !isFieldDataAvailable(fieldType)) {
       const displayName = fieldDisplayNames[fieldType] || fieldType;
@@ -2239,14 +2283,14 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
               console.log(`🏷️ [EMAIL ID] Layer ID: ${layerId}`);
               console.log('🎯🎯🎯 [EMAIL POSITION CHANGED] End of email position update');
             }
-            
+
             // ✅ UPDATE ANIMATED VALUES TO MATCH NEW POSITION
             if (layerAnimations[layerId]) {
               console.log(`🔄 [ANIMATION UPDATE] Updating animated values for layer ${layerId} to position: x: ${newX}, y: ${newY}`);
               layerAnimations[layerId].x.setValue(newX);
               layerAnimations[layerId].y.setValue(newY);
             }
-            
+
             return {
               ...layer,
               position: { x: newX, y: newY }
@@ -2369,10 +2413,10 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     if (newText.trim()) {
       // Ensure text is truncated to 100 characters (safety measure)
       const truncatedText = newText.slice(0, 100);
-      
+
       // Calculate dynamic width based on text content (approximate)
       const estimatedWidth = Math.max(truncatedText.length * 10, 50); // Minimum 50px width
-      
+
       const newLayer: Layer = {
         id: generateId(),
         type: 'text',
@@ -2953,8 +2997,8 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                 width: 'auto',
                 alignSelf: 'flex-start',
               }}
-              numberOfLines={1}
-              ellipsizeMode="clip">
+                numberOfLines={1}
+                ellipsizeMode="clip">
                 {layer.content}
               </Text>
             </TouchableOpacity>
@@ -3119,20 +3163,20 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
           activeOpacity={0.85}
           onPress={async () => {
             console.log(":dart: [POSTER EDITOR] Next button clicked");
-            
+
             // CRITICAL: Business Profile Debug Logging
             console.log("===== BUSINESS PROFILE DEBUG =====");
             console.log("Selected Business Profile:", activeBusinessProfile);
             console.log("Subscription Status:", activeBusinessProfile?.subscriptionStatus);
             console.log("==================================");
-            
+
             // Safe guards - ensure business profile exists
             if (!activeBusinessProfile) {
               console.log(":x: [POSTER EDITOR] Validation failed - No business profile selected");
               setShowPremiumTemplateModal(true);
               return;
             }
-            
+
             if (activeBusinessProfile.subscriptionStatus !== "ACTIVE") {
               console.log(":x: [POSTER EDITOR] Validation failed - Subscription not active", {
                 subscriptionStatus: activeBusinessProfile.subscriptionStatus
@@ -3140,7 +3184,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
               setShowPremiumTemplateModal(true);
               return;
             }
-            
+
             // Validate business category if business type (but skip if coming from MyBusinessPosterPlayer, IndustryCategoryScreen, or TemplateGallery)
             if (type === "business" && source !== "MyBusinessPosterPlayer" && source !== "IndustryCategoryScreen" && source !== "TemplateGallery") {
               console.log(":mag: [POSTER EDITOR] Validating business category", {
@@ -3148,7 +3192,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                 selectedTemplate: selectedTemplate,
                 source: source
               });
-              
+
               // Extract template category from selected template
               let templateCategory = null;
               try {
@@ -3162,7 +3206,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
               } catch (error) {
                 console.error("Error parsing template:", error);
               }
-              
+
               // Business category validation - compare profile category with template category
               if (!activeBusinessProfile?.category || !templateCategory || activeBusinessProfile.category.toLowerCase() !== templateCategory.toLowerCase()) {
                 console.log(":x: [POSTER EDITOR] Validation failed - Business category mismatch", {
@@ -3181,7 +3225,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                 source: source
               });
             }
-            
+
             // Strict subscription validation using only business profile subscription status
             if (activeBusinessProfile.subscriptionStatus !== "ACTIVE") {
               console.log(":x: [POSTER EDITOR] Access Denied: Subscription inactive", {
@@ -3197,7 +3241,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
               );
               return;
             }
-            
+
             console.log(":white_check_mark: [POSTER EDITOR] Validation passed");
 
             console.log('🎨 [POSTER EDITOR] Preparing for capture - deselecting layers...');
@@ -3402,6 +3446,8 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                     style={styles.frameIntegrated}
                     resizeMode="contain"
                     pointerEvents="none"
+                    onLoad={() => console.log(`✅ [CANVAS FRAME] Successfully loaded: ${selectedFrame}`)}
+                    onError={(e) => console.error(`❌ [CANVAS FRAME] Failed to load: ${selectedFrame}`, e.nativeEvent)}
                   />
                 )}
               </View>
@@ -3463,7 +3509,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                 />
               ))}
 
-              
+
             </View>
           </TouchableWithoutFeedback>
         </ViewShot>
@@ -3597,26 +3643,26 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
           >
             <TouchableOpacity
               style={[
-                styles.fieldToggleButton, 
+                styles.fieldToggleButton,
                 visibleFields.footerBackground && styles.fieldToggleButtonActive,
                 selectedFrame && styles.fieldToggleButtonDisabled
               ]}
               onPress={() => !selectedFrame && toggleFieldVisibility('footerBackground')}
               disabled={!!selectedFrame}
             >
-              <Icon 
-                name="format-color-fill" 
-                size={getResponsiveIconSize()} 
+              <Icon
+                name="format-color-fill"
+                size={getResponsiveIconSize()}
                 color={
-                  selectedFrame 
-                    ? "#999999" 
-                    : visibleFields.footerBackground 
-                      ? "#ffffff" 
+                  selectedFrame
+                    ? "#999999"
+                    : visibleFields.footerBackground
+                      ? "#ffffff"
                       : "#667eea"
-                } 
+                }
               />
               <Text style={[
-                styles.fieldToggleButtonText, 
+                styles.fieldToggleButtonText,
                 visibleFields.footerBackground && styles.fieldToggleButtonTextActive,
                 selectedFrame && styles.fieldToggleButtonTextDisabled
               ]}>
@@ -3700,89 +3746,62 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
           <View style={styles.templatesHeader}>
             <Text style={styles.templatesTitle}>Templates</Text>
           </View>
-          <ScrollView
-            style={styles.templatesContent}
+          <FlatList
+            data={TEMPLATE_OPTIONS}
+            renderItem={({ item: option }) => (
+              <TemplateItem
+                option={option}
+                isSelected={selectedTemplate === option.id}
+                onPress={() => applyTemplate(option.id)}
+                styles={styles}
+                templateStyle={TEMPLATE_FOOTER_STYLES[option.id]}
+              />
+            )}
+            keyExtractor={item => item.id}
             horizontal
             showsHorizontalScrollIndicator={false}
-            showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.templatesScrollContent}
-          >
-            {TEMPLATE_OPTIONS.map(option => {
-              const templateStyle = TEMPLATE_FOOTER_STYLES[option.id];
-              const isSelected = selectedTemplate === option.id;
-              return (
-                <TouchableOpacity
-                  key={option.id}
-                  style={[styles.templateButton, isSelected && styles.templateButtonActive]}
-                  onPress={() => applyTemplate(option.id)}
-                >
-                  <View style={styles.templatePreview}>
-                    <View style={styles.templatePreviewContent}>
-                      {templateStyle?.gradient ? (
-                        <LinearGradient
-                          colors={templateStyle.gradient}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 0 }}
-                          style={[styles.templatePreviewFooter, { backgroundColor: 'transparent' }]}
-                        />
-                      ) : (
-                        <View
-                          style={[
-                            styles.templatePreviewFooter,
-                            { backgroundColor: templateStyle?.backgroundColor || 'rgba(102, 126, 234, 0.9)' }
-                          ]}
-                        />
-                      )}
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+            initialNumToRender={5}
+            maxToRenderPerBatch={3}
+            windowSize={3}
+            removeClippedSubviews={true}
+          />
         </View>
 
         {/* Frames Section */}
-         <View style={styles.framesSection}>
+        <View style={styles.framesSection}>
           <View style={styles.framesHeader}>
             <Text style={styles.framesTitle}>Frames</Text>
           </View>
-          <ScrollView
-            style={styles.framesContent}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.framesScrollContent}
-          >
-            {FRAME_OPTIONS.map(frame => (
-              <TouchableOpacity
-                key={frame.id}
-                style={[
-                  styles.frameButton,
-                  selectedFrame === frame.id && styles.frameButtonActive
-                ]}
+          <FlatList
+            data={FRAME_OPTIONS}
+            renderItem={({ item: frame }) => (
+              <FrameItem
+                frame={frame}
+                isSelected={selectedFrame === frame.id}
                 onPress={() => {
                   if (selectedFrame === frame.id) {
-                    // If same frame is selected, remove it
                     setSelectedFrame(null);
-                    // Reset auto-layout state when frame is removed
                     setIsAutoLayoutApplied({});
                   } else {
-                    // If different frame or no frame selected, apply new frame
                     setSelectedFrame(frame.id);
                     setVisibleFields(prev => ({ ...prev, footerBackground: false }));
                     applyFrameLayout(frame.id);
                   }
                 }}
-              >
-                <Image
-                  source={frame.source}
-                  style={styles.framePreview}
-                  resizeMode="contain"
-                />
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View> 
+                styles={styles}
+              />
+            )}
+            keyExtractor={item => item.id}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.framesScrollContent}
+            initialNumToRender={6}
+            maxToRenderPerBatch={4}
+            windowSize={3}
+            removeClippedSubviews={true} // Important for Android memory
+          />
+        </View>
 
       </View>
 
@@ -4422,10 +4441,10 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
             {/* Icon Container */}
             <View style={styles.frameRemovalIconContainer}>
               <View style={styles.frameRemovalIconBackground}>
-                <Icon 
-                  name="image-not-supported" 
-                  size={dynamicModerateScale(32)} 
-                  color="#ff6b6b" 
+                <Icon
+                  name="image-not-supported"
+                  size={dynamicModerateScale(32)}
+                  color="#ff6b6b"
                 />
               </View>
             </View>
@@ -4452,10 +4471,10 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                 style={[styles.frameRemovalButton, styles.frameRemovalCancelButton]}
                 onPress={handleCancelFrameRemoval}
               >
-                <Icon 
-                  name="close" 
-                  size={dynamicModerateScale(18)} 
-                  color="#666666" 
+                <Icon
+                  name="close"
+                  size={dynamicModerateScale(18)}
+                  color="#666666"
                   style={styles.frameRemovalButtonIcon}
                 />
                 <Text style={styles.frameRemovalCancelButtonText}>
@@ -4466,10 +4485,10 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                 style={[styles.frameRemovalButton, styles.frameRemovalConfirmButton]}
                 onPress={handleRemoveFrameOnly}
               >
-                <Icon 
-                  name="delete-outline" 
-                  size={dynamicModerateScale(18)} 
-                  color="#ffffff" 
+                <Icon
+                  name="delete-outline"
+                  size={dynamicModerateScale(18)}
+                  color="#ffffff"
                   style={styles.frameRemovalButtonIcon}
                 />
                 <Text style={styles.frameRemovalConfirmButtonText}>
