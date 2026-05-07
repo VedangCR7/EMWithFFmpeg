@@ -160,12 +160,26 @@ const PosterCanvas: React.FC<PosterCanvasProps> = ({
         </Text>
       );
     } else if (layer.type === 'image' || layer.type === 'logo') {
+      const effectiveBorderRadius = layer.isCircular
+        ? Math.min(layer.size.width, layer.size.height) / 2
+        : (layer.borderRadius || 0);
+
       return (
-        <Image
-          source={{ uri: layer.content }}
-          style={styles.layerImage}
-          resizeMode="contain"
-        />
+        <View style={{
+          width: '100%',
+          height: '100%',
+          borderRadius: effectiveBorderRadius,
+          overflow: 'hidden',
+        }}>
+          <Image
+            source={{ uri: layer.content }}
+            style={[
+              styles.layerImage,
+              { borderRadius: effectiveBorderRadius }
+            ]}
+            resizeMode={layer.type === 'logo' ? "cover" : "contain"}
+          />
+        </View>
       );
     }
     return null;

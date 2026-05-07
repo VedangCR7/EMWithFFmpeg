@@ -169,11 +169,6 @@ const FRAME_OPTIONS = Object.keys(FRAME_ASSETS).map(id => ({
   source: FRAME_ASSETS[id as keyof typeof FRAME_ASSETS]
 }));
 
-console.log('🖼️ [FRAME_OPTIONS] Dynamic Initialization:', {
-  count: FRAME_OPTIONS.length,
-  ids: FRAME_OPTIONS.map(f => f.id)
-});
-
 // Responsive scaling functions for static styles
 const scale = (size: number) => (screenWidth / 375) * size;
 const verticalScale = (size: number) => (screenHeight / 667) * size;
@@ -365,6 +360,7 @@ interface Layer {
   zIndex: number;
   fieldType?: string; // Add field type identifier
   isCircular?: boolean; // Toggle between circle and square for logos
+  borderRadius?: number; // Base border radius for logos/images
   style?: {
     fontSize?: number;
     color?: string;
@@ -430,8 +426,6 @@ const FrameItem = React.memo(({ frame, isSelected, onPress, styles }: {
       style={styles.framePreview}
       resizeMode="contain"
       resizeMethod="resize" // Android optimization: reduces memory footprint by scaling image down during decode
-      onLoad={() => console.log(`✅ [PREVIEW FRAME] Loaded: ${frame.id}`)}
-      onError={(e) => console.error(`❌ [PREVIEW FRAME] Failed: ${frame.id}`, e.nativeEvent)}
     />
   </TouchableOpacity>
 ));
@@ -558,16 +552,6 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
 
   // State for overlay frames (independent of templates)
   const [selectedFrame, setSelectedFrame] = useState<string | null>(null);
-  const renderCount = useRef(0);
-  renderCount.current++;
-
-  useEffect(() => {
-    console.log(`🔄 [POSTER_EDITOR_SCREEN] Render cycle: ${renderCount.current}`, {
-      selectedFrame,
-      layersCount: layers.length,
-      visibleFields: Object.keys(visibleFields).filter(k => visibleFields[k])
-    });
-  });
   const [isAutoLayoutApplied, setIsAutoLayoutApplied] = useState<{ [key: string]: boolean }>({});
 
   // State for business profiles
@@ -601,22 +585,34 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
   // Handle frame removal modal actions
   const handleRemoveFrameOnly = () => {
     setShowFrameRemovalModal(false);
-
+    
+    console.log('🖼️ [FRAME REMOVAL] Starting frame removal process:', {
+      currentFrame: selectedFrame,
+      originalLayersCount: originalLayers.length
+    });
+    
     // Restore original layers before removing frame
     if (originalLayers.length > 0) {
       const restoredLayers = [...originalLayers];
+      
+      console.log('🖼️ [FRAME REMOVAL] Restoring original layers:', {
+        originalLayersCount: originalLayers.length,
+        removedFrame: selectedFrame,
+        layers: restoredLayers.map(l => ({ id: l.id, fieldType: l.fieldType, position: l.position }))
+      });
 
       // Reset logo circular state for all logo layers
       const resetLayers = restoredLayers.map(layer => {
         if (layer.type === 'logo' && layer.fieldType === 'logo') {
           console.log(`🔄 [FRAME REMOVAL] Resetting logo circular state for layer ${layer.id}`);
 
-          // Reset border radius animated values to 0 (square)
+          // Reset border radius animated values to base radius (from layer)
           if (borderRadiusValues[layer.id]) {
-            borderRadiusValues[layer.id].setValue(0);
-          }
-          if (selectionBorderRadiusValues[layer.id]) {
-            selectionBorderRadiusValues[layer.id].setValue(3); // 0 + 3 for selection
+            const baseRadius = layer.borderRadius || 0;
+            borderRadiusValues[layer.id].setValue(baseRadius);
+            if (selectionBorderRadiusValues[layer.id]) {
+              selectionBorderRadiusValues[layer.id].setValue(baseRadius + 3);
+            }
           }
 
           // Reset isCircular property to false
@@ -625,19 +621,25 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
         return layer;
       });
 
-      console.log('🖼️ [FRAME REMOVED] Restoring original layers with logo reset:', {
-        originalLayersCount: originalLayers.length,
-        removedFrame: selectedFrame,
-        layers: resetLayers.map(l => ({ id: l.id, fieldType: l.fieldType, position: l.position, isCircular: l.isCircular }))
+      // Update animated values to match original positions
+      resetLayers.forEach(layer => {
+        if (layerAnimations[layer.id]) {
+          layerAnimations[layer.id].x.setValue(layer.position.x);
+          layerAnimations[layer.id].y.setValue(layer.position.y);
+        }
       });
+
       setLayers(resetLayers);
 
       // Restore footer background visibility
       setVisibleFields(prev => ({ ...prev, footerBackground: true }));
-
-      console.log('🖼️ [FRAME REMOVED] Original layers restored with logo circular reset:', resetLayers.length);
+      
+      console.log('🖼️ [FRAME REMOVAL] Original layers restored successfully:', resetLayers.length);
     } else {
-      console.log('🖼️ [FRAME REMOVED] No original layers to restore for frame:', selectedFrame);
+      console.log('🖼️ [FRAME REMOVAL] No original layers to restore for frame:', selectedFrame);
+      
+      // Still restore footer background even if no original layers
+      setVisibleFields(prev => ({ ...prev, footerBackground: true }));
     }
 
     setSelectedFrame(null);
@@ -646,7 +648,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
 
     // Clear pending template - only remove frame, don't apply template
     setPendingTemplate(null);
-    console.log('🖼️ [FRAME REMOVED] Frame removed with logo circular state reset');
+    console.log('🖼️ [FRAME REMOVAL] Frame removed without applying template');
   };
 
   const handleCancelFrameRemoval = () => {
@@ -1570,14 +1572,13 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
         // Force immediate state update with original layers and reset logo circular state
         const restoredLayers = originalLayers.map(layer => {
           if (layer.type === 'logo' && layer.fieldType === 'logo') {
-            console.log(`🔄 [FRAME REMOVAL useEffect] Resetting logo circular state for layer ${layer.id}`);
-
-            // Reset border radius animated values to 0 (square)
+            // Reset border radius animated values to base radius (from layer)
             if (borderRadiusValues[layer.id]) {
-              borderRadiusValues[layer.id].setValue(0);
-            }
-            if (selectionBorderRadiusValues[layer.id]) {
-              selectionBorderRadiusValues[layer.id].setValue(3); // 0 + 3 for selection
+              const baseRadius = layer.borderRadius || 0;
+              borderRadiusValues[layer.id].setValue(baseRadius);
+              if (selectionBorderRadiusValues[layer.id]) {
+                selectionBorderRadiusValues[layer.id].setValue(baseRadius + 3);
+              }
             }
 
             // Reset isCircular property to false
@@ -1587,19 +1588,6 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
         });
 
         setLayers(restoredLayers);
-
-        // ✅ RESTORE ANIMATED VALUES TO MATCH ORIGINAL POSITIONS
-        restoredLayers.forEach(layer => {
-          if (layerAnimations[layer.id]) {
-            layerAnimations[layer.id].x.setValue(layer.position.x);
-            layerAnimations[layer.id].y.setValue(layer.position.y);
-          }
-        });
-
-        // Restore footer background visibility when frame is removed
-        setVisibleFields(prev => ({ ...prev, footerBackground: true }));
-
-        console.log('🖼️ [FRAME REMOVAL useEffect] Original layers restored with logo circular reset:', restoredLayers.length);
       } else {
         // Still restore footer background even if no original layers
         setVisibleFields(prev => ({ ...prev, footerBackground: true }));
@@ -1610,13 +1598,6 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
 
   // Apply frame-specific layout to elements
   const applyFrameLayout = useCallback((frameId: string) => {
-    const frameObj = FRAME_OPTIONS.find(f => f.id === frameId);
-    console.log('🖼️ [FRAME LAYOUT] applyFrameLayout triggered:', {
-      frameId,
-      foundInOptions: !!frameObj,
-      sourceValid: !!frameObj?.source
-    });
-
     // Store original layers ONLY if no frame is currently applied (preserve true original positions)
     if (layers.length > 0 && !selectedFrame) {
       const layersToStore = [...layers];
@@ -1651,7 +1632,6 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
         const positionChanged = oldPosition && (oldPosition.x !== layer.position.x || oldPosition.y !== layer.position.y);
 
         if (positionChanged) {
-          console.log(`🔄 [FRAME ANIMATION UPDATE] Updating animated values for layer ${layer.id} (${layer.fieldType}) to position: x: ${layer.position.x}, y: ${layer.position.y}`);
           layerAnimations[layer.id].x.setValue(layer.position.x);
           layerAnimations[layer.id].y.setValue(layer.position.y);
         }
@@ -1661,38 +1641,38 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
         const sizeChanged = oldSize && (oldSize.width !== layer.size.width || oldSize.height !== layer.size.height);
 
         if (sizeChanged) {
-          console.log(`🔄 [FRAME SIZE UPDATE] Updating size for layer ${layer.id} (${layer.fieldType}): ${oldSize?.width}x${oldSize?.height} → ${layer.size.width}x${layer.size.height}`);
-
           // Update scale values if they exist
           if (scaleValues[layer.id]) {
             const scaleX = layer.size.width / oldSize.width;
             const scaleY = layer.size.height / oldSize.height;
-            console.log(`🔄 [FRAME SIZE UPDATE] Scale factors: X=${scaleX.toFixed(2)}, Y=${scaleY.toFixed(2)}`);
           }
         }
 
-        // ✅ UPDATE BORDER RADIUS FOR LOGO CIRCULAR PROPERTY
+        // ✅ UPDATE BORDER RADIUS FOR LOGO CIRCULAR/BORDER-RADIUS PROPERTY
         if (layer.type === 'logo' && layer.fieldType === 'logo') {
-          const oldCircularState = layers.find(l => l.id === layer.id)?.isCircular;
+          const prevLayer = layers.find(l => l.id === layer.id);
+          const oldCircularState = prevLayer?.isCircular;
+          const oldBorderRadius = prevLayer?.borderRadius;
           const circularStateChanged = oldCircularState !== layer.isCircular;
+          const borderRadiusChanged = oldBorderRadius !== layer.borderRadius;
 
-          if (circularStateChanged) {
-            console.log(`🔄 [LOGO CIRCULAR UPDATE] Updating circular state for layer ${layer.id} (${layer.fieldType}): ${oldCircularState} → ${layer.isCircular}`);
+          if (circularStateChanged || borderRadiusChanged) {
 
             // Initialize borderRadius values if they don't exist
             if (!borderRadiusValues[layer.id]) {
-              borderRadiusValues[layer.id] = new Animated.Value(0);
-              selectionBorderRadiusValues[layer.id] = new Animated.Value(3);
+              const initialRadius = layer.isCircular
+                ? Math.min(layer.size.width, layer.size.height) / 2
+                : (layer.borderRadius || 0);
+              borderRadiusValues[layer.id] = new Animated.Value(initialRadius);
+              selectionBorderRadiusValues[layer.id] = new Animated.Value(initialRadius + 3);
             }
 
-            // Calculate target radius based on NEW size
+            // Calculate target radius based on NEW size and configuration
             const targetRadius = layer.isCircular
               ? Math.min(layer.size.width, layer.size.height) / 2
-              : 0;
+              : (layer.borderRadius || 0);
 
             const targetSelectionRadius = targetRadius + 3;
-
-            console.log(`🔄 [LOGO CIRCULAR UPDATE] Setting border radius to: ${targetRadius} (selection: ${targetSelectionRadius}) based on size: ${layer.size.width}x${layer.size.height}`);
 
             // Update border radius values
             borderRadiusValues[layer.id].setValue(targetRadius);
@@ -1717,7 +1697,6 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     setOriginalLayers([]);
     // Reset auto-layout state when business profile changes
     setIsAutoLayoutApplied({});
-    console.log('🔄 [APPLY BUSINESS PROFILE] Cleared original layers and reset auto-layout for new profile:', profile.name);
 
     // Auto-set template based on business profile category
     // DISABLED: Template should come from selected poster, not business profile
@@ -1973,23 +1952,11 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     // Check if frame is already selected and hide footer background accordingly
     if (selectedFrame) {
       setVisibleFields(prev => ({ ...prev, footerBackground: false }));
-      console.log('🖼️ [FRAME DETECTED] Footer background hidden due to applied frame');
     }
 
     setLayers(newLayers);
 
-    console.log('✅ [BUSINESS PROFILE APPLIED] Layers created:', {
-      totalLayers: newLayers.length,
-      profileName: profile.name,
-      hasLogo: !!(profile.companyLogo || profile.logo),
-      hasCompany: !!profile.name,
-      hasPhone: !!profile.phone,
-      hasEmail: !!profile.email,
-      hasWebsite: !!profile.website,
-      hasCategory: !!profile.category,
-      hasAddress: !!profile.address,
-      layerIds: newLayers.map(l => l.id)
-    });
+    setLayers(newLayers);
 
     // Initialize animated values for new layers
     newLayers.forEach(layer => {
@@ -2837,7 +2804,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
     if (layer.type === 'logo' && !borderRadiusValues[layer.id]) {
       const initialRadius = layer.isCircular
         ? Math.min(layer.size.width, layer.size.height) / 2
-        : 0;
+        : (layer.borderRadius || 0);
       borderRadiusValues[layer.id] = new Animated.Value(initialRadius);
       selectionBorderRadiusValues[layer.id] = new Animated.Value(initialRadius + 3);
     }
@@ -2877,13 +2844,13 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
         const newIsCircular = !layer.isCircular;
         const targetRadius = newIsCircular
           ? Math.min(layer.size.width, layer.size.height) / 2
-          : 0;
+          : (layer.borderRadius || 0);
 
         // Initialize borderRadius value if it doesn't exist
         if (!borderRadiusValues[layer.id]) {
           const currentRadius = layer.isCircular
             ? Math.min(layer.size.width, layer.size.height) / 2
-            : 0;
+            : (layer.borderRadius || 0);
           borderRadiusValues[layer.id] = new Animated.Value(currentRadius);
           selectionBorderRadiusValues[layer.id] = new Animated.Value(currentRadius + 3);
         }
@@ -3022,12 +2989,12 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
       case 'image':
       case 'logo':
         // Use animated borderRadius for logos, static for images
-        const animatedBorderRadius = layer.type === 'logo' && borderRadiusValues[layer.id]
+        const animatedBorderRadius = (layer.type === 'logo' || layer.type === 'image') && borderRadiusValues[layer.id]
           ? borderRadiusValues[layer.id]
-          : 0;
+          : (layer.type === 'logo' || layer.type === 'image') ? (layer.borderRadius || 0) : 0;
 
         // Selection border radius (borderRadius + 3 for logos)
-        const animatedSelectionBorderRadius = layer.type === 'logo' && selectionBorderRadiusValues[layer.id]
+        const animatedSelectionBorderRadius = (layer.type === 'logo' || layer.type === 'image') && selectionBorderRadiusValues[layer.id]
           ? selectionBorderRadiusValues[layer.id]
           : 8;
 
@@ -3044,7 +3011,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                 styles.layerTouchable,
                 {
                   overflow: 'hidden',
-                  borderRadius: layer.type === 'logo' ? animatedBorderRadius : 0
+                  borderRadius: (layer.type === 'logo' || layer.type === 'image') ? animatedBorderRadius : 0
                 }
               ]}
             >
@@ -3058,7 +3025,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                   style={[
                     styles.layerImage,
                     {
-                      borderRadius: layer.type === 'logo' ? animatedBorderRadius : 0
+                      borderRadius: (layer.type === 'logo' || layer.type === 'image') ? animatedBorderRadius : 0
                     }
                   ]}
                   resizeMode={layer.type === 'logo' ? "cover" : "contain"}
@@ -3075,7 +3042,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                   bottom: -3,
                   borderWidth: 3,
                   borderColor: '#667eea',
-                  borderRadius: layer.type === 'logo' ? animatedSelectionBorderRadius : 8,
+                  borderRadius: (layer.type === 'logo' || layer.type === 'image') ? animatedSelectionBorderRadius : 8,
                   pointerEvents: 'none',
                 }}
               />
@@ -3446,8 +3413,6 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                     style={styles.frameIntegrated}
                     resizeMode="contain"
                     pointerEvents="none"
-                    onLoad={() => console.log(`✅ [CANVAS FRAME] Successfully loaded: ${selectedFrame}`)}
-                    onError={(e) => console.error(`❌ [CANVAS FRAME] Failed to load: ${selectedFrame}`, e.nativeEvent)}
                   />
                 )}
               </View>
@@ -3610,11 +3575,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
             {selectedFrame && (
               <TouchableOpacity
                 style={styles.toolbarButton}
-                onPress={() => {
-                  setSelectedFrame(null);
-                  // Reset auto-layout state when frame is removed
-                  setIsAutoLayoutApplied({});
-                }}
+                onPress={handleRemoveFrameOnly}
               >
                 <LinearGradient
                   colors={['#ff6b6b', '#ff5252']}
@@ -3781,8 +3742,8 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
                 isSelected={selectedFrame === frame.id}
                 onPress={() => {
                   if (selectedFrame === frame.id) {
-                    setSelectedFrame(null);
-                    setIsAutoLayoutApplied({});
+                    // If same frame is selected, remove it with proper restoration
+                    handleRemoveFrameOnly();
                   } else {
                     setSelectedFrame(frame.id);
                     setVisibleFields(prev => ({ ...prev, footerBackground: false }));
