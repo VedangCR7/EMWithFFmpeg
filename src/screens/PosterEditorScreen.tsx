@@ -2224,13 +2224,7 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
         newX = Number.isFinite(newX) ? newX : 0;
         newY = Number.isFinite(newY) ? newY : 0;
 
-        // Debug: Log the current position and field type
-        console.log(`🎯 DEBUG: ${currentLayer.fieldType || 'Unknown Field'} moved to position:`);
-        console.log(`   📍 X: ${newX.toFixed(1)}, Y: ${newY.toFixed(1)}`);
-        console.log(`   📏 Canvas Size: ${canvasWidth}x${canvasHeight}`);
-        console.log(`   🏷️ Field Type: ${currentLayer.fieldType || 'Unknown'}`);
-        console.log(`   📝 Content: ${currentLayer.content || 'No content'}`);
-        console.log(`   🔧 Position: x: ${newX.toFixed(0)}, y: ${newY.toFixed(0)}`);
+      
 
         // Update the animated position values directly
         if (layerAnimations[layerId]) {
@@ -2244,16 +2238,12 @@ const PosterEditorScreen: React.FC<PosterEditorScreenProps> = ({ route }) => {
           if (layer.id === layerId) {
             // ✅ SPECIAL LOG FOR EMAIL ELEMENT POSITION CHANGES
             if (layer.fieldType === 'email') {
-              console.log('🎯🎯🎯 [EMAIL POSITION CHANGED] Email element moved!');
-              console.log(`📍 [EMAIL MOVED] New position: x: ${newX.toFixed(1)}, y: ${newY.toFixed(1)}`);
-              console.log(`📝 [EMAIL CONTENT] Content: ${layer.content}`);
-              console.log(`🏷️ [EMAIL ID] Layer ID: ${layerId}`);
-              console.log('🎯🎯🎯 [EMAIL POSITION CHANGED] End of email position update');
+             
             }
 
             // ✅ UPDATE ANIMATED VALUES TO MATCH NEW POSITION
             if (layerAnimations[layerId]) {
-              console.log(`🔄 [ANIMATION UPDATE] Updating animated values for layer ${layerId} to position: x: ${newX}, y: ${newY}`);
+              // console.log(`🔄 [ANIMATION UPDATE] Updating animated values for layer ${layerId} to position: x: ${newX}, y: ${newY}`);
               layerAnimations[layerId].x.setValue(newX);
               layerAnimations[layerId].y.setValue(newY);
             }
