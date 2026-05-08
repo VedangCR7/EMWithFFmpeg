@@ -378,7 +378,7 @@ export const FRAME_LAYOUTS: FrameLayouts = {
     { key: 'website', x: 481, y: 461, color: '#475163' }, // Updated to position website at (x: 229.4, y: 325.2) on canvas
     { key: 'address', x: 15, y: 461, color: '#475163' }, // Updated to position address at (x: 7.2, y: 325.2) on canvas
     { key: 'category', x: 228, y: 461, color: '#475163' }, // Updated to position category at (x: 108.9, y: 325.2) on canvas
-    { key: 'logo', x: 293, y: 360, size: { width: 65, height: 65 }, circular: true }, // Updated to position logo at (x: 141.2, y: 255.2) on canvas
+    { key: 'logo', x: 293, y: 360, size: { width: 65, height: 65 }, circular: true }, // Updated to position logo at (x: 139.2, y: 252.0) on canvas
   ],
   frame48: [
     { key: 'companyName', x: 458, y: 4,  }, // Updated to position companyName at (x: 218.7, y: 2.7) on canvas
